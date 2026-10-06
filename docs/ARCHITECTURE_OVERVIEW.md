@@ -1,6 +1,6 @@
 # SBAM Architecture Overview (developer edition)
 
-This is the short version. The full detail is in [specs/SBAM_Technical_Design.md](specs/SBAM_Technical_Design.md) (TD) and [specs/SBAM_Implementation_Plan.md](specs/SBAM_Implementation_Plan.md) (PLAN).
+This is the short version. The full detail is in the [design pages](design/README.md) (TD), the [phase pages](phases/README.md) and the [plan pages](plan/README.md) (PLAN).
 
 ---
 
@@ -86,7 +86,7 @@ BAM/
 └── Makefile    make up | down | logs | seed | test | e2e | reset
 ```
 
-Full tree: TD §6. Where an issue says `apps/web`, `services/api`, `services/workers`, `packages/contracts`, `templates/` or `deploy/`, read `client/`, `server/api`, `server/workers`, `server/contracts`, `server/templates` and `compose/`.
+Full tree: [TD §6](design/06-repository-structure.md). Where an issue says `apps/web`, `services/api`, `services/workers`, `packages/contracts`, `templates/` or `deploy/`, read `client/`, `server/api`, `server/workers`, `server/contracts`, `server/templates` and `compose/`.
 
 ## 7. Golden rules (non-negotiable)
 

@@ -152,6 +152,21 @@ A PR is mergeable only when all of the following hold (from PLAN §26.4):
 | LLM golden sets | `server/tests/llm-golden` | on prompt/model change |
 | Security / performance | `server/tests/{security,perf}` | nightly / release |
 
+**Issue test cases are the minimum test set.** Every story issue has these sections:
+
+- **Inputs and input validation**: what the code receives and the exact checks to enforce.
+- **Outputs and output checks**: the contract and how it's verified.
+- **Safety checks**: must-enforce security and data-integrity rules, as a checklist.
+- **Edge cases.**
+- **Test cases** table with IDs like `E4.2-T01`.
+
+How to use them:
+
+- Implement every listed test. Put the ID in the test name or docstring (e.g. `def test_e4_2_t02_oversize_rejected():`) so reviewers can trace it.
+- `manual` tests (spikes, ops) are recorded in the PR description with their measured results.
+- Tick the safety-check boxes in the issue as you implement them. Reviewers verify each one.
+- Adding tests beyond the list is welcome. Removing or weakening a listed test needs a comment on the issue explaining why.
+
 LLM-dependent tests run against the **mock LLM provider** in CI (issue E1.15). Fixtures (ISATVON 1.4 sample MS01.1, masters workbook, sample client documents, EICAR test file) live in `server/tests/fixtures` (issue E0.8).
 
 ---

@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this folder with the confirmed decisions (`C-xx`) and the defaults for open items (`O-xx`) from [../specs/SBAM_Implementation_Plan.md](../specs/SBAM_Implementation_Plan.md) §3 and §30.
+ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this folder with the confirmed decisions (`C-xx`) and the defaults for open items (`O-xx`) from [plan/02-confirmed-decisions.md](../plan/02-confirmed-decisions.md) and [plan/07-risks-and-open-items.md](../plan/07-risks-and-open-items.md).
 
 ## When to write one
 
@@ -12,7 +12,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 
 1. Copy the template below to `NNNN-short-title.md` (next free number).
 2. Open a PR titled `[ADR] <title>` that references the related issue.
-3. On merge, the ADR status becomes **Accepted**. If the decision changes the specs, update `docs/specs/` in the same PR.
+3. On merge, the ADR status becomes **Accepted**. If the decision changes the specs, update the master spec files (maintainers regenerate `docs/phases`, `docs/design` and `docs/plan` from them) in the same PR.
 
 ## Template
 
