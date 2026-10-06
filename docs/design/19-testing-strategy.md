@@ -11,12 +11,34 @@
 | API             | Every endpoint × role × tenant; problem+json; 409/412/423                                     | pytest + httpx, schemathesis                 |
 | Contract        | Pydantic ↔ JSON Schema ↔ TS drift; ISATVON/manifest fixtures                                  | snapshot tests                               |
 | Temporal        | Every path with mocked activities, time-skipping, replay                                        | `temporalio.testing`                       |
-| Integration     | Postgres, storage, tusd, ClamAV, Cognee, Bifrost (mock model), Promptfoo, CubeSandbox (staging) | Compose test profile                         |
+| Integration     | Postgres, storage, tusd, ClamAV, Cognee, Bifrost (mock model), Promptfoo, CubeSandbox (staging) | pytest `-m integration` against the running Compose `core` stack (§19.3) |
 | LLM golden sets | OCR, SOW, ISATVON, codegen, testgen, correction; regression on prompt/model change              | Promptfoo + Langfuse datasets                |
 | Frontend        | Components (grid states, editors, explorer), access control                                     | Vitest + Testing Library                     |
 | E2E             | Full journeys                                                                                   | Playwright                                   |
 | Security        | IDOR, tokens, injection, tamper, egress, scans                                                  | pytest suites, ZAP baseline, Trivy, gitleaks |
 | Performance     | 10 users, 4 parallel builds, 20 × 15 MB ingestion, 500-row grid                                | k6*(proposed)*                             |
+
+## 19.3 Where tests get their services
+
+There is **one** environment for development, tests and CI: the Docker Compose `core` stack (TD §20).
+There is no separate test profile and no testcontainers.
+
+| Kind | Needs services? | Marker | Command | Gets services from |
+|---|---|---|---|---|
+| Unit, API, contract | no | none | `make test` | fakes injected through the app factory (e.g. `create_app(settings, checks)`), in-memory stores, `httpx` mock transport |
+| Temporal workflow | no | none | `make test` | `temporalio.testing.WorkflowEnvironment` (time-skipping), mocked activities |
+| Integration | **yes** | `@pytest.mark.integration` | `make test-int` (runs `make up` first if needed) | the running Compose stack, reached through the published `127.0.0.1` ports from `compose/.env` |
+| E2E | yes | Playwright | `make e2e` | the running Compose stack (web + api) |
+
+Rules:
+
+- `make test` never needs Docker and is safe to run anywhere. Integration tests are skipped automatically when
+  the stack isn't up, so the skip is visible and they never fail with a confusing connection error.
+- Integration tests create their own data under a unique tenant / prefix and clean up. They never assume an
+  empty database and never run `make reset`.
+- "Dependency down" tests (e.g. *Temporal stopped*) stop and restart the one container they need with
+  `docker compose stop <svc>` / `start <svc>`, and wait for it to report healthy before finishing.
+- CI runs `make up` followed by `make test-int` as the `compose-smoke` job (TD §20.4).
 
 ## 19.2 E2E scenarios
 

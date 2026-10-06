@@ -9,6 +9,10 @@
 
 **Goal:** Create the fresh monorepo, the full Docker Compose stack and CI, so any developer can run SBAM locally on day one.
 
+> **Order (2026-10-06):** #38 Dockerfiles → #39 Compose `core` profile come first: `make up` runs the whole app, with stubs
+> for services not built yet ([TD §20.3.6](../design/20-docker-and-environments.md)). Issues that need a running service are
+> blocked by #39, and integration tests run against that stack ([TD §19.3](../design/19-testing-strategy.md)).
+
 **Owner:** Dev A (platform) · **Indicative effort:** 1.5 weeks · **Complexity:** M · **Depends on:** Phase 0
 **Design references:** [TD §6](../design/06-repository-structure.md) (repo structure), [TD §20](../design/20-docker-and-environments.md) (Docker & environments).
 
@@ -71,17 +75,17 @@ Each issue contains inputs/validation, outputs/checks, safety checks, edge cases
 | [#32](https://github.com/solutionsDigibull/BAM/issues/32) | `E1.1` | Monorepo scaffold and tooling | A Platform | M | P0 | M0 | — |
 | [#33](https://github.com/solutionsDigibull/BAM/issues/33) | `E1.2` | Contracts package: Pydantic → JSON Schema → TypeScript generation + drift check | C Build | M | P0 | M0 | [#32](https://github.com/solutionsDigibull/BAM/issues/32), [#19](https://github.com/solutionsDigibull/BAM/issues/19), [#20](https://github.com/solutionsDigibull/BAM/issues/20), [#21](https://github.com/solutionsDigibull/BAM/issues/21) |
 | [#34](https://github.com/solutionsDigibull/BAM/issues/34) | `E1.3` | FastAPI core: app factory, settings, errors, correlation IDs, logging, health | A Platform | M | P0 | M0 | [#32](https://github.com/solutionsDigibull/BAM/issues/32), [#24](https://github.com/solutionsDigibull/BAM/issues/24) |
-| [#35](https://github.com/solutionsDigibull/BAM/issues/35) | `E1.4` | OpenTelemetry instrumentation baseline | A Platform | S | P0 | M0 | [#34](https://github.com/solutionsDigibull/BAM/issues/34) |
-| [#36](https://github.com/solutionsDigibull/BAM/issues/36) | `E1.5` | Database: SQLAlchemy 2 + Alembic baseline + tenant-scoped repository base | A Platform | M | P0 | M0 | [#34](https://github.com/solutionsDigibull/BAM/issues/34) |
+| [#35](https://github.com/solutionsDigibull/BAM/issues/35) | `E1.4` | OpenTelemetry instrumentation baseline | A Platform | S | P0 | M0 | [#34](https://github.com/solutionsDigibull/BAM/issues/34), [#42](https://github.com/solutionsDigibull/BAM/issues/42) |
+| [#36](https://github.com/solutionsDigibull/BAM/issues/36) | `E1.5` | Database: SQLAlchemy 2 + Alembic baseline + tenant-scoped repository base | A Platform | M | P0 | M0 | [#34](https://github.com/solutionsDigibull/BAM/issues/34), [#39](https://github.com/solutionsDigibull/BAM/issues/39) |
 | [#37](https://github.com/solutionsDigibull/BAM/issues/37) | `E1.6` | StorageBackend interface + LocalDiskBackend + S3 stub | A Platform | S | P0 | M0 | [#34](https://github.com/solutionsDigibull/BAM/issues/34) |
 | [#40](https://github.com/solutionsDigibull/BAM/issues/40) | `E1.7` | Temporal client, worker bootstrap (--queues), run mirror | C Build | M | P0 | M0 | [#34](https://github.com/solutionsDigibull/BAM/issues/34), [#39](https://github.com/solutionsDigibull/BAM/issues/39) |
-| [#41](https://github.com/solutionsDigibull/BAM/issues/41) | `E1.8` | State-machine service + audit writer | C Build | M | P0 | M0 | [#36](https://github.com/solutionsDigibull/BAM/issues/36), [#23](https://github.com/solutionsDigibull/BAM/issues/23) |
+| [#41](https://github.com/solutionsDigibull/BAM/issues/41) | `E1.8` | State-machine service + audit writer | C Build | M | P0 | M0 | [#36](https://github.com/solutionsDigibull/BAM/issues/36), [#23](https://github.com/solutionsDigibull/BAM/issues/23), [#39](https://github.com/solutionsDigibull/BAM/issues/39) |
 | [#38](https://github.com/solutionsDigibull/BAM/issues/38) | `E1.9` | Dockerfiles: web, api, worker, toolchain, promptfoo, skill-runtime base, mock-api | A Platform | M | P0 | M0 | [#32](https://github.com/solutionsDigibull/BAM/issues/32) |
 | [#39](https://github.com/solutionsDigibull/BAM/issues/39) | `E1.10` | Docker Compose core profile + init jobs + Makefile + README | A Platform | M | P0 | M0 | [#38](https://github.com/solutionsDigibull/BAM/issues/38) |
 | [#42](https://github.com/solutionsDigibull/BAM/issues/42) | `E1.11` | Compose profiles obs, analytics, sandbox-local | A Platform | S | P1 | M0 | [#39](https://github.com/solutionsDigibull/BAM/issues/39) |
-| [#43](https://github.com/solutionsDigibull/BAM/issues/43) | `E1.12` | GitHub Actions CI pipeline | A Platform | M | P0 | M0 | [#38](https://github.com/solutionsDigibull/BAM/issues/38), [#33](https://github.com/solutionsDigibull/BAM/issues/33) |
+| [#43](https://github.com/solutionsDigibull/BAM/issues/43) | `E1.12` | GitHub Actions CI pipeline | A Platform | M | P0 | M0 | [#38](https://github.com/solutionsDigibull/BAM/issues/38), [#33](https://github.com/solutionsDigibull/BAM/issues/33), [#39](https://github.com/solutionsDigibull/BAM/issues/39) |
 | [#44](https://github.com/solutionsDigibull/BAM/issues/44) | `E1.13` | Next.js + Refine app shell, (admin)/(fde) route groups, UI kit | D Frontend | M | P0 | M0 | [#32](https://github.com/solutionsDigibull/BAM/issues/32) |
-| [#45](https://github.com/solutionsDigibull/BAM/issues/45) | `E1.14` | Refine data provider, problem+json mapping, API proxy route | D Frontend | S | P0 | M0 | [#44](https://github.com/solutionsDigibull/BAM/issues/44), [#33](https://github.com/solutionsDigibull/BAM/issues/33) |
+| [#45](https://github.com/solutionsDigibull/BAM/issues/45) | `E1.14` | Refine data provider, problem+json mapping, API proxy route | D Frontend | S | P0 | M0 | [#44](https://github.com/solutionsDigibull/BAM/issues/44), [#33](https://github.com/solutionsDigibull/BAM/issues/33), [#39](https://github.com/solutionsDigibull/BAM/issues/39) |
 | [#46](https://github.com/solutionsDigibull/BAM/issues/46) | `E1.15` | Bifrost container + mock LLM provider for dev/tests | B Knowledge/LLM | S | P0 | M0 | [#39](https://github.com/solutionsDigibull/BAM/issues/39) |
 
 ---

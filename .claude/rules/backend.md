@@ -21,6 +21,10 @@ paths:
 - Logs and traces carry `tenant_id`, `project_id`, `workflow_id` and the correlation ID. Never log secrets,
   tokens or document contents.
 - Tests:
-  - Unit tests in `server/tests/unit`, API tests in `tests/api`, contract tests in `tests/contract`.
+  - Unit tests in `server/tests/unit`, API tests in `tests/api`, contract tests in `tests/contract`. These never
+    need Docker: inject fakes (e.g. `create_app(settings, checks)`).
+  - Tests that need a real Postgres, Temporal, Keycloak, tusd, ClamAV or Bifrost go in `tests/integration`, are
+    marked `@pytest.mark.integration` and run against the Compose stack (`make up`, then `make test-int`).
+    Use a unique tenant/prefix per test and clean up. No testcontainers (TD §19.3).
   - LLM tests use the mock provider and fixtures from `server/tests/fixtures`.
   - Name each test after its issue test-case ID, e.g. `test_e4_2_t02_oversize_rejected`.

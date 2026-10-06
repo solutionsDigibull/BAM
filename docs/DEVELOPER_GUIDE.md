@@ -175,31 +175,48 @@ LLM-dependent tests run against the **mock LLM provider** in CI (issue E1.15). F
 
 ## 6. Local development
 
-> Available once **E1.10** (Compose core profile) is merged. Until then, follow the instructions in the M0 issues.
+**The whole application runs in Docker.** `make up` starts the complete `core` profile (TD §20): Postgres,
+Keycloak, Temporal and its UI, Bifrost, ClamAV, tusd, sbam-api, the six workers, sbam-mock-api and sbam-web.
+Services whose feature isn't built yet run as stubs with their final name, port and healthcheck (TD §20.3.6).
+The stack is delivered by **#38 (Dockerfiles) and #39 (Compose)**, which come before every other issue that needs a
+running service.
 
 Prerequisites:
-- Docker Desktop (WSL2 on Windows) with at least 32 GB RAM on the machine.
-- Python 3.12 + uv.
-- Node 22 + pnpm.
-- make.
+- Docker Desktop (WSL2 on Windows) or Docker Engine, with **at least 12 GB of memory for Docker** (32 GB machine recommended).
+- make (on Windows use Git Bash or WSL2).
+- For host-side work (tests, lint, editors): Python 3.12 + uv, Node 22 + pnpm. Run `make doctor` to check.
 - Netbird client, for access to the dev VM and the CubeSandbox host.
 
 ```bash
-cp compose/.env.example compose/.env      # fill the OpenRouter key (or leave the mock provider on)
-make up                                   # core profile: postgres, keycloak, temporal, bifrost, clamav, tusd, api, workers, web
-make seed                                 # imports the consolidated masters workbook + demo tenant/users
-make test                                 # unit + API + contract + temporal tests
-make logs                                 # follow logs
-make down                                 # stop (data kept);  make reset = destroy volumes (asks first)
+cp compose/.env.example compose/.env      # set the passwords; leave OPENROUTER_API_KEY empty to use the mock LLM
+make up                                   # core profile; first run ~5–10 min (image pulls + ClamAV signatures)
+make ps                                   # every service should show "healthy"
+make seed                                 # demo tenant/users + masters workbook (filled in as the features land)
+make test                                 # unit + API + contract + Temporal tests: no Docker needed
+make test-int                             # integration tests against the running stack (TD §19.3)
+make logs s=sbam-api                      # follow one service's logs
+make down                                 # stop (data kept);  make reset CONFIRM=yes = destroy volumes
 ```
 
-| URL (local) | What |
+| URL (local, default ports) | What |
 |---|---|
 | http://localhost:3000 | SBAM web (Admin login and FDE login) |
-| http://localhost:8000/docs | API (OpenAPI) |
-| http://localhost:8080 | Keycloak admin |
+| http://localhost:8000/api/v1/docs | API (OpenAPI) |
+| http://localhost:8000/health/ready | API readiness (db, storage, temporal, keycloak) |
+| http://localhost:8080 | Keycloak admin (realm `bullm`) |
 | http://localhost:8233 | Temporal UI |
 | http://localhost:3001 / :3002 | Langfuse / Grafana (profile `obs`) |
+
+If a port is already in use on your machine, change it in `compose/.env` (`API_PORT`, `WEB_PORT`, …).
+Code changes reload automatically: `compose.override.yaml` mounts `server/` and `client/` into the containers.
+
+**Where configuration lives.** `compose/.env` configures the Docker stack. `server/.env` is only needed if you run the
+API on the host (`uv run uvicorn sbam_api.main:create_app --factory`) against the Compose services; point it at
+`localhost` and the published ports. Neither file is committed.
+
+**Adding your service.** If your issue owns a service (tusd, ClamAV wiring, Bifrost aliases, a worker, …), replace
+only that service's block in `compose/compose.yaml` and its folder under `compose/`. Keep its name, port and
+healthcheck, and never touch other services' blocks.
 
 The CubeSandbox host isn't available on laptops. Use the `sandbox-local` profile (non-certifying local-docker runner). Certification only happens on the real CubeSandbox host.
 

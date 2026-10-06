@@ -18,8 +18,22 @@ This page assigns all 128 story issues to three developers and orders them into 
 | Product | **SBAM**, the build-time layer of BuLLM. Admin creates a tenant project and masters. The FDE uploads documents and drives the pipeline. SBAM builds knowledge (Cognee + OKF), generates and approves the SOW, **generates the Workflow itself**, breaks it into Macro Skills and Sub-Skills (ISATVON 1.4), generates code (`fastmcp-loopy`), tests it in CubeSandbox and certifies and freezes it for SRIM. |
 | Architecture | Next.js + Refine (`client/`) → FastAPI modular monolith (`server/api`) → Temporal workers (`server/workers`, ProjectPipeline + SubSkillBuild) → PostgreSQL, local disk behind an S3 interface, Keycloak, Bifrost → OpenRouter, Cognee, ClamAV, tusd, CubeSandbox. Shared Pydantic contracts in `server/contracts` generate the TypeScript types. Everything runs in Docker Compose. |
 | Major modules | identity/tenancy · admin (projects, masters, filetypes) · ingestion · knowledge · LLM layer · SOW · ISATVON · manifest/schema.sql · orchestration · codegen · validation gates · sandbox/testing · certification/versioning/export · frontend · ops/observability |
-| Current phase | **Pre-M0, greenfield.** `main` contains only docs and empty `client/`, `server/` and `compose/` folders. No story issue is closed or assigned, no PR touches code and `main` is the only branch. Every issue is open. |
+| Current phase | **M0 in progress (2026-10-06).** Work merges into the `dev` branch. Merged to `dev`: #32 scaffold, #44 app shell, #24 API conventions, #26 Cognee spike, #21 masters schemas; #34 FastAPI core in review. The Docker stack (#38, #39) is not built yet: see the change notice below. |
 | Key constraints | Every query is tenant-scoped (404 cross-tenant) · contracts in `server/contracts` are the single source of truth · long work runs only in Temporal activities, and workflow code is deterministic · LLM calls only through Bifrost aliases · file access only through `StorageBackend` · certified versions are immutable (423) · local-docker sandbox runs never certify · **the FDE never creates a Workflow** |
+
+> **Change notice (2026-10-06): the Docker environment comes first.**
+> The whole application must run in Docker from day one (`make up`, [TD §20](design/20-docker-and-environments.md)).
+> This overrides the tables below wherever they disagree; the `Blocked by` line in each GitHub issue is authoritative.
+>
+> - **#38 (Dockerfiles) then #39 (Compose `core` profile)** are the next platform merges, ahead of any other issue that
+>   needs a running service. They were taken over by 🟦 D1 to unblock everyone; D2 still reviews `compose/` and the Makefile.
+> - #39 ships the **full `core` profile**. Services whose feature isn't built yet run as **stubs** with their final name,
+>   port and healthcheck ([TD §20.3.6](design/20-docker-and-environments.md)). The owning issue later replaces only its
+>   own service block: #40 workers, #46 Bifrost, #47 Keycloak realm, #61 tusd hooks, #62 ClamAV, #126 mock-api, #36 api-migrate.
+> - #39 is no longer blocked by those issues (the circular dependency is removed). #36, #40, #41, #43, #45, #47, #48 and #78
+>   are now blocked by #39; #35 is blocked by #42 (otel-collector).
+> - Integration tests run against the same Compose stack (`make test-int`, [TD §19.3](design/19-testing-strategy.md)).
+> - Redis is not an SBAM dependency; it exists only for Langfuse in the `obs` profile.
 
 ## B. Issue dependency table
 
@@ -921,7 +935,7 @@ graph LR
 | 1 | [#21](https://github.com/solutionsDigibull/BAM/issues/21) `E0.4` | Admin masters schemas (BAM 0.2) + RAG Reference + stable-ID/status rules | M | W0 | — | admin module owner |
 | 2 | [#26](https://github.com/solutionsDigibull/BAM/issues/26) `E0.9` | Spike: Cognee default stores + OKF bundle | M | W0 | — | knowledge module owner |
 | 3 | [#38](https://github.com/solutionsDigibull/BAM/issues/38) `E1.9` | Dockerfiles: web, api, worker, toolchain, promptfoo, skill-runtime base, mock-api | M | W0 | [#32](https://github.com/solutionsDigibull/BAM/issues/32) (D1) | Compose holds D2's services (tusd, ClamAV, Bifrost, Cognee) |
-| 4 | [#39](https://github.com/solutionsDigibull/BAM/issues/39) `E1.10` | Docker Compose core profile + init jobs + Makefile + README | M | W0 | — | Compose holds D2's services (tusd, ClamAV, Bifrost, Cognee) |
+| 4 | [#39](https://github.com/solutionsDigibull/BAM/issues/39) `E1.10` | Docker Compose core profile + init jobs + Makefile + README | M | W0 | [#38](https://github.com/solutionsDigibull/BAM/issues/38) | Compose holds D2's services (tusd, ClamAV, Bifrost, Cognee) |
 | 5 | [#46](https://github.com/solutionsDigibull/BAM/issues/46) `E1.15` | Bifrost container + mock LLM provider for dev/tests | S | W1 | — | llm module owner |
 | 6 | [#22](https://github.com/solutionsDigibull/BAM/issues/22) `E0.5` | SowDocument model (ISATVON 1.4-derived sections) | S | W1 | [#19](https://github.com/solutionsDigibull/BAM/issues/19) (D3) | sow module owner |
 | 7 | [#78](https://github.com/solutionsDigibull/BAM/issues/78) `E5.1` | Cognee adapter: default stores, per-project dataset, Bifrost routing | M | W1 | — | knowledge module owner |
