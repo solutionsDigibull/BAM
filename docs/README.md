@@ -10,10 +10,11 @@ All work is tracked as **GitHub issues in [solutionsDigibull/BAM](https://github
 |---|---|
 | Understand what we are building, in 10 minutes | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) |
 | Pick up an issue and get a PR merged | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
-| See every issue by milestone, stream and dependency | [ISSUE_MAP.md](ISSUE_MAP.md) |
-| Look up a design detail referenced by an issue (`TD §x`) | [specs/SBAM_Technical_Design.md](specs/SBAM_Technical_Design.md) |
-| Look up a phase, task or decision referenced by an issue (`PLAN §x`, `SBAM-0xx`, `C-xx`, `O-xx`, `AR-xx`) | [specs/SBAM_Implementation_Plan.md](specs/SBAM_Implementation_Plan.md) |
-| See the stakeholder answers behind decisions (`QA x`) | [specs/SBAM_Plan_Open_Questions.md](specs/SBAM_Plan_Open_Questions.md) |
+| **Work on a phase**: its goal, tasks, exit criteria, design pages and issues | [phases/](phases/README.md) (one page per phase, 0–16) |
+| See milestones, starter issues and the critical path | [ISSUE_MAP.md](ISSUE_MAP.md) |
+| Look up a design detail referenced by an issue (`TD §x`) | [design/](design/README.md) (one page per section §1–§20) |
+| Look up a task or decision referenced by an issue (`PLAN §x`, `SBAM-0xx`, `C-xx`, `O-xx`, `AR-xx`) | [plan/](plan/README.md) (index maps every PLAN § to its page) |
+| See the stakeholder answers behind decisions (`QA x`) | [plan/09-stakeholder-answers.md](plan/09-stakeholder-answers.md) |
 | See the source documents (ISATVON 1.4, Admin masters workbook, process doc, architecture diagrams) | [reference/](reference/) |
 | Record an architecture decision | [adr/README.md](adr/README.md) |
 
@@ -24,8 +25,10 @@ docs/
 ├── README.md                    this index
 ├── ARCHITECTURE_OVERVIEW.md     what SBAM is, hierarchy, flow, stack, repo layout, golden rules
 ├── DEVELOPER_GUIDE.md           issue → fork → branch → PR workflow, conventions, Definition of Done
-├── ISSUE_MAP.md                 all issues by milestone/stream, critical path, starter issues
-├── specs/                       authoritative plan + technical design (referenced by every issue)
+├── ISSUE_MAP.md                 milestones, starter issues, critical path, links to phase pages
+├── phases/                      one page per phase (0–16): goal, tasks, exit criteria, design links, issues
+├── design/                      technical design (TD), one page per section §1–§20
+├── plan/                        implementation plan (PLAN): objectives, decisions, tasks, MVP, DoD, risks, traceability
 ├── reference/                   source inputs (ISATVON 1.4, masters workbook, process doc, diagrams)
 ├── adr/                         architecture decision records (created by issue E0.1)
 ├── spikes/                      spike write-ups (E0.9–E0.13)
@@ -38,7 +41,8 @@ Every story issue contains:
 
 - **Spec key** (e.g. `E4.2`), which matches `ISSUE_MAP.md` and the epic's sub-issue list.
 - **Plan tasks** (`SBAM-0xx`), the task IDs in the Implementation Plan §23.
-- **Docs**: sections to read before starting (`TD §5.2`, `PLAN Phase 4`, `C-37`, `O-16` …).
+- **Docs**: sections to read before starting (`TD §5.2` → [design/05-…](design/README.md), `PLAN Phase 4` → [phases/phase-04-…](phases/README.md), `C-37` → [plan/02](plan/02-confirmed-decisions.md), `O-16` → [plan/07](plan/07-risks-and-open-items.md)).
+- **Phase page**: link to the phase page with the context for the whole epic.
 - **Acceptance criteria**: the checklist the reviewer verifies.
 - **Blocked by #n**: issues that must be merged first.
 
