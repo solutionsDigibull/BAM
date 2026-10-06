@@ -1,0 +1,10 @@
+{
+  "rule": "RULE-BOM",
+  "policy": "flag single-source parts",
+  "scrap_rate": 0.015,
+  "approved_suppliers": [
+    "DigiKey",
+    "Mouser",
+    "Farnell"
+  ]
+}

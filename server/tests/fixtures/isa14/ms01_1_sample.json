@@ -1,0 +1,123 @@
+{
+  "skill_metadata": {
+    "macro_category": "MS01_Investor_Registration_Access",
+    "skill_id": "MS01.1_Investor_Auth_Manager",
+    "skill_name": "Investor OTP & Access Verifier",
+    "skill_type": "Deterministic_Loopy_MCP",
+    "reusable": true,
+    "version": "1.4.0",
+    "status": "APPROVED",
+    "owner": "AntMeta Platform Operations",
+    "created_at": "2026-06-29T12:00:00Z",
+    "updated_at": "2026-06-29T12:00:00Z"
+  },
+  "isatvon_definition": {
+    "i_instructions": "Triggered by login request. Action: Validate OTP and enforce RBAC device limits. Check: Verify OTP matches secure vault and device count is under limit. Bound: Allow up to 3 OTP retry loops before locking the profile.",
+    "s_source": {
+      "required_inputs": [
+        "mobile_number",
+        "otp_payload",
+        "device_fingerprint"
+      ],
+      "fresh_state_parameters": [
+        "Current failed_login_attempts in Postgres",
+        "Active device_registration_count in Postgres"
+      ]
+    },
+    "a_automation": {
+      "orchestration_layer": "BuLLM_DMR",
+      "action_step": "Compare provided OTP against Auth_MCP memory and calculate device fingerprint limits.",
+      "acceptance_check": "Programmatically evaluate if otp_match == True AND active_devices <= max_device_limit."
+    },
+    "t_tech_stack": {
+      "execution_layer": "FastMCP",
+      "action_tool": "Auth_MCP (Session & OTP Evaluator)",
+      "fixed_check_tool": "RBAC_MCP (Policy & Limit Validator)"
+    },
+    "v_variables": {
+      "max_iterations": 3,
+      "success_gate": "otp_match == True AND policy_violation == False",
+      "no_op_condition": "user_status is already 'LOCKED'",
+      "escalation_condition": "failed_login_attempts >= max_iterations",
+      "budget_limit": "5000ms timeout per validation cycle"
+    },
+    "o_outcome": {
+      "json_schema": {
+        "auth_status": ["AUTHENTICATED", "REJECTED", "LOCKED"],
+        "user_role": "string",
+        "jwt_token": "string"
+      },
+      "state_handoff_file": "Append to PostgreSQL 'auth_event_audit_handoff' table. Must log iteration_pass, device_fingerprint used, OTP boolean match evidence, and final access scope."
+    },
+    "n_notification": {
+      "ui_updates": [
+        "Status: Verifying -> Looping [Pass 2/3]: Incorrect OTP -> Authenticated",
+        "Status: Escalated - Account Locked"
+      ],
+      "database_updates": [
+        "Update investor_profiles with failed attempts or new active session state"
+      ],
+      "alerts": [
+        "Notify platform ops on account lockout (Escalation)"
+      ]
+    }
+  },
+  "srim_runtime_definition": {
+    "orchestration": {
+      "router": "Dify_Dynamic_Master_Router",
+      "trigger": "HTTP_POST_Payload_plus_Variables"
+    },
+    "execution": {
+      "engine": "FastMCP_Execution_Engine"
+    },
+    "gateway": {
+      "route_via": "MCP_Jungle_Gateway_Reverse_Proxy"
+    },
+    "persistence": {
+      "database": "PostgreSQL_Database_State_Config",
+      "table": "investor_profiles, auth_event_audit_handoff",
+      "action": "Execute_SQL_Queries_via_Postgres_MCP"
+    },
+    "audit": {
+      "telemetry": "PostgreSQL_Audit_Logs"
+    },
+    "ui": {
+      "target": "SRIM_UI_Canvas",
+      "method": "Embedded_iFrames_Widgets"
+    }
+  },
+  "contracts": {
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "mobile_number": { "type": "string" },
+        "otp_payload": { "type": "string" },
+        "device_fingerprint": { "type": "string" }
+      },
+      "required": ["mobile_number", "otp_payload", "device_fingerprint"]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "auth_status": { "type": "string" },
+        "user_role": { "type": "string" },
+        "jwt_token": { "type": "string" },
+        "state_handoff_id": { "type": "string" }
+      }
+    }
+  },
+  "governance": {
+    "deterministic_hash": "sha256:TO_BE_COMPUTED_ON_SAVE",
+    "lifecycle": {
+      "state": "APPROVED",
+      "approval_required_for_change": true,
+      "immutable_after_approval": true
+    },
+    "versioning": {
+      "major": 1,
+      "minor": 4,
+      "patch": 0
+    }
+  }
+}
+

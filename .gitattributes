@@ -7,3 +7,6 @@ Makefile text eol=lf
 *.docx binary
 *.png binary
 client/src/contracts/** linguist-generated=true
+
+# Fixture documents are byte-exact inputs (checksummed): never convert line endings or diff them as text.
+server/tests/fixtures/documents/** -text
