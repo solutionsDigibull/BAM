@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "One of the 43 frozen filetypes. Changed only by super-admin through a new workbook (O-23).",
+  "properties": {
+    "file_format": {
+      "maxLength": 32767,
+      "minLength": 1,
+      "title": "File Format",
+      "type": "string"
+    },
+    "tier": {
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Tier",
+      "type": "integer"
+    },
+    "purpose": {
+      "maxLength": 32767,
+      "title": "Purpose",
+      "type": "string"
+    },
+    "rag_ingestion": {
+      "maxLength": 32767,
+      "title": "Rag Ingestion",
+      "type": "string"
+    },
+    "example": {
+      "maxLength": 32767,
+      "pattern": "^https?://\\S+$",
+      "title": "Example",
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_format",
+    "tier",
+    "purpose",
+    "rag_ingestion",
+    "example"
+  ],
+  "structure_version": "BAM 0.2",
+  "title": "FiletypePayload",
+  "type": "object",
+  "x-system-owned": true
+}

@@ -1,0 +1,133 @@
+{
+  "$defs": {
+    "RagReference": {
+      "additionalProperties": false,
+      "description": "RAG Reference cell (Rules and Skills): a JSON object with exactly these 7 keys.\n\nValues may be empty strings. `Links / Path` is a pointer and is never fetched.",
+      "properties": {
+        "Example": {
+          "maxLength": 32767,
+          "title": "Example",
+          "type": "string"
+        },
+        "Links / Path": {
+          "maxLength": 32767,
+          "title": "Links / Path",
+          "type": "string"
+        },
+        "Entity / Node Type": {
+          "maxLength": 32767,
+          "title": "Entity / Node Type",
+          "type": "string"
+        },
+        "Security / Access Level": {
+          "maxLength": 32767,
+          "title": "Security / Access Level",
+          "type": "string"
+        },
+        "Refresh Frequency": {
+          "maxLength": 32767,
+          "title": "Refresh Frequency",
+          "type": "string"
+        },
+        "ID Field": {
+          "maxLength": 32767,
+          "title": "Id Field",
+          "type": "string"
+        },
+        "Parent Entity": {
+          "maxLength": 32767,
+          "title": "Parent Entity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Example",
+        "Links / Path",
+        "Entity / Node Type",
+        "Security / Access Level",
+        "Refresh Frequency",
+        "ID Field",
+        "Parent Entity"
+      ],
+      "title": "RagReference",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "domain_rule": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Domain Rule",
+      "type": "string"
+    },
+    "pcb_panelization": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Pcb Panelization",
+      "type": "string"
+    },
+    "components_bom": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Components Bom",
+      "type": "string"
+    },
+    "materials_finish": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Materials Finish",
+      "type": "string"
+    },
+    "box_build": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Box Build",
+      "type": "string"
+    },
+    "machine_hr_rates": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Machine Hr Rates",
+      "type": "string"
+    },
+    "outsourced_services": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Outsourced Services",
+      "type": "string"
+    },
+    "assembly_routing": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Assembly Routing",
+      "type": "string"
+    },
+    "rules_dfm_sourcing": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Rules Dfm Sourcing",
+      "type": "string"
+    },
+    "misc": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Misc",
+      "type": "string"
+    },
+    "rag_reference": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RagReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "structure_version": "BAM 0.2",
+  "title": "RulesPayload",
+  "type": "object"
+}
