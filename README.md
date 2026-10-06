@@ -29,5 +29,10 @@ uvx pre-commit install   # ruff, black, mypy, eslint, prettier, gitleaks on ever
 pnpm --dir client dev    # http://localhost:3000
 ```
 
+Until Keycloak sign-in lands (#51), start the client with `SBAM_DEV_AUTH=1` (for example in
+`client/.env.local`) to get a dev-only role picker on `/login-admin` and `/login-fde`. It is ignored in
+production builds. E2E tests: `pnpm --dir client exec playwright install chromium` once, then
+`pnpm --dir client e2e`.
+
 Lockfiles (`server/uv.lock`, `client/pnpm-lock.yaml`) are committed. Add dependencies with `uv add` /
 `pnpm --dir client add`, never by editing lockfiles.
