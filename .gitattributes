@@ -6,3 +6,4 @@ Makefile text eol=lf
 *.xlsx binary
 *.docx binary
 *.png binary
+client/src/contracts/** linguist-generated=true

@@ -1,0 +1,46 @@
+# Install once: `uvx pre-commit install`. Run everything: `uvx pre-commit run --all-files`.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run --directory server ruff check
+        language: system
+        files: ^server/.*\.py$
+        pass_filenames: false
+      - id: black
+        name: black
+        entry: uv run --directory server black --check .
+        language: system
+        files: ^server/.*\.py$
+        pass_filenames: false
+      - id: mypy
+        name: mypy --strict
+        entry: uv run --directory server mypy
+        language: system
+        files: ^server/.*\.py$
+        pass_filenames: false
+      - id: eslint
+        name: eslint
+        entry: pnpm --dir client lint
+        language: system
+        files: ^client/.*\.(ts|tsx|js|mjs)$
+        pass_filenames: false
+      - id: prettier
+        name: prettier
+        entry: pnpm --dir client format:check
+        language: system
+        files: ^client/
+        pass_filenames: false

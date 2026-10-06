@@ -1,0 +1,1 @@
+"""SBAM FastAPI modular monolith."""

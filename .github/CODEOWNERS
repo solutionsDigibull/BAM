@@ -1,0 +1,4 @@
+# Contracts are owned by lane D3. client/src/contracts is GENERATED from server/contracts
+# by `make contracts`: never edit it by hand, CI fails on drift.
+/server/contracts/      @Harish919901
+/client/src/contracts/  @Harish919901
