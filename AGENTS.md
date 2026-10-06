@@ -27,7 +27,9 @@ into phases → 128 GitHub story issues → a dependency graph. Every session do
   - `server/`: Python 3.12 + uv. FastAPI in `server/api`, Temporal workers in `server/workers`, Pydantic
     contracts in `server/contracts`, Jinja2 templates in `server/templates`.
   - Services: PostgreSQL, Keycloak, Bifrost → OpenRouter, Cognee, ClamAV, tusd, CubeSandbox.
-  - Everything runs in Docker Compose (`compose/`).
+  - Everything runs in Docker Compose (`compose/`, TD §20). `make up` brings up the whole `core` profile. Services
+    not built yet run as stubs with their final name, port and healthcheck (TD §20.3.6). Redis is not an SBAM
+    dependency (Langfuse-only).
 - Read before coding:
   - `docs/ARCHITECTURE_OVERVIEW.md` (golden rules, glossary) and `docs/DEVELOPER_GUIDE.md`.
   - `docs/TEAM_PLAN.md` (who owns what, waves, hand-offs).
@@ -35,12 +37,13 @@ into phases → 128 GitHub story issues → a dependency graph. Every session do
 
 ## Commands
 
-The repo is greenfield. These targets are **created by the M0 issues with exactly these names**:
-#32 E1.1 scaffold, #33 E1.2 contracts, #39 E1.10 Compose, #43 E1.12 CI. Until they merge, follow the
-issue text.
+These targets are **created by the M0 issues with exactly these names**: #32 E1.1 scaffold (done),
+#38 E1.9 + #39 E1.10 Docker stack, #33 E1.2 contracts, #43 E1.12 CI. Until they merge, follow the issue text.
 
-- Stack: `make up` · `make down` · `make logs` · `make seed` · `make reset` (asks first)
+- Stack: `make up` · `make ps` · `make down` · `make logs s=<service>` · `make seed` · `make reset CONFIRM=yes`
 - One backend test: `cd server && uv run pytest tests/unit/test_x.py -k name`. Prefer this while iterating.
+- Integration tests (need `make up`): `make test-int`, or one test with
+  `cd server && uv run pytest -m integration tests/integration/test_x.py`. See TD §19.3.
 - One frontend test: `pnpm --dir client test src/path/x.test.tsx`
 - Regenerate contracts (JSON Schema + TS types): `make contracts`
 - **Full checks before pushing:** `make check`. It runs ruff, black --check, mypy --strict, pytest
@@ -105,6 +108,11 @@ issue text.
 - **Never edit the ProjectPipeline workflow to add your stage.** Implement your activity in your own
   module (`ingest/`, `knowledge/`, `sow/`, `isatvon/`, …). It registers itself, and D3 wires it.
 - **Never register routes in `main.py`.** Each API module exposes `router`, and it is auto-discovered.
+- **Your service is your block.** If your issue owns a Compose service (TD §20.3.6), replace only that service's
+  block in `compose/compose.yaml` and its folder under `compose/`. Keep the name, port and healthcheck, and keep
+  `make up` healthy. New env vars go in `compose/.env.example` with a comment and a safe default.
+- **Tests that need a running service** are `@pytest.mark.integration` and run against the Compose stack
+  (`make test-int`). Unit and API tests use fakes and never need Docker (TD §19.3).
 - If you need something another in-progress issue is building, do not build it too. Code against
   the contract or a stub, say so in the PR, and comment on the other issue.
 

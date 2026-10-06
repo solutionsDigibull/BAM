@@ -16,13 +16,28 @@ pagination).
 
 ## Prerequisites
 
-- git, [uv](https://docs.astral.sh/uv/getting-started/installation/), Node 22 (`client/.nvmrc`), pnpm (`corepack enable pnpm`)
-- Docker Desktop (WSL2 backend on Windows) for the Compose stack
-- Windows: use Git Bash or WSL2 for `make`, and run `git config --global core.longpaths true`
+- Docker Desktop (WSL2 backend on Windows) or Docker Engine, with **at least 12 GB of memory for Docker**
+- git and make (Windows: use Git Bash or WSL2, and run `git config --global core.longpaths true`)
+- For host-side tests and editors: [uv](https://docs.astral.sh/uv/getting-started/installation/), Node 22 (`client/.nvmrc`), pnpm (`corepack enable pnpm`)
 
 Run `make doctor` to check them.
 
-## Quickstart
+## Run everything in Docker
+
+The whole application (web, API, workers, Postgres, Keycloak, Temporal, Bifrost, ClamAV, tusd) runs with
+Docker Compose ([TD §20](docs/design/20-docker-and-environments.md)). The stack itself is delivered by #38/#39.
+
+```bash
+cp compose/.env.example compose/.env   # set the passwords
+make up                                # first run ~5–10 min
+make ps                                # every service "healthy"
+```
+
+Open http://localhost:3000 (web) and http://localhost:8000/api/v1/docs (API). Ports are configurable in
+`compose/.env`. `make down` stops the stack; `make reset CONFIRM=yes` also deletes its data.
+See [DEVELOPER_GUIDE §6](docs/DEVELOPER_GUIDE.md#6-local-development) for every command.
+
+## Develop on the host
 
 ```bash
 make install     # uv sync --locked + pnpm install --frozen-lockfile
