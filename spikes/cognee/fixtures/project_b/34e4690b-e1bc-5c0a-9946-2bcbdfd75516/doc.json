@@ -1,0 +1,23 @@
+{
+ "blocks": [
+  {
+   "id": "34e4690b-e1bc-5c0a-9946-2bcbdfd75516#b0",
+   "location": {
+    "cell": "A1",
+    "sheet": "BOM"
+   },
+   "text": "## Sheet: BOM"
+  },
+  {
+   "id": "34e4690b-e1bc-5c0a-9946-2bcbdfd75516#b1",
+   "location": {
+    "cell": "A2:D4",
+    "sheet": "BOM"
+   },
+   "text": "| CPN | MPN | Qty | Supplier |\n| --- | --- | --- | --- |\n| C-900 | CL10A106KP8NNNC | 60 | Farnell |\n| U-020 | TPS54331DR | 2 | Farnell |"
+  }
+ ],
+ "document_version_id": "34e4690b-e1bc-5c0a-9946-2bcbdfd75516",
+ "name": "bom_beta",
+ "title": "BOM Beta TIDE-4"
+}

@@ -1,0 +1,23 @@
+{
+ "blocks": [
+  {
+   "id": "367178f7-107a-59b3-9b7a-a677628b05a5#b0",
+   "location": {
+    "line": 1,
+    "page": 1
+   },
+   "text": "# Supplier terms"
+  },
+  {
+   "id": "367178f7-107a-59b3-9b7a-a677628b05a5#b1",
+   "location": {
+    "line": 3,
+    "page": 1
+   },
+   "text": "DigiKey offers net-30 payment with a minimum order value of USD 250. Mouser offers net-45 for approved accounts. Quotes are valid for 14 days."
+  }
+ ],
+ "document_version_id": "367178f7-107a-59b3-9b7a-a677628b05a5",
+ "name": "supplier_terms",
+ "title": "Supplier terms Alpha"
+}

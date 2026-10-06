@@ -1,0 +1,23 @@
+{
+ "blocks": [
+  {
+   "id": "62cd776d-3d7f-50ea-89b1-f84e2ba3d24b#b0",
+   "location": {
+    "line": 1,
+    "page": 1
+   },
+   "text": "# Notes"
+  },
+  {
+   "id": "62cd776d-3d7f-50ea-89b1-f84e2ba3d24b#b1",
+   "location": {
+    "line": 3,
+    "page": 1
+   },
+   "text": "تم الاتفاق على تسليم لوحات TIDE-4 إلى ميناء هامبورغ. 部品番号 U-020 は在庫切れ。Ünïcödé ✓ — QUOKKA-4419."
+  }
+ ],
+ "document_version_id": "62cd776d-3d7f-50ea-89b1-f84e2ba3d24b",
+ "name": "notes_unicode",
+ "title": "Multilingual notes"
+}

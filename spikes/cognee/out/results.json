@@ -1,0 +1,182 @@
+{
+ "T01": {
+  "A_sees_own_marker": 1,
+  "A_sees_B_marker": 0,
+  "B_sees_own_marker": 2,
+  "B_sees_A_marker": 0,
+  "B_graph_nodes_with_A_document_id": 0,
+  "UNSCOPED_search_for_B_marker_hits": 1,
+  "pass": true
+ },
+ "T01b": {
+  "p1_own": 1,
+  "p2_own": 1,
+  "p2_reads_p1_dataset": "DENIED DatasetNotFoundError",
+  "p1_reads_p2_dataset": "DENIED DatasetNotFoundError",
+  "p2_UNSCOPED_search_for_p1_marker_hits": 0,
+  "pass": true
+ },
+ "T03": {
+  "entities": 22,
+  "relations": 18,
+  "entities_with_valid_ref": 22,
+  "relations_with_valid_ref": 18,
+  "entities_with_document_level_fallback_ref": 3,
+  "pass": true
+ },
+ "T04": {
+  "root_entity_found": true,
+  "root_entity_names": [
+   "organization org-ems"
+  ],
+  "master_nodes_expected": 16,
+  "master_nodes_found_as_graph_entities": 16,
+  "non_structural_edges_touching_root": 16,
+  "illustrative_excluded": [],
+  "pass": true
+ },
+ "T05": {
+  "method": "tiktoken cl100k_base on bundle parts; extrapolated by measured tokens/char; windows are assumptions (sbam-sow model not chosen yet); reserve 16k tokens for prompt+output",
+  "bundle_tokens_by_part": {
+   "entities.jsonl": 2941,
+   "relations.jsonl": 2931,
+   "chunks.jsonl": 1088,
+   "masters.jsonl": 2730,
+   "coverage.json": 155
+  },
+  "bundle_tokens_total": 9845,
+  "tokens_per_char": 0.318,
+  "wrapper_tokens_per_chunk": 71.9,
+  "chunk_factor_at_1000_token_chunks": 1.072,
+  "graph_tokens_measured": 5872,
+  "graph_tokens_per_record_measured": 146.8,
+  "masters_tokens": 2730,
+  "scenarios": {
+   "20 files x 15 MB (hard limit)": {
+    "tokens_chunks_and_masters_excl_graph": 107225912,
+    "ranking_needed_even_without_graph": {
+     "128k": true,
+     "200k": true,
+     "1M": true
+    }
+   },
+   "20 files x 500 KB (large typical)": {
+    "tokens_chunks_and_masters_excl_graph": 3493067,
+    "ranking_needed_even_without_graph": {
+     "128k": true,
+     "200k": true,
+     "1M": true
+    }
+   },
+   "20 files x 50 KB (typical RFQ pack)": {
+    "tokens_chunks_and_masters_excl_graph": 351763,
+    "ranking_needed_even_without_graph": {
+     "128k": true,
+     "200k": true,
+     "1M": false
+    }
+   }
+  },
+  "ranking_budget_tokens": 100,
+  "ranking_selection": {
+   "overview": {
+    "chunks": [
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c2",
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c3",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c1"
+    ],
+    "tokens": 94
+   },
+   "users and authority": {
+    "chunks": [
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c2",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c1",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c0",
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c3"
+    ],
+    "tokens": 94
+   },
+   "scope": {
+    "chunks": [
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c2",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c1",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c2"
+    ],
+    "tokens": 93
+   },
+   "modules": {
+    "chunks": [
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c1",
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0"
+    ],
+    "tokens": 92
+   },
+   "features": {
+    "chunks": [
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c3",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c1",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c2"
+    ],
+    "tokens": 94
+   },
+   "data and integrations": {
+    "chunks": [
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c1",
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c1"
+    ],
+    "tokens": 100
+   },
+   "rules and constraints": {
+    "chunks": [
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c0",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c1",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c2"
+    ],
+    "tokens": 89
+   },
+   "deliverables and acceptance": {
+    "chunks": [
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c2",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c1",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0"
+    ],
+    "tokens": 95
+   },
+   "assumptions and open points": {
+    "chunks": [
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c2",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c0",
+     "367178f7-107a-59b3-9b7a-a677628b05a5#c0",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c3",
+     "16d56e34-52f6-57f5-9b71-85e1d85576d5#c1",
+     "87b208ef-c48d-5bc2-8092-923dad1ddc71#c0",
+     "ebaa5c38-5983-5422-93aa-e9246d2b02c4#c0"
+    ],
+    "tokens": 94
+   }
+  }
+ }
+}
