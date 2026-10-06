@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+# The repo root ignores every out/ directory (build output). This spike's out/ holds the prototype OKF bundle and
+# measured results that issue #26 requires to be committed, so re-include it here (scoped to this directory only).
+!out/
+# Docker volumes live in named volumes, not here.

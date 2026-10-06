@@ -1,0 +1,23 @@
+{
+ "blocks": [
+  {
+   "id": "16d56e34-52f6-57f5-9b71-85e1d85576d5#b0",
+   "location": {
+    "line": 1,
+    "page": 1
+   },
+   "text": "0 0 0 0 0 0 0 0"
+  },
+  {
+   "id": "16d56e34-52f6-57f5-9b71-85e1d85576d5#b1",
+   "location": {
+    "line": 2,
+    "page": 1
+   },
+   "text": "00 00 00 00 00 00"
+  }
+ ],
+ "document_version_id": "16d56e34-52f6-57f5-9b71-85e1d85576d5",
+ "name": "boilerplate_numbers",
+ "title": "Boilerplate numbers only"
+}

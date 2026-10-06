@@ -1,0 +1,39 @@
+{
+ "blocks": [
+  {
+   "id": "87b208ef-c48d-5bc2-8092-923dad1ddc71#b0",
+   "location": {
+    "line": 1,
+    "page": 1
+   },
+   "text": "# RFQ ADX-2026-014 from Alpha Dynamics"
+  },
+  {
+   "id": "87b208ef-c48d-5bc2-8092-923dad1ddc71#b1",
+   "location": {
+    "line": 3,
+    "page": 1
+   },
+   "text": "Alpha Dynamics Ltd requests a quotation for 2,500 units of the NAV-9 flight controller board. Internal tracking reference ZEBRA-7731. Required delivery: 2026-12-01 to the Austin, TX facility."
+  },
+  {
+   "id": "87b208ef-c48d-5bc2-8092-923dad1ddc71#b2",
+   "location": {
+    "line": 6,
+    "page": 1
+   },
+   "text": "The assembly must meet IPC-A-610 Class 3 and AS9100D. Rocketreach Pvt. Ltd. will act as the Tier-1 EMS contract manufacturer for the programme."
+  },
+  {
+   "id": "87b208ef-c48d-5bc2-8092-923dad1ddc71#b3",
+   "location": {
+    "line": 2,
+    "page": 2
+   },
+   "text": "Pricing basis: live costing with FX as-of the quotation date; scrap rate 1.5 percent."
+  }
+ ],
+ "document_version_id": "87b208ef-c48d-5bc2-8092-923dad1ddc71",
+ "name": "rfq_alpha",
+ "title": "RFQ Alpha Dynamics"
+}

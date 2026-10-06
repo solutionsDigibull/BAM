@@ -1,0 +1,31 @@
+{
+ "blocks": [
+  {
+   "id": "ebaa5c38-5983-5422-93aa-e9246d2b02c4#b0",
+   "location": {
+    "cell": "A1",
+    "sheet": "BOM"
+   },
+   "text": "## Sheet: BOM"
+  },
+  {
+   "id": "ebaa5c38-5983-5422-93aa-e9246d2b02c4#b1",
+   "location": {
+    "cell": "A2:D5",
+    "sheet": "BOM"
+   },
+   "text": "| CPN | MPN | Qty | Supplier |\n| --- | --- | --- | --- |\n| C-100 | GRM188R71H104KA93 | 120 | DigiKey |\n| U-210 | STM32H743VIT6 | 1 | Mouser |\n| R-330 | RC0603FR-0710KL | 85 | DigiKey |"
+  },
+  {
+   "id": "ebaa5c38-5983-5422-93aa-e9246d2b02c4#b2",
+   "location": {
+    "cell": "A7",
+    "sheet": "BOM"
+   },
+   "text": "Note: U-210 is single-source; flag for sourcing review. Total lines = 3."
+  }
+ ],
+ "document_version_id": "ebaa5c38-5983-5422-93aa-e9246d2b02c4",
+ "name": "bom_alpha",
+ "title": "BOM Alpha NAV-9"
+}
