@@ -1,0 +1,14 @@
+{
+  "type": "about:blank",
+  "title": "Invalid request",
+  "status": 400,
+  "detail": null,
+  "code": "VALIDATION_ERROR",
+  "errors": [
+    {
+      "path": "limit",
+      "message": "must be between 1 and 100"
+    }
+  ],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

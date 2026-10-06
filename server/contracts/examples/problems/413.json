@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "File too large",
+  "status": 413,
+  "detail": "Files are limited to 15 MB.",
+  "code": "FILE_TOO_LARGE",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

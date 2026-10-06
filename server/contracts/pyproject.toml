@@ -3,7 +3,9 @@ name = "sbam-contracts"
 version = "0.1.0"
 description = "SBAM Pydantic contracts, the single source of truth"
 requires-python = "==3.12.*"
-dependencies = []
+dependencies = [
+    "pydantic>=2.11",
+]
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

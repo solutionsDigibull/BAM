@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "ErrorCode": {
+      "description": "Stable machine-readable error codes. Add new codes here; never rename or reuse one.",
+      "enum": [
+        "VALIDATION_ERROR",
+        "UNAUTHENTICATED",
+        "FORBIDDEN",
+        "WRONG_PORTAL",
+        "NOT_FOUND",
+        "CONFLICT",
+        "PRECONDITION_FAILED",
+        "PRECONDITION_REQUIRED",
+        "PAYLOAD_TOO_LARGE",
+        "UNSUPPORTED_MEDIA_TYPE",
+        "RESOURCE_LOCKED",
+        "RATE_LIMITED",
+        "SERVICE_UNAVAILABLE",
+        "INTERNAL_ERROR",
+        "IDEMPOTENCY_KEY_REUSED",
+        "INVALID_CURSOR",
+        "VERSION_CONFLICT",
+        "INVALID_TRANSITION",
+        "READ_ONLY",
+        "TENANT_MISMATCH",
+        "TENANT_SUSPENDED",
+        "IDP_UNAVAILABLE",
+        "LAST_ADMIN",
+        "USER_EXISTS",
+        "DUPLICATE_NAME",
+        "DRAFT_EXISTS",
+        "STRUCTURE_MISMATCH",
+        "FILETYPE_FROZEN",
+        "SECRET_VALUE_NOT_ALLOWED",
+        "FILE_TOO_LARGE",
+        "FILE_LIMIT_REACHED",
+        "UNSUPPORTED_TYPE",
+        "INVALID_ENCODING",
+        "NESTED_ARCHIVE",
+        "ARCHIVE_LIMIT",
+        "HASH_MISMATCH",
+        "NO_DOCUMENTS",
+        "PARSE_ERROR",
+        "SCAN_UNAVAILABLE",
+        "OCR_UNAVAILABLE",
+        "KNOWLEDGE_BUILDING",
+        "KNOWLEDGE_NOT_READY",
+        "COGNEE_ACL_DISABLED",
+        "SOW_STALE",
+        "SOW_LOCKED",
+        "SOW_APPROVED",
+        "SOW_NOT_APPROVED",
+        "SOW_NOT_LATEST",
+        "SOW_VERSION_CONFLICT",
+        "NO_APPROVED_SOW",
+        "NOT_IN_REVIEW",
+        "PIPELINE_RUNNING",
+        "PIPELINE_NOT_WAITING",
+        "TEMPORAL_UNAVAILABLE",
+        "ORCHESTRATOR_UNAVAILABLE",
+        "ISATVON_CONTRACT",
+        "SKILL_ID_PREFIX_MISMATCH",
+        "MACRO_REQUIRES_SUB_SKILL",
+        "GATE_PARSE_ERROR",
+        "UNRESOLVED_IDENTIFIER",
+        "TYPE_MISMATCH",
+        "SCHEMA_PARSE_ERROR",
+        "LIBRARY_NOT_IN_REGISTRY",
+        "TOOLS_NOT_DECOUPLED",
+        "WORKFLOW_BUILDING",
+        "MIN_TEST_CASES",
+        "MOCK_UNMATCHED",
+        "WORKFLOW_FROZEN",
+        "NOT_FROZEN"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
+    "FieldError": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Dotted path of the offending field, e.g. 'limit'",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "message"
+      ],
+      "title": "FieldError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`application/problem+json` body returned for every 4xx/5xx response.",
+  "properties": {
+    "type": {
+      "default": "about:blank",
+      "title": "Type",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "status": {
+      "maximum": 599,
+      "minimum": 400,
+      "title": "Status",
+      "type": "integer"
+    },
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    },
+    "code": {
+      "$ref": "#/$defs/ErrorCode"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/FieldError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "correlation_id": {
+      "minLength": 1,
+      "title": "Correlation Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "status",
+    "code",
+    "correlation_id"
+  ],
+  "title": "ProblemDetail",
+  "type": "object"
+}
