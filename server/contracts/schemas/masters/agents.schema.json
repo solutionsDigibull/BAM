@@ -1,0 +1,74 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "agent_name": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Agent Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Description",
+      "type": "string"
+    },
+    "model": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Model",
+      "type": "string"
+    },
+    "repo": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Repo",
+      "type": "string"
+    },
+    "api": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Api",
+      "type": "string"
+    },
+    "mcp_server": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Mcp Server",
+      "type": "string"
+    },
+    "script": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Script",
+      "type": "string"
+    },
+    "prompt": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Prompt",
+      "type": "string"
+    },
+    "eval": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Eval",
+      "type": "string"
+    },
+    "logs": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Logs",
+      "type": "string"
+    },
+    "misc": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Misc",
+      "type": "string"
+    }
+  },
+  "structure_version": "BAM 0.2",
+  "title": "AgentsPayload",
+  "type": "object"
+}

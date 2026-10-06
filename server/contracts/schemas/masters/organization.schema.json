@@ -1,0 +1,92 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "org_name": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Org Name",
+      "type": "string"
+    },
+    "type": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Type",
+      "type": "string"
+    },
+    "code": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Code",
+      "type": "string"
+    },
+    "location": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Location",
+      "type": "string"
+    },
+    "org_details": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Org Details",
+      "type": "string"
+    },
+    "employees": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Employees",
+      "type": "string"
+    },
+    "customers": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Customers",
+      "type": "string"
+    },
+    "offerings": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Offerings",
+      "type": "string"
+    },
+    "competencies": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Competencies",
+      "type": "string"
+    },
+    "data_sources": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Data Sources",
+      "type": "string"
+    },
+    "systems_tools": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Systems Tools",
+      "type": "string"
+    },
+    "assets": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Assets",
+      "type": "string"
+    },
+    "certifications": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Certifications",
+      "type": "string"
+    },
+    "misc_audit": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Misc Audit",
+      "type": "string"
+    }
+  },
+  "structure_version": "BAM 0.2",
+  "title": "OrganizationPayload",
+  "type": "object"
+}

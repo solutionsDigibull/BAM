@@ -17,7 +17,7 @@ sbam-workers = { workspace = true }
 sbam-contracts = { workspace = true }
 
 [dependency-groups]
-dev = ["ruff>=0.13", "black>=25.1", "mypy>=1.18", "pytest>=8.4"]
+dev = ["ruff>=0.13", "black>=25.1", "mypy>=1.18", "pytest>=8.4", "openpyxl>=3.1.5", "types-openpyxl>=3.1.5.20260827"]
 
 [tool.ruff]
 line-length = 100

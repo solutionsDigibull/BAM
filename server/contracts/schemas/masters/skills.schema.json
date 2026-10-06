@@ -1,0 +1,133 @@
+{
+  "$defs": {
+    "RagReference": {
+      "additionalProperties": false,
+      "description": "RAG Reference cell (Rules and Skills): a JSON object with exactly these 7 keys.\n\nValues may be empty strings. `Links / Path` is a pointer and is never fetched.",
+      "properties": {
+        "Example": {
+          "maxLength": 32767,
+          "title": "Example",
+          "type": "string"
+        },
+        "Links / Path": {
+          "maxLength": 32767,
+          "title": "Links / Path",
+          "type": "string"
+        },
+        "Entity / Node Type": {
+          "maxLength": 32767,
+          "title": "Entity / Node Type",
+          "type": "string"
+        },
+        "Security / Access Level": {
+          "maxLength": 32767,
+          "title": "Security / Access Level",
+          "type": "string"
+        },
+        "Refresh Frequency": {
+          "maxLength": 32767,
+          "title": "Refresh Frequency",
+          "type": "string"
+        },
+        "ID Field": {
+          "maxLength": 32767,
+          "title": "Id Field",
+          "type": "string"
+        },
+        "Parent Entity": {
+          "maxLength": 32767,
+          "title": "Parent Entity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Example",
+        "Links / Path",
+        "Entity / Node Type",
+        "Security / Access Level",
+        "Refresh Frequency",
+        "ID Field",
+        "Parent Entity"
+      ],
+      "title": "RagReference",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "skill": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Skill",
+      "type": "string"
+    },
+    "documents": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Documents",
+      "type": "string"
+    },
+    "rfq_inquiries": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Rfq Inquiries",
+      "type": "string"
+    },
+    "currency": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Currency",
+      "type": "string"
+    },
+    "supplier_master": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Supplier Master",
+      "type": "string"
+    },
+    "commodity_pricing": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Commodity Pricing",
+      "type": "string"
+    },
+    "shipping_logistics": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Shipping Logistics",
+      "type": "string"
+    },
+    "templates": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Templates",
+      "type": "string"
+    },
+    "hitl_governance": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Hitl Governance",
+      "type": "string"
+    },
+    "misc": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Misc",
+      "type": "string"
+    },
+    "rag_reference": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RagReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "structure_version": "BAM 0.2",
+  "title": "SkillsPayload",
+  "type": "object"
+}

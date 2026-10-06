@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "description": "RAG Reference cell (Rules and Skills): a JSON object with exactly these 7 keys.\n\nValues may be empty strings. `Links / Path` is a pointer and is never fetched.",
+  "properties": {
+    "Example": {
+      "maxLength": 32767,
+      "title": "Example",
+      "type": "string"
+    },
+    "Links / Path": {
+      "maxLength": 32767,
+      "title": "Links / Path",
+      "type": "string"
+    },
+    "Entity / Node Type": {
+      "maxLength": 32767,
+      "title": "Entity / Node Type",
+      "type": "string"
+    },
+    "Security / Access Level": {
+      "maxLength": 32767,
+      "title": "Security / Access Level",
+      "type": "string"
+    },
+    "Refresh Frequency": {
+      "maxLength": 32767,
+      "title": "Refresh Frequency",
+      "type": "string"
+    },
+    "ID Field": {
+      "maxLength": 32767,
+      "title": "Id Field",
+      "type": "string"
+    },
+    "Parent Entity": {
+      "maxLength": 32767,
+      "title": "Parent Entity",
+      "type": "string"
+    }
+  },
+  "required": [
+    "Example",
+    "Links / Path",
+    "Entity / Node Type",
+    "Security / Access Level",
+    "Refresh Frequency",
+    "ID Field",
+    "Parent Entity"
+  ],
+  "title": "RagReference",
+  "type": "object"
+}
