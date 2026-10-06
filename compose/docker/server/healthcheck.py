@@ -10,7 +10,7 @@ import sys
 import time
 import urllib.request
 
-HEARTBEAT = "/tmp/sbam/heartbeat"
+HEARTBEAT = "/tmp/sbam/heartbeat"  # noqa: S108 - container-private dir owned by uid 10001
 MAX_AGE_SECONDS = 30
 
 

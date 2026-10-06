@@ -16,15 +16,15 @@ repos:
     hooks:
       - id: ruff
         name: ruff
-        entry: uv run --directory server ruff check
+        entry: uv run --directory server ruff check --config pyproject.toml . ../compose
         language: system
-        files: ^server/.*\.py$
+        files: ^(server|compose)/.*\.py$
         pass_filenames: false
       - id: black
         name: black
-        entry: uv run --directory server black --check .
+        entry: uv run --directory server black --config pyproject.toml --check . ../compose
         language: system
-        files: ^server/.*\.py$
+        files: ^(server|compose)/.*\.py$
         pass_filenames: false
       - id: mypy
         name: mypy --strict
