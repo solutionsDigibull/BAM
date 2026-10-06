@@ -1,0 +1,7 @@
+rule: RULE-OFFER
+policy: convert offers with approved FX
+currency: USD
+validity_days: 14
+stop_conditions:
+  - expired offer
+  - missing FX rate

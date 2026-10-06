@@ -1,0 +1,21 @@
+{
+  "name": "bom-scrub",
+  "version": "0.1.0",
+  "tools": [
+    {
+      "name": "scrub_bom",
+      "description": "Normalize a BOM and flag single-source parts",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "bom_ref"
+        ],
+        "properties": {
+          "bom_ref": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

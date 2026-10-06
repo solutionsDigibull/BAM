@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bom project="NAV-9">
+  <line cpn="C-100" mpn="GRM188R71H104KA93" qty="120"/>
+  <line cpn="U-210" mpn="STM32H743VIT6" qty="1"/>
+  <line cpn="R-330" mpn="RC0603FR-0710KL" qty="85"/>
+  <line cpn="C-415" mpn="CL10A106KP8NNNC" qty="40"/>
+  <line cpn="L-050" mpn="SRN4018-4R7M" qty="6"/>
+</bom>

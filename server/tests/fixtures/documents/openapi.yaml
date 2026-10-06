@@ -1,0 +1,16 @@
+openapi: 3.0.3
+info:
+  title: Quote API (synthetic)
+  version: 1.0.0
+paths:
+  /quotes:
+    get:
+      summary: List quotes
+      responses:
+        '200':
+          description: A list of quotes
+    post:
+      summary: Create a quote
+      responses:
+        '201':
+          description: Created

@@ -1,0 +1,140 @@
+{
+  "overview": {
+    "client": "Alpha Dynamics Ltd (synthetic)",
+    "objective": "Quote the NAV-9 flight controller board from an RFQ and a bill of materials, with costing that follows the approved rules.",
+    "background": "Alpha Dynamics sends RFQs as PDF and spreadsheet packs. Sourcing engineers re-key the BOM by hand today.",
+    "topic": "Electronics manufacturing services (EMS) RFQ costing",
+    "history": "Quotes are produced manually; single-source parts are flagged late.",
+    "citations": [
+      {"okf_ref": "chunk:text.pdf#c0", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 1}},
+      {"okf_ref": "chunk:text.pdf#c1", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 3}}
+    ]
+  },
+  "users_authority": {
+    "roles": [
+      {"role": "Sourcing engineer", "decision_rights": "Reviews flagged parts and releases the quotation"},
+      {"role": "Team lead", "decision_rights": "Approves exceptions to the costing rules"}
+    ],
+    "citations": [
+      {"okf_ref": "chunk:text.pdf#c3", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 2, "line": 2}}
+    ]
+  },
+  "scope": {
+    "in_scope": ["Parse the RFQ and BOM", "Flag single-source parts", "Compute a costed BOM with scrap and FX"],
+    "out_of_scope": ["Purchasing", "Production planning"],
+    "citations": [
+      {"okf_ref": "chunk:sample.md#c2", "document_version_id": "fixture:documents/sample.md", "location": {"line": 5}}
+    ]
+  },
+  "modules": [
+    {
+      "id": "M-INTAKE",
+      "name": "RFQ intake",
+      "purpose": "Turn the RFQ pack into a normalized BOM",
+      "agent_role": "Intake agent (AG-INTAKE)",
+      "citations": [
+        {"okf_ref": "chunk:multi_sheet.xlsx#c0", "document_version_id": "fixture:documents/multi_sheet.xlsx", "location": {"sheet": "BOM", "cell": "A1:E1"}}
+      ]
+    },
+    {
+      "id": "M-COST",
+      "name": "Costing",
+      "purpose": "Price the normalized BOM under the approved rules",
+      "agent_role": "Costing agent (AG-COST)",
+      "citations": [
+        {"okf_ref": "chunk:text.pdf#c1", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 3}}
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "F-INTAKE-1",
+      "module_id": "M-INTAKE",
+      "name": "Parse the RFQ and BOM",
+      "trigger": "A new RFQ pack is uploaded to the project",
+      "action": "Read the RFQ and the BOM sheet and produce one normalized BOM line per component",
+      "check": "Every line has a CPN, an MPN and a quantity greater than zero",
+      "bound": {"max_attempts": 3, "on_exhaustion": "send to FDE review"},
+      "inputs_state": ["RFQ document", "BOM sheet", "Project context notes"],
+      "external_data": [],
+      "tools": {"action": ["parse_bom"], "check": ["validate_bom_lines"]},
+      "tables": ["bom_line"],
+      "success_criteria": ["All BOM lines are present and valid"],
+      "output": "Normalized BOM",
+      "handoff": "Record of parsed lines and rejected rows",
+      "notifications": ["Alert the sourcing engineer when a line is rejected"],
+      "citations": [
+        {"okf_ref": "chunk:multi_sheet.xlsx#c1", "document_version_id": "fixture:documents/multi_sheet.xlsx", "location": {"sheet": "BOM", "cell": "A2:E7"}}
+      ]
+    },
+    {
+      "id": "F-INTAKE-2",
+      "module_id": "M-INTAKE",
+      "name": "Flag single-source parts",
+      "trigger": "A normalized BOM is available",
+      "action": "Mark every component that has exactly one approved supplier",
+      "check": "Each flagged part appears in the review list",
+      "bound": {"max_attempts": 2, "on_exhaustion": "send to FDE review"},
+      "inputs_state": ["Normalized BOM", "Supplier master"],
+      "external_data": ["Distributor catalogue"],
+      "tools": {"action": ["flag_single_source"], "check": ["verify_review_list"]},
+      "tables": ["bom_line", "supplier_offer"],
+      "success_criteria": ["Single-source parts are listed before quotation release"],
+      "output": "Review list",
+      "handoff": "Record of flagged parts",
+      "notifications": ["Alert the team lead when a part is single-source"],
+      "citations": [
+        {"okf_ref": "chunk:text.pdf#c3", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 2, "line": 2}}
+      ]
+    },
+    {
+      "id": "F-COST-1",
+      "module_id": "M-COST",
+      "name": "Compute the costed BOM",
+      "trigger": "The review list is cleared",
+      "action": "Price each line with the chosen offer, apply FX as of the quotation date and add the scrap rate",
+      "check": "The extended cost of every line equals quantity times unit price times one plus the scrap rate",
+      "bound": {"max_attempts": 3, "on_exhaustion": "stop and alert the team lead"},
+      "inputs_state": ["Normalized BOM", "Selected offers", "FX rates"],
+      "external_data": ["FX rate feed"],
+      "tools": {"action": ["price_bom"], "check": ["recompute_extended_cost"]},
+      "tables": ["bom_line", "offer", "fx_rate"],
+      "success_criteria": ["Totals match the recomputed values", "Scrap rate of 1.5 percent is applied"],
+      "output": "Costed BOM",
+      "handoff": "Record of prices, FX rate and scrap rate used",
+      "notifications": ["Alert the team lead when an offer or FX rate is missing"],
+      "citations": [
+        {"okf_ref": "chunk:text.pdf#c2", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 6}}
+      ]
+    }
+  ],
+  "data_integrations": {
+    "sources": ["RFQ pack (PDF, XLSX)", "Supplier offers", "FX rate feed"],
+    "apis": ["Quote API (see documents/openapi.yaml)"],
+    "tables": ["bom_line", "supplier_offer", "offer", "fx_rate"],
+    "citations": [
+      {"okf_ref": "chunk:openapi.yaml#c0", "document_version_id": "fixture:documents/openapi.yaml", "location": {"line": 1}}
+    ]
+  },
+  "rules_constraints": {
+    "rule_refs": ["RULE-BOM", "RULE-OFFER"],
+    "constraints": ["Stop on an unresolved MPN", "Do not use an expired offer"],
+    "citations": [
+      {"okf_ref": "chunk:sample.yaml#c0", "document_version_id": "fixture:documents/sample.yaml", "location": {"line": 1}}
+    ]
+  },
+  "deliverables_acceptance": {
+    "deliverables": ["Costed BOM", "Review list of single-source parts"],
+    "acceptance_criteria": ["Every line is priced", "Every single-source part is flagged"],
+    "citations": [
+      {"okf_ref": "chunk:sample.md#c3", "document_version_id": "fixture:documents/sample.md", "location": {"line": 9}}
+    ]
+  },
+  "assumptions_open_points": {
+    "assumptions": ["Quotes stay valid for 14 days"],
+    "open_points": ["Which FX source is authoritative"],
+    "citations": [
+      {"okf_ref": "chunk:sample.md#c3", "document_version_id": "fixture:documents/sample.md", "location": {"line": 9}}
+    ]
+  }
+}
