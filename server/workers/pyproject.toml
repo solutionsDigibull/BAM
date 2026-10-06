@@ -1,0 +1,13 @@
+[project]
+name = "sbam-workers"
+version = "0.1.0"
+description = "SBAM Temporal workers"
+requires-python = "==3.12.*"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""

@@ -35,3 +35,12 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Storage volumes and local secrets
+storage/
+secrets/
+*.key
+
+# Next.js generated
+next-env.d.ts
+*.tsbuildinfo
