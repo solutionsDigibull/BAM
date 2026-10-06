@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Idempotency-Key already used with a different request body",
+  "status": 422,
+  "detail": null,
+  "code": "IDEMPOTENCY_KEY_REUSED",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

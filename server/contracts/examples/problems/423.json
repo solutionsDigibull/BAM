@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Locked",
+  "status": 423,
+  "detail": "This resource is frozen / approved — create a new version to change it.",
+  "code": "RESOURCE_LOCKED",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

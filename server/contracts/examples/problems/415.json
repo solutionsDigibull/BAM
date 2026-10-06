@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Unsupported file type",
+  "status": 415,
+  "detail": "This file type is not on the Filetype master.",
+  "code": "UNSUPPORTED_TYPE",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

@@ -3,7 +3,9 @@ name = "sbam-api"
 version = "0.1.0"
 description = "SBAM FastAPI modular monolith"
 requires-python = "==3.12.*"
-dependencies = []
+dependencies = [
+    "sbam-contracts",
+]
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]
@@ -11,3 +13,6 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
+
+[tool.uv.sources]
+sbam-contracts = { workspace = true }

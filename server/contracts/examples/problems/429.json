@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Too many requests",
+  "status": 429,
+  "detail": "Retry after 30 seconds.",
+  "code": "RATE_LIMITED",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

@@ -1,7 +1,9 @@
 # BAM
 
 SBAM (Skills Build Acceleration Manager), the build-time layer of BuLLM. Start with
-[`docs/README.md`](docs/README.md) and [`AGENTS.md`](AGENTS.md).
+[`docs/README.md`](docs/README.md) and [`AGENTS.md`](AGENTS.md). Every API endpoint follows
+[`docs/api-conventions.md`](docs/api-conventions.md) (problem+json errors, ETag/If-Match, Idempotency-Key,
+pagination).
 
 ## Layout
 

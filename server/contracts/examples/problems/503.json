@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Service unavailable",
+  "status": 503,
+  "detail": "The orchestrator is unavailable; nothing was changed. Try again shortly.",
+  "code": "TEMPORAL_UNAVAILABLE",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Sign in required",
+  "status": 401,
+  "detail": null,
+  "code": "UNAUTHENTICATED",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}

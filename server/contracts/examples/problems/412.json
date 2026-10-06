@@ -1,0 +1,9 @@
+{
+  "type": "about:blank",
+  "title": "Resource changed since you loaded it; reload",
+  "status": 412,
+  "detail": null,
+  "code": "PRECONDITION_FAILED",
+  "errors": [],
+  "correlation_id": "01J9Z6Q8K4X2V7M3N5P0R1S2T3"
+}
