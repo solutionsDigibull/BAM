@@ -31,10 +31,12 @@ is:open label:blocked                                                           
 
 ## 2. Picking an issue
 
-1. **Work in milestone order.** Take issues from the current milestone first (see [ISSUE_MAP.md](ISSUE_MAP.md)).
-2. **Check that it's unblocked.** Every issue under **Blocked by** must be closed. If they're all closed but the `blocked` label is still there, remove the label.
-3. **Prefer your stream, but help where the critical path needs it.** Stream A carries a lot of M0 work. B and D developers should pick up M0 platform stories (Compose profiles, CI, fixtures) when their own stream is blocked.
-4. **Assign yourself** before starting. If you can't self-assign, comment `I'm taking this`.
+> Using Claude Code or another agent? The same rules are in [AGENTS.md](../AGENTS.md). In Claude Code, `/next-issue --lane Dn` does steps 1–4 for you and `/ship` opens the PR.
+
+1. **Work in milestone order, in your lane.** Run `uv run scripts/unblocked_issues.py --lane D1|D2|D3`. It lists only the issues whose blockers are all closed, sorted by milestone, priority and how many issues each one unblocks. Lanes come from [TEAM_PLAN.md](TEAM_PLAN.md).
+2. **Check that it's unblocked.** Every issue under **Blocked by** must be closed (`uv run scripts/unblocked_issues.py --check <n>`). If they're all closed but the `blocked` label is still there, remove the label.
+3. **Prefer your lane, but help where the critical path needs it.** When your lane has nothing unblocked, take the top issue from another lane and say so on the issue.
+4. **Claim it** before starting: assign yourself and add `status:in-progress`. When the PR opens, switch the label to `status:in-review`. If you can't self-assign, comment `I'm taking this`.
 5. **One P0 story at a time per developer.** Finish or hand back before taking another P0.
 6. **Read before coding.** Read the sections listed under **Docs** in the issue (`TD §…`, `PLAN …`), the parent epic's goal and exit criteria, and the rules in [ARCHITECTURE_OVERVIEW.md §7](ARCHITECTURE_OVERVIEW.md#7-golden-rules-non-negotiable).
 7. **If the story is bigger than its size label**, split it: create sub-issues under the same epic, using the same title format, and link them in a comment.
@@ -85,9 +87,9 @@ Types: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`, `ci`, `build`, `perf`
 ### Pull request rules
 
 - **Title:** the issue title (`[E4.2] …`).
-- **Body:** `Closes #<issue>`. Then a short *what/why*, *how to test* and screenshots for UI.
-- **Size:** under ~600 changed lines (excluding generated files). Split bigger work into stacked PRs.
-- **Review:** at least **1 approving review**. Changes to `server/contracts/` (shared contracts) need a reviewer from stream C plus one from the consuming stream.
+- **Body:** the [PR template](../.github/pull_request_template.md), starting with `Closes #<issue>`. It covers what/why, how to test, the issue's test-case IDs, hot files touched, and screenshots for UI.
+- **Size:** aim for ≤ 400 changed lines, excluding generated files and lockfiles. Above ~600, split the work (contract → backend → UI).
+- **Review:** at least **1 approving review**. A PR that touches a hot file also needs its owner's review: `server/contracts/` and the pipeline are owned by D3, API core/CI/client shell by D1, and Compose/Makefile by D2 (see [AGENTS.md](../AGENTS.md)).
 - **Merge:** squash merge; delete the branch.
 - **After merging,** look for issues your PR unblocks (search `is:open label:blocked "#42"`). Remove `blocked` from any whose blockers are now all closed.
 

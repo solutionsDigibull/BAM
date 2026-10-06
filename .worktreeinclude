@@ -1,0 +1,6 @@
+# Gitignored files copied into every worktree Claude Code creates (.gitignore syntax).
+# A fresh checkout needs these local env files to run `make up` and the tests.
+compose/.env
+server/.env
+client/.env.local
+CLAUDE.local.md

@@ -1,0 +1,37 @@
+# Secrets and local env (templates such as compose/.env.example ARE committed)
+.env
+.env.*
+!.env.example
+*.pem
+
+# Claude Code / agents: worktrees and personal settings
+.claude/worktrees/
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+
+# Local data and OS/editor files
+data/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

@@ -12,6 +12,8 @@ All work is tracked as **GitHub issues in [solutionsDigibull/BAM](https://github
 | Pick up an issue and get a PR merged | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
 | **Work on a phase**: its goal, tasks, exit criteria, design pages and issues | [phases/](phases/README.md) (one page per phase, 0–16) |
 | See milestones, starter issues and the critical path | [ISSUE_MAP.md](ISSUE_MAP.md) |
+| See **who owns which issues** (3 lanes), the waves, hand-offs and merge order | [TEAM_PLAN.md](TEAM_PLAN.md) |
+| Work with Claude Code or another coding agent | [../AGENTS.md](../AGENTS.md) (`/next-issue`, `/ship`) |
 | Look up a design detail referenced by an issue (`TD §x`) | [design/](design/README.md) (one page per section §1–§20) |
 | Look up a task or decision referenced by an issue (`PLAN §x`, `SBAM-0xx`, `C-xx`, `O-xx`, `AR-xx`) | [plan/](plan/README.md) (index maps every PLAN § to its page) |
 | See the stakeholder answers behind decisions (`QA x`) | [plan/09-stakeholder-answers.md](plan/09-stakeholder-answers.md) |
@@ -26,6 +28,8 @@ docs/
 ├── ARCHITECTURE_OVERVIEW.md     what SBAM is, hierarchy, flow, stack, repo layout, golden rules
 ├── DEVELOPER_GUIDE.md           issue → fork → branch → PR workflow, conventions, Definition of Done
 ├── ISSUE_MAP.md                 milestones, starter issues, critical path, links to phase pages
+├── TEAM_PLAN.md                 3-developer lanes, waves, dependency graphs, hotspots, merge order
+├── team-lanes.json              issue number → lane (D1/D2/D3) + wave, read by scripts/unblocked_issues.py
 ├── phases/                      one page per phase (0–16): goal, tasks, exit criteria, design links, issues
 ├── design/                      technical design (TD), one page per section §1–§20
 ├── plan/                        implementation plan (PLAN): objectives, decisions, tasks, MVP, DoD, risks, traceability
