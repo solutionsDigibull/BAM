@@ -38,8 +38,11 @@ def default_checks(settings: Settings) -> dict[str, Check]:
         return await _tcp(db.hostname or "localhost", db.port or 5432)
 
     async def storage() -> bool:
-        root = settings.storage_root
-        return root.is_dir() and os.access(root, os.W_OK)
+        # Write + delete a probe file: os.access(W_OK) misses Windows ACLs and some RO mounts.
+        probe = settings.storage_root / f".ready-{os.getpid()}"
+        probe.write_bytes(b"ok")
+        probe.unlink()
+        return True
 
     async def temporal() -> bool:
         # ponytail: TCP reachability only; #40 (E1.7) swaps this for the client health check.

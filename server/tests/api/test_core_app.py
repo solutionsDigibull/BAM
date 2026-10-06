@@ -314,3 +314,16 @@ def test_e0_7_t04_idempotent_generate_starts_once(app_factory: AppFactory) -> No
     reused = client.post("/api/v1/_test/generate", json={"sub_skill_ids": ["X"]}, headers=headers)
     assert reused.status_code == 422
     assert reused.json()["code"] == "IDEMPOTENCY_KEY_REUSED"
+
+
+async def _storage_check(root: Path) -> bool:
+    return await default_checks(make_settings(root))["storage"]()
+
+
+def test_e1_3_storage_check_needs_a_writable_directory(tmp_path: Path) -> None:
+    import asyncio
+
+    assert asyncio.run(_storage_check(tmp_path)) is True
+    assert not list(tmp_path.iterdir())  # probe file cleaned up
+    with pytest.raises(OSError):
+        asyncio.run(_storage_check(tmp_path / "missing"))
