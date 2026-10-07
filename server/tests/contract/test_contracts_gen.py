@@ -15,7 +15,7 @@ import pytest
 from fixtures import fixture_path
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel
-from sbam_contracts import isatvon14, manifest, masters, sow
+from sbam_contracts import isatvon14, manifest, masters, sow, state_machines
 from sbam_contracts._jsonschema import DRAFT, contract_schema
 from sbam_contracts.canonical import sha256_of
 from sbam_contracts.gen import REPO, SCHEMA_DIR, TS_FILE, drift, generate, main, ts_bundle
@@ -193,6 +193,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("manifest", manifest),
             ("masters", masters),
             ("sow", sow),
+            ("state_machines", state_machines),
         )
         for stem in module.schemas()
     }

@@ -80,5 +80,144 @@ Mapping to ISATVON/manifest status values: SBAM `DRAFT`/`VALID`/`INVALID` → `s
 
 All transitions go through `sbam.workflows.state_machine` in a DB transaction (row_version check + audit row + notification). Activities call the same service; the UI never sets states directly.
 
+## 14.8 Transitions as code
+
+The machines above are implemented in `server/contracts/sbam_contracts/state_machines.py` (E0.6) and exported read-only for the UI to `server/contracts/schemas/state_machines.json` by `make contracts` (drift-checked). `can_transition(machine, from_state, event, actor)` is the authoritative check; a row with no *from* state creates the entity. Actors: FDE, ADMIN, SYSTEM. A restored document goes back to `UPLOADED` and is scanned and parsed again. Edit events on locked states (APPROVED SOW, CERTIFIED/FROZEN) fail with `LOCKED`.
+
+**Project pipeline** — terminal: CANCELLED
+
+| From | Event | To | Actor |
+|---|---|---|---|
+| (create) | `create_project` | IDLE | ADMIN |
+| IDLE | `start_processing` | INGESTING | FDE |
+| INGESTING | `ingestion_completed` | KNOWLEDGE_BUILDING | SYSTEM |
+| INGESTING | `ingestion_failed` | INGESTION_FAILED | SYSTEM |
+| KNOWLEDGE_BUILDING | `knowledge_ready` | SOW_GENERATING | SYSTEM |
+| KNOWLEDGE_BUILDING | `knowledge_failed` | KNOWLEDGE_FAILED | SYSTEM |
+| SOW_GENERATING | `sow_generated` | SOW_REVIEW | SYSTEM |
+| SOW_GENERATING | `sow_generation_failed` | SOW_GENERATION_FAILED | SYSTEM |
+| SOW_REVIEW | `approve_sow` | SOW_APPROVED | FDE |
+| SOW_APPROVED | `workflow_created` | WORKFLOW_CREATED | SYSTEM |
+| WORKFLOW_CREATED | `start_processing` | INGESTING | FDE |
+| WORKFLOW_CREATED | `start_scope_change` | SOW_REVIEW | FDE |
+| INGESTION_FAILED | `retry` | INGESTING | FDE |
+| KNOWLEDGE_FAILED | `retry` | KNOWLEDGE_BUILDING | FDE |
+| SOW_GENERATION_FAILED | `regenerate` | SOW_GENERATING | FDE |
+| IDLE | `cancel` | CANCELLED | FDE |
+| INGESTING | `cancel` | CANCELLED | FDE |
+| KNOWLEDGE_BUILDING | `cancel` | CANCELLED | FDE |
+| SOW_GENERATING | `cancel` | CANCELLED | FDE |
+| SOW_REVIEW | `cancel` | CANCELLED | FDE |
+| INGESTION_FAILED | `cancel` | CANCELLED | FDE |
+| KNOWLEDGE_FAILED | `cancel` | CANCELLED | FDE |
+| SOW_GENERATION_FAILED | `cancel` | CANCELLED | FDE |
+
+**Workflow** — terminal: CANCELLED
+
+| From | Event | To | Actor |
+|---|---|---|---|
+| (create) | `sow_approved` | CREATED | SYSTEM |
+| CREATED | `start_extraction` | ISATVON_EXTRACTING | SYSTEM |
+| ISATVON_EXTRACTING | `extraction_completed` | ISATVON_REVIEW | SYSTEM |
+| ISATVON_EXTRACTING | `extraction_failed` | EXTRACTION_FAILED | SYSTEM |
+| EXTRACTION_FAILED | `retry` | ISATVON_EXTRACTING | FDE |
+| ISATVON_REVIEW | `generate` | BUILDING | FDE |
+| BUILDING | `all_sub_skills_certified` | CERTIFYING | SYSTEM |
+| BUILDING | `sub_skill_needs_review` | NEEDS_FDE_REVIEW | SYSTEM |
+| NEEDS_FDE_REVIEW | `retry` | BUILDING | FDE |
+| CERTIFYING | `workflow_certified` | CERTIFIED | SYSTEM |
+| CERTIFYING | `workflow_validation_failed` | WORKFLOW_VALIDATION_FAILED | SYSTEM |
+| WORKFLOW_VALIDATION_FAILED | `retry` | BUILDING | FDE |
+| CERTIFIED | `freeze` | FROZEN | SYSTEM |
+| FROZEN | `start_patch_version` | BUILDING | FDE |
+| CREATED | `cancel` | CANCELLED | FDE |
+| ISATVON_EXTRACTING | `cancel` | CANCELLED | FDE |
+| ISATVON_REVIEW | `cancel` | CANCELLED | FDE |
+| BUILDING | `cancel` | CANCELLED | FDE |
+| CERTIFYING | `cancel` | CANCELLED | FDE |
+| EXTRACTION_FAILED | `cancel` | CANCELLED | FDE |
+| NEEDS_FDE_REVIEW | `cancel` | CANCELLED | FDE |
+| WORKFLOW_VALIDATION_FAILED | `cancel` | CANCELLED | FDE |
+
+**Document version** — terminal: PURGED
+
+| From | Event | To | Actor |
+|---|---|---|---|
+| (create) | `upload` | UPLOADED | FDE |
+| UPLOADED | `scan_started` | SCANNING | SYSTEM |
+| SCANNING | `scan_clean` | PARSING | SYSTEM |
+| SCANNING | `malware_detected` | REJECTED | SYSTEM |
+| SCANNING | `scan_unavailable` | SCAN_FAILED | SYSTEM |
+| SCAN_FAILED | `auto_retry` | SCANNING | SYSTEM |
+| SCAN_FAILED | `retry` | SCANNING | FDE |
+| PARSING | `parse_completed` | PARSED | SYSTEM |
+| PARSING | `parse_failed` | PARSE_FAILED | SYSTEM |
+| UPLOADED | `delete` | DELETED | FDE |
+| PARSED | `delete` | DELETED | FDE |
+| REJECTED | `delete` | DELETED | FDE |
+| SCAN_FAILED | `delete` | DELETED | FDE |
+| PARSE_FAILED | `delete` | DELETED | FDE |
+| DELETED | `restore` | UPLOADED | FDE |
+| DELETED | `purge` | PURGED | SYSTEM |
+
+**SOW version** — terminal: SUPERSEDED
+
+| From | Event | To | Actor |
+|---|---|---|---|
+| (create) | `generated` | GENERATED | SYSTEM |
+| (create) | `generation_failed` | GENERATION_FAILED | SYSTEM |
+| (create) | `new_version` | IN_REVIEW | FDE |
+| GENERATION_FAILED | `regenerate` | GENERATED | FDE |
+| GENERATED | `open_review` | IN_REVIEW | SYSTEM |
+| IN_REVIEW | `edit` | IN_REVIEW | FDE |
+| IN_REVIEW | `approve` | APPROVED | FDE |
+| APPROVED | `superseded` | SUPERSEDED | SYSTEM |
+
+**Sub-Skill** — terminal: SUPERSEDED
+
+| From | Event | To | Actor |
+|---|---|---|---|
+| (create) | `extracted` | DRAFT | SYSTEM |
+| DRAFT | `validation_passed` | VALID | SYSTEM |
+| DRAFT | `validation_failed` | INVALID | SYSTEM |
+| VALID | `edit` | DRAFT | FDE |
+| INVALID | `edit` | DRAFT | FDE |
+| VALID | `generate` | BUILDING | FDE |
+| BUILDING | `tests_started` | TESTING | SYSTEM |
+| BUILDING | `gate_failed` | CORRECTING | SYSTEM |
+| BUILDING | `dependency_missing` | DEPENDENCY_FAILED | SYSTEM |
+| BUILDING | `template_error` | BUILD_ERROR | SYSTEM |
+| CORRECTING | `correction_applied` | BUILDING | SYSTEM |
+| CORRECTING | `attempts_exhausted` | NEEDS_FDE_REVIEW | SYSTEM |
+| NEEDS_FDE_REVIEW | `retry` | BUILDING | FDE |
+| TESTING | `tests_passed` | CERTIFIED | SYSTEM |
+| TESTING | `tests_failed` | CORRECTING | SYSTEM |
+| TESTING | `sandbox_unavailable` | TESTING_BLOCKED | SYSTEM |
+| TESTING_BLOCKED | `auto_retry` | TESTING | SYSTEM |
+| TESTING_BLOCKED | `retry` | TESTING | FDE |
+| DEPENDENCY_FAILED | `correction_applied` | BUILDING | SYSTEM |
+| DEPENDENCY_FAILED | `retry` | BUILDING | FDE |
+| BUILD_ERROR | `retry` | BUILDING | ADMIN |
+| CERTIFIED | `freeze` | FROZEN | SYSTEM |
+| VALID | `scope_changed` | INVALIDATED | SYSTEM |
+| INVALID | `scope_changed` | INVALIDATED | SYSTEM |
+| CERTIFIED | `scope_changed` | INVALIDATED | SYSTEM |
+| FROZEN | `scope_changed` | INVALIDATED | SYSTEM |
+| INVALIDATED | `re_extracted` | DRAFT | SYSTEM |
+| FROZEN | `start_patch_version` | DRAFT | FDE |
+| FROZEN | `superseded` | SUPERSEDED | SYSTEM |
+
+**Agent (Macro Skill)** — terminal: none
+
+| From | Event | To | Actor |
+|---|---|---|---|
+| (create) | `extracted` | PENDING | SYSTEM |
+| PENDING | `build_started` | BUILDING | SYSTEM |
+| BUILDING | `all_sub_skills_certified` | CERTIFIED | SYSTEM |
+| CERTIFIED | `sub_skill_invalidated` | BUILDING | SYSTEM |
+| CERTIFIED | `sub_skill_patched` | BUILDING | SYSTEM |
+| CERTIFIED | `freeze` | FROZEN | SYSTEM |
+| FROZEN | `start_patch_version` | BUILDING | SYSTEM |
+
 ---
 [← §13](13-temporal-design.md)   [Design index](README.md)   [§15 →](15-test-data-promptfoo-and-sandbox-design.md)

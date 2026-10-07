@@ -1,0 +1,777 @@
+{
+  "project_pipeline": {
+    "states": [
+      "IDLE",
+      "INGESTING",
+      "KNOWLEDGE_BUILDING",
+      "SOW_GENERATING",
+      "SOW_REVIEW",
+      "SOW_APPROVED",
+      "WORKFLOW_CREATED",
+      "INGESTION_FAILED",
+      "KNOWLEDGE_FAILED",
+      "SOW_GENERATION_FAILED",
+      "CANCELLED"
+    ],
+    "initial": [
+      "IDLE"
+    ],
+    "terminal": [
+      "CANCELLED"
+    ],
+    "locked": [],
+    "transitions": [
+      {
+        "from": null,
+        "event": "create_project",
+        "to": "IDLE",
+        "actor": "ADMIN"
+      },
+      {
+        "from": "IDLE",
+        "event": "start_processing",
+        "to": "INGESTING",
+        "actor": "FDE"
+      },
+      {
+        "from": "INGESTING",
+        "event": "ingestion_completed",
+        "to": "KNOWLEDGE_BUILDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "INGESTING",
+        "event": "ingestion_failed",
+        "to": "INGESTION_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "KNOWLEDGE_BUILDING",
+        "event": "knowledge_ready",
+        "to": "SOW_GENERATING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "KNOWLEDGE_BUILDING",
+        "event": "knowledge_failed",
+        "to": "KNOWLEDGE_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SOW_GENERATING",
+        "event": "sow_generated",
+        "to": "SOW_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SOW_GENERATING",
+        "event": "sow_generation_failed",
+        "to": "SOW_GENERATION_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SOW_REVIEW",
+        "event": "approve_sow",
+        "to": "SOW_APPROVED",
+        "actor": "FDE"
+      },
+      {
+        "from": "SOW_APPROVED",
+        "event": "workflow_created",
+        "to": "WORKFLOW_CREATED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "WORKFLOW_CREATED",
+        "event": "start_processing",
+        "to": "INGESTING",
+        "actor": "FDE"
+      },
+      {
+        "from": "WORKFLOW_CREATED",
+        "event": "start_scope_change",
+        "to": "SOW_REVIEW",
+        "actor": "FDE"
+      },
+      {
+        "from": "INGESTION_FAILED",
+        "event": "retry",
+        "to": "INGESTING",
+        "actor": "FDE"
+      },
+      {
+        "from": "KNOWLEDGE_FAILED",
+        "event": "retry",
+        "to": "KNOWLEDGE_BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "SOW_GENERATION_FAILED",
+        "event": "regenerate",
+        "to": "SOW_GENERATING",
+        "actor": "FDE"
+      },
+      {
+        "from": "IDLE",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "INGESTING",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "KNOWLEDGE_BUILDING",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "SOW_GENERATING",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "SOW_REVIEW",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "INGESTION_FAILED",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "KNOWLEDGE_FAILED",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "SOW_GENERATION_FAILED",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      }
+    ]
+  },
+  "workflow": {
+    "states": [
+      "CREATED",
+      "ISATVON_EXTRACTING",
+      "ISATVON_REVIEW",
+      "BUILDING",
+      "CERTIFYING",
+      "CERTIFIED",
+      "FROZEN",
+      "EXTRACTION_FAILED",
+      "NEEDS_FDE_REVIEW",
+      "WORKFLOW_VALIDATION_FAILED",
+      "CANCELLED"
+    ],
+    "initial": [
+      "CREATED"
+    ],
+    "terminal": [
+      "CANCELLED"
+    ],
+    "locked": [
+      "CERTIFIED",
+      "FROZEN"
+    ],
+    "transitions": [
+      {
+        "from": null,
+        "event": "sow_approved",
+        "to": "CREATED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CREATED",
+        "event": "start_extraction",
+        "to": "ISATVON_EXTRACTING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "ISATVON_EXTRACTING",
+        "event": "extraction_completed",
+        "to": "ISATVON_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "ISATVON_EXTRACTING",
+        "event": "extraction_failed",
+        "to": "EXTRACTION_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "EXTRACTION_FAILED",
+        "event": "retry",
+        "to": "ISATVON_EXTRACTING",
+        "actor": "FDE"
+      },
+      {
+        "from": "ISATVON_REVIEW",
+        "event": "generate",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "BUILDING",
+        "event": "all_sub_skills_certified",
+        "to": "CERTIFYING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "BUILDING",
+        "event": "sub_skill_needs_review",
+        "to": "NEEDS_FDE_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "NEEDS_FDE_REVIEW",
+        "event": "retry",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "CERTIFYING",
+        "event": "workflow_certified",
+        "to": "CERTIFIED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CERTIFYING",
+        "event": "workflow_validation_failed",
+        "to": "WORKFLOW_VALIDATION_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "WORKFLOW_VALIDATION_FAILED",
+        "event": "retry",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "CERTIFIED",
+        "event": "freeze",
+        "to": "FROZEN",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "FROZEN",
+        "event": "start_patch_version",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "CREATED",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "ISATVON_EXTRACTING",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "ISATVON_REVIEW",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "BUILDING",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "CERTIFYING",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "EXTRACTION_FAILED",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "NEEDS_FDE_REVIEW",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      },
+      {
+        "from": "WORKFLOW_VALIDATION_FAILED",
+        "event": "cancel",
+        "to": "CANCELLED",
+        "actor": "FDE"
+      }
+    ]
+  },
+  "document_version": {
+    "states": [
+      "UPLOADED",
+      "SCANNING",
+      "REJECTED",
+      "SCAN_FAILED",
+      "PARSING",
+      "PARSED",
+      "PARSE_FAILED",
+      "DELETED",
+      "PURGED"
+    ],
+    "initial": [
+      "UPLOADED"
+    ],
+    "terminal": [
+      "PURGED"
+    ],
+    "locked": [],
+    "transitions": [
+      {
+        "from": null,
+        "event": "upload",
+        "to": "UPLOADED",
+        "actor": "FDE"
+      },
+      {
+        "from": "UPLOADED",
+        "event": "scan_started",
+        "to": "SCANNING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SCANNING",
+        "event": "scan_clean",
+        "to": "PARSING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SCANNING",
+        "event": "malware_detected",
+        "to": "REJECTED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SCANNING",
+        "event": "scan_unavailable",
+        "to": "SCAN_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SCAN_FAILED",
+        "event": "auto_retry",
+        "to": "SCANNING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "SCAN_FAILED",
+        "event": "retry",
+        "to": "SCANNING",
+        "actor": "FDE"
+      },
+      {
+        "from": "PARSING",
+        "event": "parse_completed",
+        "to": "PARSED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "PARSING",
+        "event": "parse_failed",
+        "to": "PARSE_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "UPLOADED",
+        "event": "delete",
+        "to": "DELETED",
+        "actor": "FDE"
+      },
+      {
+        "from": "PARSED",
+        "event": "delete",
+        "to": "DELETED",
+        "actor": "FDE"
+      },
+      {
+        "from": "REJECTED",
+        "event": "delete",
+        "to": "DELETED",
+        "actor": "FDE"
+      },
+      {
+        "from": "SCAN_FAILED",
+        "event": "delete",
+        "to": "DELETED",
+        "actor": "FDE"
+      },
+      {
+        "from": "PARSE_FAILED",
+        "event": "delete",
+        "to": "DELETED",
+        "actor": "FDE"
+      },
+      {
+        "from": "DELETED",
+        "event": "restore",
+        "to": "UPLOADED",
+        "actor": "FDE"
+      },
+      {
+        "from": "DELETED",
+        "event": "purge",
+        "to": "PURGED",
+        "actor": "SYSTEM"
+      }
+    ]
+  },
+  "sow_version": {
+    "states": [
+      "GENERATED",
+      "IN_REVIEW",
+      "APPROVED",
+      "SUPERSEDED",
+      "GENERATION_FAILED"
+    ],
+    "initial": [
+      "GENERATED",
+      "GENERATION_FAILED",
+      "IN_REVIEW"
+    ],
+    "terminal": [
+      "SUPERSEDED"
+    ],
+    "locked": [
+      "APPROVED",
+      "SUPERSEDED"
+    ],
+    "transitions": [
+      {
+        "from": null,
+        "event": "generated",
+        "to": "GENERATED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": null,
+        "event": "generation_failed",
+        "to": "GENERATION_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": null,
+        "event": "new_version",
+        "to": "IN_REVIEW",
+        "actor": "FDE"
+      },
+      {
+        "from": "GENERATION_FAILED",
+        "event": "regenerate",
+        "to": "GENERATED",
+        "actor": "FDE"
+      },
+      {
+        "from": "GENERATED",
+        "event": "open_review",
+        "to": "IN_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "IN_REVIEW",
+        "event": "edit",
+        "to": "IN_REVIEW",
+        "actor": "FDE"
+      },
+      {
+        "from": "IN_REVIEW",
+        "event": "approve",
+        "to": "APPROVED",
+        "actor": "FDE"
+      },
+      {
+        "from": "APPROVED",
+        "event": "superseded",
+        "to": "SUPERSEDED",
+        "actor": "SYSTEM"
+      }
+    ]
+  },
+  "sub_skill": {
+    "states": [
+      "DRAFT",
+      "VALID",
+      "INVALID",
+      "BUILDING",
+      "CORRECTING",
+      "TESTING",
+      "TESTING_BLOCKED",
+      "NEEDS_FDE_REVIEW",
+      "DEPENDENCY_FAILED",
+      "BUILD_ERROR",
+      "CERTIFIED",
+      "FROZEN",
+      "INVALIDATED",
+      "SUPERSEDED"
+    ],
+    "initial": [
+      "DRAFT"
+    ],
+    "terminal": [
+      "SUPERSEDED"
+    ],
+    "locked": [
+      "CERTIFIED",
+      "FROZEN",
+      "SUPERSEDED"
+    ],
+    "transitions": [
+      {
+        "from": null,
+        "event": "extracted",
+        "to": "DRAFT",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "DRAFT",
+        "event": "validation_passed",
+        "to": "VALID",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "DRAFT",
+        "event": "validation_failed",
+        "to": "INVALID",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "VALID",
+        "event": "edit",
+        "to": "DRAFT",
+        "actor": "FDE"
+      },
+      {
+        "from": "INVALID",
+        "event": "edit",
+        "to": "DRAFT",
+        "actor": "FDE"
+      },
+      {
+        "from": "VALID",
+        "event": "generate",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "BUILDING",
+        "event": "tests_started",
+        "to": "TESTING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "BUILDING",
+        "event": "gate_failed",
+        "to": "CORRECTING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "BUILDING",
+        "event": "dependency_missing",
+        "to": "DEPENDENCY_FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "BUILDING",
+        "event": "template_error",
+        "to": "BUILD_ERROR",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CORRECTING",
+        "event": "correction_applied",
+        "to": "BUILDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CORRECTING",
+        "event": "attempts_exhausted",
+        "to": "NEEDS_FDE_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "NEEDS_FDE_REVIEW",
+        "event": "retry",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "TESTING",
+        "event": "tests_passed",
+        "to": "CERTIFIED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "TESTING",
+        "event": "tests_failed",
+        "to": "CORRECTING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "TESTING",
+        "event": "sandbox_unavailable",
+        "to": "TESTING_BLOCKED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "TESTING_BLOCKED",
+        "event": "auto_retry",
+        "to": "TESTING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "TESTING_BLOCKED",
+        "event": "retry",
+        "to": "TESTING",
+        "actor": "FDE"
+      },
+      {
+        "from": "DEPENDENCY_FAILED",
+        "event": "correction_applied",
+        "to": "BUILDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "DEPENDENCY_FAILED",
+        "event": "retry",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "BUILD_ERROR",
+        "event": "retry",
+        "to": "BUILDING",
+        "actor": "ADMIN"
+      },
+      {
+        "from": "CERTIFIED",
+        "event": "freeze",
+        "to": "FROZEN",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "VALID",
+        "event": "scope_changed",
+        "to": "INVALIDATED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "INVALID",
+        "event": "scope_changed",
+        "to": "INVALIDATED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CERTIFIED",
+        "event": "scope_changed",
+        "to": "INVALIDATED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "FROZEN",
+        "event": "scope_changed",
+        "to": "INVALIDATED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "INVALIDATED",
+        "event": "re_extracted",
+        "to": "DRAFT",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "FROZEN",
+        "event": "start_patch_version",
+        "to": "DRAFT",
+        "actor": "FDE"
+      },
+      {
+        "from": "FROZEN",
+        "event": "superseded",
+        "to": "SUPERSEDED",
+        "actor": "SYSTEM"
+      }
+    ]
+  },
+  "agent": {
+    "states": [
+      "PENDING",
+      "BUILDING",
+      "CERTIFIED",
+      "FROZEN"
+    ],
+    "initial": [
+      "PENDING"
+    ],
+    "terminal": [],
+    "locked": [
+      "CERTIFIED",
+      "FROZEN"
+    ],
+    "transitions": [
+      {
+        "from": null,
+        "event": "extracted",
+        "to": "PENDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "PENDING",
+        "event": "build_started",
+        "to": "BUILDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "BUILDING",
+        "event": "all_sub_skills_certified",
+        "to": "CERTIFIED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CERTIFIED",
+        "event": "sub_skill_invalidated",
+        "to": "BUILDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CERTIFIED",
+        "event": "sub_skill_patched",
+        "to": "BUILDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "CERTIFIED",
+        "event": "freeze",
+        "to": "FROZEN",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "FROZEN",
+        "event": "start_patch_version",
+        "to": "BUILDING",
+        "actor": "SYSTEM"
+      }
+    ]
+  }
+}

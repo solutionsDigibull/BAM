@@ -28,11 +28,13 @@ from pydantic.json_schema import models_json_schema
 from sbam_contracts._jsonschema import DRAFT, contract_schema, schema_id
 from sbam_contracts.canonical import sha256_of
 from sbam_contracts.registry import ROOTS
+from sbam_contracts.state_machines import export as state_machine_tables
 
 CONTRACTS_DIR: Final = Path(__file__).resolve().parent.parent  # server/contracts
 REPO: Final = CONTRACTS_DIR.parent.parent
 SCHEMA_DIR: Final = CONTRACTS_DIR / "schemas"
 TS_FILE: Final = REPO / "client" / "src" / "contracts" / "index.ts"
+STATE_MACHINES_FILE: Final = SCHEMA_DIR / "state_machines.json"  # read-only tables for the UI
 NODE_SCRIPT: Final = REPO / "client" / "scripts" / "gen-contracts.mjs"
 TS_HEADER: Final = (
     "// GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).\n"
@@ -130,6 +132,7 @@ def generate(roots: Roots = ROOTS) -> dict[Path, bytes]:
         SCHEMA_DIR / f"{path}.schema.json": _json(contract_schema(model, path))
         for path, model in roots
     }
+    files[STATE_MACHINES_FILE] = _json(state_machine_tables())
     bundle = ts_bundle(roots)
     header = TS_HEADER + f"// source-{sha256_of(bundle)}\n\n"
     files[TS_FILE] = (header + _compile_ts(bundle)).encode("utf-8")
