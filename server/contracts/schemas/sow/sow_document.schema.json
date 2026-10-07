@@ -1,0 +1,692 @@
+{
+  "$defs": {
+    "AssumptionsOpenPoints": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "assumptions": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "open_points": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Open Points",
+          "type": "array"
+        }
+      },
+      "required": [
+        "citations",
+        "assumptions",
+        "open_points"
+      ],
+      "title": "AssumptionsOpenPoints",
+      "type": "object"
+    },
+    "Bound": {
+      "additionalProperties": false,
+      "description": "Retry policy; becomes the Sub-Skill's max_iterations and escalation.",
+      "properties": {
+        "max_attempts": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "on_exhaustion": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "On Exhaustion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_attempts",
+        "on_exhaustion"
+      ],
+      "title": "Bound",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "okf_ref_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Okf Ref Id",
+          "type": "string"
+        },
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        }
+      },
+      "required": [
+        "okf_ref_id",
+        "document_version_id",
+        "location"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "DataIntegrations": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "apis": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Apis",
+          "type": "array"
+        },
+        "tables": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tables",
+          "type": "array"
+        }
+      },
+      "required": [
+        "citations",
+        "sources",
+        "apis",
+        "tables"
+      ],
+      "title": "DataIntegrations",
+      "type": "object"
+    },
+    "DeliverablesAcceptance": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "deliverables": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Deliverables",
+          "type": "array"
+        },
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Acceptance Criteria",
+          "type": "array"
+        }
+      },
+      "required": [
+        "citations",
+        "deliverables",
+        "acceptance_criteria"
+      ],
+      "title": "DeliverablesAcceptance",
+      "type": "object"
+    },
+    "FeatureItem": {
+      "additionalProperties": false,
+      "description": "A future Sub-Skill. Fields map onto ISATVON 1.4 I/S/A/T/V/O/N.",
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^F-[A-Za-z0-9][A-Za-z0-9.-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "module_id": {
+          "pattern": "^M-[A-Za-z0-9][A-Za-z0-9.-]*$",
+          "title": "Module Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "trigger": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        },
+        "action": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Check",
+          "type": "string"
+        },
+        "bound": {
+          "$ref": "#/$defs/Bound"
+        },
+        "inputs_state": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Inputs State",
+          "type": "array"
+        },
+        "external_data": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "External Data",
+          "type": "array"
+        },
+        "tools": {
+          "$ref": "#/$defs/FeatureTools"
+        },
+        "tables": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tables",
+          "type": "array"
+        },
+        "success_criteria": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Success Criteria",
+          "type": "array"
+        },
+        "output": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Output",
+          "type": "string"
+        },
+        "handoff": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Handoff",
+          "type": "string"
+        },
+        "notifications": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Notifications",
+          "type": "array"
+        }
+      },
+      "required": [
+        "citations",
+        "id",
+        "module_id",
+        "name",
+        "trigger",
+        "action",
+        "check",
+        "bound",
+        "inputs_state",
+        "external_data",
+        "tools",
+        "tables",
+        "success_criteria",
+        "output",
+        "handoff",
+        "notifications"
+      ],
+      "title": "FeatureItem",
+      "type": "object"
+    },
+    "FeatureTools": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Action",
+          "type": "array"
+        },
+        "check": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Check",
+          "type": "array"
+        }
+      },
+      "required": [
+        "action",
+        "check"
+      ],
+      "title": "FeatureTools",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "sheet": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet"
+        },
+        "cell": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cell"
+        }
+      },
+      "title": "Location",
+      "type": "object"
+    },
+    "Module": {
+      "additionalProperties": false,
+      "description": "A future Agent (TD: Macro Skill).",
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^M-[A-Za-z0-9][A-Za-z0-9.-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "purpose": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Purpose",
+          "type": "string"
+        },
+        "agent_role": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Agent Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "citations",
+        "id",
+        "name",
+        "purpose",
+        "agent_role"
+      ],
+      "title": "Module",
+      "type": "object"
+    },
+    "Overview": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "client": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Client",
+          "type": "string"
+        },
+        "objective": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Objective",
+          "type": "string"
+        },
+        "background": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Background",
+          "type": "string"
+        },
+        "topic": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Topic",
+          "type": "string"
+        },
+        "history": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "History"
+        }
+      },
+      "required": [
+        "citations",
+        "client",
+        "objective",
+        "background",
+        "topic"
+      ],
+      "title": "Overview",
+      "type": "object"
+    },
+    "Role": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "decision_rights": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Decision Rights",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "decision_rights"
+      ],
+      "title": "Role",
+      "type": "object"
+    },
+    "RulesConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "rule_refs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Rule Refs",
+          "type": "array"
+        },
+        "constraints": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        }
+      },
+      "required": [
+        "citations",
+        "rule_refs",
+        "constraints"
+      ],
+      "title": "RulesConstraints",
+      "type": "object"
+    },
+    "Scope": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "in_scope": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "In Scope",
+          "type": "array"
+        },
+        "out_of_scope": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Out Of Scope",
+          "type": "array"
+        }
+      },
+      "required": [
+        "citations",
+        "in_scope",
+        "out_of_scope"
+      ],
+      "title": "Scope",
+      "type": "object"
+    },
+    "UsersAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/Role"
+          },
+          "minItems": 1,
+          "title": "Roles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "citations",
+        "roles"
+      ],
+      "title": "UsersAuthority",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The nine SOW sections of TD §10.6, in order.",
+  "properties": {
+    "overview": {
+      "$ref": "#/$defs/Overview"
+    },
+    "users_authority": {
+      "$ref": "#/$defs/UsersAuthority"
+    },
+    "scope": {
+      "$ref": "#/$defs/Scope"
+    },
+    "modules": {
+      "items": {
+        "$ref": "#/$defs/Module"
+      },
+      "minItems": 1,
+      "title": "Modules",
+      "type": "array"
+    },
+    "features": {
+      "items": {
+        "$ref": "#/$defs/FeatureItem"
+      },
+      "minItems": 1,
+      "title": "Features",
+      "type": "array"
+    },
+    "data_integrations": {
+      "$ref": "#/$defs/DataIntegrations"
+    },
+    "rules_constraints": {
+      "$ref": "#/$defs/RulesConstraints"
+    },
+    "deliverables_acceptance": {
+      "$ref": "#/$defs/DeliverablesAcceptance"
+    },
+    "assumptions_open_points": {
+      "$ref": "#/$defs/AssumptionsOpenPoints"
+    }
+  },
+  "required": [
+    "overview",
+    "users_authority",
+    "scope",
+    "modules",
+    "features",
+    "data_integrations",
+    "rules_constraints",
+    "deliverables_acceptance",
+    "assumptions_open_points"
+  ],
+  "title": "SowDocument",
+  "type": "object"
+}
