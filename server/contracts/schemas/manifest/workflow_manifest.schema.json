@@ -1,0 +1,444 @@
+{
+  "$defs": {
+    "CertificationState": {
+      "enum": [
+        "CERTIFIED",
+        "FROZEN"
+      ],
+      "title": "CertificationState",
+      "type": "string"
+    },
+    "Dag": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Edges",
+          "type": "array"
+        }
+      },
+      "required": [
+        "nodes",
+        "edges"
+      ],
+      "title": "Dag",
+      "type": "object"
+    },
+    "EvidenceEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Level",
+          "type": "string"
+        },
+        "subject": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Subject",
+          "type": "string"
+        },
+        "certification_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Certification Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "subject",
+        "certification_id",
+        "sha256"
+      ],
+      "title": "EvidenceEntry",
+      "type": "object"
+    },
+    "Integrity": {
+      "additionalProperties": false,
+      "properties": {
+        "content_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content_sha256"
+      ],
+      "title": "Integrity",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "sow_version_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Sow Version Id",
+          "type": "string"
+        },
+        "sow_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Sow Sha256",
+          "type": "string"
+        },
+        "approved_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Approved At",
+          "type": "string"
+        },
+        "approved_by": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Approved By",
+          "type": "string"
+        },
+        "knowledge_version_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Knowledge Version Id",
+          "type": "string"
+        },
+        "okf_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Okf Sha256",
+          "type": "string"
+        },
+        "master_snapshot_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Master Snapshot Sha256",
+          "type": "string"
+        },
+        "sow_refs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sow Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sow_version_id",
+        "sow_sha256",
+        "approved_at",
+        "approved_by",
+        "knowledge_version_id",
+        "okf_sha256",
+        "master_snapshot_sha256",
+        "sow_refs"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "SchemaSql": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_key": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Artifact Key",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_key",
+        "sha256"
+      ],
+      "title": "SchemaSql",
+      "type": "object"
+    },
+    "WorkflowAgent": {
+      "additionalProperties": false,
+      "description": "One Agent (TD: Macro Skill) of the Workflow and its certified Sub-Skills.",
+      "properties": {
+        "macro_category": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Macro Category",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "agent_ref": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Ref"
+        },
+        "certification_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Certification Id",
+          "type": "string"
+        },
+        "skills": {
+          "items": {
+            "$ref": "#/$defs/WorkflowSkill"
+          },
+          "minItems": 1,
+          "title": "Skills",
+          "type": "array"
+        }
+      },
+      "required": [
+        "macro_category",
+        "name",
+        "certification_id",
+        "skills"
+      ],
+      "title": "WorkflowAgent",
+      "type": "object"
+    },
+    "WorkflowCertification": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/CertificationState"
+        },
+        "certified_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Certified At",
+          "type": "string"
+        },
+        "frozen_at": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frozen At"
+        }
+      },
+      "required": [
+        "state",
+        "certified_at"
+      ],
+      "title": "WorkflowCertification",
+      "type": "object"
+    },
+    "WorkflowIds": {
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "project_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Project Id",
+          "type": "string"
+        },
+        "workflow_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Workflow Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "project_id",
+        "workflow_id"
+      ],
+      "title": "WorkflowIds",
+      "type": "object"
+    },
+    "WorkflowSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "deterministic_hash": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Deterministic Hash",
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Manifest Sha256",
+          "type": "string"
+        },
+        "bundle_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Bundle Sha256",
+          "type": "string"
+        },
+        "certification_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Certification Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "deterministic_hash",
+        "manifest_sha256",
+        "bundle_sha256",
+        "certification_id"
+      ],
+      "title": "WorkflowSkill",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The final SBAM output for one Workflow (TD §11.3).",
+  "properties": {
+    "schema_version": {
+      "const": "sbam-workflow-manifest/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "ids": {
+      "$ref": "#/$defs/WorkflowIds"
+    },
+    "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "objective": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Objective",
+      "type": "string"
+    },
+    "version": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    },
+    "previous_version": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Version"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "isatvon_framework_version": {
+      "const": "1.4",
+      "title": "Isatvon Framework Version",
+      "type": "string"
+    },
+    "macro_skills": {
+      "items": {
+        "$ref": "#/$defs/WorkflowAgent"
+      },
+      "minItems": 1,
+      "title": "Macro Skills",
+      "type": "array"
+    },
+    "schema_sql": {
+      "$ref": "#/$defs/SchemaSql"
+    },
+    "dag": {
+      "$ref": "#/$defs/Dag"
+    },
+    "runtime_image_digest": {
+      "pattern": "^(sha256:)?[0-9a-f]{64}$",
+      "title": "Runtime Image Digest",
+      "type": "string"
+    },
+    "evidence_index": {
+      "items": {
+        "$ref": "#/$defs/EvidenceEntry"
+      },
+      "title": "Evidence Index",
+      "type": "array"
+    },
+    "certification": {
+      "$ref": "#/$defs/WorkflowCertification"
+    },
+    "integrity": {
+      "$ref": "#/$defs/Integrity"
+    }
+  },
+  "required": [
+    "schema_version",
+    "ids",
+    "name",
+    "objective",
+    "version",
+    "provenance",
+    "isatvon_framework_version",
+    "macro_skills",
+    "schema_sql",
+    "dag",
+    "runtime_image_digest",
+    "evidence_index",
+    "certification",
+    "integrity"
+  ],
+  "title": "WorkflowManifest",
+  "type": "object"
+}

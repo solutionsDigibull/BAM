@@ -7,6 +7,8 @@
 
 The Sub-Skill manifest uses **exactly** the ISA14 Skill Manifest top-level structure, so the file SRIM receives is the format SRIM expects. SBAM adds one extension block, `sbam_build_record`, for provenance, build evidence and integrity.
 
+The contract has two layers (`server/contracts/sbam_contracts/manifest.py`): `Isa14Manifest` is the exact ISA14 five-block shape and accepts the verbatim ISA14 sample (version `1.4.0`, `i_instructions` and `state_handoff_file` as text); it is the FDE/LLM-facing shape and rejects `sbam_build_record`. `SkillManifest` adds `sbam_build_record` and the SBAM rules: `skill_type` `Deterministic_Loopy_MCP` (O-15), status DRAFT/VALIDATING/APPROVED/SUPERSEDED, version `MAJOR.0.PATCH` equal to `governance.versioning` (C-32), UTC timestamps, APPROVED ⇒ `immutable_after_approval` (C-52), and `n_notification.next` present.
+
 ```json
 {
   "skill_metadata": {
@@ -104,6 +106,8 @@ WorkflowManifest (schema_version = "sbam-workflow-manifest/1.0")
 ## 11.5 Hash rule
 
 `governance.deterministic_hash` = `sha256:` + SHA-256 of the RFC 8785 canonical JSON of the manifest, excluding `governance.deterministic_hash`, `sbam_build_record.evidence` and `sbam_build_record.certification`. This matches ISA14's "TO_BE_COMPUTED_ON_SAVE". The Workflow manifest hash includes every skill's `deterministic_hash`, bundle hash and the schema SQL hash. Signing is future scope.
+
+The Workflow `integrity.content_sha256` is the same hash over the Workflow manifest without `integrity` and `certification` (freezing does not change it). NaN, Infinity, non-UTF-8 strings and integers outside the I-JSON range are rejected before hashing. Implementation: `sbam_contracts.canonical` on the `rfc8785` library.
 
 ---
 [← §10](10-isatvon-1-4-contract.md)   [Design index](README.md)   [§12 →](12-code-generation.md)

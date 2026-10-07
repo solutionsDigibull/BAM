@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "description": "`loop_spec.json`: the five loop bounds in runtime form (the full compiler is #102).",
+  "properties": {
+    "max_iterations": {
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Max Iterations",
+      "type": "integer"
+    },
+    "success_gate": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Success Gate",
+      "type": "string"
+    },
+    "no_op_condition": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "No Op Condition",
+      "type": "string"
+    },
+    "escalation_condition": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Escalation Condition",
+      "type": "string"
+    },
+    "budget_limit_ms": {
+      "exclusiveMinimum": 0,
+      "title": "Budget Limit Ms",
+      "type": "integer"
+    },
+    "ui_update_template": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Ui Update Template",
+      "type": "string"
+    }
+  },
+  "required": [
+    "max_iterations",
+    "success_gate",
+    "no_op_condition",
+    "escalation_condition",
+    "budget_limit_ms",
+    "ui_update_template"
+  ],
+  "title": "LoopSpec",
+  "type": "object"
+}

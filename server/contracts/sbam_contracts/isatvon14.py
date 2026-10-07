@@ -143,7 +143,7 @@ class ExternalKind(StrEnum):
 
 class ExternalData(_Strict):
     name: ShortText
-    kind: ExternalKind
+    kind: Annotated[ExternalKind, Field(strict=False)]  # enum from a JSON string
     ref: Text  # pointer only, never fetched by the contract
 
 

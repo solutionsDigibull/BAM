@@ -1,0 +1,1827 @@
+{
+  "$defs": {
+    "AAutomation": {
+      "additionalProperties": false,
+      "properties": {
+        "orchestration_layer": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Orchestration Layer",
+          "type": "string"
+        },
+        "trigger_mode": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Trigger Mode",
+          "type": "string"
+        },
+        "action_step": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Action Step",
+          "type": "string"
+        },
+        "acceptance_check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Acceptance Check",
+          "type": "string"
+        },
+        "srim_metadata": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Srim Metadata",
+          "type": "string"
+        }
+      },
+      "required": [
+        "orchestration_layer",
+        "trigger_mode",
+        "action_step",
+        "acceptance_check",
+        "srim_metadata"
+      ],
+      "title": "AAutomation",
+      "type": "object"
+    },
+    "Audit": {
+      "additionalProperties": false,
+      "properties": {
+        "telemetry": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Telemetry",
+          "type": "string"
+        }
+      },
+      "required": [
+        "telemetry"
+      ],
+      "title": "Audit",
+      "type": "object"
+    },
+    "Build": {
+      "additionalProperties": false,
+      "properties": {
+        "template": {
+          "$ref": "#/$defs/TemplateRef"
+        },
+        "runtime_image_digest": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Runtime Image Digest",
+          "type": "string"
+        },
+        "libraries": {
+          "items": {
+            "$ref": "#/$defs/Library"
+          },
+          "title": "Libraries",
+          "type": "array"
+        },
+        "schema_sql_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Schema Sql Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "template",
+        "runtime_image_digest",
+        "libraries",
+        "schema_sql_sha256"
+      ],
+      "title": "Build",
+      "type": "object"
+    },
+    "BuildIds": {
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "project_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Project Id",
+          "type": "string"
+        },
+        "workflow_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Workflow Id",
+          "type": "string"
+        },
+        "sub_skill_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Sub Skill Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "project_id",
+        "workflow_id",
+        "sub_skill_id"
+      ],
+      "title": "BuildIds",
+      "type": "object"
+    },
+    "Certification": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/CertificationState"
+        },
+        "certified_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Certified At",
+          "type": "string"
+        },
+        "reused_from": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reused From"
+        }
+      },
+      "required": [
+        "state",
+        "certified_at"
+      ],
+      "title": "Certification",
+      "type": "object"
+    },
+    "CertificationState": {
+      "enum": [
+        "CERTIFIED",
+        "FROZEN"
+      ],
+      "title": "CertificationState",
+      "type": "string"
+    },
+    "Context": {
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Background",
+          "type": "string"
+        },
+        "topic": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Topic",
+          "type": "string"
+        },
+        "history": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "History"
+        }
+      },
+      "required": [
+        "background",
+        "topic"
+      ],
+      "title": "Context",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "code_attempt_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Code Attempt Id",
+          "type": "string"
+        },
+        "bundle_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Bundle Sha256",
+          "type": "string"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Gates",
+          "type": "array"
+        },
+        "test_run_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Test Run Id",
+          "type": "string"
+        },
+        "sandbox_run_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Sandbox Run Id",
+          "type": "string"
+        },
+        "passed_cases": {
+          "minimum": 0,
+          "title": "Passed Cases",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code_attempt_id",
+        "bundle_sha256",
+        "gates",
+        "test_run_id",
+        "sandbox_run_id",
+        "passed_cases"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Execution": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Engine",
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine"
+      ],
+      "title": "Execution",
+      "type": "object"
+    },
+    "ExternalData": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ExternalKind"
+        },
+        "ref": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "ref"
+      ],
+      "title": "ExternalData",
+      "type": "object"
+    },
+    "ExternalKind": {
+      "enum": [
+        "FILE",
+        "API",
+        "URL"
+      ],
+      "title": "ExternalKind",
+      "type": "string"
+    },
+    "FlatAutomation": {
+      "additionalProperties": false,
+      "properties": {
+        "orchestration_layer": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Orchestration Layer",
+          "type": "string"
+        },
+        "action_step": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Action Step",
+          "type": "string"
+        },
+        "acceptance_check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Acceptance Check",
+          "type": "string"
+        },
+        "trigger_mode": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trigger Mode"
+        },
+        "srim_metadata": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Srim Metadata"
+        }
+      },
+      "required": [
+        "orchestration_layer",
+        "action_step",
+        "acceptance_check"
+      ],
+      "title": "FlatAutomation",
+      "type": "object"
+    },
+    "FlatNotification": {
+      "additionalProperties": false,
+      "properties": {
+        "ui_updates": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Ui Updates",
+          "type": "array"
+        },
+        "database_updates": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Database Updates",
+          "type": "array"
+        },
+        "alerts": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Alerts",
+          "type": "array"
+        },
+        "next": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next"
+        }
+      },
+      "required": [
+        "ui_updates",
+        "database_updates",
+        "alerts"
+      ],
+      "title": "FlatNotification",
+      "type": "object"
+    },
+    "FlatOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "json_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "minProperties": 1,
+          "title": "Json Schema",
+          "type": "object"
+        },
+        "state_handoff_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StateHandoffFile"
+            },
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "title": "State Handoff File"
+        },
+        "success_criteria": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Success Criteria"
+        }
+      },
+      "required": [
+        "json_schema",
+        "state_handoff_file"
+      ],
+      "title": "FlatOutcome",
+      "type": "object"
+    },
+    "FlatSource": {
+      "additionalProperties": false,
+      "properties": {
+        "required_inputs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Required Inputs",
+          "type": "array"
+        },
+        "fresh_state_parameters": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Fresh State Parameters",
+          "type": "array"
+        },
+        "external_data": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ExternalData"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Data"
+        },
+        "ml_data": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ml Data"
+        }
+      },
+      "required": [
+        "required_inputs",
+        "fresh_state_parameters"
+      ],
+      "title": "FlatSource",
+      "type": "object"
+    },
+    "FlatTechStack": {
+      "additionalProperties": false,
+      "properties": {
+        "execution_layer": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Execution Layer",
+          "type": "string"
+        },
+        "action_tool": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Action Tool",
+          "type": "string"
+        },
+        "fixed_check_tool": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Fixed Check Tool",
+          "type": "string"
+        },
+        "secondary_tools": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secondary Tools"
+        },
+        "gateway_routing": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gateway Routing"
+        },
+        "libraries": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Library"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Libraries"
+        }
+      },
+      "required": [
+        "execution_layer",
+        "action_tool",
+        "fixed_check_tool"
+      ],
+      "title": "FlatTechStack",
+      "type": "object"
+    },
+    "FlatVariables": {
+      "additionalProperties": false,
+      "properties": {
+        "max_iterations": {
+          "title": "Max Iterations",
+          "type": "integer"
+        },
+        "success_gate": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Success Gate",
+          "type": "string"
+        },
+        "no_op_condition": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "No Op Condition",
+          "type": "string"
+        },
+        "escalation_condition": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Escalation Condition",
+          "type": "string"
+        },
+        "budget_limit": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Budget Limit",
+          "type": "string"
+        },
+        "tables": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tables"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Parameter"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        },
+        "secrets": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secrets"
+        }
+      },
+      "required": [
+        "max_iterations",
+        "success_gate",
+        "no_op_condition",
+        "escalation_condition",
+        "budget_limit"
+      ],
+      "title": "FlatVariables",
+      "type": "object"
+    },
+    "Gateway": {
+      "additionalProperties": false,
+      "properties": {
+        "route_via": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Route Via",
+          "type": "string"
+        }
+      },
+      "required": [
+        "route_via"
+      ],
+      "title": "Gateway",
+      "type": "object"
+    },
+    "Governance": {
+      "additionalProperties": false,
+      "properties": {
+        "deterministic_hash": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Deterministic Hash",
+          "type": "string"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/Lifecycle"
+        },
+        "versioning": {
+          "$ref": "#/$defs/Versioning"
+        }
+      },
+      "required": [
+        "deterministic_hash",
+        "lifecycle",
+        "versioning"
+      ],
+      "title": "Governance",
+      "type": "object"
+    },
+    "IInstructions": {
+      "additionalProperties": false,
+      "properties": {
+        "statement": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "trigger": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        },
+        "action": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Check",
+          "type": "string"
+        },
+        "bound": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Bound",
+          "type": "string"
+        },
+        "user_role": {
+          "$ref": "#/$defs/UserRole"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "context": {
+          "$ref": "#/$defs/Context"
+        }
+      },
+      "required": [
+        "statement",
+        "trigger",
+        "action",
+        "check",
+        "bound",
+        "user_role",
+        "task",
+        "context"
+      ],
+      "title": "IInstructions",
+      "type": "object"
+    },
+    "Isa14Definition": {
+      "additionalProperties": false,
+      "description": "`isatvon_definition` as exported: ISA14's flat shape (`i_instructions` is one string).",
+      "properties": {
+        "i_instructions": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "I Instructions",
+          "type": "string"
+        },
+        "s_source": {
+          "$ref": "#/$defs/FlatSource"
+        },
+        "a_automation": {
+          "$ref": "#/$defs/FlatAutomation"
+        },
+        "t_tech_stack": {
+          "$ref": "#/$defs/FlatTechStack"
+        },
+        "v_variables": {
+          "$ref": "#/$defs/FlatVariables"
+        },
+        "o_outcome": {
+          "$ref": "#/$defs/FlatOutcome"
+        },
+        "n_notification": {
+          "$ref": "#/$defs/FlatNotification"
+        }
+      },
+      "required": [
+        "i_instructions",
+        "s_source",
+        "a_automation",
+        "t_tech_stack",
+        "v_variables",
+        "o_outcome",
+        "n_notification"
+      ],
+      "title": "Isa14Definition",
+      "type": "object"
+    },
+    "IsatvonDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "i_instructions": {
+          "$ref": "#/$defs/IInstructions"
+        },
+        "s_source": {
+          "$ref": "#/$defs/SSource"
+        },
+        "a_automation": {
+          "$ref": "#/$defs/AAutomation"
+        },
+        "t_tech_stack": {
+          "$ref": "#/$defs/TTechStack"
+        },
+        "v_variables": {
+          "$ref": "#/$defs/VVariables"
+        },
+        "o_outcome": {
+          "$ref": "#/$defs/OOutcome"
+        },
+        "n_notification": {
+          "$ref": "#/$defs/NNotification"
+        }
+      },
+      "required": [
+        "i_instructions",
+        "s_source",
+        "a_automation",
+        "t_tech_stack",
+        "v_variables",
+        "o_outcome",
+        "n_notification"
+      ],
+      "title": "IsatvonDefinition",
+      "type": "object"
+    },
+    "JsonSchemaObject": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "object",
+          "title": "Type",
+          "type": "string"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Properties"
+        },
+        "required": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required"
+        }
+      },
+      "required": [
+        "type",
+        "properties"
+      ],
+      "title": "JsonSchemaObject",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Library": {
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Package",
+          "type": "string"
+        },
+        "version_constraint": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Constraint"
+        }
+      },
+      "required": [
+        "package"
+      ],
+      "title": "Library",
+      "type": "object"
+    },
+    "Lifecycle": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "State",
+          "type": "string"
+        },
+        "approval_required_for_change": {
+          "title": "Approval Required For Change",
+          "type": "boolean"
+        },
+        "immutable_after_approval": {
+          "title": "Immutable After Approval",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "state",
+        "approval_required_for_change",
+        "immutable_after_approval"
+      ],
+      "title": "Lifecycle",
+      "type": "object"
+    },
+    "ManifestContracts": {
+      "additionalProperties": false,
+      "properties": {
+        "input_schema": {
+          "$ref": "#/$defs/JsonSchemaObject"
+        },
+        "output_schema": {
+          "$ref": "#/$defs/JsonSchemaObject"
+        }
+      },
+      "required": [
+        "input_schema",
+        "output_schema"
+      ],
+      "title": "ManifestContracts",
+      "type": "object"
+    },
+    "ManifestSkillMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "macro_category": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Macro Category",
+          "type": "string"
+        },
+        "skill_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "skill_name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Name",
+          "type": "string"
+        },
+        "skill_type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Type",
+          "type": "string"
+        },
+        "reusable": {
+          "title": "Reusable",
+          "type": "boolean"
+        },
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "status": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "created_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "macro_category",
+        "skill_id",
+        "skill_name",
+        "skill_type",
+        "reusable",
+        "version",
+        "status",
+        "owner",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "ManifestSkillMetadata",
+      "type": "object"
+    },
+    "NNotification": {
+      "additionalProperties": false,
+      "properties": {
+        "ui_updates": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Ui Updates",
+          "type": "array"
+        },
+        "database_updates": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Database Updates",
+          "type": "array"
+        },
+        "alerts": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Alerts",
+          "type": "array"
+        },
+        "next": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next"
+        }
+      },
+      "required": [
+        "ui_updates",
+        "database_updates",
+        "alerts",
+        "next"
+      ],
+      "title": "NNotification",
+      "type": "object"
+    },
+    "OOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "json_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "minProperties": 1,
+          "title": "Json Schema",
+          "type": "object"
+        },
+        "state_handoff_file": {
+          "$ref": "#/$defs/StateHandoffFile"
+        },
+        "success_criteria": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Success Criteria",
+          "type": "string"
+        }
+      },
+      "required": [
+        "json_schema",
+        "state_handoff_file",
+        "success_criteria"
+      ],
+      "title": "OOutcome",
+      "type": "object"
+    },
+    "Orchestration": {
+      "additionalProperties": false,
+      "properties": {
+        "router": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Router",
+          "type": "string"
+        },
+        "trigger": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        }
+      },
+      "required": [
+        "router",
+        "trigger"
+      ],
+      "title": "Orchestration",
+      "type": "object"
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "default": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Constraints"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "Parameter",
+      "type": "object"
+    },
+    "Persistence": {
+      "additionalProperties": false,
+      "properties": {
+        "database": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Database",
+          "type": "string"
+        },
+        "table": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Table",
+          "type": "string"
+        },
+        "action": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database",
+        "table",
+        "action"
+      ],
+      "title": "Persistence",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "sow_version_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Sow Version Id",
+          "type": "string"
+        },
+        "sow_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Sow Sha256",
+          "type": "string"
+        },
+        "approved_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Approved At",
+          "type": "string"
+        },
+        "approved_by": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Approved By",
+          "type": "string"
+        },
+        "knowledge_version_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Knowledge Version Id",
+          "type": "string"
+        },
+        "okf_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Okf Sha256",
+          "type": "string"
+        },
+        "master_snapshot_sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Master Snapshot Sha256",
+          "type": "string"
+        },
+        "sow_refs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sow Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sow_version_id",
+        "sow_sha256",
+        "approved_at",
+        "approved_by",
+        "knowledge_version_id",
+        "okf_sha256",
+        "master_snapshot_sha256",
+        "sow_refs"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "RuntimeUi": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        },
+        "method": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "method"
+      ],
+      "title": "RuntimeUi",
+      "type": "object"
+    },
+    "SSource": {
+      "additionalProperties": false,
+      "properties": {
+        "required_inputs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Required Inputs",
+          "type": "array"
+        },
+        "fresh_state_parameters": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Fresh State Parameters",
+          "type": "array"
+        },
+        "external_data": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ExternalData"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Data"
+        },
+        "ml_data": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ml Data"
+        }
+      },
+      "required": [
+        "required_inputs",
+        "fresh_state_parameters"
+      ],
+      "title": "SSource",
+      "type": "object"
+    },
+    "SbamBuildRecord": {
+      "additionalProperties": false,
+      "description": "Platform-only provenance and build evidence. Never accepted from the FDE or an LLM.",
+      "properties": {
+        "isatvon_framework_version": {
+          "const": "1.4",
+          "title": "Isatvon Framework Version",
+          "type": "string"
+        },
+        "isatvon_detail": {
+          "$ref": "#/$defs/IsatvonDefinition"
+        },
+        "ids": {
+          "$ref": "#/$defs/BuildIds"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "build": {
+          "$ref": "#/$defs/Build"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Evidence"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "certification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Certification"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "isatvon_framework_version",
+        "isatvon_detail",
+        "ids",
+        "provenance",
+        "build"
+      ],
+      "title": "SbamBuildRecord",
+      "type": "object"
+    },
+    "SrimRuntimeDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "orchestration": {
+          "$ref": "#/$defs/Orchestration"
+        },
+        "execution": {
+          "$ref": "#/$defs/Execution"
+        },
+        "gateway": {
+          "$ref": "#/$defs/Gateway"
+        },
+        "persistence": {
+          "$ref": "#/$defs/Persistence"
+        },
+        "audit": {
+          "$ref": "#/$defs/Audit"
+        },
+        "ui": {
+          "$ref": "#/$defs/RuntimeUi"
+        }
+      },
+      "required": [
+        "orchestration",
+        "execution",
+        "gateway",
+        "persistence",
+        "audit",
+        "ui"
+      ],
+      "title": "SrimRuntimeDefinition",
+      "type": "object"
+    },
+    "StateHandoffFile": {
+      "additionalProperties": false,
+      "properties": {
+        "table": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Table",
+          "type": "string"
+        },
+        "mode": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Mode",
+          "type": "string"
+        },
+        "required_fields": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Required Fields",
+          "type": "array"
+        },
+        "description": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "table",
+        "mode",
+        "required_fields",
+        "description"
+      ],
+      "title": "StateHandoffFile",
+      "type": "object"
+    },
+    "TTechStack": {
+      "additionalProperties": false,
+      "properties": {
+        "execution_layer": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Execution Layer",
+          "type": "string"
+        },
+        "action_tool": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Action Tool",
+          "type": "string"
+        },
+        "fixed_check_tool": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Fixed Check Tool",
+          "type": "string"
+        },
+        "secondary_tools": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secondary Tools"
+        },
+        "gateway_routing": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gateway Routing"
+        },
+        "libraries": {
+          "items": {
+            "$ref": "#/$defs/Library"
+          },
+          "minItems": 1,
+          "title": "Libraries",
+          "type": "array"
+        }
+      },
+      "required": [
+        "execution_layer",
+        "action_tool",
+        "fixed_check_tool",
+        "libraries"
+      ],
+      "title": "TTechStack",
+      "type": "object"
+    },
+    "Task": {
+      "additionalProperties": false,
+      "properties": {
+        "goal": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Goal",
+          "type": "string"
+        },
+        "method": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Method",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "goal",
+        "method",
+        "steps"
+      ],
+      "title": "Task",
+      "type": "object"
+    },
+    "TemplateRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "sha256"
+      ],
+      "title": "TemplateRef",
+      "type": "object"
+    },
+    "UserRole": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Level",
+          "type": "string"
+        },
+        "persona": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Persona",
+          "type": "string"
+        },
+        "authority": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Authority",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "persona",
+        "authority"
+      ],
+      "title": "UserRole",
+      "type": "object"
+    },
+    "VVariables": {
+      "additionalProperties": false,
+      "properties": {
+        "max_iterations": {
+          "title": "Max Iterations",
+          "type": "integer"
+        },
+        "success_gate": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Success Gate",
+          "type": "string"
+        },
+        "no_op_condition": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "No Op Condition",
+          "type": "string"
+        },
+        "escalation_condition": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Escalation Condition",
+          "type": "string"
+        },
+        "budget_limit": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Budget Limit",
+          "type": "string"
+        },
+        "tables": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tables",
+          "type": "array"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Parameter"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        },
+        "secrets": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secrets"
+        }
+      },
+      "required": [
+        "max_iterations",
+        "success_gate",
+        "no_op_condition",
+        "escalation_condition",
+        "budget_limit",
+        "tables"
+      ],
+      "title": "VVariables",
+      "type": "object"
+    },
+    "Versioning": {
+      "additionalProperties": false,
+      "properties": {
+        "major": {
+          "minimum": 0,
+          "title": "Major",
+          "type": "integer"
+        },
+        "minor": {
+          "minimum": 0,
+          "title": "Minor",
+          "type": "integer"
+        },
+        "patch": {
+          "minimum": 0,
+          "title": "Patch",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "title": "Versioning",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The Sub-Skill manifest SBAM writes: ISA14 blocks + `sbam_build_record` (TD §11.1).",
+  "properties": {
+    "skill_metadata": {
+      "$ref": "#/$defs/ManifestSkillMetadata"
+    },
+    "isatvon_definition": {
+      "$ref": "#/$defs/Isa14Definition"
+    },
+    "srim_runtime_definition": {
+      "$ref": "#/$defs/SrimRuntimeDefinition"
+    },
+    "contracts": {
+      "$ref": "#/$defs/ManifestContracts"
+    },
+    "governance": {
+      "$ref": "#/$defs/Governance"
+    },
+    "sbam_build_record": {
+      "$ref": "#/$defs/SbamBuildRecord"
+    }
+  },
+  "required": [
+    "skill_metadata",
+    "isatvon_definition",
+    "srim_runtime_definition",
+    "contracts",
+    "governance",
+    "sbam_build_record"
+  ],
+  "title": "SkillManifest",
+  "type": "object"
+}

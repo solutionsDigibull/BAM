@@ -27,8 +27,9 @@ too_big = blob(15 * 1024 * 1024 + 1)                              # exact size, 
 
 | File | What it is | Expected outcome |
 |---|---|---|
-| `isa14/ms01_1_sample.json` | ISATVON 1.4 sample Sub-Skill `MS01.1_Investor_Auth_Manager`, copied verbatim from `docs/reference/ISATVON 1.4 for Skill Generation.docx` | Valid JSON with the five top-level blocks. Must validate against the E0.3 model once #20 merges |
+| `isa14/ms01_1_sample.json` | ISATVON 1.4 sample Sub-Skill `MS01.1_Investor_Auth_Manager`, copied verbatim from `docs/reference/ISATVON 1.4 for Skill Generation.docx` | Valid JSON with the five top-level blocks. Validates as `Isa14Manifest` (E0.3) and round-trips byte-identically |
 | `isa14/ms01_1_structured.json` | The same MS01.1 Sub-Skill in SBAM's structured ISATVON 1.4 build form (TD §10.3): `i_instructions` split into its parts, `state_handoff_file` as an object, `libraries`, and `n_notification.next` (N = Next + Notification). Written by hand | Validates as `SubSkill` with no TD §10.4 rule violations (E0.2-T01) |
+| `isa14/ms01_1_manifest.json` | MS01.1 as a full SBAM Skill Manifest (TD §11.1): the ISA14 sample's blocks with version `1.0.0`, `n_notification.next`, a structured `state_handoff_file` and an `sbam_build_record` (isatvon_detail = `ms01_1_structured.json`, synthetic digests). Generated once, then committed | Validates as `SkillManifest`; `governance.deterministic_hash` equals the RFC 8785 hash (E0.3-T01) |
 
 ## masters/
 
