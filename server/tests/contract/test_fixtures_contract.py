@@ -1,8 +1,8 @@
 """E0.8 contract tests: the ISA14 manifest, masters workbook and SOW fixture are loaded and checked.
 
 Each of the three fixtures is used by at least one test here (E0.8-T01). The ISA14 sample is also
-validated against the E0.3 model (`Isa14Manifest`, #20); the SowDocument model (SOW, #22) is added
-when it merges.
+validated against the E0.3 model (`Isa14Manifest`, #20) and the SOW fixtures against `SowDocument`
+(E0.5, #22).
 """
 
 import hashlib
@@ -13,7 +13,7 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 import openpyxl
-from fixtures import fixture_path
+from fixtures import FIXTURES_DIR, document_version_uuid, fixture_path
 from sbam_contracts.masters_workbook import TAB_ORDER, parse_workbook
 
 REPO = Path(__file__).resolve().parents[3]
@@ -146,11 +146,22 @@ def test_e0_8_t01_every_sow_section_and_feature_is_cited() -> None:
 
 
 def test_e0_8_t01_sow_citations_point_at_real_fixture_files() -> None:
-    for section, citation in all_citations(load_sow()):
-        assert set(citation) == {"okf_ref", "document_version_id", "location"}, section
-        prefix, _, relative = citation["document_version_id"].partition(":")
-        assert prefix == "fixture", section
-        assert fixture_path(*relative.split("/")).is_file(), citation["document_version_id"]
+    files = {
+        str(document_version_uuid(path.relative_to(FIXTURES_DIR).as_posix()))
+        for path in (FIXTURES_DIR / "documents").iterdir()
+    }
+    for name in ("sow_rfq_nav9.json", "ms01_1_sow.json"):
+        sow = json.loads(fixture_path("sow", name).read_text("utf-8"))
+        for section, citation in all_citations(sow):
+            assert set(citation) == {"okf_ref_id", "document_version_id", "location"}, section
+            assert citation["document_version_id"] in files, (name, section)
+
+
+def test_e0_8_t01_sow_fixtures_validate_as_sow_document() -> None:
+    from sbam_contracts.sow import SowDocument
+
+    for name in ("sow_rfq_nav9.json", "ms01_1_sow.json"):
+        SowDocument.model_validate(json.loads(fixture_path("sow", name).read_text("utf-8")))
 
 
 def test_e0_8_t01_sow_feature_items_have_stable_ids_and_the_full_field_set() -> None:

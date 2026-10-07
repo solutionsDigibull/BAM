@@ -6,8 +6,8 @@
     "topic": "Electronics manufacturing services (EMS) RFQ costing",
     "history": "Quotes are produced manually; single-source parts are flagged late.",
     "citations": [
-      {"okf_ref": "chunk:text.pdf#c0", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 1}},
-      {"okf_ref": "chunk:text.pdf#c1", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 3}}
+      {"okf_ref_id": "chunk:text.pdf#c0", "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe", "location": {"page": 1, "line": 1}},
+      {"okf_ref_id": "chunk:text.pdf#c1", "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe", "location": {"page": 1, "line": 3}}
     ]
   },
   "users_authority": {
@@ -16,14 +16,14 @@
       {"role": "Team lead", "decision_rights": "Approves exceptions to the costing rules"}
     ],
     "citations": [
-      {"okf_ref": "chunk:text.pdf#c3", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 2, "line": 2}}
+      {"okf_ref_id": "chunk:text.pdf#c3", "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe", "location": {"page": 2, "line": 2}}
     ]
   },
   "scope": {
     "in_scope": ["Parse the RFQ and BOM", "Flag single-source parts", "Compute a costed BOM with scrap and FX"],
     "out_of_scope": ["Purchasing", "Production planning"],
     "citations": [
-      {"okf_ref": "chunk:sample.md#c2", "document_version_id": "fixture:documents/sample.md", "location": {"line": 5}}
+      {"okf_ref_id": "chunk:sample.md#c2", "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f", "location": {"line": 5}}
     ]
   },
   "modules": [
@@ -33,7 +33,7 @@
       "purpose": "Turn the RFQ pack into a normalized BOM",
       "agent_role": "Intake agent (AG-INTAKE)",
       "citations": [
-        {"okf_ref": "chunk:multi_sheet.xlsx#c0", "document_version_id": "fixture:documents/multi_sheet.xlsx", "location": {"sheet": "BOM", "cell": "A1:E1"}}
+        {"okf_ref_id": "chunk:multi_sheet.xlsx#c0", "document_version_id": "b5b9cb33-38b0-5ce1-8122-c5ff61ff950b", "location": {"sheet": "BOM", "cell": "A1:E1"}}
       ]
     },
     {
@@ -42,7 +42,7 @@
       "purpose": "Price the normalized BOM under the approved rules",
       "agent_role": "Costing agent (AG-COST)",
       "citations": [
-        {"okf_ref": "chunk:text.pdf#c1", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 3}}
+        {"okf_ref_id": "chunk:text.pdf#c1", "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe", "location": {"page": 1, "line": 3}}
       ]
     }
   ],
@@ -64,7 +64,7 @@
       "handoff": "Record of parsed lines and rejected rows",
       "notifications": ["Alert the sourcing engineer when a line is rejected"],
       "citations": [
-        {"okf_ref": "chunk:multi_sheet.xlsx#c1", "document_version_id": "fixture:documents/multi_sheet.xlsx", "location": {"sheet": "BOM", "cell": "A2:E7"}}
+        {"okf_ref_id": "chunk:multi_sheet.xlsx#c1", "document_version_id": "b5b9cb33-38b0-5ce1-8122-c5ff61ff950b", "location": {"sheet": "BOM", "cell": "A2:E7"}}
       ]
     },
     {
@@ -84,7 +84,7 @@
       "handoff": "Record of flagged parts",
       "notifications": ["Alert the team lead when a part is single-source"],
       "citations": [
-        {"okf_ref": "chunk:text.pdf#c3", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 2, "line": 2}}
+        {"okf_ref_id": "chunk:text.pdf#c3", "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe", "location": {"page": 2, "line": 2}}
       ]
     },
     {
@@ -104,7 +104,7 @@
       "handoff": "Record of prices, FX rate and scrap rate used",
       "notifications": ["Alert the team lead when an offer or FX rate is missing"],
       "citations": [
-        {"okf_ref": "chunk:text.pdf#c2", "document_version_id": "fixture:documents/text.pdf", "location": {"page": 1, "line": 6}}
+        {"okf_ref_id": "chunk:text.pdf#c2", "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe", "location": {"page": 1, "line": 6}}
       ]
     }
   ],
@@ -113,28 +113,28 @@
     "apis": ["Quote API (see documents/openapi.yaml)"],
     "tables": ["bom_line", "supplier_offer", "offer", "fx_rate"],
     "citations": [
-      {"okf_ref": "chunk:openapi.yaml#c0", "document_version_id": "fixture:documents/openapi.yaml", "location": {"line": 1}}
+      {"okf_ref_id": "chunk:openapi.yaml#c0", "document_version_id": "a1b49a71-2421-5c5b-9852-4a0d0d61e9b7", "location": {"line": 1}}
     ]
   },
   "rules_constraints": {
     "rule_refs": ["RULE-BOM", "RULE-OFFER"],
     "constraints": ["Stop on an unresolved MPN", "Do not use an expired offer"],
     "citations": [
-      {"okf_ref": "chunk:sample.yaml#c0", "document_version_id": "fixture:documents/sample.yaml", "location": {"line": 1}}
+      {"okf_ref_id": "chunk:sample.yaml#c0", "document_version_id": "caedd789-f1fa-520d-aed5-388a0e3e17cb", "location": {"line": 1}}
     ]
   },
   "deliverables_acceptance": {
     "deliverables": ["Costed BOM", "Review list of single-source parts"],
     "acceptance_criteria": ["Every line is priced", "Every single-source part is flagged"],
     "citations": [
-      {"okf_ref": "chunk:sample.md#c3", "document_version_id": "fixture:documents/sample.md", "location": {"line": 9}}
+      {"okf_ref_id": "chunk:sample.md#c3", "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f", "location": {"line": 9}}
     ]
   },
   "assumptions_open_points": {
     "assumptions": ["Quotes stay valid for 14 days"],
     "open_points": ["Which FX source is authoritative"],
     "citations": [
-      {"okf_ref": "chunk:sample.md#c3", "document_version_id": "fixture:documents/sample.md", "location": {"line": 9}}
+      {"okf_ref_id": "chunk:sample.md#c3", "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f", "location": {"line": 9}}
     ]
   }
 }

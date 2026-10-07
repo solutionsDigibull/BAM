@@ -21,7 +21,7 @@ too_big = blob(15 * 1024 * 1024 + 1)                              # exact size, 
 - `SHA256SUMS` records every fixture file (not this README or the helper code). Verify with `cd server/tests/fixtures && sha256sum -c SHA256SUMS`.
 - `python server/tests/fixtures/check_fixture_readme.py` fails if a file is not listed in this README.
 - Regenerate the documents deliberately with `uv run scripts/generate_test_fixtures.py`, then commit them together
-  with the new `SHA256SUMS`. `sow/sow_rfq_nav9.json` and this README are written by hand.
+  with the new `SHA256SUMS`. The `sow/` files and this README are written by hand.
 
 ## isa14/
 
@@ -41,7 +41,8 @@ too_big = blob(15 * 1024 * 1024 + 1)                              # exact size, 
 
 | File | What it is | Expected outcome |
 |---|---|---|
-| `sow/sow_rfq_nav9.json` | A complete cited SOW for the NAV-9 RFQ project: the nine sections of TD §10.6, feature items with stable ids (`F-<module>-<n>`) and citations. Shape is **provisional** until `SowDocument` (E0.5, #22) lands; citation ids are placeholders (`chunk:<file>#c<n>`) | All nine sections present and non-empty; every section and feature cited; feature ids unique |
+| `sow/sow_rfq_nav9.json` | A complete cited SOW for the NAV-9 RFQ project: the nine sections of TD §10.6, feature items with stable ids (`F-<module>-<n>`) and citations `{okf_ref_id, document_version_id, location}`. `document_version_id` is `document_version_uuid("documents/<file>")` from `fixtures/__init__.py`; `okf_ref_id` values are placeholders (`chunk:<file>#c<n>`) | Validates as `SowDocument` (E0.5); every section and feature cited; feature ids unique |
+| `sow/ms01_1_sow.json` | SOW for the MS01.1 investor-access example: module `M-ACCESS` (future Agent MS01) with features `F-ACCESS-1` (OTP + device limits, MS01.1) and `F-ACCESS-2` (KYC, MS01.2), cited like the NAV-9 SOW. Written by hand | Validates as `SowDocument` (E0.5-T01) |
 
 ## documents/
 

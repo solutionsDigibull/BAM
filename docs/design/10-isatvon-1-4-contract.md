@@ -109,5 +109,7 @@ The SOW is generated so it can be broken down mechanically into ISATVON. `SowDoc
 
 Every section and feature item carries `citations[]` (OKF chunk/entity ids → document + location). Feature items have stable ids, which drive Sub-Skill extraction and scope-change impact analysis.
 
+Contract: `server/contracts/sbam_contracts/sow.py` (`SowDocument`, E0.5). Keys in order: `overview`, `users_authority`, `scope`, `modules[]` (`id` `M-…`, `name`, `purpose`, `agent_role`), `features[]` (`id` `F-…`, `module_id`, `name`, `trigger`, `action`, `check`, `bound {max_attempts 1–10, on_exhaustion}`, `inputs_state[]`, `external_data[]`, `tools {action[], check[]}` (no overlap), `tables[]`, `success_criteria[]`, `output`, `handoff`, `notifications[]`), `data_integrations`, `rules_constraints` (`rule_refs` `RULE-*`), `deliverables_acceptance`, `assumptions_open_points`. A citation is `{okf_ref_id, document_version_id (UUID), location {page?, line?, sheet?, cell?}}`. Every module has at least one feature; module and feature ids are unique. Platform fields (status, approval, hashes) live outside the document.
+
 ---
 [← §9](09-frontend-design.md)   [Design index](README.md)   [§11 →](11-manifest-design.md)
