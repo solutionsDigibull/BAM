@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "SBAM FastAPI modular monolith"
 requires-python = "==3.12.*"
 dependencies = [
+    "fastapi>=0.142.2",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.15.0",
     "sbam-contracts",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [build-system]
