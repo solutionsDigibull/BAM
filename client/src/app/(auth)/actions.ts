@@ -3,8 +3,9 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
+import { auth, providerId, signIn, signOut as authSignOut, type Portal } from "@/auth";
 import { parseRoles } from "@/lib/roles";
-import { DEV_ROLES_COOKIE, devAuthEnabled } from "@/lib/session";
+import { DEV_ROLES_COOKIE, devAuthEnabled, keycloakEnabled } from "@/lib/session";
 
 export async function devSignIn(formData: FormData) {
   if (!devAuthEnabled()) notFound();
@@ -17,7 +18,15 @@ export async function devSignIn(formData: FormData) {
   redirect("/");
 }
 
+export async function keycloakSignIn(formData: FormData) {
+  if (!keycloakEnabled()) notFound();
+  const portal: Portal = formData.get("portal") === "admin" ? "admin" : "fde";
+  // Keycloak down: Auth.js redirects to pages.error (the login card) with error=Configuration.
+  await signIn(providerId(portal), { redirectTo: "/" });
+}
+
 export async function signOut() {
   (await cookies()).delete(DEV_ROLES_COOKIE);
+  if (keycloakEnabled() && (await auth())) await authSignOut({ redirectTo: "/login-fde" });
   redirect("/login-fde");
 }
