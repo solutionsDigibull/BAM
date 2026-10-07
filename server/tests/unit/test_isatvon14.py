@@ -115,6 +115,14 @@ def test_e0_2_empty_state_and_tables_are_legitimate() -> None:
     assert rules_at(validate_sub_skill(raw)) == [(7, IDEF + "o_outcome.state_handoff_file.table")]
 
 
+def test_e0_2_external_data_kind_accepts_json_strings() -> None:
+    sources = [{"name": "kyc_api", "kind": "API", "ref": "https://example.com/kyc"}]
+    raw = variant(**{IDEF + "s_source.external_data": sources})
+    assert validate_sub_skill(raw) == []
+    sources[0]["kind"] = "FTP"
+    assert rules_at(validate_sub_skill(raw)) == [(1, IDEF + "s_source.external_data.0.kind")]
+
+
 # --- Rule 2: IDs (T02) ----------------------------------------------------------------------------
 
 

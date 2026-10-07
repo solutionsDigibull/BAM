@@ -1,7 +1,8 @@
 """E0.8 contract tests: the ISA14 manifest, masters workbook and SOW fixture are loaded and checked.
 
-Each of the three fixtures is used by at least one test here (E0.8-T01). Validation against the E0.3
-model (ISA14, #20) and the SowDocument model (SOW, #22) is added when those models merge.
+Each of the three fixtures is used by at least one test here (E0.8-T01). The ISA14 sample is also
+validated against the E0.3 model (`Isa14Manifest`, #20); the SowDocument model (SOW, #22) is added
+when it merges.
 """
 
 import hashlib
@@ -77,6 +78,15 @@ def test_e0_8_t01_isa14_manifest_loads_with_the_five_blocks() -> None:
     meta = manifest["skill_metadata"]
     assert meta["skill_id"] == "MS01.1_Investor_Auth_Manager"
     assert meta["version"] == "1.4.0"
+
+
+def test_e0_8_t01_isa14_manifest_validates_against_the_e0_3_model() -> None:
+    from sbam_contracts.canonical import canonical_json
+    from sbam_contracts.manifest import Isa14Manifest
+
+    manifest = json.loads(fixture_path("isa14", "ms01_1_sample.json").read_text("utf-8"))
+    model = Isa14Manifest.model_validate(manifest)
+    assert canonical_json(model.dump()) == canonical_json(manifest)
 
 
 def test_e0_8_t01_isa14_manifest_matches_the_reference_document() -> None:

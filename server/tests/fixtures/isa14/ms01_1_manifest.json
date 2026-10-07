@@ -1,0 +1,350 @@
+{
+  "skill_metadata": {
+    "macro_category": "MS01_Investor_Registration_Access",
+    "skill_id": "MS01.1_Investor_Auth_Manager",
+    "skill_name": "Investor OTP & Access Verifier",
+    "skill_type": "Deterministic_Loopy_MCP",
+    "reusable": true,
+    "version": "1.0.0",
+    "status": "APPROVED",
+    "owner": "AntMeta Platform Operations",
+    "created_at": "2026-06-29T12:00:00Z",
+    "updated_at": "2026-06-29T12:00:00Z"
+  },
+  "isatvon_definition": {
+    "i_instructions": "Triggered by login request. Action: Validate OTP and enforce RBAC device limits. Check: Verify OTP matches secure vault and device count is under limit. Bound: Allow up to 3 OTP retry loops before locking the profile.",
+    "s_source": {
+      "required_inputs": [
+        "mobile_number",
+        "otp_payload",
+        "device_fingerprint"
+      ],
+      "fresh_state_parameters": [
+        "Current failed_login_attempts in Postgres",
+        "Active device_registration_count in Postgres"
+      ]
+    },
+    "a_automation": {
+      "orchestration_layer": "BuLLM_DMR",
+      "action_step": "Compare provided OTP against Auth_MCP memory and calculate device fingerprint limits.",
+      "acceptance_check": "Programmatically evaluate if otp_match == True AND active_devices <= max_device_limit.",
+      "trigger_mode": "HTTP_POST_Payload_plus_Variables"
+    },
+    "t_tech_stack": {
+      "execution_layer": "FastMCP",
+      "action_tool": "Auth_MCP (Session & OTP Evaluator)",
+      "fixed_check_tool": "RBAC_MCP (Policy & Limit Validator)"
+    },
+    "v_variables": {
+      "max_iterations": 3,
+      "success_gate": "otp_match == True AND policy_violation == False",
+      "no_op_condition": "user_status is already 'LOCKED'",
+      "escalation_condition": "failed_login_attempts >= max_iterations",
+      "budget_limit": "5000ms timeout per validation cycle",
+      "tables": [
+        "investor_profiles",
+        "auth_event_audit_handoff"
+      ]
+    },
+    "o_outcome": {
+      "json_schema": {
+        "auth_status": [
+          "AUTHENTICATED",
+          "REJECTED",
+          "LOCKED"
+        ],
+        "user_role": "string",
+        "jwt_token": "string"
+      },
+      "state_handoff_file": {
+        "table": "auth_event_audit_handoff",
+        "mode": "append_only",
+        "required_fields": [
+          "iteration_pass",
+          "device_fingerprint",
+          "otp_match",
+          "access_scope"
+        ],
+        "description": "Log iteration_pass, device fingerprint used, OTP boolean match evidence and final access scope."
+      },
+      "success_criteria": "OTP matches and no RBAC policy violation within 3 attempts"
+    },
+    "n_notification": {
+      "ui_updates": [
+        "Status: Verifying -> Looping [Pass 2/3]: Incorrect OTP -> Authenticated",
+        "Status: Escalated - Account Locked"
+      ],
+      "database_updates": [
+        "Update investor_profiles with failed attempts or new active session state"
+      ],
+      "alerts": [
+        "Notify platform ops on account lockout (Escalation)"
+      ],
+      "next": "MS01.2_Investor_KYC_Verifier"
+    }
+  },
+  "srim_runtime_definition": {
+    "orchestration": {
+      "router": "Dify_Dynamic_Master_Router",
+      "trigger": "HTTP_POST_Payload_plus_Variables"
+    },
+    "execution": {
+      "engine": "FastMCP_Execution_Engine"
+    },
+    "gateway": {
+      "route_via": "MCP_Jungle_Gateway_Reverse_Proxy"
+    },
+    "persistence": {
+      "database": "PostgreSQL_Database_State_Config",
+      "table": "investor_profiles, auth_event_audit_handoff",
+      "action": "Execute_SQL_Queries_via_Postgres_MCP"
+    },
+    "audit": {
+      "telemetry": "PostgreSQL_Audit_Logs"
+    },
+    "ui": {
+      "target": "SRIM_UI_Canvas",
+      "method": "Embedded_iFrames_Widgets"
+    }
+  },
+  "contracts": {
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "mobile_number": {
+          "type": "string"
+        },
+        "otp_payload": {
+          "type": "string"
+        },
+        "device_fingerprint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mobile_number",
+        "otp_payload",
+        "device_fingerprint"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "auth_status": {
+          "type": "string"
+        },
+        "user_role": {
+          "type": "string"
+        },
+        "jwt_token": {
+          "type": "string"
+        },
+        "state_handoff_id": {
+          "type": "string"
+        }
+      },
+      "required": []
+    }
+  },
+  "governance": {
+    "deterministic_hash": "sha256:e21ab559e95f01d8d13bde30475c16004d59eb6c5b341847f5de12852ee21daa",
+    "lifecycle": {
+      "state": "APPROVED",
+      "approval_required_for_change": true,
+      "immutable_after_approval": true
+    },
+    "versioning": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "sbam_build_record": {
+    "isatvon_framework_version": "1.4",
+    "isatvon_detail": {
+      "i_instructions": {
+        "statement": "Triggered by login request. Action: Validate OTP and enforce RBAC device limits. Check: Verify OTP matches secure vault and device count is under limit. Bound: Allow up to 3 OTP retry loops before locking the profile.",
+        "trigger": "Investor submits a login request with an OTP",
+        "action": "Validate OTP and enforce RBAC device limits",
+        "check": "Verify OTP matches secure vault and device count is under limit",
+        "bound": "Allow up to 3 OTP retry loops before locking the profile",
+        "user_role": {
+          "level": "External investor",
+          "persona": "Retail investor signing in to the portal",
+          "authority": "May access only their own profile and holdings"
+        },
+        "task": {
+          "goal": "Authenticate the investor within 3 attempts or lock the profile",
+          "method": "Bounded OTP verification with an independent RBAC policy check",
+          "steps": [
+            "Trigger: receive login request",
+            "Action Step: compare OTP and compute device limits",
+            "Fixed Check: evaluate otp_match and policy_violation",
+            "Loop or Resolve: retry up to 3 times, then authenticate or lock"
+          ]
+        },
+        "context": {
+          "background": "Investor portal for a fictional fund (Alpha Dynamics Ltd)",
+          "topic": "Investor registration and access",
+          "history": "Device limits were introduced after credential-sharing incidents"
+        }
+      },
+      "s_source": {
+        "required_inputs": [
+          "mobile_number",
+          "otp_payload",
+          "device_fingerprint"
+        ],
+        "fresh_state_parameters": [
+          "failed_login_attempts",
+          "active_devices",
+          "user_status"
+        ]
+      },
+      "a_automation": {
+        "orchestration_layer": "BuLLM_DMR",
+        "trigger_mode": "HTTP_POST_Payload_plus_Variables",
+        "action_step": "Compare provided OTP against Auth_MCP memory and calculate device fingerprint limits.",
+        "acceptance_check": "Programmatically evaluate if otp_match == True AND active_devices <= max_device_limit.",
+        "srim_metadata": "FastMCP_Execution_Engine with PostgreSQL JSONB state in investor_profiles"
+      },
+      "t_tech_stack": {
+        "execution_layer": "FastMCP",
+        "action_tool": "Auth_MCP (Session & OTP Evaluator)",
+        "fixed_check_tool": "RBAC_MCP (Policy & Limit Validator)",
+        "gateway_routing": "MCP_Jungle_Gateway",
+        "libraries": [
+          {
+            "package": "fastmcp",
+            "version_constraint": ">=2.0"
+          },
+          {
+            "package": "psycopg",
+            "version_constraint": ">=3.2"
+          },
+          {
+            "package": "pyjwt"
+          }
+        ]
+      },
+      "v_variables": {
+        "max_iterations": 3,
+        "success_gate": "otp_match == True AND policy_violation == False",
+        "no_op_condition": "user_status is 'LOCKED'",
+        "escalation_condition": "failed_login_attempts >= max_iterations",
+        "budget_limit": "5000ms timeout per validation cycle",
+        "tables": [
+          "investor_profiles",
+          "auth_event_audit_handoff"
+        ],
+        "parameters": [
+          {
+            "name": "max_device_limit",
+            "type": "integer",
+            "value": 3
+          }
+        ],
+        "secrets": [
+          "AUTH_VAULT_KEY",
+          "JWT_SIGNING_KEY"
+        ]
+      },
+      "o_outcome": {
+        "json_schema": {
+          "auth_status": [
+            "AUTHENTICATED",
+            "REJECTED",
+            "LOCKED"
+          ],
+          "user_role": "string",
+          "jwt_token": "string",
+          "otp_match": "boolean",
+          "policy_violation": "boolean"
+        },
+        "state_handoff_file": {
+          "table": "auth_event_audit_handoff",
+          "mode": "append_only",
+          "required_fields": [
+            "iteration_pass",
+            "device_fingerprint",
+            "otp_match",
+            "access_scope"
+          ],
+          "description": "Log iteration_pass, device fingerprint used, OTP boolean match evidence and final access scope."
+        },
+        "success_criteria": "OTP matches and no RBAC policy violation within 3 attempts"
+      },
+      "n_notification": {
+        "ui_updates": [
+          "Status: Verifying -> Looping [Pass 2/3]: Incorrect OTP -> Authenticated",
+          "Status: Escalated - Account Locked"
+        ],
+        "database_updates": [
+          "Update investor_profiles with failed attempts or new active session state"
+        ],
+        "alerts": [
+          "Notify platform ops on account lockout (Escalation)"
+        ],
+        "next": "MS01.2_Investor_KYC_Verifier"
+      }
+    },
+    "ids": {
+      "tenant_id": "tnt-alpha",
+      "project_id": "prj-investor-portal",
+      "workflow_id": "wf-001",
+      "sub_skill_id": "ss-ms01-1"
+    },
+    "provenance": {
+      "sow_version_id": "sow-v3",
+      "sow_sha256": "4b313e3eba7ae02eafed5b8d877ff06f0a4ab889edcb12adea9142287f75b207",
+      "approved_at": "2026-06-28T09:30:00Z",
+      "approved_by": "fde@example.com",
+      "knowledge_version_id": "kv-7",
+      "okf_sha256": "799494054f312437e7b829a45bfc7ab0df4e7154a1520707ca93d3473a233184",
+      "master_snapshot_sha256": "dbf4291de9df5f03dbcf9884ddfec779a90cafa4a19fba88f8f611d3801e30a9",
+      "sow_refs": [
+        "SOW-4.1",
+        "SOW-5.1.1"
+      ]
+    },
+    "build": {
+      "template": {
+        "name": "fastmcp-loopy",
+        "version": "1.0.0",
+        "sha256": "53f7302e7d498b06ad4de7c8a759f9edeca4948a7bae63ec6e85b7836190d83b"
+      },
+      "runtime_image_digest": "sha256:90ba6d6f300581ec5f161e63cd642d8d290b724462eaa5d365434cb78642cb30",
+      "libraries": [
+        {
+          "package": "fastmcp",
+          "version_constraint": ">=2.0"
+        },
+        {
+          "package": "psycopg",
+          "version_constraint": ">=3.2"
+        },
+        {
+          "package": "pyjwt"
+        }
+      ],
+      "schema_sql_sha256": "939acd018b931292330e519becd8d003ed0dd20c5e42de62ec3d37553698739a"
+    },
+    "evidence": {
+      "code_attempt_id": "ca-0001",
+      "bundle_sha256": "555dcce02dd7346254c8a12c402ecf39afeb1dbb91340832009151fbb1bb7af9",
+      "gates": [
+        "lint",
+        "unit",
+        "sandbox"
+      ],
+      "test_run_id": "tr-0001",
+      "sandbox_run_id": "sr-0001",
+      "passed_cases": 12
+    },
+    "certification": {
+      "state": "CERTIFIED",
+      "certified_at": "2026-06-29T12:00:00Z",
+      "reused_from": null
+    }
+  }
+}
