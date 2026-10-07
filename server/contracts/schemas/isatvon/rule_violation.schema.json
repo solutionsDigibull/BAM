@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "rule": {
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Rule",
+      "type": "integer"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "rule",
+    "path",
+    "message"
+  ],
+  "title": "RuleViolation",
+  "type": "object"
+}
