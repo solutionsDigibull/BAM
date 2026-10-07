@@ -51,5 +51,27 @@ Until Keycloak sign-in lands (#51), start the client with `SBAM_DEV_AUTH=1` (for
 production builds. E2E tests: `pnpm --dir client exec playwright install chromium` once, then
 `pnpm --dir client e2e`.
 
+### Run the API
+
+The API reads its settings from the environment or `server/.env` (gitignored). It refuses to start
+if any of these are missing:
+
+| Variable | Example |
+|---|---|
+| `DATABASE_URL` | `postgresql://sbam:…@localhost:5432/sbam` |
+| `STORAGE_ROOT` | `./data/storage` (must exist and be writable) |
+| `TEMPORAL_HOST` | `localhost:7233` |
+| `KEYCLOAK_ISSUER` | `http://localhost:8080/realms/sbam` |
+| `KEYCLOAK_AUDIENCE` | `sbam-api` |
+| `MAX_BODY_BYTES`, `LOG_LEVEL` | optional: `10485760`, `INFO` |
+
+```bash
+cd server && uv run uvicorn sbam_api.main:create_app --factory --reload --port 8000
+curl localhost:8000/health/live     # {"status":"ok"}
+curl localhost:8000/health/ready    # 200, or 503 naming the failed dependency
+```
+
+API docs are served at `/api/v1/docs`. Logs are JSON lines on stdout.
+
 Lockfiles (`server/uv.lock`, `client/pnpm-lock.yaml`) are committed. Add dependencies with `uv add` /
 `pnpm --dir client add`, never by editing lockfiles.
