@@ -22,6 +22,7 @@ from sbam_contracts.masters import (
     SkillsPayload,
 )
 from sbam_contracts.sow import SowDocument
+from sbam_contracts.state_machines import StateMachineStates
 
 ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("problem_detail", ProblemDetail),
@@ -40,4 +41,5 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/filetype", FiletypePayload),
     ("masters/rag_reference", RagReference),
     ("sow/sow_document", SowDocument),
+    ("state_machines/states", StateMachineStates),
 )

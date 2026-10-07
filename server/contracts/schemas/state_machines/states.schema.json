@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:state_machines/states:0.1.0",
+  "$defs": {
+    "Actor": {
+      "enum": [
+        "FDE",
+        "ADMIN",
+        "SYSTEM"
+      ],
+      "title": "Actor",
+      "type": "string"
+    },
+    "AgentState": {
+      "description": "Agent = TD Macro Skill (§14.5).",
+      "enum": [
+        "PENDING",
+        "BUILDING",
+        "CERTIFIED",
+        "FROZEN"
+      ],
+      "title": "AgentState",
+      "type": "string"
+    },
+    "DocumentVersionState": {
+      "enum": [
+        "UPLOADED",
+        "SCANNING",
+        "REJECTED",
+        "SCAN_FAILED",
+        "PARSING",
+        "PARSED",
+        "PARSE_FAILED",
+        "DELETED",
+        "PURGED"
+      ],
+      "title": "DocumentVersionState",
+      "type": "string"
+    },
+    "MachineName": {
+      "enum": [
+        "project_pipeline",
+        "workflow",
+        "document_version",
+        "sow_version",
+        "sub_skill",
+        "agent"
+      ],
+      "title": "MachineName",
+      "type": "string"
+    },
+    "ProjectPipelineState": {
+      "enum": [
+        "IDLE",
+        "INGESTING",
+        "KNOWLEDGE_BUILDING",
+        "SOW_GENERATING",
+        "SOW_REVIEW",
+        "SOW_APPROVED",
+        "WORKFLOW_CREATED",
+        "INGESTION_FAILED",
+        "KNOWLEDGE_FAILED",
+        "SOW_GENERATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "ProjectPipelineState",
+      "type": "string"
+    },
+    "SowVersionState": {
+      "enum": [
+        "GENERATED",
+        "IN_REVIEW",
+        "APPROVED",
+        "SUPERSEDED",
+        "GENERATION_FAILED"
+      ],
+      "title": "SowVersionState",
+      "type": "string"
+    },
+    "SubSkillState": {
+      "enum": [
+        "DRAFT",
+        "VALID",
+        "INVALID",
+        "BUILDING",
+        "CORRECTING",
+        "TESTING",
+        "TESTING_BLOCKED",
+        "NEEDS_FDE_REVIEW",
+        "DEPENDENCY_FAILED",
+        "BUILD_ERROR",
+        "CERTIFIED",
+        "FROZEN",
+        "INVALIDATED",
+        "SUPERSEDED"
+      ],
+      "title": "SubSkillState",
+      "type": "string"
+    },
+    "WorkflowState": {
+      "enum": [
+        "CREATED",
+        "ISATVON_EXTRACTING",
+        "ISATVON_REVIEW",
+        "BUILDING",
+        "CERTIFYING",
+        "CERTIFIED",
+        "FROZEN",
+        "EXTRACTION_FAILED",
+        "NEEDS_FDE_REVIEW",
+        "WORKFLOW_VALIDATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "WorkflowState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Every state enum in one model, so the generated TypeScript exports them as string unions.",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "machine": {
+      "$ref": "#/$defs/MachineName"
+    },
+    "project_pipeline": {
+      "$ref": "#/$defs/ProjectPipelineState"
+    },
+    "workflow": {
+      "$ref": "#/$defs/WorkflowState"
+    },
+    "document_version": {
+      "$ref": "#/$defs/DocumentVersionState"
+    },
+    "sow_version": {
+      "$ref": "#/$defs/SowVersionState"
+    },
+    "sub_skill": {
+      "$ref": "#/$defs/SubSkillState"
+    },
+    "agent": {
+      "$ref": "#/$defs/AgentState"
+    }
+  },
+  "required": [
+    "actor",
+    "machine",
+    "project_pipeline",
+    "workflow",
+    "document_version",
+    "sow_version",
+    "sub_skill",
+    "agent"
+  ],
+  "title": "StateMachineStates",
+  "type": "object"
+}

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:58860eb16222f73b7710a50903e58cfe4e81507fd6003655a3a2c6e04a0d2b11
+// source-sha256:0cd3132c20085df9b889f851e150a368b6a05982ed48e4c3a14ae17d2ea7909d
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -98,6 +98,85 @@ export type ManifestStatus = "DRAFT" | "VALIDATING" | "APPROVED" | "SUPERSEDED";
  * via the `definition` "CertificationState".
  */
 export type CertificationState = "CERTIFIED" | "FROZEN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Actor".
+ */
+export type Actor = "FDE" | "ADMIN" | "SYSTEM";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MachineName".
+ */
+export type MachineName = "project_pipeline" | "workflow" | "document_version" | "sow_version" | "sub_skill" | "agent";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectPipelineState".
+ */
+export type ProjectPipelineState =
+  | "IDLE"
+  | "INGESTING"
+  | "KNOWLEDGE_BUILDING"
+  | "SOW_GENERATING"
+  | "SOW_REVIEW"
+  | "SOW_APPROVED"
+  | "WORKFLOW_CREATED"
+  | "INGESTION_FAILED"
+  | "KNOWLEDGE_FAILED"
+  | "SOW_GENERATION_FAILED"
+  | "CANCELLED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowState".
+ */
+export type WorkflowState =
+  | "CREATED"
+  | "ISATVON_EXTRACTING"
+  | "ISATVON_REVIEW"
+  | "BUILDING"
+  | "CERTIFYING"
+  | "CERTIFIED"
+  | "FROZEN"
+  | "EXTRACTION_FAILED"
+  | "NEEDS_FDE_REVIEW"
+  | "WORKFLOW_VALIDATION_FAILED"
+  | "CANCELLED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DocumentVersionState".
+ */
+export type DocumentVersionState =
+  "UPLOADED" | "SCANNING" | "REJECTED" | "SCAN_FAILED" | "PARSING" | "PARSED" | "PARSE_FAILED" | "DELETED" | "PURGED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowVersionState".
+ */
+export type SowVersionState = "GENERATED" | "IN_REVIEW" | "APPROVED" | "SUPERSEDED" | "GENERATION_FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillState".
+ */
+export type SubSkillState =
+  | "DRAFT"
+  | "VALID"
+  | "INVALID"
+  | "BUILDING"
+  | "CORRECTING"
+  | "TESTING"
+  | "TESTING_BLOCKED"
+  | "NEEDS_FDE_REVIEW"
+  | "DEPENDENCY_FAILED"
+  | "BUILD_ERROR"
+  | "CERTIFIED"
+  | "FROZEN"
+  | "INVALIDATED"
+  | "SUPERSEDED";
+/**
+ * Agent = TD Macro Skill (§14.5).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AgentState".
+ */
+export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -119,6 +198,7 @@ export interface SbamContracts {
   FiletypePayload?: FiletypePayload;
   RagReference?: RagReference;
   SowDocument?: SowDocument;
+  StateMachineStates?: StateMachineStates;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1223,4 +1303,20 @@ export interface AssumptionsOpenPoints {
   citations: [Citation, ...Citation[]];
   assumptions: string[];
   open_points: string[];
+}
+/**
+ * Every state enum in one model, so the generated TypeScript exports them as string unions.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StateMachineStates".
+ */
+export interface StateMachineStates {
+  actor: Actor;
+  machine: MachineName;
+  project_pipeline: ProjectPipelineState;
+  workflow: WorkflowState;
+  document_version: DocumentVersionState;
+  sow_version: SowVersionState;
+  sub_skill: SubSkillState;
+  agent: AgentState;
 }
