@@ -24,6 +24,8 @@ from typing import Annotated, Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from sbam_contracts._jsonschema import contract_schema
+
 STRUCTURE_VERSION: Final = "BAM 0.2"
 MAX_CELL_CHARS: Final = 32_767  # Excel's own per-cell limit
 FORMULA_PREFIXES: Final = ("=", "+", "-", "@")
@@ -305,13 +307,13 @@ SCHEMA_DIR: Final = Path(__file__).resolve().parents[1] / "schemas" / "masters"
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/masters/`."""
     return {
-        "readme": ReadmeTab.model_json_schema(),
-        "organization": OrganizationPayload.model_json_schema(),
-        "rules": RulesPayload.model_json_schema(),
-        "agents": AgentsPayload.model_json_schema(),
-        "skills": SkillsPayload.model_json_schema(),
-        "filetype": FiletypePayload.model_json_schema(),
-        "rag_reference": RagReference.model_json_schema(),
+        "readme": contract_schema(ReadmeTab, "masters/readme"),
+        "organization": contract_schema(OrganizationPayload, "masters/organization"),
+        "rules": contract_schema(RulesPayload, "masters/rules"),
+        "agents": contract_schema(AgentsPayload, "masters/agents"),
+        "skills": contract_schema(SkillsPayload, "masters/skills"),
+        "filetype": contract_schema(FiletypePayload, "masters/filetype"),
+        "rag_reference": contract_schema(RagReference, "masters/rag_reference"),
     }
 
 

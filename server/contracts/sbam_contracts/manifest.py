@@ -33,6 +33,7 @@ from typing import Annotated, Any, Final, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from sbam_contracts import gate_expr
+from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.canonical import (
     HASH_PATTERN,
     deterministic_hash,
@@ -55,10 +56,10 @@ from sbam_contracts.isatvon14 import (
     parse_budget_ms,
 )
 
-SKILL_TYPE: Final = "Deterministic_Loopy_MCP"  # O-15: the only allowed value
 HASH_PLACEHOLDER: Final = "sha256:TO_BE_COMPUTED_ON_SAVE"  # ISA14 sample value, never on APPROVED
 WORKFLOW_SCHEMA_VERSION: Final = "sbam-workflow-manifest/1.0"
 VERSION = re.compile(r"^(\d+)\.0\.(\d+)$")  # MAJOR.0.PATCH (C-32)
+VERSION_PATTERN: Final = r"^\d+\.0\.\d+$"  # same rule, as shown in the JSON Schema and TS
 UI_UPDATE_TEMPLATE: Final = "Looping [Pass {iteration}/{max_iterations}]"
 SCHEMA_DIR: Final = Path(__file__).resolve().parent.parent / "schemas" / "manifest"
 
@@ -317,23 +318,30 @@ class SbamBuildRecord(_Strict):
     certification: Certification | None = None  # excluded from the hash
 
 
+class SbamSkillMetadata(ManifestSkillMetadata):
+    """`skill_metadata` as SBAM writes it; ids, version and enums are visible in the JSON Schema."""
+
+    macro_category: Annotated[str, Field(strict=True, pattern=MACRO_CATEGORY.pattern)]
+    skill_id: Annotated[str, Field(strict=True, pattern=SKILL_ID.pattern)]
+    skill_type: Literal["Deterministic_Loopy_MCP"]  # O-15
+    version: Annotated[str, Field(strict=True, pattern=VERSION_PATTERN)]  # MAJOR.0.PATCH (C-32)
+    status: Annotated[ManifestStatus, Field(strict=False)]  # enum from a JSON string
+
+
 class SkillManifest(Isa14Manifest):
     """The Sub-Skill manifest SBAM writes: ISA14 blocks + `sbam_build_record` (TD §11.1)."""
 
+    skill_metadata: SbamSkillMetadata
     sbam_build_record: SbamBuildRecord
 
     @model_validator(mode="after")
     def _sbam_rules(self) -> Self:
         meta, gov = self.skill_metadata, self.governance
-        if meta.skill_type != SKILL_TYPE:
-            raise ValueError(f"skill_metadata.skill_type must be {SKILL_TYPE!r} (O-15)")
         statuses = {s.value for s in ManifestStatus}
-        for where, value in (
-            ("skill_metadata.status", meta.status),
-            ("lifecycle.state", gov.lifecycle.state),
-        ):
-            if value not in statuses:
-                raise ValueError(f"{where} {value!r} is not one of {sorted(statuses)}")
+        if gov.lifecycle.state not in statuses:
+            raise ValueError(
+                f"lifecycle.state {gov.lifecycle.state!r} is not one of {sorted(statuses)}"
+            )
         if meta.status != gov.lifecycle.state:
             raise ValueError("skill_metadata.status must equal governance.lifecycle.state (C-52)")
         _version(meta.version, gov.versioning, "skill_metadata.version")
@@ -500,10 +508,10 @@ class LoopSpec(_Strict):
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/manifest/`."""
     return {
-        "isa14_manifest": Isa14Manifest.model_json_schema(),
-        "skill_manifest": SkillManifest.model_json_schema(),
-        "workflow_manifest": WorkflowManifest.model_json_schema(),
-        "loop_spec": LoopSpec.model_json_schema(),
+        "isa14_manifest": contract_schema(Isa14Manifest, "manifest/isa14_manifest"),
+        "skill_manifest": contract_schema(SkillManifest, "manifest/skill_manifest"),
+        "workflow_manifest": contract_schema(WorkflowManifest, "manifest/workflow_manifest"),
+        "loop_spec": contract_schema(LoopSpec, "manifest/loop_spec"),
     }
 
 

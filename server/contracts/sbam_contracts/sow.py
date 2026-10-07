@@ -27,6 +27,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.isatvon14 import MAX_ITERATIONS_RANGE, RULE_REF, ShortText, Text
 
 SECTIONS: Final = (
@@ -278,7 +279,7 @@ def breakdown_hints(doc: SowDocument) -> list[dict[str, Any]]:
 
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/sow/`."""
-    return {"sow_document": SowDocument.model_json_schema()}
+    return {"sow_document": contract_schema(SowDocument, "sow/sow_document")}
 
 
 def write_schemas(directory: Path = SCHEMA_DIR) -> list[Path]:

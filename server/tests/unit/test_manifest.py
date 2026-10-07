@@ -133,7 +133,9 @@ def test_e0_3_t04_key_order_and_whitespace_never_change_the_hash(
 def test_e0_3_t06_bad_versions_are_rejected(version: str) -> None:
     x = manifest()
     x["skill_metadata"]["version"] = version
-    assert "is not MAJOR.0.PATCH" in rejected(x)
+    message = rejected(x)
+    assert "skill_metadata.version" in message
+    assert r"String should match pattern '^\d+\.0\.\d+$'" in message
 
 
 def test_e0_3_t06_version_must_agree_with_versioning() -> None:
@@ -162,7 +164,9 @@ def test_e0_3_t07_extra_top_level_block_is_rejected() -> None:
 def test_e0_3_t07_only_deterministic_loopy_mcp_skill_type() -> None:
     x = manifest()
     x["skill_metadata"]["skill_type"] = "Agentic_Loop"
-    assert "O-15" in rejected(x)
+    message = rejected(x)
+    assert "skill_metadata.skill_type" in message
+    assert "Deterministic_Loopy_MCP" in message
 
 
 @pytest.mark.parametrize("status", ["CERTIFIED", "approved", "DONE"])
@@ -170,7 +174,9 @@ def test_e0_3_unknown_status_is_rejected(status: str) -> None:
     x = manifest()
     x["skill_metadata"]["status"] = status
     x["governance"]["lifecycle"]["state"] = status
-    assert "is not one of" in rejected(x)
+    assert "skill_metadata.status" in rejected(x)
+    x["skill_metadata"]["status"] = "APPROVED"
+    assert "lifecycle.state" in rejected(x)
 
 
 @pytest.mark.parametrize(

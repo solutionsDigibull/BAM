@@ -1,0 +1,43 @@
+"""Every exported root contract, in a fixed order (issue E1.2).
+
+`python -m sbam_contracts.gen` writes one JSON Schema per entry (`schemas/<path>.schema.json`) and
+one TypeScript file with every entry and the models they use (`client/src/contracts/index.ts`).
+Adding a contract is one line here, then `make contracts`.
+"""
+
+from typing import Final
+
+from pydantic import BaseModel
+
+from sbam_contracts.api import ProblemDetail
+from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
+from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
+from sbam_contracts.masters import (
+    AgentsPayload,
+    FiletypePayload,
+    OrganizationPayload,
+    RagReference,
+    ReadmeTab,
+    RulesPayload,
+    SkillsPayload,
+)
+from sbam_contracts.sow import SowDocument
+
+ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
+    ("problem_detail", ProblemDetail),
+    ("isatvon/agent", Agent),
+    ("isatvon/sub_skill", SubSkill),
+    ("isatvon/rule_violation", RuleViolation),
+    ("manifest/isa14_manifest", Isa14Manifest),
+    ("manifest/skill_manifest", SkillManifest),
+    ("manifest/workflow_manifest", WorkflowManifest),
+    ("manifest/loop_spec", LoopSpec),
+    ("masters/readme", ReadmeTab),
+    ("masters/organization", OrganizationPayload),
+    ("masters/rules", RulesPayload),
+    ("masters/agents", AgentsPayload),
+    ("masters/skills", SkillsPayload),
+    ("masters/filetype", FiletypePayload),
+    ("masters/rag_reference", RagReference),
+    ("sow/sow_document", SowDocument),
+)

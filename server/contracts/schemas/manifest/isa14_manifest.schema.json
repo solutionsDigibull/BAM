@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:manifest/isa14_manifest:0.1.0",
   "$defs": {
     "Audit": {
       "additionalProperties": false,

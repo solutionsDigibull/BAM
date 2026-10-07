@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:problem_detail:0.1.0",
   "$defs": {
     "ErrorCode": {
       "description": "Stable machine-readable error codes. Add new codes here; never rename or reuse one.",

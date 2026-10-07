@@ -1,0 +1,52 @@
+# Contract drift (issue E1.2): the generated JSON Schemas and client/src/contracts/index.ts must equal a
+# fresh generation from the Pydantic contracts. A hand edit or a forgotten `make contracts` fails here.
+name: contracts
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: contract drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: server/uv.lock
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: client/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: client/.nvmrc
+          cache: pnpm
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: Install
+        run: make install
+
+      - name: Generated files match the contracts
+        run: make contracts-check
+
+      - name: Contract generation tests
+        run: cd server && uv run pytest tests/contract/test_contracts_gen.py -v
+
+      - name: Generated TypeScript compiles (strict)
+        run: pnpm --dir client typecheck

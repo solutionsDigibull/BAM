@@ -31,6 +31,7 @@ from typing import Annotated, Any, Final
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from sbam_contracts import gate_expr
+from sbam_contracts._jsonschema import contract_schema
 
 FRAMEWORK_VERSION: Final = "1.4"
 SHORT_CHARS: Final = 200
@@ -608,9 +609,9 @@ def _check_chain(agent: Agent, workflow_agents: Sequence[str] | None) -> list[tu
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/isatvon/`."""
     return {
-        "agent": Agent.model_json_schema(),
-        "sub_skill": SubSkill.model_json_schema(),
-        "rule_violation": RuleViolation.model_json_schema(),
+        "agent": contract_schema(Agent, "isatvon/agent"),
+        "sub_skill": contract_schema(SubSkill, "isatvon/sub_skill"),
+        "rule_violation": contract_schema(RuleViolation, "isatvon/rule_violation"),
     }
 
 
