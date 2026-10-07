@@ -28,7 +28,7 @@ The Sub-Skill manifest uses **exactly** the ISA14 Skill Manifest top-level struc
     "t_tech_stack": { "execution_layer": "FastMCP", "action_tool": "", "fixed_check_tool": "" },
     "v_variables": { "max_iterations": 3, "success_gate": "", "no_op_condition": "", "escalation_condition": "", "budget_limit": "" },
     "o_outcome": { "json_schema": {}, "state_handoff_file": { "table": "", "mode": "append_only", "required_fields": [], "description": "" }, "success_criteria": "" },
-    "n_notification": { "ui_updates": [], "database_updates": [], "alerts": [] }
+    "n_notification": { "ui_updates": [], "database_updates": [], "alerts": [], "next": "MS01.2_<Name> | MS02_<Name> | null" }
   },
   "srim_runtime_definition": {
     "orchestration": { "router": "Dify_Dynamic_Master_Router", "trigger": "HTTP_POST_Payload_plus_Variables" },
