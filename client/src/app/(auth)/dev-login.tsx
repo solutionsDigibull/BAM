@@ -1,8 +1,13 @@
 "use client";
 
-import { Button, Card, Flex, Typography } from "antd";
+import { Alert, Button, Card, Flex, Typography } from "antd";
 
-import { devSignIn } from "./actions";
+import { devSignIn, keycloakSignIn } from "./actions";
+
+const ERRORS: Record<string, string> = {
+  WrongPortal: "This account cannot use this portal. Sign in through the portal for your role.",
+  Configuration: "The sign-in service is unavailable. Try again in a few minutes.",
+};
 
 const CHOICES = {
   admin: [
@@ -15,14 +20,40 @@ const CHOICES = {
   ],
 };
 
-// ponytail: dev role picker until #51 replaces this with the Auth.js Keycloak sign-in.
-export function DevLogin({ portal, enabled }: { portal: keyof typeof CHOICES; enabled: boolean }) {
+// Keycloak sign-in when KEYCLOAK_ISSUER is set (#31); the dev role picker stays as a local fallback.
+export function DevLogin({
+  portal,
+  enabled,
+  keycloak = false,
+  error,
+}: {
+  portal: keyof typeof CHOICES;
+  enabled: boolean;
+  keycloak?: boolean;
+  error?: string;
+}) {
   return (
     <Flex align="center" justify="center" style={{ minHeight: "100vh", background: "#f6f7fb" }}>
       <Card style={{ width: 380 }}>
         <Typography.Title level={3} style={{ marginTop: 0 }}>
           SBAM {portal === "admin" ? "Admin" : "FDE"} sign-in
         </Typography.Title>
+        {error && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message={ERRORS[error] ?? "Sign-in failed. Try again."}
+          />
+        )}
+        {keycloak && (
+          <form action={keycloakSignIn} style={{ marginBottom: enabled ? 16 : 0 }}>
+            <input type="hidden" name="portal" value={portal} />
+            <Button type="primary" htmlType="submit" block>
+              Sign in with Keycloak
+            </Button>
+          </form>
+        )}
         {enabled ? (
           <Flex vertical gap={8}>
             <Typography.Text type="secondary">
@@ -38,9 +69,11 @@ export function DevLogin({ portal, enabled }: { portal: keyof typeof CHOICES; en
             ))}
           </Flex>
         ) : (
-          <Typography.Text type="secondary">
-            Keycloak sign-in is not configured yet.
-          </Typography.Text>
+          !keycloak && (
+            <Typography.Text type="secondary">
+              Keycloak sign-in is not configured yet.
+            </Typography.Text>
+          )
         )}
         <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0 }}>
           <a href={portal === "admin" ? "/login-fde" : "/login-admin"}>

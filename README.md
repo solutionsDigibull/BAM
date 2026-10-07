@@ -48,7 +48,9 @@ pnpm --dir client dev    # http://localhost:3000
 
 Until Keycloak sign-in lands (#51), start the client with `SBAM_DEV_AUTH=1` (for example in
 `client/.env.local`) to get a dev-only role picker on `/login-admin` and `/login-fde`. It is ignored in
-production builds. E2E tests: `pnpm --dir client exec playwright install chromium` once, then
+production builds. To sign in through Keycloak instead, set `KEYCLOAK_ISSUER`, `AUTH_SECRET` and
+`SBAM_API_URL` for the client (the spike realm in [`spikes/identity`](spikes/identity/README.md) works
+until #47 adds Keycloak to Compose). E2E tests: `pnpm --dir client exec playwright install chromium` once, then
 `pnpm --dir client e2e`.
 
 ### Run the API
