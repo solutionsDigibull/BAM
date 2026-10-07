@@ -26,6 +26,8 @@ dev = [
     "openpyxl>=3.1.5",
     "types-openpyxl>=3.1.5.20260827",
     "hypothesis>=6.140",
+    "jsonschema>=4.25",
+    "types-jsonschema>=4.26.0.20261006",
 ]
 
 [tool.ruff]

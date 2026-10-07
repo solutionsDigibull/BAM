@@ -250,7 +250,7 @@ def test_e0_4_t05_rag_reference_schema_has_seven_required_keys_and_no_extras() -
 
 
 def test_e0_4_t01_models_are_the_ones_the_schemas_describe() -> None:
-    assert ReadmeTab.model_json_schema() == schemas()["readme"]
+    assert ReadmeTab.model_json_schema().items() <= schemas()["readme"].items()  # + $schema/$id
     assert {
         OrganizationPayload,
         RulesPayload,

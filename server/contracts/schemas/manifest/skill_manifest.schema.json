@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:manifest/skill_manifest:0.1.0",
   "$defs": {
     "AAutomation": {
       "additionalProperties": false,
@@ -985,82 +987,15 @@
       "title": "ManifestContracts",
       "type": "object"
     },
-    "ManifestSkillMetadata": {
-      "additionalProperties": false,
-      "properties": {
-        "macro_category": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Macro Category",
-          "type": "string"
-        },
-        "skill_id": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Skill Id",
-          "type": "string"
-        },
-        "skill_name": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Skill Name",
-          "type": "string"
-        },
-        "skill_type": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Skill Type",
-          "type": "string"
-        },
-        "reusable": {
-          "title": "Reusable",
-          "type": "boolean"
-        },
-        "version": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Version",
-          "type": "string"
-        },
-        "status": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Status",
-          "type": "string"
-        },
-        "owner": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Owner",
-          "type": "string"
-        },
-        "created_at": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Created At",
-          "type": "string"
-        },
-        "updated_at": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Updated At",
-          "type": "string"
-        }
-      },
-      "required": [
-        "macro_category",
-        "skill_id",
-        "skill_name",
-        "skill_type",
-        "reusable",
-        "version",
-        "status",
-        "owner",
-        "created_at",
-        "updated_at"
+    "ManifestStatus": {
+      "enum": [
+        "DRAFT",
+        "VALIDATING",
+        "APPROVED",
+        "SUPERSEDED"
       ],
-      "title": "ManifestSkillMetadata",
-      "type": "object"
+      "title": "ManifestStatus",
+      "type": "string"
     },
     "NNotification": {
       "additionalProperties": false,
@@ -1444,6 +1379,77 @@
       "title": "SbamBuildRecord",
       "type": "object"
     },
+    "SbamSkillMetadata": {
+      "additionalProperties": false,
+      "description": "`skill_metadata` as SBAM writes it; ids, version and enums are visible in the JSON Schema.",
+      "properties": {
+        "macro_category": {
+          "pattern": "^MS(\\d{2})_[A-Za-z0-9_]+$",
+          "title": "Macro Category",
+          "type": "string"
+        },
+        "skill_id": {
+          "pattern": "^MS(\\d{2})\\.(\\d+)_[A-Za-z0-9_]+$",
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "skill_name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Name",
+          "type": "string"
+        },
+        "skill_type": {
+          "const": "Deterministic_Loopy_MCP",
+          "title": "Skill Type",
+          "type": "string"
+        },
+        "reusable": {
+          "title": "Reusable",
+          "type": "boolean"
+        },
+        "version": {
+          "pattern": "^\\d+\\.0\\.\\d+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ManifestStatus"
+        },
+        "owner": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "created_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "macro_category",
+        "skill_id",
+        "skill_name",
+        "skill_type",
+        "reusable",
+        "version",
+        "status",
+        "owner",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "SbamSkillMetadata",
+      "type": "object"
+    },
     "SrimRuntimeDefinition": {
       "additionalProperties": false,
       "properties": {
@@ -1796,7 +1802,7 @@
   "description": "The Sub-Skill manifest SBAM writes: ISA14 blocks + `sbam_build_record` (TD §11.1).",
   "properties": {
     "skill_metadata": {
-      "$ref": "#/$defs/ManifestSkillMetadata"
+      "$ref": "#/$defs/SbamSkillMetadata"
     },
     "isatvon_definition": {
       "$ref": "#/$defs/Isa14Definition"

@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/readme:0.1.0",
   "additionalProperties": false,
   "description": "The README tab: help text. Only its structure is checked, its content is not interpreted.",
   "properties": {

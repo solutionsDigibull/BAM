@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/rag_reference:0.1.0",
   "additionalProperties": false,
   "description": "RAG Reference cell (Rules and Skills): a JSON object with exactly these 7 keys.\n\nValues may be empty strings. `Links / Path` is a pointer and is never fetched.",
   "properties": {

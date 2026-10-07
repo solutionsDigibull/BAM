@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.api import PROBLEM_JSON, ErrorCode, Page, PageParams, ProblemDetail
 
 CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
@@ -26,7 +27,8 @@ def test_e0_7_t01_example_validates(path: Path) -> None:
 
 def test_e0_7_t01_committed_schema_matches_model() -> None:
     committed = json.loads((CONTRACTS / "schemas/problem_detail.schema.json").read_text("utf-8"))
-    assert committed == ProblemDetail.model_json_schema(), "regenerate the schema from the model"
+    expected = contract_schema(ProblemDetail, "problem_detail")
+    assert committed == expected, "regenerate with `make contracts`"
 
 
 def test_e0_7_error_codes_are_unique_and_self_named() -> None:

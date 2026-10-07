@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:manifest/loop_spec:0.1.0",
   "additionalProperties": false,
   "description": "`loop_spec.json`: the five loop bounds in runtime form (the full compiler is #102).",
   "properties": {
