@@ -1,0 +1,5 @@
+# Spike E0.12 (#30) - E0.12-T04: a suite with no test cases. The wrapper must refuse it before running Promptfoo.
+description: empty suite (must be rejected)
+prompts: ["{{output}}"]
+providers: [echo]
+tests: []

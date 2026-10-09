@@ -1,0 +1,13 @@
+{
+  "name": "sbam-spike-promptfoo",
+  "private": true,
+  "description": "Spike E0.12 (#30): pinned Promptfoo CLI + suite wrapper for the sbam-promptfoo image",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "dependencies": {
+    "promptfoo": "0.124.1",
+    "yaml": "2.9.1"
+  }
+}

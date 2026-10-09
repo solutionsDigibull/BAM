@@ -1,0 +1,95 @@
+# Spike E0.12 (#30): deterministic Promptfoo suite for the MS01.1 sample tool (TD §15.1).
+# No LLM: the `echo` provider returns the prompt unchanged, and the prompt is the tool output file,
+# so Promptfoo only grades data the harness already produced. Each assertion has a `metric` name, so
+# a failure says which check broke. JavaScript lives only here (platform-authored), never in tool output.
+# Transforms never throw (try/catch, "<not json>"): plain-text output then fails the assertions cleanly instead of
+# turning the whole test into an error (E0.12-T03).
+description: MS01.1 login - deterministic checks
+prompts: ["{{output}}"]
+providers: [echo]
+
+defaultTest:
+  assert:
+    - metric: output_schema # o_outcome.json_schema + state_handoff_id + handoff rows with every required field
+      type: is-json
+      value:
+        type: object
+        required: [case, synthetic, terminal_state, iterations, max_iterations, output, handoff_rows, ui_updates]
+        properties:
+          synthetic: {const: true}
+          terminal_state: {enum: [SUCCESS, ESCALATED, NO_OP]}
+          iterations: {type: integer, minimum: 0}
+          max_iterations: {type: integer, minimum: 1}
+          output:
+            type: object
+            required: [auth_status, user_role, jwt_token, otp_match, policy_violation, state_handoff_id]
+            properties:
+              auth_status: {enum: [AUTHENTICATED, REJECTED, LOCKED]}
+              user_role: {type: string}
+              jwt_token: {type: string}
+              otp_match: {type: boolean}
+              policy_violation: {type: boolean}
+              state_handoff_id: {type: string, minLength: 1}
+          handoff_rows:
+            type: array
+            items:
+              type: object
+              required: [iteration_pass, device_fingerprint, otp_match, access_scope]
+    - metric: iterations_within_bound # V.max_iterations is never exceeded
+      type: javascript
+      value: JSON.parse(output).iterations <= JSON.parse(output).max_iterations
+    - metric: one_handoff_row_per_pass # append_only audit: exactly one row per iteration
+      type: javascript
+      value: JSON.parse(output).handoff_rows.length === JSON.parse(output).iterations
+
+tests:
+  - description: PASS_FIRST - correct OTP on pass 1
+    vars: {output: file://out/outputs/PASS_FIRST.json}
+    assert:
+      - metric: terminal_state
+        type: equals
+        value: SUCCESS
+        transform: |
+          try { return JSON.parse(output).terminal_state } catch { return "<not json>" }
+      - metric: auth_status
+        type: equals
+        value: AUTHENTICATED
+        transform: |
+          try { return JSON.parse(output).output.auth_status } catch { return "<not json>" }
+      - metric: success_gate # otp_match == True AND policy_violation == False
+        type: javascript
+        value: JSON.parse(output).output.otp_match === true && JSON.parse(output).output.policy_violation === false
+
+  - description: ESCALATION - wrong OTP every pass, stops exactly at max_iterations
+    vars: {output: file://out/outputs/ESCALATION.json}
+    assert:
+      - metric: terminal_state
+        type: equals
+        value: ESCALATED
+        transform: |
+          try { return JSON.parse(output).terminal_state } catch { return "<not json>" }
+      - metric: auth_status
+        type: equals
+        value: LOCKED
+        transform: |
+          try { return JSON.parse(output).output.auth_status } catch { return "<not json>" }
+      - metric: iterations_equal_max # edge case: iterations == max_iterations is allowed, not one more
+        type: javascript
+        value: JSON.parse(output).iterations === JSON.parse(output).max_iterations
+      - metric: n_ui_updates # N assertion: the expected looping and escalation messages
+        type: javascript
+        value: |
+          const ui = JSON.parse(output).ui_updates;
+          return ui.includes('Looping [Pass 2/3]') && ui.includes('Status: Escalated - Account Locked');
+
+  - description: NO_OP - account already locked, no action executed
+    vars: {output: file://out/outputs/NO_OP.json}
+    assert:
+      - metric: terminal_state
+        type: equals
+        value: NO_OP
+        transform: |
+          try { return JSON.parse(output).terminal_state } catch { return "<not json>" }
+      - metric: no_tool_called
+        type: javascript
+        value: JSON.parse(output).trace.length === 0 && JSON.parse(output).iterations === 0
