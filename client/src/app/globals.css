@@ -1,0 +1,7 @@
+/* antd menus drop the outline on links; keep a visible keyboard focus everywhere. */
+a:focus-visible,
+.ant-menu-item:focus-visible,
+.ant-menu-item:has(a:focus-visible) {
+  outline: 2px solid #818cf8;
+  outline-offset: -2px;
+}

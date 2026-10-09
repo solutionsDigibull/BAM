@@ -8,7 +8,11 @@ import { EmptyState } from "@/components/ui-kit";
 export function PagePlaceholder({ title, empty }: { title: string; empty: string }) {
   return (
     <Card>
-      <Typography.Title level={3} ellipsis={{ tooltip: title }} style={{ marginTop: 0 }}>
+      <Typography.Title
+        level={1}
+        ellipsis={{ tooltip: title }}
+        style={{ marginTop: 0, fontSize: 24 }}
+      >
         {title}
       </Typography.Title>
       <EmptyState message={empty} />

@@ -1,5 +1,7 @@
 import { PagePlaceholder } from "@/components/shell/page-placeholder";
 
+export const metadata = { title: "Workflows" };
+
 export default function WorkflowsPage() {
   return (
     <PagePlaceholder

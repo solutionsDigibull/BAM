@@ -2,6 +2,8 @@ import { devAuthEnabled, keycloakEnabled } from "@/lib/session";
 
 import { DevLogin } from "../dev-login";
 
+export const metadata = { title: "Admin sign-in" };
+
 export default async function AdminLoginPage({
   searchParams,
 }: {

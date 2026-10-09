@@ -35,7 +35,7 @@ export function DevLogin({
   return (
     <Flex align="center" justify="center" style={{ minHeight: "100vh", background: "#f6f7fb" }}>
       <Card style={{ width: 380 }}>
-        <Typography.Title level={3} style={{ marginTop: 0 }}>
+        <Typography.Title level={1} style={{ marginTop: 0, fontSize: 24 }}>
           SBAM {portal === "admin" ? "Admin" : "FDE"} sign-in
         </Typography.Title>
         {error && (
