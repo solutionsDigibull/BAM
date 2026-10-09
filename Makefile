@@ -4,7 +4,15 @@
 
 # Compose stack (TD §20.3). ENV_FILE can point at another env file, e.g. `make up ENV_FILE=/tmp/ci.env`.
 ENV_FILE ?= compose/.env
-COMPOSE := docker compose --env-file $(ENV_FILE) -f compose/compose.yaml -f compose/compose.override.yaml
+# Optional profiles on top of core, one file each: `make up PROFILES=obs,sandbox-local` (E1.11).
+VALID_PROFILES := obs analytics sandbox-local
+comma := ,
+PROFILE_LIST := $(subst $(comma), ,$(PROFILES))
+ifneq ($(filter-out $(VALID_PROFILES),$(PROFILE_LIST)),)
+$(error unknown PROFILES '$(filter-out $(VALID_PROFILES),$(PROFILE_LIST))'; valid profiles: $(VALID_PROFILES))
+endif
+COMPOSE := docker compose --env-file $(ENV_FILE) -f compose/compose.yaml -f compose/compose.override.yaml 	$(foreach p,$(PROFILE_LIST),-f compose/compose.$(p).yaml)
+PROJECT := $(or $(COMPOSE_PROJECT_NAME),sbam)
 
 doctor:
 	bash scripts/doctor.sh
@@ -44,8 +52,9 @@ up:
 ps:
 	$(COMPOSE) ps
 
+# --remove-orphans also stops profile services started with PROFILES=..., even when PROFILES isn't given here.
 down:
-	$(COMPOSE) down
+	$(COMPOSE) down --remove-orphans
 
 logs:
 	$(COMPOSE) logs -f --tail=200 $(s)
@@ -60,7 +69,9 @@ test-int: up
 e2e:
 	pnpm --dir client e2e
 
-# The only destructive target: stops the stack and deletes every volume (database, storage, signatures).
+# The only destructive target: stops the stack and deletes every volume (database, storage, signatures,
+# and the profile volumes such as Langfuse's).
 reset:
 	@test "$(CONFIRM)" = yes || { echo "reset deletes all stack data. Run: make reset CONFIRM=yes" >&2; exit 1; }
 	$(COMPOSE) down -v --remove-orphans
+	docker volume ls -q --filter label=com.docker.compose.project=$(PROJECT) | xargs -r docker volume rm

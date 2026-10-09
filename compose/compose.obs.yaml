@@ -1,0 +1,159 @@
+# SBAM `obs` profile (TD §20.3, E1.11): telemetry on top of `core`. Load with `make up PROFILES=obs`.
+# Its own file, not `profiles:` in compose.yaml: Compose interpolates every service, even inactive ones,
+# so obs-only required secrets would break plain `make up` for anyone whose .env predates them.
+# No core service depends on anything here, so obs being down never blocks core (non-blocking telemetry).
+
+x-langfuse-env: &langfuse-env
+  DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?is required - set it in compose/.env}@postgres:5432/langfuse
+  NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3001}
+  SALT: ${LANGFUSE_SALT:?is required for PROFILES=obs - set it in compose/.env}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?is required for PROFILES=obs (64 hex chars, openssl rand -hex 32)}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: langfuse
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?is required for PROFILES=obs - set it in compose/.env}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:?is required for PROFILES=obs - set it in compose/.env}
+  # Blob storage stays inside the network (no public bucket port), so browser media uploads are off.
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:?is required for PROFILES=obs - set it in compose/.env}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+
+x-langfuse-deps: &langfuse-deps
+  postgres: { condition: service_healthy }
+  clickhouse: { condition: service_healthy }
+  redis: { condition: service_healthy }
+  minio: { condition: service_healthy }
+
+services:
+  # Grafana LGTM: OTel collector (OTLP 4317 gRPC / 4318 HTTP) + Tempo, Loki, Prometheus and Grafana.
+  otel-collector:
+    image: grafana/otel-lgtm:0.35.0@sha256:2de1094c593c671cbfca878a28ffcd7e46ff5e32f2ce966c0cf33003f6cf4266
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?is required for PROFILES=obs - set it in compose/.env}
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3002}:3000"
+      - "127.0.0.1:${OTLP_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OTLP_HTTP_PORT:-4318}:4318"
+    networks:
+      sbam_edge: {}
+      sbam_internal: { aliases: [grafana-lgtm] } # sbam-api/workers export to otel-collector:4317
+    volumes: [lgtm_data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/api/health && curl -s -o /dev/null http://127.0.0.1:4318/v1/traces"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    mem_limit: 2g
+    restart: unless-stopped
+
+  langfuse-web:
+    image: langfuse/langfuse:3.225.11@sha256:a343f64e035eb01aeea358703a0428945d909d01e19452509a5a830862dda878
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?is required for PROFILES=obs - set it in compose/.env}
+      HOSTNAME: 0.0.0.0
+    ports: ["127.0.0.1:${LANGFUSE_PORT:-3001}:3000"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on: *langfuse-deps
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/public/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    mem_limit: 2g # Node sizes its heap from this; 1g (~500 MB heap) ran out of memory on startup
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3.225.11@sha256:8a28c946bb5401eef488153fa294db5a79bd99dd5c90db8e4d39559374c9ebd3
+    environment:
+      <<: *langfuse-env
+      HOSTNAME: 0.0.0.0 # listen on all interfaces, not the container-id hostname (healthcheck uses 127.0.0.1)
+    networks: [sbam_internal]
+    depends_on: *langfuse-deps
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3030/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    mem_limit: 1g
+    restart: unless-stopped
+
+  # --- Langfuse-only dependencies: internal network, no host ports. SBAM itself uses none of them. ---
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    networks: [sbam_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 2g
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory-policy noeviction']
+    environment:
+      REDIS_PASSWORD: ${LANGFUSE_REDIS_PASSWORD}
+      REDISCLI_AUTH: ${LANGFUSE_REDIS_PASSWORD} # for the healthcheck; keeps the password off argv
+    volumes: [redis_data:/data]
+    networks: [sbam_internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 256m
+    restart: unless-stopped
+
+  minio:
+    # Upstream MinIO stopped publishing images (2025); Chainguard's build is what Langfuse's own compose uses.
+    image: cgr.dev/chainguard/minio:latest@sha256:f74600a1a46330cdbda1ef760d17a96bd6e0f4a6f0a2c49792ca3ee7e4c6fa18
+    entrypoint: sh
+    command: ["-c", 'mkdir -p /data/langfuse && exec minio server --address ":9000" /data']
+    environment:
+      MINIO_ROOT_USER: langfuse
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD}
+    volumes: [minio_data:/data]
+    networks: [sbam_internal] # internal only: no public bucket port
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  lgtm_data:
+  clickhouse_data:
+  clickhouse_logs:
+  redis_data:
+  minio_data:

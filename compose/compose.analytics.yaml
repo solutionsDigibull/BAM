@@ -1,0 +1,20 @@
+# SBAM `analytics` profile (TD §20.3, E1.11). Load with `make up PROFILES=analytics`.
+# Stub (TD §20.3.6): PostHog self-hosted is ~10 services (Kafka, ClickHouse, plugin server, ...) and is
+# optional even on 64 GB laptops. This keeps its final name, port and healthcheck; the real deployment and
+# event wiring land with #141 (E16.2) / #142 (E16.3).
+services:
+  posthog:
+    image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+    command:
+      - sh
+      - -c
+      - mkdir -p /www/_health && echo ok > /www/_health/index.html && exec httpd -f -p 8000 -h /www
+    ports: ["127.0.0.1:${POSTHOG_PORT:-8010}:8000"]
+    networks: [sbam_edge, sbam_internal]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/_health/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 64m
+    restart: unless-stopped

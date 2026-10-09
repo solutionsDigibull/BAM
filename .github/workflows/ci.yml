@@ -202,10 +202,10 @@ jobs:
         with: { persist-credentials: false }
       - *setup-uv
       - run: cd server && uv sync --locked
-      - name: CI env file (random passwords; never committed)
+      - name: CI env file (random 64-hex secrets, valid even for Langfuse ENCRYPTION_KEY; never committed)
         run: |
           while IFS= read -r line; do
-            case "$line" in *=change-me-*) echo "${line%%=*}=$(openssl rand -hex 16)" ;; *) echo "$line" ;; esac
+            case "$line" in *=change-me-*) echo "${line%%=*}=$(openssl rand -hex 32)" ;; *) echo "$line" ;; esac
           done < compose/.env.example > "$ENV_FILE"
       # The dev override bind-mounts client/ into sbam-web, which runs as uid 10001; on a Linux runner the
       # checkout belongs to the runner user, so `next dev` can't write next-env.d.ts. Throwaway checkout.
