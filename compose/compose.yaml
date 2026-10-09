@@ -307,6 +307,8 @@ services:
     environment:
       # Dev role picker; ignored by prod builds, active with the dev target (compose.override.yaml).
       SBAM_DEV_AUTH: ${SBAM_DEV_AUTH:-}
+      # Upstream of the /api/proxy route (E1.14); the browser never calls sbam-api directly.
+      SBAM_API_URL: http://sbam-api:8000
     ports: ["127.0.0.1:${WEB_PORT:-3000}:3000"]
     networks: [sbam_edge, sbam_internal]
     depends_on:

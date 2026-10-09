@@ -7,6 +7,9 @@ import routerProvider from "@refinedev/nextjs-router";
 import { App, ConfigProvider, type ThemeConfig } from "antd";
 import { Suspense, type ReactNode } from "react";
 
+import { authProvider } from "./auth-provider";
+import { dataProvider } from "./data-provider";
+
 const theme: ThemeConfig = {
   token: {
     colorPrimary: "#4f46e5",
@@ -20,14 +23,18 @@ const theme: ThemeConfig = {
   },
 };
 
-// Data and access-control providers arrive with #45 (E1.14).
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ConfigProvider theme={theme}>
       <App>
         {/* nextjs-router reads useSearchParams(), which needs a Suspense boundary to prerender. */}
         <Suspense>
-          <Refine routerProvider={routerProvider} options={{ disableTelemetry: true }}>
+          <Refine
+            routerProvider={routerProvider}
+            dataProvider={dataProvider}
+            authProvider={authProvider}
+            options={{ disableTelemetry: true }}
+          >
             {children}
           </Refine>
         </Suspense>
