@@ -1,0 +1,22 @@
+# Spike E0.12 (#30): FastMCP tool -> Promptfoo, isolated from the product stack.
+# Not part of compose/compose.yaml. Run from this directory (see Makefile / README.md).
+#
+# Both containers have NO network at run time (E0.12-T06): the suite is deterministic, so no LLM
+# provider is needed. They share only ./out (tool outputs in, results out).
+
+name: sbam-spike-promptfoo
+
+services:
+  tool:
+    build: ./tool
+    network_mode: none
+    volumes:
+      - ./out:/spike/out
+
+  promptfoo:
+    build: ./promptfoo
+    network_mode: none
+    volumes:
+      - ./suite.yaml:/spike/suite.yaml:ro
+      - ./empty_suite.yaml:/spike/empty_suite.yaml:ro
+      - ./out:/spike/out
