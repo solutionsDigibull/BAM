@@ -207,6 +207,10 @@ jobs:
           while IFS= read -r line; do
             case "$line" in *=change-me-*) echo "${line%%=*}=$(openssl rand -hex 16)" ;; *) echo "$line" ;; esac
           done < compose/.env.example > "$ENV_FILE"
+      # The dev override bind-mounts client/ into sbam-web, which runs as uid 10001; on a Linux runner the
+      # checkout belongs to the runner user, so `next dev` can't write next-env.d.ts. Throwaway checkout.
+      - name: Make the checkout writable for the dev containers
+        run: chmod -R a+rwX client
       # Flaky first boot (image pulls, Keycloak import): retry once, then fail.
       - name: make up
         run: make up ENV_FILE="$ENV_FILE" || { echo "::warning::make up failed, retrying once"; make down ENV_FILE="$ENV_FILE"; make up ENV_FILE="$ENV_FILE"; }
