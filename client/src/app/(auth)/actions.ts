@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { auth, providerId, signIn, signOut as authSignOut, type Portal } from "@/auth";
-import { parseRoles } from "@/lib/roles";
+import { isAdmin, parseRoles } from "@/lib/roles";
 import { DEV_ROLES_COOKIE, devAuthEnabled, keycloakEnabled } from "@/lib/session";
 
 export async function devSignIn(formData: FormData) {
@@ -15,7 +15,8 @@ export async function devSignIn(formData: FormData) {
     sameSite: "lax",
     path: "/",
   });
-  redirect("/");
+  // Straight to the landing page: a server-action redirect to "/" is not re-routed by src/proxy.ts.
+  redirect(roles.length === 0 ? "/login-fde" : isAdmin(roles) ? "/admin/projects" : "/projects");
 }
 
 export async function keycloakSignIn(formData: FormData) {

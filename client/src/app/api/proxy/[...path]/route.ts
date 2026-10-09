@@ -13,6 +13,7 @@ const unauthorized = () =>
   );
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+  if (!process.env.AUTH_SECRET) return unauthorized(); // getToken throws MissingSecret otherwise
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET,

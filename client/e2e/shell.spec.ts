@@ -49,3 +49,43 @@ test("e1_13_t08 invalid project id shows not-found", async ({ page, baseURL }) =
   await expect(page.getByText("Not found")).toBeVisible();
   expect(apiCalls).toEqual([]);
 });
+
+// Deep-test regressions: guards run in src/proxy.ts before rendering, so no page payload ships.
+test("guard_t01 anonymous admin route is a real 307 and ships no page content", async ({
+  request,
+}) => {
+  const r = await request.get("/admin/masters", { maxRedirects: 0 });
+  expect(r.status()).toBe(307);
+  expect(r.headers()["location"]).toMatch(/\/login-admin$/);
+  expect(await r.text()).not.toContain("Import the BAM");
+});
+
+test("guard_t02 FDE on admin route gets 403 and the admin page is never rendered", async ({
+  page,
+  baseURL,
+}) => {
+  await signInAs(page, "sbam-fde", baseURL!);
+  const r = await page.request.get("/admin/masters", { maxRedirects: 0 });
+  expect(r.status()).toBe(403);
+  expect(await r.text()).not.toMatch(/Import the BAM|No masters loaded/);
+});
+
+test("guard_t03 invalid project or workflow id is a 404 status", async ({ page, baseURL }) => {
+  await signInAs(page, "sbam-fde", baseURL!);
+  for (const path of [
+    "/projects/not-a-uuid",
+    "/projects/0190f3a2-7b1c-7d4e-8f00-123456789abc/workflows/nope/code",
+  ]) {
+    const r = await page.goto(path);
+    expect(r?.status()).toBe(404);
+    await expect(page.getByText("Not found")).toBeVisible();
+  }
+});
+
+test("guard_t04 security headers are set and X-Powered-By is hidden", async ({ request }) => {
+  const h = (await request.get("/login-fde")).headers();
+  expect(h["x-frame-options"]).toBe("DENY");
+  expect(h["x-content-type-options"]).toBe("nosniff");
+  expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(h["x-powered-by"]).toBeUndefined();
+});
