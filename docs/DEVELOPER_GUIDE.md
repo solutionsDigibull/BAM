@@ -124,7 +124,7 @@ A PR is mergeable only when all of the following hold (from PLAN §26.4):
 - FastAPI modules follow `router → service → repository`. Routers contain no business logic.
 - **Every** repository query is tenant-scoped through the base repository. Cross-tenant or unassigned access returns **404**.
 - Pydantic v2 models in `server/contracts` are the single source of truth. Never duplicate a contract model elsewhere.
-- After changing a contract run `make contracts` and commit the regenerated `server/contracts/schemas/**` and `client/src/contracts/index.ts` together with the model. `make contracts-check` (part of `make check`, and the CI job **contract drift**) fails, naming each file, when they differ. A new root model is one line in `server/contracts/sbam_contracts/registry.py`.
+- After changing a contract run `make contracts` and commit the regenerated `server/contracts/schemas/**` and `client/src/contracts/index.ts` together with the model. `make contracts-check` (part of `make check`, and the CI job **contract-drift**) fails, naming each file, when they differ. A new root model is one line in `server/contracts/sbam_contracts/registry.py`.
 - No direct file I/O for project data. Use `StorageBackend`.
 - No direct LLM SDK calls. Use the Bifrost client with an **alias** (`sbam-ocr`, `sbam-sow`, `sbam-isatvon`, `sbam-codegen`, `sbam-testgen`, `sbam-corrector`).
 - Long-running work runs in Temporal activities only. API handlers never block on parsing, LLM, codegen or sandbox calls.
@@ -171,6 +171,40 @@ How to use them:
 - Adding tests beyond the list is welcome. Removing or weakening a listed test needs a comment on the issue explaining why.
 
 LLM-dependent tests run against the **mock LLM provider** in CI (issue E1.15). Fixtures (ISATVON 1.4 sample MS01.1, masters workbook, sample client documents, EICAR test file) live in `server/tests/fixtures` (issue E0.8).
+
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` (issue E1.12, TD §20.4) runs on every PR and push to `dev`/`main`, on `v*` tags, and nightly. It has no path filters, so the required checks report on docs-only PRs too.
+
+| Job | What it does | Required |
+|---|---|---|
+| `lint` | `make lint` (ruff, black, eslint, prettier) | yes |
+| `types` | `make typecheck` (mypy --strict, tsc) | yes |
+| `unit` | pytest `unit`, `contract`, `temporal` (incl. replay) + vitest | yes |
+| `api` | pytest `tests/api` | yes |
+| `contract-drift` | `make contracts-check` (in `contracts.yml`) | yes |
+| `secret-scan` | gitleaks over the PR's commits (full history on push/nightly) | yes |
+| `hadolint` | every `compose/docker/*.Dockerfile` | yes |
+| `image-scan` | builds `sbam-api`, `sbam-worker`, `sbam-web`, `sbam-mock-api`; Trivy fails on fixable CRITICAL; Syft SPDX SBOM; pushes `ghcr.io/<owner>/<image>:<sha>` + `:main` (or the tag) **only** on push to `main` or a `v*` tag | yes |
+| `compose-smoke` | `make up` + `make test-int` with a generated `compose/.env.ci` (gitignored, random passwords); retries `make up` once | yes |
+| `playwright-smoke` | `pnpm --dir client e2e` | no |
+
+Rules the pipeline keeps:
+- Every third-party action is pinned by commit SHA. The scanners (Trivy, Syft, gitleaks, hadolint) run as digest-pinned images, not actions.
+- `GITHUB_TOKEN` is `contents: read`. Only `image-scan` gets `packages: write`, and only its push steps use it.
+- PRs from forks get no secrets.
+- The buildx cache is scoped per branch, so a PR can't overwrite `dev`/`main` layers.
+- Integration tests skip when no stack is running, but fail under `CI=true`, so `compose-smoke` can't pass by skipping.
+
+Turning on the required checks needs repository admin, so the repo owner runs this once per branch (`main`, then `dev`):
+
+```bash
+gh api -X PUT repos/solutionsDigibull/BAM/branches/main/protection --input - <<'JSON'
+{"required_status_checks":{"strict":true,"contexts":["lint","types","unit","api","contract-drift","secret-scan","hadolint","compose-smoke","image-scan (sbam-api)","image-scan (sbam-worker)","image-scan (sbam-web)","image-scan (sbam-mock-api)"]},
+ "enforce_admins":true,"required_pull_request_reviews":{"required_approving_review_count":1},"restrictions":null,
+ "allow_force_pushes":false,"allow_deletions":false}
+JSON
+```
 
 ---
 

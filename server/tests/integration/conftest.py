@@ -14,7 +14,8 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
-ENV_FILE = os.environ.get("ENV_FILE", str(REPO / "compose" / ".env"))
+# Relative to the repo root, like the Makefile's ENV_FILE (pytest itself runs from server/).
+ENV_FILE = str(REPO / os.environ.get("ENV_FILE", "compose/.env"))
 
 DOCKER_COMPOSE = [
     "docker",
@@ -41,6 +42,9 @@ def is_open(p: int) -> bool:
 @pytest.fixture(scope="session", autouse=True)
 def _stack_up() -> None:
     if not is_open(port("API_PORT", 8000)):
+        # CI's compose-smoke must never pass by skipping: there the stack is required.
+        if os.environ.get("CI"):
+            pytest.fail("Compose stack is not running in CI (make up failed?)")
         pytest.skip("Compose stack is not running (make up)")
 
 
