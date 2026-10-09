@@ -1,0 +1,326 @@
+# SBAM Docker Compose: the `core` profile (TD §20.3). Every service here is core and always starts.
+# Run through the Makefile (`make up`), which loads compose/.env and compose.override.yaml.
+# Services whose feature isn't built yet are stubs with their final name, port and healthcheck
+# (TD §20.3.6); the owning issue replaces only its own block.
+name: sbam
+
+
+x-worker: &worker
+  image: sbam-worker:local
+  build:
+    context: ..
+    dockerfile: compose/docker/server.Dockerfile
+    target: prod
+    args: { PACKAGE: sbam-workers, ROLE: worker }
+  # Stub: heartbeat loop per queue until #40. Variables are passed one by one, never an env_file
+  # (the OpenRouter key must not reach workers, ADR 0001).
+  environment: &worker-env
+    SBAM_QUEUES: unset
+    LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+    TEMPORAL_HOST: temporal:7233
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  depends_on:
+    postgres: { condition: service_healthy }
+    temporal: { condition: service_healthy }
+    temporal-namespace: { condition: service_completed_successfully }
+    bifrost: { condition: service_healthy }
+  networks: [sbam_internal] # no internet route (TD §20.3.3)
+  cpus: 1.0 # ponytail: default limits, the TD sets none; tune when real workers land (#40)
+  mem_limit: 1g
+  restart: unless-stopped
+
+services:
+  # --- data -------------------------------------------------------------------------------------
+  postgres:
+    image: postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      SBAM_DB_PASSWORD: ${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5432}:5432"]
+    networks: [sbam_edge, sbam_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  storage-init:
+    image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+    command:
+      - sh
+      - -c
+      - mkdir -p /data/storage/uploads /data/storage/derived /data/storage/okf /data/storage/code /data/storage/tests /data/storage/exports && chown -R 10001:10001 /data/storage
+    volumes: [storage:/data/storage]
+    network_mode: none
+
+  # --- identity ---------------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      KC_HEALTH_ENABLED: "true"
+      # Browsers use localhost:<port>; containers reach keycloak:8080. Tokens carry the localhost issuer
+      # (see ADR 0002); #47/#48 align the API's expected issuer with it.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      # Placeholders in the realm file (seed user password, web port for redirect URIs).
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      WEB_PORT: ${WEB_PORT:-3000}
+    volumes:
+      # Stub realm until #47 hardens it. --import-realm skips a realm that already exists.
+      - ./keycloak/realm-bullm-dev.json:/opt/keycloak/data/import/realm-bullm-dev.json:ro
+    ports: ["127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  # --- workflow engine --------------------------------------------------------------------------
+  temporal-schema:
+    image: temporalio/admin-tools:1.31.3@sha256:76a70ead160808b54acdbc98944dfc07990d9637dda999118a2d9ee1f58b9bc9
+    environment:
+      SQL_PLUGIN: postgres12
+      SQL_HOST: postgres
+      SQL_PORT: "5432"
+      SQL_USER: temporal
+      SQL_PASSWORD: ${TEMPORAL_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+    # setup-schema -v 0.0 and update-schema are both re-runnable (TD §20.3.4).
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        schema=/etc/temporal/schema/postgresql/v12
+        temporal-sql-tool --db temporal setup-schema -v 0.0
+        temporal-sql-tool --db temporal update-schema -d $$schema/temporal/versioned
+        temporal-sql-tool --db temporal_visibility setup-schema -v 0.0
+        temporal-sql-tool --db temporal_visibility update-schema -d $$schema/visibility/versioned
+    networks: [sbam_internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  temporal:
+    image: temporalio/server:1.31.3@sha256:b4a78d2186e558aa3502be08d576086c3a82fccdf6184cb4c819eb27bea7bd63
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+      BIND_ON_IP: 0.0.0.0
+      TEMPORAL_BROADCAST_ADDRESS: 127.0.0.1
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/docker.yaml
+    volumes:
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+    ports: ["127.0.0.1:${TEMPORAL_PORT:-7233}:7233"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on:
+      temporal-schema: { condition: service_completed_successfully }
+    healthcheck:
+      # The server image has no `temporal` CLI (only admin-tools does), so check the frontend port;
+      # temporal-namespace then talks to it with the real CLI.
+      test: ["CMD", "nc", "-z", "127.0.0.1", "7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  temporal-namespace:
+    image: temporalio/admin-tools:1.31.3@sha256:76a70ead160808b54acdbc98944dfc07990d9637dda999118a2d9ee1f58b9bc9
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    entrypoint:
+      - sh
+      - -ec
+      - temporal operator namespace describe -n sbam >/dev/null 2>&1 || temporal operator namespace create -n sbam --retention 7d
+    networks: [sbam_internal]
+    depends_on:
+      temporal: { condition: service_healthy }
+
+  temporal-ui:
+    image: temporalio/ui:2.55.0@sha256:3899d5cf749b5555c9f798d46f2423b1d6190ea391ca713db5d1bba961759e58
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_DEFAULT_NAMESPACE: sbam
+    ports: ["127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8080"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on:
+      temporal: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # --- LLM gateway, malware scanning, uploads ------------------------------------------------------
+  bifrost:
+    # Stub: no providers/aliases until #46. The OpenRouter key is passed to bifrost only.
+    image: maximhq/bifrost:v2.2.6@sha256:d0b4708ace1aa175766f94afa715fd9bba3a1b56c1dc2afff15a21edf3ae4e2a
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    volumes:
+      - ./bifrost/config.json:/app/data/config.json:ro
+    ports: ["127.0.0.1:${BIFROST_PORT:-8081}:8080"]
+    networks: [sbam_edge, sbam_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  clamav:
+    # Real clamd + freshclam, not called yet (#62 wires scanning). Not published.
+    image: clamav/clamav:1.5.4@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
+    volumes: [clamav_db:/var/lib/clamav]
+    networks: [sbam_edge, sbam_internal] # edge only for signature updates
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s # the first freshclam download takes minutes
+    restart: unless-stopped
+
+  tusd:
+    # Stub: file store on the storage volume, no hooks until #61.
+    image: tusproject/tusd:v2.10.1@sha256:7b1c552a8b42f4b36cb01f2a3bd49f82ab078b2eefd191459e716141dd50376c
+    command: ["-upload-dir=/data/storage/uploads", "-base-path=/files/", "-port=1080", "-behind-proxy"]
+    user: "10001:10001"
+    environment:
+      TUSD_HOOK_SECRET: ${TUSD_HOOK_SECRET:?is required - set it in compose/.env (copy compose/.env.example)}
+    volumes: [storage:/data/storage]
+    ports: ["127.0.0.1:${TUSD_PORT:-1080}:1080"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on:
+      storage-init: { condition: service_completed_successfully }
+      sbam-api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null --method=OPTIONS http://127.0.0.1:1080/files/ 2>/dev/null || wget -q -S -O /dev/null http://127.0.0.1:1080/files/ 2>&1 | grep -q 'HTTP/'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # --- SBAM -------------------------------------------------------------------------------------
+  api-migrate:
+    # Stub: `sbam-migrate` exits 0 until #36 runs `alembic upgrade head`.
+    image: sbam-api:local
+    build: &api-build
+      context: ..
+      dockerfile: compose/docker/server.Dockerfile
+      target: prod
+      args: { PACKAGE: sbam-api, ROLE: api }
+    command: ["sbam-migrate"]
+    environment:
+      DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
+    networks: [sbam_internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  sbam-api:
+    image: sbam-api:local
+    build: *api-build
+    environment:
+      DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
+      STORAGE_ROOT: /data/storage
+      TEMPORAL_HOST: temporal:7233
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/bullm
+      KEYCLOAK_AUDIENCE: sbam-api
+      MAX_BODY_BYTES: ${MAX_BODY_BYTES:-10485760}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes: [storage:/data/storage]
+    ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
+      storage-init: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      temporal: { condition: service_healthy }
+      temporal-namespace: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
+    healthcheck:
+      # Ready = db, storage, temporal and Keycloak JWKS all ok (the image itself checks /health/live).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4)"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  worker-ingest:
+    <<: *worker
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-ingest }
+  worker-knowledge:
+    <<: *worker
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-knowledge }
+  worker-llm:
+    <<: *worker
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-llm }
+  worker-build:
+    <<: *worker
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-build }
+  worker-test:
+    <<: *worker
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-test }
+  worker-certify:
+    <<: *worker
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-certify }
+
+  sbam-mock-api:
+    # Stub: health-only until #126.
+    image: sbam-mock-api:local
+    build:
+      context: ..
+      dockerfile: compose/docker/mock-api.Dockerfile
+    networks: [sbam_internal]
+    restart: unless-stopped
+
+  sbam-web:
+    image: sbam-web:local
+    build:
+      context: ..
+      dockerfile: compose/docker/web.Dockerfile
+      target: prod
+    environment:
+      # Dev role picker; ignored by prod builds, active with the dev target (compose.override.yaml).
+      SBAM_DEV_AUTH: ${SBAM_DEV_AUTH:-}
+    ports: ["127.0.0.1:${WEB_PORT:-3000}:3000"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on:
+      sbam-api: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    restart: unless-stopped
+
+networks:
+  sbam_edge: {}
+  sbam_internal:
+    internal: true # no internet route; workers sit only here
+
+volumes:
+  pgdata:
+  storage:
+  cognee_data:
+  clamav_db:

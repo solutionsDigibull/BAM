@@ -1,0 +1,37 @@
+# Local development mode (TD §20.3.5), loaded by `make up` on laptops: dev image targets with the source
+# bind-mounted, so code changes don't need image rebuilds. Dev/staging/prod use compose.<env>.yaml (#142).
+
+x-worker-dev: &worker-dev
+  build:
+    target: dev
+  volumes: [../server:/app/server]
+
+services:
+  sbam-api:
+    build:
+      target: dev # uvicorn --reload on /app/server
+    volumes:
+      - ../server:/app/server
+      - storage:/data/storage
+
+  sbam-web:
+    build:
+      target: dev # next dev
+    environment:
+      WATCHPACK_POLLING: "true" # file events don't cross Docker Desktop bind mounts on Windows
+    volumes:
+      - ../client:/app/client
+      - web_node_modules:/app/client/node_modules
+      - web_next:/app/client/.next
+
+  # ponytail: the worker stub doesn't read the source yet; #40 adds restart-on-change with the real bootstrap.
+  worker-ingest: *worker-dev
+  worker-knowledge: *worker-dev
+  worker-llm: *worker-dev
+  worker-build: *worker-dev
+  worker-test: *worker-dev
+  worker-certify: *worker-dev
+
+volumes:
+  web_node_modules:
+  web_next:

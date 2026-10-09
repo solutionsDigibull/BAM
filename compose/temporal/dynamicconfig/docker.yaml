@@ -1,0 +1,5 @@
+# Temporal dynamic config (the plain temporalio/server image ships none). Dev defaults from Temporal's
+# docker-compose samples; tune per environment in compose.<env>.yaml (#142).
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true # single-node dev: new search attributes visible immediately
+    constraints: {}

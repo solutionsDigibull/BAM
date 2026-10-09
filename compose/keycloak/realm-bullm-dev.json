@@ -1,0 +1,343 @@
+{
+  "realm": "bullm",
+  "enabled": true,
+  "organizationsEnabled": true,
+  "sslRequired": "external",
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "super-admin",
+        "description": "BuLLM operator, no tenant"
+      },
+      {
+        "name": "sbam-admin",
+        "description": "Tenant admin (admin portal)"
+      },
+      {
+        "name": "sbam-fde",
+        "description": "Forward-deployed engineer (FDE portal)"
+      }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "organization",
+      "description": "tenant_id claim from Organization membership",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-organization-membership-mapper",
+          "config": {
+            "claim.name": "tenant_id",
+            "multivalued": "true",
+            "addOrganizationId": "false",
+            "addOrganizationAttributes": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "roles",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "email",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "basic",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "sbam-admin",
+      "name": "SBAM admin portal",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:${WEB_PORT:3000}/*"
+      ],
+      "webOrigins": [
+        "http://localhost:${WEB_PORT:3000}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:${WEB_PORT:3000}/*"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "roles",
+        "organization"
+      ],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "sbam-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "sbam-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "sbam-fde",
+      "name": "SBAM FDE portal",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:${WEB_PORT:3000}/*"
+      ],
+      "webOrigins": [
+        "http://localhost:${WEB_PORT:3000}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:${WEB_PORT:3000}/*"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "profile",
+        "email",
+        "roles",
+        "organization"
+      ],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "sbam-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "sbam-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "fde-a",
+      "email": "fde-a@tenant-a.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Fde",
+      "lastName": "A",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SEED_USER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "sbam-fde"
+      ]
+    },
+    {
+      "username": "fde-b",
+      "email": "fde-b@tenant-b.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Fde",
+      "lastName": "B",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SEED_USER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "sbam-fde"
+      ]
+    },
+    {
+      "username": "fde-ab",
+      "email": "fde-ab@tenant-a.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Fde",
+      "lastName": "AB",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SEED_USER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "sbam-fde"
+      ]
+    },
+    {
+      "username": "admin-a",
+      "email": "admin-a@tenant-a.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "A",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SEED_USER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "sbam-admin"
+      ]
+    },
+    {
+      "username": "root",
+      "email": "root@bullm.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Super",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SEED_USER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "super-admin"
+      ]
+    }
+  ],
+  "organizations": [
+    {
+      "name": "Tenant A",
+      "alias": "tenant-a",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "tenant-a.test"
+        }
+      ],
+      "members": [
+        {
+          "username": "fde-a"
+        },
+        {
+          "username": "fde-ab"
+        },
+        {
+          "username": "admin-a"
+        }
+      ]
+    },
+    {
+      "name": "Tenant B",
+      "alias": "tenant-b",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "tenant-b.test"
+        }
+      ],
+      "members": [
+        {
+          "username": "fde-b"
+        },
+        {
+          "username": "fde-ab"
+        }
+      ]
+    }
+  ]
+}

@@ -23,12 +23,14 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # --- dev: node_modules live in the image (Compose keeps them in a named volume) -------------------
 FROM deps AS dev
 COPY client/ ./
-RUN chown -R sbam:sbam /app/client
+# .next exists so Compose's named volume for it starts owned by uid 10001, not root.
+RUN mkdir -p .next && chown -R sbam:sbam /app/client
 USER 10001:10001
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
   CMD ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
-CMD ["pnpm", "exec", "next", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
+# Run next directly: `pnpm exec` would make corepack download pnpm into a home uid 10001 can't write.
+CMD ["node_modules/.bin/next", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
 
 FROM deps AS build
 COPY client/ ./

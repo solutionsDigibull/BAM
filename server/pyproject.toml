@@ -51,4 +51,5 @@ files = ["api", "workers", "contracts", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not integration'"
+markers = ["integration: needs the Compose stack (`make up`); run with `make test-int`"]
