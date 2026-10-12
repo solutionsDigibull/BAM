@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "SBAM FastAPI modular monolith"
 requires-python = "==3.12.*"
 dependencies = [
+    "alembic>=1.16,<2",
     "fastapi>=0.142.2",
     "httpx>=0.28.1",
     "opentelemetry-exporter-otlp-proto-http>=1.44.0,<1.45",
@@ -11,6 +12,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.65b0,<0.66",
     "opentelemetry-instrumentation-sqlalchemy>=0.65b0,<0.66",
     "opentelemetry-sdk>=1.44.0,<1.45",
+    "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.15.0",
     "sbam-contracts",
     "sqlalchemy>=2.0.54,<2.1",  # OTel sqlalchemy instrumentation supports <2.1 only

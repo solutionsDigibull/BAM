@@ -2,10 +2,8 @@
 
 import logging
 import re
-import secrets
 import time
 import traceback
-import uuid
 from pathlib import Path
 
 from opentelemetry import trace
@@ -14,21 +12,12 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from sbam_api.core.conventions import ApiError
 from sbam_api.core.errors import INTERNAL_ERROR, send_problem
+from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 
 CORRELATION_HEADER = b"x-correlation-id"
 _VALID_CORRELATION_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 log = logging.getLogger("sbam_api.request")
-
-
-def uuid7() -> str:
-    """RFC 9562 UUIDv7 (time-ordered). Python 3.12 has no uuid.uuid7."""
-    ms = time.time_ns() // 1_000_000
-    rand = secrets.randbits(74)
-    value = (
-        (ms << 80) | (0x7 << 76) | ((rand >> 62) << 64) | (0b10 << 62) | (rand & ((1 << 62) - 1))
-    )
-    return str(uuid.UUID(int=value))
 
 
 def _header(scope: Scope, name: bytes) -> str:
@@ -62,7 +51,7 @@ class CorrelationIdMiddleware:
             await self.app(scope, receive, send)
             return
         raw = _header(scope, CORRELATION_HEADER)
-        cid = raw if _VALID_CORRELATION_ID.fullmatch(raw) else uuid7()
+        cid = raw if _VALID_CORRELATION_ID.fullmatch(raw) else str(uuid7())
         token = correlation_id_var.set(cid)
         trace.get_current_span().set_attribute("sbam.correlation_id", cid)  # no-op without a span
         started, status = False, 500

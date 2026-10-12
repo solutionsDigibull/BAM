@@ -13,6 +13,28 @@
 - Frozen rows are protected by `BEFORE UPDATE OR DELETE` triggers (`is_frozen = true` → raise).
 - Audit: a normal append-only table (C-42).
 
+### 7.1.1 Implementation (E1.5, ADR 0003)
+
+Code lives in `server/api/sbam_api/db/`. It uses sync SQLAlchemy 2 on psycopg 3. `DATABASE_URL` stays a plain `postgresql://` URL, and `make_engine` adds the driver.
+
+- **Tables.** Declare a table as `class X(ProjectOwned, Base)` (or `TenantOwned`). `Base.metadata` has `schema="sbam"` and a constraint naming convention (`pk_`, `fk_`, `ix_`, `uq_`, `ck_<table>_<name>`).
+  - Ids come from `core/ids.uuid7()`: RFC 9562 UUIDv7, with a 12-bit counter, so ids made by one process stay ordered within a millisecond and across clock steps.
+  - `row_version` is SQLAlchemy's `version_id_col`, so every UPDATE carries `WHERE row_version = <loaded>`.
+- **Status columns.** `status_check(Enum)` or `status_check(check_constraint_values("<machine>"))` builds the `CHECK (status IN (...))`.
+- **Repositories.** Feature code subclasses `TenantScopedRepository[X]` (`get` / `list` / `add` / `update(entity, expected_row_version)` / `soft_delete`) and builds it with a `TenantContext` from auth (#48).
+  - No context raises `TenantContextMissing` before any query runs.
+  - Other-tenant and soft-deleted rows read as `None`, which the API answers with 404.
+  - A stale version raises `StaleRowVersion`, which renders as 412.
+  - A frozen row raises `RowFrozen`, which renders as 423.
+  - Both errors are `ApiError`s.
+- **Frozen rows.** Opt a table in from its migration with `op.execute(create_frozen_trigger("<table>"))`. The shared function `sbam.forbid_frozen_change()` comes from the baseline and raises SQLSTATE `SB423`.
+- **Lint.** Ruff `TID251` bans `sqlalchemy.select/insert/update/delete/text/create_engine` outside `sbam_api/db/`, `migrations/`, `*repository.py` and tests.
+- **Migrations.**
+  - They live in `sbam_api/migrations/` (packaged, no `alembic.ini`), and the version table is in `sbam`.
+  - Run them with `uv run python -m sbam_api.db.migrate <alembic args>`. No args means `upgrade head`, which is what the `api-migrate` job runs.
+  - `make migrations-check` (part of `make check`) fails on more than one head.
+  - Downgrades undo only their own revision. The baseline never drops the schema.
+
 ## 7.2 Tenancy, identity, projects
 
 | Table               | Purpose                        | Key fields                                                                               | Relations      | Status / notes            |

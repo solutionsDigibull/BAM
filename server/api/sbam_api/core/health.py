@@ -8,13 +8,13 @@ import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
-from urllib.parse import urlsplit
 
 import httpx
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from sbam_api.core.settings import Settings
+from sbam_api.db.session import make_engine, ping
 
 Check = Callable[[], Awaitable[bool]]
 CHECK_TIMEOUT_SECONDS = 2.0
@@ -29,13 +29,13 @@ async def _tcp(host: str, port: int) -> bool:
 
 
 def default_checks(settings: Settings) -> dict[str, Check]:
-    db = urlsplit(settings.database_url)
     temporal_host, temporal_port = settings.temporal_host.rsplit(":", 1)
     jwks_url = f"{str(settings.keycloak_issuer).rstrip('/')}/protocol/openid-connect/certs"
 
+    engine = make_engine(settings.database_url)  # lazy: connects on the first check
+
     async def database() -> bool:
-        # ponytail: TCP reachability only; #36 (E1.5) swaps this for `SELECT 1` on the pool.
-        return await _tcp(db.hostname or "localhost", db.port or 5432)
+        return await asyncio.to_thread(ping, engine)
 
     async def storage() -> bool:
         # Write + delete a probe file: os.access(W_OK) misses Windows ACLs and some RO mounts.
