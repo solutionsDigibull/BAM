@@ -194,7 +194,7 @@ jobs:
 
   compose-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55 # includes the Keycloak login e2e, whose refresh test idles past the 300 s token
     env:
       ENV_FILE: compose/.env.ci # gitignored via .env.*
     steps:
@@ -216,6 +216,16 @@ jobs:
         run: make up ENV_FILE="$ENV_FILE" || { echo "::warning::make up failed, retrying once"; make down ENV_FILE="$ENV_FILE"; make up ENV_FILE="$ENV_FILE"; }
       - name: make test-int
         run: make test-int ENV_FILE="$ENV_FILE"
+      # Real browser logins through Keycloak against the running stack (#51, E2.5-T01..T08).
+      - *setup-pnpm
+      - *setup-node
+      - name: Keycloak login e2e
+        run: |
+          pnpm --dir client install --frozen-lockfile
+          pnpm --dir client exec playwright install --with-deps chromium
+          seed="$(sed -n 's/^SEED_USER_PASSWORD=//p' "$ENV_FILE")"
+          echo "::add-mask::$seed"
+          E2E_SEED_PASSWORD="$seed" E2E_BASE_URL=http://localhost:3000 E2E_KEYCLOAK=1             pnpm --dir client exec playwright test --project keycloak
       - if: failure()
         run: |
           docker compose --env-file "$ENV_FILE" -f compose/compose.yaml -f compose/compose.override.yaml ps -a

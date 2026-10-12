@@ -6,7 +6,8 @@ import { devSignIn, keycloakSignIn } from "./actions";
 
 const ERRORS: Record<string, string> = {
   WrongPortal: "This account cannot use this portal. Sign in through the portal for your role.",
-  Configuration: "The sign-in service is unavailable. Try again in a few minutes.",
+  NoRole: "This account has no SBAM role. Ask your Admin for access.",
+  Configuration: "Sign-in is unavailable, try again later.", // Keycloak unreachable
 };
 
 const CHOICES = {
@@ -26,11 +27,15 @@ export function DevLogin({
   enabled,
   keycloak = false,
   error,
+  reference,
+  callbackUrl,
 }: {
   portal: keyof typeof CHOICES;
   enabled: boolean;
   keycloak?: boolean;
   error?: string;
+  reference?: string;
+  callbackUrl?: string;
 }) {
   return (
     <Flex align="center" justify="center" style={{ minHeight: "100vh", background: "#f6f7fb" }}>
@@ -44,11 +49,13 @@ export function DevLogin({
             showIcon
             style={{ marginBottom: 12 }}
             message={ERRORS[error] ?? "Sign-in failed. Try again."}
+            description={reference ? `Reference: ${reference}` : undefined}
           />
         )}
         {keycloak && (
           <form action={keycloakSignIn} style={{ marginBottom: enabled ? 16 : 0 }}>
             <input type="hidden" name="portal" value={portal} />
+            {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
             <Button type="primary" htmlType="submit" block>
               Sign in with Keycloak
             </Button>

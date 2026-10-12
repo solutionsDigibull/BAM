@@ -3,6 +3,7 @@
 // when its layout redirects or renders Forbidden. The layouts keep their guards as defence in depth.
 import { NextResponse, type NextRequest } from "next/server";
 
+import { landing } from "@/lib/landing";
 import { isAdmin, isFde, isUuid } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
@@ -12,10 +13,19 @@ export async function proxy(req: NextRequest) {
   const session = await getSession();
   if (pathname === "/") {
     // Same landing choice as app/page.tsx, but as a real 307 before the streamed render starts.
-    const home = !session ? "/login-fde" : isAdmin(session.roles) ? "/admin/projects" : "/projects";
+    const home = !session
+      ? "/login-fde"
+      : isAdmin(session.roles)
+        ? landing("admin", session.roles)
+        : landing("fde", session.roles);
     return NextResponse.redirect(new URL(home, req.url));
   }
-  if (!session) return NextResponse.redirect(new URL(`/login-${portal}`, req.url));
+  if (!session) {
+    // Back to where the user was going after sign-in; actions.ts re-checks it (safeCallback).
+    const login = new URL(`/login-${portal}`, req.url);
+    login.searchParams.set("callbackUrl", `${pathname}${req.nextUrl.search}`);
+    return NextResponse.redirect(login);
+  }
   if (!(portal === "admin" ? isAdmin : isFde)(session.roles)) {
     return NextResponse.rewrite(new URL(`/forbidden/${portal}`, req.url), { status: 403 });
   }
