@@ -49,6 +49,10 @@ profile analytics:  posthog (self-hosted; heavier — run on dev/staging VM, opt
 profile sandbox-local: local-docker sandbox runner (non-certifying) for laptops without the KVM host
 ```
 
+Each optional profile is its own file, `compose/compose.<profile>.yaml`, added by `make up PROFILES=obs,...`
+(E1.11). They aren't `profiles:` entries in `compose.yaml` because Compose interpolates every service, active
+or not, so profile-only required secrets would break plain `make up` for an `.env` that predates them.
+
 **Redis is not an SBAM dependency.** It exists only inside the `obs` profile because Langfuse needs it. SBAM state
 (idempotency keys, runs, caches) lives in PostgreSQL. Don't add Redis to `core` without an ADR.
 
@@ -181,7 +185,9 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 | workers ×6 | `sbam-worker` image, heartbeat loop per queue | #40 E1.7 (bootstrap `--queues`) |
 | api-migrate | exits 0 ("no migrations yet") | #36 E1.5 (Alembic) |
 | sbam-mock-api | health-only HTTP server | #126 E13.5 |
-| otel-collector / langfuse (obs) | not in `core` | #42 E1.11 |
+| otel-collector / langfuse (obs) | real (`compose.obs.yaml`, #42 E1.11) | — |
+| posthog (analytics) | busybox health endpoint on 8010 | #141 E16.2 / #142 E16.3 |
+| sandbox-runner (sandbox-local) | hardened idle container on internal `sbam_sandbox` (peer: `sbam-mock-api` only), `SANDBOX_MODE=LOCAL_DOCKER_NONCERT` | #123 E13.2 (adapter, `EGRESS_BLOCKED`, non-certifying runs) |
 
 ### 20.3.7 Running it
 
@@ -190,13 +196,15 @@ cp compose/.env.example compose/.env   # set the passwords
 make up            # core profile, healthy in ~5–10 min on first run (image pulls + ClamAV signatures)
 make ps            # docker compose ps: every service "healthy"
 make logs s=sbam-api
+make up PROFILES=obs,sandbox-local   # core + optional profiles (obs, analytics, sandbox-local)
 make test-int      # integration tests against the running stack (TD §19)
 make down          # stop, keep data
 make reset CONFIRM=yes   # stop and delete all volumes (the only destructive command)
 ```
 
 URLs: web `http://localhost:3000`, API docs `http://localhost:8000/api/v1/docs`, Keycloak
-`http://localhost:8080`, Temporal UI `http://localhost:8233`.
+`http://localhost:8080`, Temporal UI `http://localhost:8233`. With `obs`: Grafana `http://localhost:3002`
+(user `admin`), Langfuse `http://localhost:3001`, OTLP `localhost:4317` (gRPC) / `4318` (HTTP).
 
 ## 20.4 CI/CD (GitHub Actions)
 

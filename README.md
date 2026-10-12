@@ -50,6 +50,7 @@ run as stubs with their final name and port (TD §20.3.6).
 | Command | What |
 |---|---|
 | `make up` / `make down` | start (or update) / stop; data is kept in named volumes |
+| `make up PROFILES=obs` | also start optional profiles: `obs` (Grafana on 3002, Langfuse on 3001), `analytics`, `sandbox-local` |
 | `make ps`, `make logs s=sbam-api` | status, follow one service's logs |
 | `make test-int` | integration tests against the running stack (`pytest -m integration`) |
 | `make e2e` | Playwright end-to-end tests |
