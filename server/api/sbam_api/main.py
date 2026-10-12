@@ -18,6 +18,7 @@ from sbam_api.core.health import Check, default_checks, health_router
 from sbam_api.core.logging import configure_logging
 from sbam_api.core.middleware import BodyLimitMiddleware, CorrelationIdMiddleware
 from sbam_api.core.settings import Settings, load_settings
+from sbam_api.core.telemetry import configure_telemetry
 
 _NOT_FEATURE_MODULES = {"core", "main"}
 
@@ -44,6 +45,9 @@ def create_app(
         docs_url=f"{API_BASE}/docs",
         openapi_url=f"{API_BASE}/openapi.json",
         redoc_url=None,
+        # FastAPI's built-in OpenTelemetry would add a second exporter to our provider, own spans,
+        # and metrics/log exporters (logs can carry request bodies). core/telemetry.py owns tracing.
+        telemetry={"auto_configure": False, "tracing": False, "metrics": False, "logs": False},
     )
     app.state.settings = settings
     install_error_handlers(app)
@@ -53,4 +57,5 @@ def create_app(
     # Last added runs first: correlation id wraps the body limit so a 413 also carries the id.
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
     app.add_middleware(CorrelationIdMiddleware)
+    configure_telemetry(app, settings)  # wraps the whole stack: one server span per request
     return app

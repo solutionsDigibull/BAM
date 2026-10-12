@@ -7,6 +7,26 @@
 
 Every request, Temporal workflow, activity, LLM call and log line carries `correlation_id`, `tenant_id`, `project_id`, `workflow_id` (SBAM) and, where relevant, `sub_skill_id` and the Temporal ids. Context propagates over W3C `traceparent` through API → Temporal (OTEL interceptor) → workers → Bifrost.
 
+### 17.1.1 sbam-api tracing baseline (E1.4)
+
+`sbam_api/core/telemetry.py` traces FastAPI routes, SQLAlchemy queries and outgoing httpx calls.
+
+| Setting | Effect |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP base URL (`/v1/traces` is appended). **Unset = no exporter, no errors.** The Compose `obs` profile sets it to `http://otel-collector:4318` for `sbam-api` only. An invalid URL fails startup. |
+| `OTEL_SERVICE_NAME` | `service.name`, default `sbam-api` |
+
+- **Attributes:**
+  - `sbam.correlation_id` on every server span.
+  - `sbam.tenant_id`, `sbam.project_id`, `sbam.workflow_id` only through `set_request_context(...)`. Auth calls it **after** authentication (#48); request headers never set them.
+  - JSON log lines carry `trace_id`/`span_id` while a span is active.
+- **Propagation:** W3C TraceContext only, with no baggage. A malformed `traceparent` starts a new trace. Outgoing httpx calls carry `traceparent`.
+- **Safety:**
+  - SQL spans keep the statement with its placeholders, never the bound values.
+  - `Authorization`, `Cookie` and `Set-Cookie` are never captured, and are sanitized even if header capture is switched on by env.
+  - The exporter sits behind a bounded batch queue (2048 spans, 2 s timeout), so a collector outage drops spans and never slows or fails requests.
+- **Versions:** `opentelemetry-instrumentation-sqlalchemy` 0.65 supports SQLAlchemy `< 2.1`, so SQLAlchemy is pinned to 2.0.x until the instrumentation supports 2.1.
+
 ## 17.2 Signals
 
 | Signal                   | Tool                                                                                          | Content                                                                                                                                             |

@@ -8,6 +8,7 @@ import traceback
 import uuid
 from pathlib import Path
 
+from opentelemetry import trace
 from sbam_contracts.api import ErrorCode
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -63,6 +64,7 @@ class CorrelationIdMiddleware:
         raw = _header(scope, CORRELATION_HEADER)
         cid = raw if _VALID_CORRELATION_ID.fullmatch(raw) else uuid7()
         token = correlation_id_var.set(cid)
+        trace.get_current_span().set_attribute("sbam.correlation_id", cid)  # no-op without a span
         started, status = False, 500
         begin = time.perf_counter()
 
