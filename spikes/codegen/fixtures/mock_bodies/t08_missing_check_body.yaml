@@ -1,0 +1,7 @@
+# E0.11-T08: every response is missing check_body. Schema validation fails, Pydantic AI re-asks
+# 3 times (4 calls in total), then the CLI exits 2 and assembles nothing.
+responses:
+  - state_queries:
+      failed_login_attempts: SELECT failed_login_attempts FROM investor_profiles WHERE mobile_number = ?
+    action_body: |
+      return {}

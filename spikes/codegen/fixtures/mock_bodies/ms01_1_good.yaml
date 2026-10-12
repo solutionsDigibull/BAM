@@ -1,0 +1,33 @@
+# Mock sbam-codegen response for MS01.1 (E0.11-T02): what a well-behaved LLM returns.
+# Synthetic logic only. `current` is the dict from state.read(mobile_number).
+state_queries:
+  failed_login_attempts: SELECT failed_login_attempts FROM investor_profiles WHERE mobile_number = ?
+  active_devices: SELECT active_devices FROM investor_profiles WHERE mobile_number = ?
+  user_status: SELECT user_status FROM investor_profiles WHERE mobile_number = ?
+  otp_sha256: SELECT otp_sha256 FROM investor_profiles WHERE mobile_number = ?
+
+helpers: |
+  def _otp_matches(otp_payload: str, expected_sha256: object) -> bool:
+      import hashlib
+      import hmac
+
+      digest = hashlib.sha256(otp_payload.encode("utf-8")).hexdigest()
+      return hmac.compare_digest(digest, str(expected_sha256 or ""))
+
+action_body: |
+  otp_match = _otp_matches(otp_payload, current.get("otp_sha256"))
+  iteration_pass = int(current.get("failed_login_attempts") or 0) + 1
+  access_scope = "investor:self" if otp_match else "none"
+  state_handoff.append(
+      iteration_pass=iteration_pass,
+      device_fingerprint=device_fingerprint,
+      otp_match=otp_match,
+      access_scope=access_scope,
+  )
+  return {"otp_match": otp_match, "iteration_pass": iteration_pass, "access_scope": access_scope}
+
+check_body: |
+  otp_match = _otp_matches(otp_payload, current.get("otp_sha256"))
+  over_limit = int(current.get("active_devices") or 0) > int(state.PARAMETERS["max_device_limit"])
+  policy_violation = over_limit or current.get("user_status") == "LOCKED"
+  return {"otp_match": otp_match, "policy_violation": policy_violation}

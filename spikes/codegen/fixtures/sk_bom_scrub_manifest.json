@@ -1,0 +1,327 @@
+{
+  "skill_metadata": {
+    "macro_category": "MS04_Manufacturing_Supply_Chain",
+    "skill_id": "MS04.2_BOM_Scrubber",
+    "skill_name": "SK-BOM Scrub: BOM line normaliser",
+    "skill_type": "Deterministic_Loopy_MCP",
+    "reusable": true,
+    "version": "1.0.0",
+    "status": "APPROVED",
+    "owner": "Supply Chain Engineering",
+    "created_at": "2026-06-29T12:00:00Z",
+    "updated_at": "2026-06-29T12:00:00Z"
+  },
+  "isatvon_definition": {
+    "i_instructions": "Triggered when a BOM revision is uploaded. Action: normalise BOM lines and merge duplicate part numbers. Check: every line resolves to an active part in the part master. Bound: at most 2 scrub passes before escalating to the BOM owner.",
+    "s_source": {
+      "required_inputs": [
+        "bom_id",
+        "line_count",
+        "supplier_code",
+        "strict_mode"
+      ],
+      "fresh_state_parameters": [
+        "Current scrub_passes for the BOM",
+        "Open line count in bom_lines"
+      ]
+    },
+    "a_automation": {
+      "orchestration_layer": "BuLLM_DMR",
+      "action_step": "Normalise each BOM line (trim, upper-case part numbers, unit \"EA\" default) and merge duplicates.",
+      "acceptance_check": "Programmatically evaluate if unresolved_lines == 0 AND duplicate_parts == 0 against the part master.",
+      "trigger_mode": "HTTP_POST_Payload_plus_Variables"
+    },
+    "t_tech_stack": {
+      "execution_layer": "FastMCP",
+      "action_tool": "BOM_MCP (Line Normaliser)",
+      "fixed_check_tool": "PLM_MCP (Part Master Validator)"
+    },
+    "v_variables": {
+      "max_iterations": 2,
+      "success_gate": "unresolved_lines == 0 AND duplicate_parts == 0",
+      "no_op_condition": "bom status is already 'RELEASED'",
+      "escalation_condition": "scrub_passes >= max_iterations",
+      "budget_limit": "10000ms per scrub pass",
+      "tables": [
+        "bom_lines",
+        "bom_scrub_audit_handoff"
+      ]
+    },
+    "o_outcome": {
+      "json_schema": {
+        "scrub_status": [
+          "CLEAN",
+          "NEEDS_REVIEW",
+          "ESCALATED"
+        ],
+        "unresolved_lines": "integer",
+        "duplicate_parts": "integer"
+      },
+      "state_handoff_file": {
+        "table": "bom_scrub_audit_handoff",
+        "mode": "append_only",
+        "required_fields": [
+          "iteration_pass",
+          "bom_id",
+          "unresolved_lines",
+          "duplicate_parts"
+        ],
+        "description": "Log the scrub pass, BOM id and the unresolved / duplicate counts."
+      },
+      "success_criteria": "No unresolved lines and no duplicate parts within 2 passes"
+    },
+    "n_notification": {
+      "ui_updates": [
+        "Status: Scrubbing -> Looping [Pass 1/2]: 3 unresolved -> Clean",
+        "Status: Escalated - BOM owner review"
+      ],
+      "database_updates": [
+        "Append scrub evidence to bom_scrub_audit_handoff"
+      ],
+      "alerts": [
+        "Notify the BOM owner on escalation"
+      ],
+      "next": null
+    }
+  },
+  "srim_runtime_definition": {
+    "orchestration": {
+      "router": "Dify_Dynamic_Master_Router",
+      "trigger": "HTTP_POST_Payload_plus_Variables"
+    },
+    "execution": {
+      "engine": "FastMCP_Execution_Engine"
+    },
+    "gateway": {
+      "route_via": "MCP_Jungle_Gateway_Reverse_Proxy"
+    },
+    "persistence": {
+      "database": "PostgreSQL_Database_State_Config",
+      "table": "bom_lines, bom_scrub_audit_handoff",
+      "action": "Execute_SQL_Queries_via_Postgres_MCP"
+    },
+    "audit": {
+      "telemetry": "PostgreSQL_Audit_Logs"
+    },
+    "ui": {
+      "target": "SRIM_UI_Canvas",
+      "method": "Embedded_iFrames_Widgets"
+    }
+  },
+  "contracts": {
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "bom_id": {
+          "type": "string"
+        },
+        "line_count": {
+          "type": "integer"
+        },
+        "supplier_code": {
+          "type": "string"
+        },
+        "strict_mode": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bom_id",
+        "line_count",
+        "supplier_code",
+        "strict_mode"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "scrub_status": {
+          "type": "string"
+        },
+        "unresolved_lines": {
+          "type": "integer"
+        },
+        "duplicate_parts": {
+          "type": "integer"
+        },
+        "state_handoff_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scrub_status"
+      ]
+    }
+  },
+  "governance": {
+    "deterministic_hash": "sha256:290e3efef22b2d03b29d155a4601f8e4a7b9ca03486d75059774df4ad7678ab6",
+    "lifecycle": {
+      "state": "APPROVED",
+      "approval_required_for_change": true,
+      "immutable_after_approval": true
+    },
+    "versioning": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "sbam_build_record": {
+    "isatvon_framework_version": "1.4",
+    "isatvon_detail": {
+      "i_instructions": {
+        "statement": "Triggered when a BOM revision is uploaded. Action: normalise BOM lines and merge duplicate part numbers. Check: every line resolves to an active part in the part master. Bound: at most 2 scrub passes before escalating to the BOM owner.",
+        "trigger": "A BOM revision is uploaded",
+        "action": "Normalise BOM lines and merge duplicate part numbers",
+        "check": "Every line resolves to an active part in the part master",
+        "bound": "At most 2 scrub passes before escalating to the BOM owner",
+        "user_role": {
+          "level": "Internal engineer",
+          "persona": "BOM owner in supply chain engineering",
+          "authority": "May edit BOMs of their own product line"
+        },
+        "task": {
+          "goal": "Release a clean BOM or escalate within 2 passes",
+          "method": "Bounded normalisation with an independent part-master check",
+          "steps": [
+            "Trigger: BOM revision uploaded",
+            "Action Step: normalise and merge lines",
+            "Fixed Check: count unresolved lines and duplicate parts",
+            "Loop or Resolve: retry up to 2 times, then release or escalate"
+          ]
+        },
+        "context": {
+          "background": "Fictional contract manufacturer (Beta Assemblies Ltd)",
+          "topic": "Manufacturing supply chain (MSC) BOM hygiene",
+          "history": "Duplicate part numbers caused double ordering in the last quarter"
+        }
+      },
+      "s_source": {
+        "required_inputs": [
+          "bom_id",
+          "line_count",
+          "supplier_code",
+          "strict_mode"
+        ],
+        "fresh_state_parameters": [
+          "scrub_passes",
+          "open_line_count"
+        ]
+      },
+      "a_automation": {
+        "orchestration_layer": "BuLLM_DMR",
+        "trigger_mode": "HTTP_POST_Payload_plus_Variables",
+        "action_step": "Normalise each BOM line (trim, upper-case part numbers, unit \"EA\" default) and merge duplicates.",
+        "acceptance_check": "Programmatically evaluate if unresolved_lines == 0 AND duplicate_parts == 0 against the part master.",
+        "srim_metadata": "FastMCP_Execution_Engine with PostgreSQL state in bom_lines"
+      },
+      "t_tech_stack": {
+        "execution_layer": "FastMCP",
+        "action_tool": "BOM_MCP (Line Normaliser)",
+        "fixed_check_tool": "PLM_MCP (Part Master Validator)",
+        "gateway_routing": "MCP_Jungle_Gateway",
+        "libraries": [
+          {
+            "package": "fastmcp",
+            "version_constraint": ">=2.0"
+          },
+          {
+            "package": "psycopg",
+            "version_constraint": ">=3.2"
+          }
+        ]
+      },
+      "v_variables": {
+        "max_iterations": 2,
+        "success_gate": "unresolved_lines == 0 AND duplicate_parts == 0",
+        "no_op_condition": "bom status is 'RELEASED'",
+        "escalation_condition": "scrub_passes >= max_iterations",
+        "budget_limit": "10000ms per scrub pass",
+        "tables": [
+          "bom_lines",
+          "bom_scrub_audit_handoff"
+        ],
+        "parameters": [
+          {
+            "name": "max_qty_per_line",
+            "type": "integer",
+            "value": 10000
+          }
+        ]
+      },
+      "o_outcome": {
+        "json_schema": {
+          "scrub_status": [
+            "CLEAN",
+            "NEEDS_REVIEW",
+            "ESCALATED"
+          ],
+          "unresolved_lines": "integer",
+          "duplicate_parts": "integer"
+        },
+        "state_handoff_file": {
+          "table": "bom_scrub_audit_handoff",
+          "mode": "append_only",
+          "required_fields": [
+            "iteration_pass",
+            "bom_id",
+            "unresolved_lines",
+            "duplicate_parts"
+          ],
+          "description": "Log the scrub pass, BOM id and the unresolved / duplicate counts."
+        },
+        "success_criteria": "No unresolved lines and no duplicate parts within 2 passes"
+      },
+      "n_notification": {
+        "ui_updates": [
+          "Status: Scrubbing -> Looping [Pass 1/2]: 3 unresolved -> Clean",
+          "Status: Escalated - BOM owner review"
+        ],
+        "database_updates": [
+          "Append scrub evidence to bom_scrub_audit_handoff"
+        ],
+        "alerts": [
+          "Notify the BOM owner on escalation"
+        ],
+        "next": null
+      }
+    },
+    "ids": {
+      "tenant_id": "tnt-alpha",
+      "project_id": "prj-msc-bom",
+      "workflow_id": "wf-msc-001",
+      "sub_skill_id": "ss-ms04-2"
+    },
+    "provenance": {
+      "sow_version_id": "sow-v3",
+      "sow_sha256": "4b313e3eba7ae02eafed5b8d877ff06f0a4ab889edcb12adea9142287f75b207",
+      "approved_at": "2026-06-28T09:30:00Z",
+      "approved_by": "fde@example.com",
+      "knowledge_version_id": "kv-7",
+      "okf_sha256": "799494054f312437e7b829a45bfc7ab0df4e7154a1520707ca93d3473a233184",
+      "master_snapshot_sha256": "dbf4291de9df5f03dbcf9884ddfec779a90cafa4a19fba88f8f611d3801e30a9",
+      "sow_refs": [
+        "SOW-7.2"
+      ]
+    },
+    "build": {
+      "template": {
+        "name": "fastmcp-loopy",
+        "version": "1.0.0",
+        "sha256": "53f7302e7d498b06ad4de7c8a759f9edeca4948a7bae63ec6e85b7836190d83b"
+      },
+      "runtime_image_digest": "sha256:90ba6d6f300581ec5f161e63cd642d8d290b724462eaa5d365434cb78642cb30",
+      "libraries": [
+        {
+          "package": "fastmcp",
+          "version_constraint": ">=2.0"
+        },
+        {
+          "package": "psycopg",
+          "version_constraint": ">=3.2"
+        }
+      ],
+      "schema_sql_sha256": "939acd018b931292330e519becd8d003ed0dd20c5e42de62ec3d37553698739a"
+    }
+  }
+}

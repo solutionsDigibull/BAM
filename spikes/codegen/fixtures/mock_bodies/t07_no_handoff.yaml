@@ -1,0 +1,7 @@
+# E0.11-T07: the action body never writes the handoff row. AST_HANDOFF must fail listing
+# required_fields.
+base: ms01_1_good.yaml
+override:
+  action_body: |
+    otp_match = _otp_matches(otp_payload, current.get("otp_sha256"))
+    return {"otp_match": otp_match}

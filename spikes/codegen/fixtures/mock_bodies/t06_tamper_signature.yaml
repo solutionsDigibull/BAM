@@ -1,0 +1,18 @@
+# E0.11-T06: the LLM returns the whole tool with a renamed parameter (mobile_number -> phone)
+# instead of just the body. AST_CONFORMANCE must fail ("slot redefines tool").
+base: ms01_1_good.yaml
+override:
+  action_body: |
+    def auth_mcp_session_otp_evaluator(
+        phone: str, otp_payload: str, device_fingerprint: str
+    ) -> dict[str, Any]:
+        otp_match = _otp_matches(otp_payload, state.read(phone).get("otp_sha256"))
+        state_handoff.append(
+            iteration_pass=1,
+            device_fingerprint=device_fingerprint,
+            otp_match=otp_match,
+            access_scope="investor:self",
+        )
+        return {"otp_match": otp_match}
+
+    return auth_mcp_session_otp_evaluator(mobile_number, otp_payload, device_fingerprint)

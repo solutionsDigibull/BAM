@@ -1,0 +1,16 @@
+# E0.11-T05: the action body retries by itself. AST_NO_MANUAL_LOOP must fail.
+base: ms01_1_good.yaml
+override:
+  action_body: |
+    otp_match = False
+    while True:
+        otp_match = _otp_matches(otp_payload, state.read(mobile_number).get("otp_sha256"))
+        if otp_match:
+            break
+    state_handoff.append(
+        iteration_pass=1,
+        device_fingerprint=device_fingerprint,
+        otp_match=otp_match,
+        access_scope="investor:self",
+    )
+    return {"otp_match": otp_match}
