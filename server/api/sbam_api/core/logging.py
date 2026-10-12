@@ -7,6 +7,8 @@ import sys
 from contextvars import ContextVar
 from datetime import UTC, datetime
 
+from opentelemetry import trace
+
 correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 tenant_id_var: ContextVar[str | None] = ContextVar("tenant_id", default=None)  # set by auth, #48
 project_id_var: ContextVar[str | None] = ContextVar("project_id", default=None)
@@ -27,7 +29,7 @@ class JsonFormatter(logging.Formatter):
     """One JSON object per line. json.dumps escapes newlines, so a value can't forge extra lines.
 
     Tracebacks are never written (exc_info is ignored): they can carry secrets from exception
-    messages. Callers log `exc_type` / `exc_at` instead; full traces go to OTEL (#35).
+    messages. Callers log `exc_type` / `exc_at` instead; each line carries trace_id/span_id (#35).
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -40,6 +42,10 @@ class JsonFormatter(logging.Formatter):
             "tenant_id": tenant_id_var.get(),
             "project_id": project_id_var.get(),
         }
+        span = trace.get_current_span().get_span_context()
+        if span.is_valid:  # log/trace correlation (#35)
+            entry["trace_id"] = format(span.trace_id, "032x")
+            entry["span_id"] = format(span.span_id, "016x")
         for key in _EXTRA_FIELDS:
             if hasattr(record, key):
                 entry[key] = getattr(record, key)

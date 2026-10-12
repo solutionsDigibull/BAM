@@ -40,6 +40,13 @@ x-langfuse-deps: &langfuse-deps
   minio: { condition: service_healthy }
 
 services:
+  # Merged into the core block: sbam-api exports traces only while obs runs (E1.4). Without obs there is
+  # no endpoint, so no exporter and no connection errors. No depends_on: obs never blocks core.
+  sbam-api:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: sbam-api
+
   # Grafana LGTM: OTel collector (OTLP 4317 gRPC / 4318 HTTP) + Tempo, Loki, Prometheus and Grafana.
   otel-collector:
     image: grafana/otel-lgtm:0.35.0@sha256:2de1094c593c671cbfca878a28ffcd7e46ff5e32f2ce966c0cf33003f6cf4266

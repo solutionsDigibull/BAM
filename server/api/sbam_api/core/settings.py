@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     keycloak_audience: str = Field(min_length=1)
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     log_level: str = "INFO"
+    # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
+    otel_exporter_otlp_endpoint: AnyHttpUrl | None = None
+    otel_service_name: str = Field(default="sbam-api", min_length=1)
 
 
 def load_settings(**overrides: Any) -> Settings:
