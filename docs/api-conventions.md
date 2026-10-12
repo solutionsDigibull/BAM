@@ -68,7 +68,7 @@ Every 4xx/5xx response is a [`ProblemDetail`](../server/contracts/schemas/proble
 | **423** | The resource is frozen or approved, even with a correct `If-Match` | `RESOURCE_LOCKED`, `WORKFLOW_FROZEN`, `SOW_LOCKED` |
 | 428 | `If-Match` missing on a write | `PRECONDITION_REQUIRED` |
 | 429 | Rate limited | `RATE_LIMITED` |
-| 503 | A dependency is down (Temporal, Keycloak, ClamAV, …); nothing was changed | `TEMPORAL_UNAVAILABLE`, … |
+| 503 | A dependency is down (Temporal, Keycloak, ClamAV, …); nothing was changed | `ORCHESTRATOR_UNAVAILABLE` (Temporal), … |
 
 ### 404, never 403, across tenants
 
