@@ -15,6 +15,7 @@ dependencies = [
     "opentelemetry-sdk>=1.44.0,<1.45",
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.15.0",
+    "pyjwt[crypto]>=2.10,<3",
     "sbam-contracts",
     "sqlalchemy>=2.0.54,<2.1",  # OTel sqlalchemy instrumentation supports <2.1 only
     "uvicorn[standard]>=0.54.0",

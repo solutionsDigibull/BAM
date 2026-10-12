@@ -37,6 +37,7 @@ class ApiError(Exception):
         title: str,
         detail: str | None = None,
         errors: list[FieldError] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(f"{status} {code}: {title}")
         self.status = status
@@ -44,6 +45,7 @@ class ApiError(Exception):
         self.title = title
         self.detail = detail
         self.errors = errors or []
+        self.headers = headers or {}  # e.g. WWW-Authenticate on a 401
 
     def to_problem(self, correlation_id: str) -> ProblemDetail:
         return ProblemDetail(
@@ -72,15 +74,20 @@ def etag(row_version: int) -> str:
     return f'"{row_version}"'
 
 
+def locked() -> ApiError:
+    """423 for a frozen / approved resource: the state guard, after authorization."""
+    return ApiError(
+        423,
+        ErrorCode.RESOURCE_LOCKED,
+        "Locked",
+        "This resource is frozen / approved — create a new version to change it.",
+    )
+
+
 def check_if_match(if_match: str | None, row_version: int, *, frozen: bool = False) -> None:
     """Frozen wins (423 even with a correct ETag), then missing (428), then stale (412)."""
     if frozen:
-        raise ApiError(
-            423,
-            ErrorCode.RESOURCE_LOCKED,
-            "Locked",
-            "This resource is frozen / approved — create a new version to change it.",
-        )
+        raise locked()
     if not if_match:
         raise ApiError(
             428, ErrorCode.PRECONDITION_REQUIRED, "If-Match header required on this write"

@@ -24,11 +24,20 @@ class Settings(BaseSettings):
     temporal_host: str = Field(pattern=r"^[^:\s]+:\d+$", description="host:port")
     keycloak_issuer: AnyHttpUrl
     keycloak_audience: str = Field(min_length=1)
+    # The issuer above must equal the tokens' `iss` (the browser-facing URL). The API fetches keys
+    # from inside the network, so the JWKS URL can differ; default: <issuer>/protocol/.../certs.
+    keycloak_jwks_url: AnyHttpUrl | None = None
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     log_level: str = "INFO"
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
     otel_exporter_otlp_endpoint: AnyHttpUrl | None = None
     otel_service_name: str = Field(default="sbam-api", min_length=1)
+
+
+def jwks_url(settings: Settings) -> str:
+    if settings.keycloak_jwks_url:
+        return str(settings.keycloak_jwks_url)
+    return f"{str(settings.keycloak_issuer).rstrip('/')}/protocol/openid-connect/certs"
 
 
 def load_settings(**overrides: Any) -> Settings:

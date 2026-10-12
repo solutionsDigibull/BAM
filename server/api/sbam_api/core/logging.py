@@ -13,7 +13,18 @@ correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", defaul
 tenant_id_var: ContextVar[str | None] = ContextVar("tenant_id", default=None)  # set by auth, #48
 project_id_var: ContextVar[str | None] = ContextVar("project_id", default=None)
 
-_EXTRA_FIELDS = ("method", "route", "status", "duration_ms", "exc_type", "exc_at", "check")
+_EXTRA_FIELDS = (
+    "method",
+    "route",
+    "status",
+    "duration_ms",
+    "exc_type",
+    "exc_at",
+    "check",
+    "actor",
+    "target",
+    "reason",  # security audit lines (#48)
+)
 _SECRET_VALUE = re.compile(
     r"(?i)\b(authorization|password|passwd|secret|token|api[_-]?key)\b(\s*[=:]\s*)(\"[^\"]*\"|\S+)"
 )

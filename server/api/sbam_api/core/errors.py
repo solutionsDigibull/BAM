@@ -39,7 +39,10 @@ def current_correlation_id() -> str:
 def problem_response(error: ApiError) -> JSONResponse:
     problem = error.to_problem(current_correlation_id())
     return JSONResponse(
-        problem.model_dump(mode="json"), status_code=problem.status, media_type=PROBLEM_JSON
+        problem.model_dump(mode="json"),
+        status_code=problem.status,
+        media_type=PROBLEM_JSON,
+        headers=error.headers or None,
     )
 
 
