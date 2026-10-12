@@ -1,0 +1,59 @@
+# Prerequisite checks (E0.14, docs/runbooks/prerequisites.md). Manual only: run from the Actions tab
+# or `gh workflow run prereqs.yml -R solutionsDigibull/BAM --ref dev`, then record the result in the
+# runbook's checklist.
+# - ghcr-push (T01): CI can push to GHCR with GITHUB_TOKEN; developers then pull the image.
+# - openrouter (T02): the OPENROUTER_API_KEY secret works. This is the one deliberate external LLM
+#   call (ci.yml stays on LLM_PROVIDER=mock). It calls OpenRouter directly because Bifrost is a stub
+#   until #46; app code still goes only through Bifrost.
+name: prereqs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ghcr-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write # GHCR write only from CI (least privilege); developers have read
+    steps:
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push a hello image
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/sbam-prereq-hello"
+          printf 'FROM busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e\nCMD ["echo", "sbam prerequisites ok"]\n' > Dockerfile
+          docker build -t "$image:$GITHUB_SHA" -t "$image:latest" .
+          docker push "$image:$GITHUB_SHA"
+          docker push "$image:latest"
+          echo "Pushed $image:$GITHUB_SHA. Developers verify with: docker pull $image:latest" >> "$GITHUB_STEP_SUMMARY"
+
+  openrouter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call a cheap model with the secret
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL: openai/gpt-4o-mini
+        run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "::error::OPENROUTER_API_KEY secret is not set (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          # Never echo the key or the request; Actions masks the secret, and the key goes in a header only.
+          status=$(curl -sS -o response.json -w '%{http_code}' https://openrouter.ai/api/v1/chat/completions \
+            -H "Authorization: Bearer $OPENROUTER_API_KEY" -H 'Content-Type: application/json' \
+            -d "{\"model\": \"$MODEL\", \"max_tokens\": 5, \"messages\": [{\"role\": \"user\", \"content\": \"Say ok\"}]}")
+          echo "OpenRouter HTTP $status ($MODEL)" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$status" != 200 ]; then
+            jq -r '.error.message // "no error message"' response.json || true
+            exit 1
+          fi
