@@ -27,7 +27,11 @@ def include_name(name: str | None, type_: str, _parent: object) -> bool:
 def run_migrations() -> None:
     url = context.config.get_main_option("sqlalchemy.url") or os.environ["DATABASE_URL"]
     import_models()
-    engine = make_engine(url, poolclass=pool.NullPool)
+    # The app role is named `sbam`, so the default search_path ("$user", public) makes `sbam` the
+    # default schema and autogenerate/check would reflect our tables without a schema (= drift).
+    # Every object names its schema explicitly, so pin the default to public (read at connect time).
+    connect_args = {"connect_timeout": 2, "options": "-c search_path=public"}
+    engine = make_engine(url, poolclass=pool.NullPool, connect_args=connect_args)
     with engine.connect() as conn:
         # The version table lives in `sbam`, so the schema must exist before Alembic looks for it.
         conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA}"'))

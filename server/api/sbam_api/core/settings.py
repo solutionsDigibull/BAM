@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     s3_bucket: str | None = None
     s3_endpoint_url: AnyHttpUrl | None = None
     temporal_host: str = Field(pattern=r"^[^:\s]+:\d+$", description="host:port")
+    # Temporal (#40): Compose creates namespace `sbam` and registers the search attributes.
+    temporal_namespace: str = Field(default="sbam", min_length=1)
+    temporal_search_attributes: bool = True
+    enable_ping: bool = False  # sample command POST …/runs/ping; local/dev only
     keycloak_issuer: AnyHttpUrl
     keycloak_audience: str = Field(min_length=1)
     # The issuer above must equal the tokens' `iss` (the browser-facing URL). The API fetches keys

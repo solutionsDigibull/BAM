@@ -39,7 +39,8 @@ services:
       - web_node_modules:/app/client/node_modules
       - web_next:/app/client/.next
 
-  # ponytail: the worker stub doesn't read the source yet; #40 adds restart-on-change with the real bootstrap.
+  # The bootstrap (#40) runs from the mounted source: `docker compose restart worker-<queue>` after a change.
+  # ponytail: no watch mode yet (the TD asks for restart-on-change); follow-up issue.
   worker-ingest: *worker-dev
   worker-knowledge: *worker-dev
   worker-llm: *worker-dev
