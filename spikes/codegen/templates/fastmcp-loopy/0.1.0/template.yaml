@@ -1,0 +1,57 @@
+# Template manifest for fastmcp-loopy 0.1.0 (TD §12.3). Spike E0.11 (#29).
+# Read by the assembler (which slot gets which LLM body) and by AST_SKELETON (which regions are
+# protected). A template version is immutable once a skill is certified with it: change = new version.
+name: fastmcp-loopy
+version: 0.1.0
+description: >-
+  One ISATVON 1.4 Sub-Skill as a FastMCP server with a decoupled action tool and fixed check
+  tool, a read-only fresh-state reader and an append-only state handoff writer.
+
+engine:
+  jinja2: 3.1.6
+  python: "3.12"
+runtime:
+  fastmcp: 4.1.0
+  pydantic: ">=2"
+
+# JSON Schema types this version can map to Python. Anything else fails the render (StrictUndefined).
+supported_input_types: [string, integer, number, boolean]
+
+# Slot markers in the rendered Python:   # >>> LLM_BODY:<slot>   ...   # <<< LLM_BODY:<slot>
+slot_marker:
+  open: "# >>> LLM_BODY:{slot}"
+  close: "# <<< LLM_BODY:{slot}"
+
+# Render order = dependency order. `context` lists every variable the .j2 file reads.
+# Slots are listed in the order they appear in the file.
+# `slots` maps each slot name to the CodeBodies field the LLM fills it with; {} = no LLM code in that file.
+files:
+  - output: models.py
+    template: models.py.j2
+    context: [skill_id, template_version, inputs, outputs]
+    slots: {}
+  - output: state.py
+    template: state.py.j2
+    context: [skill_id, template_version, inputs, parameters, fresh_state]
+    slots:
+      state_queries: state_queries   # rendered from a {name: SELECT} dict, never raw Python
+  - output: state_handoff.py
+    template: state_handoff.py.j2
+    context: [skill_id, template_version, handoff_table, required_fields]
+    slots: {}
+  - output: action_tool.py
+    template: action_tool.py.j2
+    context: [skill_id, template_version, action_tool, action_step, inputs, required_fields]
+    slots:
+      helpers: helpers               # module-level pure functions, copied into both tool files
+      action: action_body
+  - output: check_tool.py
+    template: check_tool.py.j2
+    context: [skill_id, template_version, fixed_check_tool, acceptance_check, inputs, gate_outputs]
+    slots:
+      helpers: helpers
+      check: check_body
+  - output: server.py
+    template: server.py.j2
+    context: [skill_id, template_version, action_tool, fixed_check_tool, inputs]
+    slots: {}

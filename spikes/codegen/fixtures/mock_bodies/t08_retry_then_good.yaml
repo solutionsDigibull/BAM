@@ -1,0 +1,6 @@
+# E0.11-T08 (recovery): the first response is invalid (no check_body), the re-ask returns the good
+# bodies. Generation succeeds on attempt 2 and every gate passes.
+responses:
+  - action_body: |
+      return {}
+  - base: ms01_1_good.yaml

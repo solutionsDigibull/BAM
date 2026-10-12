@@ -1,0 +1,39 @@
+# Mock sbam-codegen response for the second MSC-domain skill, SK-BOM scrub (MS04.2_BOM_Scrubber).
+# Different inputs (string, integer, boolean) and a different V parameter; same template, no change.
+state_queries:
+  scrub_passes: SELECT COALESCE(MAX(scrub_pass), 0) FROM bom_lines WHERE bom_id = ?
+  open_line_count: SELECT COUNT(*) FROM bom_lines WHERE bom_id = ? AND line_status = 'OPEN'
+  unresolved_lines: >-
+    SELECT COUNT(*) FROM bom_lines l LEFT JOIN part_master p ON p.part_no = l.part_no
+    WHERE l.bom_id = ? AND p.part_no IS NULL
+  duplicate_parts: SELECT COUNT(*) - COUNT(DISTINCT part_no) FROM bom_lines WHERE bom_id = ?
+
+helpers: |
+  def _count(value: object) -> int:
+      return int(value) if isinstance(value, int | str) and str(value).isdigit() else 0
+
+action_body: |
+  pass_no = _count(current.get("scrub_passes")) + 1
+  unresolved = _count(current.get("unresolved_lines"))
+  duplicates = _count(current.get("duplicate_parts"))
+  oversized = line_count > int(state.PARAMETERS["max_qty_per_line"])
+  state_handoff.append(
+      iteration_pass=pass_no,
+      bom_id=bom_id,
+      unresolved_lines=unresolved,
+      duplicate_parts=duplicates,
+  )
+  return {
+      "bom_id": bom_id,
+      "supplier_code": supplier_code.strip().upper(),
+      "unresolved_lines": unresolved,
+      "duplicate_parts": duplicates,
+      "oversized": oversized,
+  }
+
+check_body: |
+  unresolved = _count(current.get("unresolved_lines"))
+  duplicates = _count(current.get("duplicate_parts"))
+  if strict_mode and _count(current.get("open_line_count")) != line_count:
+      unresolved += 1
+  return {"unresolved_lines": unresolved, "duplicate_parts": duplicates}

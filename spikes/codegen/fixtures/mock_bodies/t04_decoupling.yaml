@@ -1,0 +1,8 @@
+# E0.11-T04: the check body imports the action tool. AST_DECOUPLING must fail with file/line.
+base: ms01_1_good.yaml
+override:
+  check_body: |
+    from action_tool import run
+
+    result = run(mobile_number, otp_payload, device_fingerprint)
+    return {"otp_match": result["otp_match"], "policy_violation": False}
