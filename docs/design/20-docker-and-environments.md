@@ -154,7 +154,8 @@ They can reach postgres, temporal and bifrost, but they have **no internet route
 | postgres `/docker-entrypoint-initdb.d/init.sql` | creates the roles and databases `sbam`, `temporal`, `temporal_visibility`, `keycloak`, `langfuse` | runs only on an empty `pgdata` volume |
 | `temporal-schema` | `temporal-sql-tool` setup + update for `temporal` and `temporal_visibility` | `setup-schema` / `update-schema` are re-runnable |
 | `temporal-namespace` | creates namespace `sbam` (retention 7 days) if missing | checks first |
-| keycloak `--import-realm` | imports `compose/keycloak/realm-bullm-dev.json` (clients `sbam-admin`, `sbam-fde`, roles, seed users) | skips an existing realm |
+| keycloak `--import-realm` | imports `compose/keycloak/realm-bullm.json` (clients `sbam-admin`, `sbam-fde`, roles, mappers, token policy; no users) | skips an existing realm |
+| `keycloak-seed` (local only, `compose.override.yaml`) | `compose/keycloak/seed.sh`: tenants A/B (org alias = tenant UUID) and the seed users | creates only what is missing |
 | `storage-init` | creates `uploads`, `derived`, `okf`, `code`, `tests`, `exports` on the `storage` volume, owned by uid 10001 | `mkdir -p` |
 | `api-migrate` | `alembic upgrade head` (`python -m sbam_api.db.migrate`, #36) | Alembic is re-runnable |
 | clamav | freshclam on start (first download takes more than 2 min; healthcheck `start_period` covers it) | built in |
@@ -178,7 +179,7 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 
 | Service | Stub until then | Replaced by |
 |---|---|---|
-| keycloak realm | dev realm `bullm`: 2 clients, 3 roles, seed users | #47 E2.1 (hardened realm, tenant mapper, Organizations) |
+| keycloak realm | real: hardened realm + local seed job (#47 E2.1) | — |
 | bifrost | Bifrost with the mock provider, no aliases yet | #46 E1.15 (six `sbam-*` aliases, fallback, mock fixtures) |
 | tusd | tusd with file store on `storage`, no hooks | #61 E4.2 (pre-create / post-finish hooks) |
 | clamav | real clamd + freshclam; not yet called | #62 E4.3 (scan wiring) |

@@ -56,3 +56,20 @@ safely.
 #47 builds the real realm export from `spikes/identity/realm/bullm-realm.json` (minus test users and direct grants).
 #48 ports `spikes/identity/api/auth.py` into `sbam_api.core` behind the existing `tenant_id_var`. #51 continues from
 the Auth.js wiring already in `client/src/auth.ts`.
+
+## Amendment (2026-10-12, #47)
+
+- **The organization alias is the tenant UUID.**
+  - #47 asks for `tenant_id` to be a UUID. Keycloak's organization membership mapper can only emit the alias, not an org attribute, as a plain claim.
+  - Setting `alias = <tenant UUID>` keeps decision 2 unchanged (same mapper, same `organization` scope), and the token now carries `"tenant_id": ["<uuid>"]`.
+  - This matches the UUID `tenant_id` columns from #36. Because the alias never changes, the alias-rename follow-up above is closed.
+  - The org **name** stays human readable (for example "Tenant A").
+- **Realm and seed data are split.**
+  - `compose/keycloak/realm-bullm.json` holds only the realm configuration: no users, no organizations, no secrets.
+  - Local tenants and users come from the re-runnable `keycloak-seed` job (`compose/keycloak/seed.sh`), defined only in `compose.override.yaml`. Staging and prod never load that file.
+- **Hardening from #47:**
+  - redirect URIs, web origins and post-logout URIs are exact
+  - refresh token rotation (`revokeRefreshToken`, `refreshTokenMaxReuse = 0`)
+  - 30-minute SSO idle timeout
+  - brute force: 5 failures in 15 minutes trigger a temporary lockout
+  - direct grants are off on both clients

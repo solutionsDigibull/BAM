@@ -82,8 +82,9 @@ services:
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
       WEB_PORT: ${WEB_PORT:-3000}
     volumes:
-      # Stub realm until #47 hardens it. --import-realm skips a realm that already exists.
-      - ./keycloak/realm-bullm-dev.json:/opt/keycloak/data/import/realm-bullm-dev.json:ro
+      # Hardened realm (#47): clients, roles, mappers, token policy; no users. --import-realm skips a
+      # realm that already exists. Local seed users come from keycloak-seed (compose.override.yaml).
+      - ./keycloak/realm-bullm.json:/opt/keycloak/data/import/realm-bullm.json:ro
     ports: ["127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"]
     networks: [sbam_edge, sbam_internal]
     depends_on:
