@@ -38,6 +38,8 @@ Thumbs.db
 
 # Storage volumes and local secrets
 storage/
+# ...but not the StorageBackend package (TD §6)
+!server/api/sbam_api/storage/
 secrets/
 *.key
 

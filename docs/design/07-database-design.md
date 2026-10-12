@@ -35,6 +35,26 @@ Code lives in `server/api/sbam_api/db/`. It uses sync SQLAlchemy 2 on psycopg 3.
   - `make migrations-check` (part of `make check`) fails on more than one head.
   - Downgrades undo only their own revision. The baseline never drops the schema.
 
+### 7.1.2 File storage (E1.6, C-37)
+
+Code lives in `server/api/sbam_api/storage/`. Project files go only through a `StorageBackend` (`put` / `open` / `get(verify=)` / `exists`). The database keeps the returned `StoredObject` fields (`storage_key`, `sha256`, `size`, `content_type`) plus the user's filename.
+
+- **Keys.** A key looks like `<tenant>/<project>/[<workflow>/]<kind>/<sha256>`, where kind is one of `uploads`, `derived`, `okf`, `code`, `tests`, `exports`.
+  - Keys are content-addressed and never built from a user filename.
+  - The same bytes in the same scope get the same key (dedupe).
+  - Every key is validated by a regex before any IO, so `..`, absolute paths and backslashes are rejected with 400.
+- **Local disk** (`STORAGE_BACKEND=local`, the default).
+  - Writes stream into `STORAGE_ROOT/.tmp/`, hash and fsync there, then `os.replace` into place, so readers never see a partial object.
+  - Objects are mode `0444` and never overwritten.
+  - An IO error such as disk full returns 503 `SERVICE_UNAVAILABLE` and leaves no partial file.
+  - Tmp files older than 1 h are removed on start.
+  - On Windows hosts, keep `STORAGE_ROOT` short: keys are about 180 characters and MAX_PATH is 260.
+- **S3 stub** (`STORAGE_BACKEND=s3`, `S3_BUCKET`, optional `S3_ENDPOINT_URL`). It uses the same keys and interface and passes the same test suite on moto.
+- **Signed downloads.**
+  - `signed_url(key, TenantContext, expires_in)` signs with HMAC-SHA256 over key + expiry + tenant, valid for 1–900 s. A key from another tenant gives 404.
+  - The URL is served by `GET /api/v1/files/{key}?exp=&sig=`. A tampered or expired link gets 403.
+  - `STORAGE_SIGNING_KEY` must be at least 32 characters. While it is missing or a placeholder, signed downloads answer 503.
+
 ## 7.2 Tenancy, identity, projects
 
 | Table               | Purpose                        | Key fields                                                                               | Relations      | Status / notes            |

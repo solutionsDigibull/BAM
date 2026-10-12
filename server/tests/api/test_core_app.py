@@ -271,7 +271,9 @@ def test_e1_3_router_discovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 
     routers = discover_routers(fakeapi)
     assert len(routers) == 1
-    assert discover_routers() == []  # no feature modules exist yet
+    from sbam_api.storage import router as storage_router
+
+    assert storage_router in discover_routers()  # the first feature module (#37)
 
 
 # --- E0.7-T04 hand-off: one start per Idempotency-Key ----------------------------------------
