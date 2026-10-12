@@ -1,6 +1,5 @@
 # SBAM developer commands. On Windows run these from Git Bash or WSL2.
-# The Alembic check joins `check` later.
-.PHONY: doctor install lint typecheck test check contracts contracts-check up ps down logs seed test-int e2e reset
+.PHONY: doctor install lint typecheck test check contracts contracts-check migrations-check up ps down logs seed test-int e2e reset
 
 # Compose stack (TD §20.3). ENV_FILE can point at another env file, e.g. `make up ENV_FILE=/tmp/ci.env`.
 ENV_FILE ?= compose/.env
@@ -34,7 +33,7 @@ test:
 	cd server && uv run pytest
 	pnpm --dir client test
 
-check: lint typecheck test contracts-check
+check: lint typecheck test contracts-check migrations-check
 	pnpm --dir client build
 
 # Pydantic -> JSON Schemas (server/contracts/schemas) + TypeScript (client/src/contracts). Commit the result.
@@ -44,6 +43,10 @@ contracts:
 # Fails, naming each file, if the committed generated files differ from a fresh generation.
 contracts-check:
 	cd server && uv run python -m sbam_contracts.gen --check
+
+# Exactly one Alembic head: two parallel migrations must be regenerated, never merged (#36).
+migrations-check:
+	cd server && test "$$(uv run python -m sbam_api.db.migrate heads | grep -c '(head)')" -eq 1
 
 up:
 	@test -f $(ENV_FILE) || { echo "$(ENV_FILE) not found: cp compose/.env.example compose/.env and set the passwords" >&2; exit 1; }

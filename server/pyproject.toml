@@ -35,10 +35,23 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "S", "N", "RUF"]
+select = ["E", "F", "W", "I", "B", "UP", "S", "N", "RUF", "TID"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "TID251"]
+# Queries live only in the db layer, migrations and repositories (TD §7.1, E1.5).
+"api/sbam_api/db/**" = ["TID251"]
+"api/sbam_api/migrations/**" = ["TID251"]
+"**/repository.py" = ["TID251"]
+"**/repositories/**" = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"sqlalchemy.text".msg = "Raw SQL only in sbam_api/db, migrations or a *repository.py (E1.5)"
+"sqlalchemy.select".msg = "Query through a TenantScopedRepository subclass (*repository.py)"
+"sqlalchemy.insert".msg = "Query through a TenantScopedRepository subclass (*repository.py)"
+"sqlalchemy.update".msg = "Query through a TenantScopedRepository subclass (*repository.py)"
+"sqlalchemy.delete".msg = "Query through a TenantScopedRepository subclass (*repository.py)"
+"sqlalchemy.create_engine".msg = "Use sbam_api.db.session.make_engine"
 
 [tool.black]
 line-length = 100

@@ -156,7 +156,7 @@ They can reach postgres, temporal and bifrost, but they have **no internet route
 | `temporal-namespace` | creates namespace `sbam` (retention 7 days) if missing | checks first |
 | keycloak `--import-realm` | imports `compose/keycloak/realm-bullm-dev.json` (clients `sbam-admin`, `sbam-fde`, roles, seed users) | skips an existing realm |
 | `storage-init` | creates `uploads`, `derived`, `okf`, `code`, `tests`, `exports` on the `storage` volume, owned by uid 10001 | `mkdir -p` |
-| `api-migrate` | `alembic upgrade head` (stub: exits 0 until #36) | Alembic is re-runnable |
+| `api-migrate` | `alembic upgrade head` (`python -m sbam_api.db.migrate`, #36) | Alembic is re-runnable |
 | clamav | freshclam on start (first download takes more than 2 min; healthcheck `start_period` covers it) | built in |
 
 ### 20.3.5 Local development mode
@@ -183,7 +183,7 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 | tusd | tusd with file store on `storage`, no hooks | #61 E4.2 (pre-create / post-finish hooks) |
 | clamav | real clamd + freshclam; not yet called | #62 E4.3 (scan wiring) |
 | workers ×6 | `sbam-worker` image, heartbeat loop per queue | #40 E1.7 (bootstrap `--queues`) |
-| api-migrate | exits 0 ("no migrations yet") | #36 E1.5 (Alembic) |
+| api-migrate | real: `alembic upgrade head` (#36 E1.5) | — |
 | sbam-mock-api | health-only HTTP server | #126 E13.5 |
 | otel-collector / langfuse (obs) | real (`compose.obs.yaml`, #42 E1.11) | — |
 | posthog (analytics) | busybox health endpoint on 8010 | #141 E16.2 / #142 E16.3 |

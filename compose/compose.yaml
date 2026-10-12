@@ -228,7 +228,7 @@ services:
 
   # --- SBAM -------------------------------------------------------------------------------------
   api-migrate:
-    # Stub: `sbam-migrate` exits 0 until #36 runs `alembic upgrade head`.
+    # `sbam-migrate` = `alembic upgrade head` (#36); re-runnable, sbam-api waits for it.
     image: sbam-api:local
     build: &api-build
       context: ..
