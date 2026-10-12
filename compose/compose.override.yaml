@@ -14,9 +14,24 @@ services:
       - ../server:/app/server
       - storage:/data/storage
 
+  # Local seed users and tenants for realm bullm (#47). Laptops/CI only; staging/prod never load this file.
+  keycloak-seed:
+    image: quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc
+    entrypoint: ["/bin/bash", "/seed/seed.sh"]
+    environment:
+      KC_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+    volumes: [./keycloak/seed.sh:/seed/seed.sh:ro]
+    networks: [sbam_internal]
+    depends_on:
+      keycloak: { condition: service_healthy }
+
   sbam-web:
     build:
       target: dev # next dev
+    depends_on:
+      keycloak-seed: { condition: service_completed_successfully }
     environment:
       WATCHPACK_POLLING: "true" # file events don't cross Docker Desktop bind mounts on Windows
     volumes:

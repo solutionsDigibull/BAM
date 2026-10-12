@@ -3,7 +3,20 @@
   "enabled": true,
   "organizationsEnabled": true,
   "sslRequired": "external",
+  "registrationAllowed": false,
   "accessTokenLifespan": 300,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "maxDeltaTimeSeconds": 900,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
   "roles": {
     "realm": [
       {
@@ -137,16 +150,19 @@
       "name": "SBAM admin portal",
       "publicClient": true,
       "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
       "redirectUris": [
-        "http://localhost:${WEB_PORT:3000}/*"
+        "http://localhost:${WEB_PORT:3000}/api/auth/callback/keycloak-admin"
       ],
       "webOrigins": [
         "http://localhost:${WEB_PORT:3000}"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:${WEB_PORT:3000}/*"
+        "post.logout.redirect.uris": "http://localhost:${WEB_PORT:3000}/login-admin",
+        "oauth2.device.authorization.grant.enabled": "false"
       },
       "defaultClientScopes": [
         "basic",
@@ -174,16 +190,19 @@
       "name": "SBAM FDE portal",
       "publicClient": true,
       "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
       "redirectUris": [
-        "http://localhost:${WEB_PORT:3000}/*"
+        "http://localhost:${WEB_PORT:3000}/api/auth/callback/keycloak-fde"
       ],
       "webOrigins": [
         "http://localhost:${WEB_PORT:3000}"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:${WEB_PORT:3000}/*"
+        "post.logout.redirect.uris": "http://localhost:${WEB_PORT:3000}/login-fde",
+        "oauth2.device.authorization.grant.enabled": "false"
       },
       "defaultClientScopes": [
         "basic",
@@ -203,139 +222,6 @@
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
-        }
-      ]
-    }
-  ],
-  "users": [
-    {
-      "username": "fde-a",
-      "email": "fde-a@tenant-a.test",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Fde",
-      "lastName": "A",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${SEED_USER_PASSWORD}",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "sbam-fde"
-      ]
-    },
-    {
-      "username": "fde-b",
-      "email": "fde-b@tenant-b.test",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Fde",
-      "lastName": "B",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${SEED_USER_PASSWORD}",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "sbam-fde"
-      ]
-    },
-    {
-      "username": "fde-ab",
-      "email": "fde-ab@tenant-a.test",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Fde",
-      "lastName": "AB",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${SEED_USER_PASSWORD}",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "sbam-fde"
-      ]
-    },
-    {
-      "username": "admin-a",
-      "email": "admin-a@tenant-a.test",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Admin",
-      "lastName": "A",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${SEED_USER_PASSWORD}",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "sbam-admin"
-      ]
-    },
-    {
-      "username": "root",
-      "email": "root@bullm.test",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Super",
-      "lastName": "Admin",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${SEED_USER_PASSWORD}",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "super-admin"
-      ]
-    }
-  ],
-  "organizations": [
-    {
-      "name": "Tenant A",
-      "alias": "tenant-a",
-      "enabled": true,
-      "domains": [
-        {
-          "name": "tenant-a.test"
-        }
-      ],
-      "members": [
-        {
-          "username": "fde-a"
-        },
-        {
-          "username": "fde-ab"
-        },
-        {
-          "username": "admin-a"
-        }
-      ]
-    },
-    {
-      "name": "Tenant B",
-      "alias": "tenant-b",
-      "enabled": true,
-      "domains": [
-        {
-          "name": "tenant-b.test"
-        }
-      ],
-      "members": [
-        {
-          "username": "fde-b"
-        },
-        {
-          "username": "fde-ab"
         }
       ]
     }
