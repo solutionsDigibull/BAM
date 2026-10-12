@@ -28,6 +28,7 @@ dev = [
     "hypothesis>=6.140",
     "jsonschema>=4.25",
     "types-jsonschema>=4.26.0.20261006",
+    "moto[s3]>=5.1,<6",
 ]
 
 [tool.ruff]
@@ -61,6 +62,11 @@ target-version = ["py312"]
 python_version = "3.12"
 strict = true
 files = ["api", "workers", "contracts", "tests"]
+
+[[tool.mypy.overrides]]
+# No type stubs shipped; the S3 stub (#37) wraps them behind StorageBackend.
+module = ["boto3", "botocore.*", "moto"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -248,6 +248,8 @@ services:
     environment:
       DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
       STORAGE_ROOT: /data/storage
+      # Signs download URLs (#37). Empty = signed downloads answer 503; existing stacks keep starting.
+      STORAGE_SIGNING_KEY: ${STORAGE_SIGNING_KEY:-}
       TEMPORAL_HOST: temporal:7233
       KEYCLOAK_ISSUER: http://keycloak:8080/realms/bullm
       KEYCLOAK_AUDIENCE: sbam-api
