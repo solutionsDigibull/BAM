@@ -10,14 +10,17 @@ from collections.abc import Mapping
 from types import ModuleType
 
 from fastapi import APIRouter, FastAPI
+from fastapi.dependencies.models import Dependant
+from fastapi.routing import APIRoute
 from sbam_contracts.api import API_BASE
 
 import sbam_api
+from sbam_api.core.auth import POLICIES, Auth, Jwks, TokenVerifier
 from sbam_api.core.errors import install_error_handlers
 from sbam_api.core.health import Check, default_checks, health_router
 from sbam_api.core.logging import configure_logging
 from sbam_api.core.middleware import BodyLimitMiddleware, CorrelationIdMiddleware
-from sbam_api.core.settings import Settings, load_settings
+from sbam_api.core.settings import Settings, jwks_url, load_settings
 from sbam_api.core.telemetry import configure_telemetry
 
 _NOT_FEATURE_MODULES = {"core", "main"}
@@ -35,8 +38,28 @@ def discover_routers(package: ModuleType = sbam_api) -> list[APIRouter]:
     return routers
 
 
+def unguarded_routes(routers: list[APIRouter]) -> list[str]:
+    """Routes with no policy dependency (core.auth.POLICIES) anywhere in their chain.
+
+    Checked on the routers before mounting: a route's dependant already includes its router-level
+    dependencies, and the mounted app keeps routers behind a private wrapper.
+    """
+
+    def guarded(dependant: Dependant) -> bool:
+        return any(d.call in POLICIES or guarded(d) for d in dependant.dependencies)
+
+    return [
+        f"{sorted(route.methods or ())} {API_BASE}{route.path}"
+        for router in routers
+        for route in router.routes
+        if isinstance(route, APIRoute) and not guarded(route.dependant)
+    ]
+
+
 def create_app(
-    settings: Settings | None = None, checks: Mapping[str, Check] | None = None
+    settings: Settings | None = None,
+    checks: Mapping[str, Check] | None = None,
+    auth: Auth | None = None,
 ) -> FastAPI:
     settings = settings or load_settings()
     configure_logging(settings.log_level)
@@ -50,9 +73,17 @@ def create_app(
         telemetry={"auto_configure": False, "tracing": False, "metrics": False, "logs": False},
     )
     app.state.settings = settings
+    app.state.auth = auth or Auth(
+        TokenVerifier(
+            str(settings.keycloak_issuer), settings.keycloak_audience, Jwks(jwks_url(settings))
+        )
+    )
     install_error_handlers(app)
     app.include_router(health_router(checks if checks is not None else default_checks(settings)))
-    for router in discover_routers():
+    routers = discover_routers()
+    if missing := unguarded_routes(routers):  # every route must say who may call it (E2.2)
+        raise RuntimeError(f"routes without an authorization policy: {', '.join(missing)}")
+    for router in routers:
         app.include_router(router, prefix=API_BASE)
     # Last added runs first: correlation id wraps the body limit so a 413 also carries the id.
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)

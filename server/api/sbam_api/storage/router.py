@@ -5,16 +5,18 @@ The signature is the authorisation: `signed_url` issues it only to a caller in t
 
 from collections.abc import Iterator
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
+from sbam_api.core.auth import internal
 from sbam_api.core.conventions import not_found
 from sbam_api.core.settings import Settings
 from sbam_api.storage.base import CHUNK, StorageBackend
 from sbam_api.storage.factory import make_backend
 from sbam_api.storage.signing import verify
 
-router = APIRouter(tags=["storage"])
+# The signed URL is the credential, so no user token: `internal` declares that explicitly.
+router = APIRouter(tags=["storage"], dependencies=[Depends(internal)])
 
 
 def backend(request: Request) -> StorageBackend:

@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from sbam_api.core.settings import Settings
+from sbam_api.core.settings import Settings, jwks_url
 from sbam_api.db.session import make_engine, ping
 
 Check = Callable[[], Awaitable[bool]]
@@ -30,7 +30,7 @@ async def _tcp(host: str, port: int) -> bool:
 
 def default_checks(settings: Settings) -> dict[str, Check]:
     temporal_host, temporal_port = settings.temporal_host.rsplit(":", 1)
-    jwks_url = f"{str(settings.keycloak_issuer).rstrip('/')}/protocol/openid-connect/certs"
+    jwks = jwks_url(settings)
 
     engine = make_engine(settings.database_url)  # lazy: connects on the first check
 
@@ -50,7 +50,7 @@ def default_checks(settings: Settings) -> dict[str, Check]:
 
     async def keycloak_jwks() -> bool:
         async with httpx.AsyncClient(timeout=CHECK_TIMEOUT_SECONDS) as client:
-            response = await client.get(jwks_url)
+            response = await client.get(jwks)
         return response.status_code == 200 and "keys" in response.json()
 
     return {
