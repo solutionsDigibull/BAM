@@ -1,9 +1,11 @@
 // API proxy (TD §9.1, E1.14): the browser calls /api/proxy/api/v1/*. This handler attaches the access
 // token from the encrypted httpOnly session cookie, so the token never reaches browser JS or storage.
-// ponytail: no silent refresh here; an expired token gets 401 from sbam-api and the UI goes to login.
-// Refresh lands with #51 (E2.5), which must persist the rotated token (#47 turns rotation on).
-import { getToken } from "next-auth/jwt";
+// Silent refresh (E2.5): wrapped in Auth.js `auth()`, so the jwt callback refreshes a token that is about to
+// expire and the rotated tokens are written back to the session cookie on this response. A failed refresh
+// answers 401 and the UI sends the user to login.
 import type { NextRequest } from "next/server";
+
+import { auth } from "@/auth";
 
 import { upstreamPath } from "@/lib/proxy-path";
 
@@ -34,7 +36,9 @@ function sameOrigin(req: NextRequest): boolean {
   }
 }
 
-async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+type Ctx = { params: Promise<{ path: string[] }> };
+
+async function forward(req: NextRequest & { auth?: { accessToken?: string } | null }, ctx: Ctx) {
   const path = upstreamPath((await ctx.params).path);
   if (!path) return problem(400, "Bad Request", "Proxy only forwards /api/v1/ paths.");
 
@@ -44,16 +48,11 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     return problem(403, "Forbidden", "Cross-origin write refused.");
   }
 
-  if (!process.env.AUTH_SECRET) return problem(401, "Unauthorized"); // getToken throws without it
-  const token = await getToken({
-    req,
-    secret: process.env.AUTH_SECRET,
-    secureCookie: req.nextUrl.protocol === "https:",
-  });
-  if (typeof token?.accessToken !== "string") return problem(401, "Unauthorized");
+  const accessToken = req.auth?.accessToken;
+  if (typeof accessToken !== "string") return problem(401, "Unauthorized");
 
   // Allowlist: the browser's Authorization and Cookie never reach sbam-api.
-  const headers = new Headers({ authorization: `Bearer ${token.accessToken}` });
+  const headers = new Headers({ authorization: `Bearer ${accessToken}` });
   for (const name of FORWARD_REQUEST) {
     const value = req.headers.get(name);
     if (value) headers.set(name, value);
@@ -89,5 +88,12 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   }
   return new Response(upstream.body, { status: upstream.status, headers: out });
 }
+
+// Auth.js needs AUTH_SECRET and an issuer; without them there is no session, so forward() still
+// validates the path and origin, then answers 401.
+const handle = (req: NextRequest, ctx: Ctx) =>
+  process.env.AUTH_SECRET && process.env.KEYCLOAK_ISSUER
+    ? (auth(forward as never) as unknown as (r: NextRequest, c: Ctx) => Promise<Response>)(req, ctx)
+    : forward(req, ctx);
 
 export { handle as DELETE, handle as GET, handle as PATCH, handle as POST, handle as PUT };

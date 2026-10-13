@@ -3,8 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { upstreamPath } from "@/lib/proxy-path";
 
-const getToken = vi.fn();
-vi.mock("next-auth/jwt", () => ({ getToken: (...a: unknown[]) => getToken(...a) }));
+// Auth.js `auth(handler)` runs the jwt callback (refresh) and puts the session on `req.auth`.
+const session = vi.fn();
+vi.mock("@/auth", () => ({
+  auth:
+    (handler: (req: unknown, ctx: unknown) => unknown) =>
+    async (req: { auth?: unknown }, ctx: unknown) => {
+      req.auth = await session();
+      return handler(req, ctx);
+    },
+}));
 
 const { GET, POST } = await import("./route");
 
@@ -23,9 +31,10 @@ function call(
 describe("API proxy (E1.14)", () => {
   beforeEach(() => {
     vi.stubEnv("AUTH_SECRET", "test-secret");
+    vi.stubEnv("KEYCLOAK_ISSUER", "http://kc.test/realms/bullm");
     vi.stubEnv("SBAM_API_URL", "http://sbam-api:8000");
     vi.stubGlobal("fetch", upstream);
-    getToken.mockResolvedValue({ accessToken: "session-token" });
+    session.mockResolvedValue({ accessToken: "session-token" });
     upstream.mockReset();
     upstream.mockResolvedValue(
       new Response('{"ok":true}', { headers: { "content-type": "application/json", etag: '"5"' } }),
@@ -66,7 +75,14 @@ describe("API proxy (E1.14)", () => {
   });
 
   it("e1_14_t07 anonymous call is a 401 with no upstream call", async () => {
-    getToken.mockResolvedValue(null);
+    session.mockResolvedValue(null);
+    const res = await call(GET, "api/v1/projects");
+    expect(res.status).toBe(401);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("e2_5 a session whose refresh failed is a 401 with no upstream call", async () => {
+    session.mockResolvedValue({ error: "RefreshFailed", accessToken: undefined });
     const res = await call(GET, "api/v1/projects");
     expect(res.status).toBe(401);
     expect(upstream).not.toHaveBeenCalled();

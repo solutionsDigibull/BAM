@@ -7,6 +7,12 @@ export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
   use: { baseURL },
+  // "keycloak" logs in through the real realm, so it needs a running stack (E2E_BASE_URL) and opts in
+  // with E2E_KEYCLOAK=1 (#51). The default project keeps using the dev role cookie.
+  projects: [
+    { name: "default", testIgnore: /keycloak\.spec\.ts/ },
+    ...(process.env.E2E_KEYCLOAK ? [{ name: "keycloak", testMatch: /keycloak\.spec\.ts/ }] : []),
+  ],
   // Dev server with the dev-only role cookie enabled; set E2E_BASE_URL to test a running stack.
   webServer: process.env.E2E_BASE_URL
     ? undefined

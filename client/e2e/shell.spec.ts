@@ -56,7 +56,7 @@ test("guard_t01 anonymous admin route is a real 307 and ships no page content", 
 }) => {
   const r = await request.get("/admin/masters", { maxRedirects: 0 });
   expect(r.status()).toBe(307);
-  expect(r.headers()["location"]).toMatch(/\/login-admin$/);
+  expect(r.headers()["location"]).toMatch(/\/login-admin\?callbackUrl=%2Fadmin%2Fmasters$/);
   expect(await r.text()).not.toContain("Import the BAM");
 });
 
