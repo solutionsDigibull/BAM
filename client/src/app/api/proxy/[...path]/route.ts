@@ -89,10 +89,11 @@ async function forward(req: NextRequest & { auth?: { accessToken?: string } | nu
   return new Response(upstream.body, { status: upstream.status, headers: out });
 }
 
-// Auth.js needs AUTH_SECRET and an issuer; without them there is no session to forward.
+// Auth.js needs AUTH_SECRET and an issuer; without them there is no session, so forward() still
+// validates the path and origin, then answers 401.
 const handle = (req: NextRequest, ctx: Ctx) =>
   process.env.AUTH_SECRET && process.env.KEYCLOAK_ISSUER
     ? (auth(forward as never) as unknown as (r: NextRequest, c: Ctx) => Promise<Response>)(req, ctx)
-    : problem(401, "Unauthorized");
+    : forward(req, ctx);
 
 export { handle as DELETE, handle as GET, handle as PATCH, handle as POST, handle as PUT };
