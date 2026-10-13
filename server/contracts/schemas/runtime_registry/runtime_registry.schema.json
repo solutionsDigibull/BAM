@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:runtime_registry/runtime_registry:0.1.0",
+  "$defs": {
+    "RuntimePackage": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "top_level_modules": {
+          "items": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Top Level Modules",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "top_level_modules"
+      ],
+      "title": "RuntimePackage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`runtime_registry.json` as the generator writes it and the sync loads it.",
+  "properties": {
+    "image_digest": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Image Digest"
+    },
+    "python_version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Python Version",
+      "type": "string"
+    },
+    "packages": {
+      "items": {
+        "$ref": "#/$defs/RuntimePackage"
+      },
+      "minItems": 1,
+      "title": "Packages",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "content_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Content Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "python_version",
+    "packages",
+    "generated_at",
+    "content_sha256"
+  ],
+  "title": "RuntimeRegistry",
+  "type": "object"
+}

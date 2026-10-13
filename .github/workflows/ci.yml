@@ -138,6 +138,7 @@ jobs:
           - { name: sbam-worker, file: server.Dockerfile, target: prod, args: "PACKAGE=sbam-workers\nROLE=worker" }
           - { name: sbam-web, file: web.Dockerfile, target: prod, args: "" }
           - { name: sbam-mock-api, file: mock-api.Dockerfile, target: "", args: "" }
+          - { name: skill-runtime, file: skill-runtime.Dockerfile, target: "", args: "" } # #67
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
       PUSH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
@@ -191,6 +192,23 @@ jobs:
           docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:$EXTRA_TAG"
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:$EXTRA_TAG"
+      # Runtime registry (#67): generated INSIDE the image (truth = installed packages), with no network,
+      # keyed by the pushed digest (or the local image ID when nothing is pushed). Deploys load it with
+      # `python -m sbam_api.registry.sync runtime_registry.json --activate`.
+      - name: Runtime registry
+        if: matrix.name == 'skill-runtime'
+        run: |
+          if [ "$PUSH" = true ]; then
+            digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE:${{ github.sha }}")"
+            digest="${digest#*@}"
+          else
+            digest="$(docker image inspect --format '{{.Id}}' "$IMAGE:${{ github.sha }}")"
+          fi
+          docker run --rm --network none "$IMAGE:${{ github.sha }}" \
+            sbam-runtime-registry --image-digest "$digest" > runtime_registry.json
+      - if: matrix.name == 'skill-runtime'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: runtime-registry, path: runtime_registry.json }
 
   compose-smoke:
     runs-on: ubuntu-latest
@@ -214,6 +232,20 @@ jobs:
       # Flaky first boot (image pulls, Keycloak import): retry once, then fail.
       - name: make up
         run: make up ENV_FILE="$ENV_FILE" || { echo "::warning::make up failed, retrying once"; make down ENV_FILE="$ENV_FILE"; make up ENV_FILE="$ENV_FILE"; }
+      # skill-runtime + runtime registry (#67): build, generate inside the image, sync into the stack DB.
+      # SKILL_RUNTIME_IMAGE also enables the in-image PostgreSQL test (E12.1-T05) in make test-int.
+      - name: Runtime registry sync
+        run: |
+          docker build -q -f compose/docker/skill-runtime.Dockerfile -t skill-runtime:ci .
+          digest="$(docker image inspect --format '{{.Id}}' skill-runtime:ci)"
+          docker run --rm --network none skill-runtime:ci \
+            sbam-runtime-registry --image-digest "$digest" > runtime_registry.json
+          pw="$(sed -n 's/^SBAM_DB_PASSWORD=//p' "$ENV_FILE")"
+          port="$(sed -n 's/^POSTGRES_PORT=//p' "$ENV_FILE")"
+          echo "::add-mask::$pw"
+          (cd server && DATABASE_URL="postgresql://sbam:$pw@127.0.0.1:${port:-5432}/sbam" \
+            uv run python -m sbam_api.registry.sync ../runtime_registry.json --activate)
+          echo "SKILL_RUNTIME_IMAGE=skill-runtime:ci" >> "$GITHUB_ENV"
       - name: make test-int
         run: make test-int ENV_FILE="$ENV_FILE"
       # Real browser logins through Keycloak against the running stack (#51, E2.5-T01..T08).

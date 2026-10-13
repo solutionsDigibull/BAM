@@ -26,6 +26,12 @@ repos:
         language: system
         files: ^(server|compose)/.*\.py$
         pass_filenames: false
+      - id: runtime-lock
+        name: skill-runtime lock pinned + hashed
+        entry: uv run --directory server python ../scripts/check_runtime_lock.py
+        language: system
+        files: ^compose/docker/skill-runtime/requirements\.lock$
+        pass_filenames: false
       - id: mypy
         name: mypy --strict
         entry: uv run --directory server mypy

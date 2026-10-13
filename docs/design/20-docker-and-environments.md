@@ -27,6 +27,23 @@ AWS (EC2 + S3 + RDS optional) is the future target. The storage adapter and Comp
 | `skill-runtime`  | `python:3.12-slim` + PostgreSQL 16 server binaries                               | FastMCP + every allowed library (no DuckDB), SBAM loop harness, MCP client; ephemeral PostgreSQL for schema/state/handoff tests; generates`runtime_registry` JSON at build; source for the CubeSandbox template |
 | `sbam-mock-api`  | per tool chosen                                                                    | Serves mock APIs for sandbox tests                                                                                                                                                                                |
 
+**skill-runtime and the runtime registry (#67, E12.1):**
+- **Libraries:**
+  - The allowed set is `compose/docker/skill-runtime/requirements.in`.
+  - The lock is `requirements.lock`, pinned with hashes, installed with `pip --require-hashes`, and checked by `make lint`.
+  - FastMCP 4.x is a meta-package; its `fastmcp` module comes from `fastmcp-slim`.
+- **Registry:** `sbam-runtime-registry` runs *inside* the image, so the truth is what is installed, not the lock. It writes
+  `{image_digest, python_version, packages[{name (PEP 503), version, top_level_modules}], generated_at, content_sha256}`.
+  `content_sha256` excludes `generated_at`.
+- **CI:**
+  - Regenerates the registry with the image digest and no network, and uploads it as the `runtime-registry` artifact.
+  - Loads it with `python -m sbam_api.registry.sync FILE --activate`: one transaction, retried, keyed by digest, one active registry.
+  - Older registries are kept for frozen versions.
+- **API:** `GET /api/v1/admin/registry` (admin) and `GET /api/v1/registry` (FDE) serve the active registry.
+- **Locally:** `make runtime-registry` builds the image and syncs its registry into the running stack.
+- **PostgreSQL:** `sbam-pg-start` starts an ephemeral PostgreSQL 16 on `127.0.0.1` only, in under 10 s.
+- **Harness:** `/opt/sbam/harness` is reserved for the loop harness (#124).
+
 Standards: multi-stage builds, non-root, pinned digests, `HEALTHCHECK`, no secrets in layers, OCI labels, hadolint clean, Trivy (PRs fail on CRITICAL; HIGH reported and must be resolved or accepted before release — [PLAN §28](../plan/06-mvp-dod-delivery-release.md)), Syft SBOM.
 
 ## 20.3 Compose services and profiles
