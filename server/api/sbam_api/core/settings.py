@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # The issuer above must equal the tokens' `iss` (the browser-facing URL). The API fetches keys
     # from inside the network, so the JWKS URL can differ; default: <issuer>/protocol/.../certs.
     keycloak_jwks_url: AnyHttpUrl | None = None
+    # Tenant creation (#49) manages Keycloak organizations as a service account. The realm URL as
+    # seen from inside the network (default: the issuer). No secret = tenant creation answers 503.
+    keycloak_internal_url: AnyHttpUrl | None = None
+    keycloak_admin_client_id: str = Field(default="sbam-api-admin", min_length=1)
+    keycloak_admin_client_secret: SecretStr | None = None
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     log_level: str = "INFO"
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
@@ -42,6 +47,10 @@ def jwks_url(settings: Settings) -> str:
     if settings.keycloak_jwks_url:
         return str(settings.keycloak_jwks_url)
     return f"{str(settings.keycloak_issuer).rstrip('/')}/protocol/openid-connect/certs"
+
+
+def keycloak_realm_url(settings: Settings) -> str:
+    return str(settings.keycloak_internal_url or settings.keycloak_issuer).rstrip("/")
 
 
 def load_settings(**overrides: Any) -> Settings:

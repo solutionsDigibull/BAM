@@ -55,6 +55,25 @@ ensure_user() { # username role [org alias...]
   done
 }
 
+ensure_api_admin_client() { # sbam-api's service account for tenant organizations (#49)
+  if [ -z "${KEYCLOAK_ADMIN_CLIENT_SECRET:-}" ]; then
+    echo "KEYCLOAK_ADMIN_CLIENT_SECRET unset: skipping sbam-api-admin (tenant creation answers 503)"
+    return
+  fi
+  local cid
+  cid=$(csv clients -q clientId=sbam-api-admin --fields id)
+  if [ -z "$cid" ]; then
+    cid=$("$kc" create clients -r "$realm" -s clientId=sbam-api-admin -s publicClient=false \
+      -s serviceAccountsEnabled=true -s standardFlowEnabled=false -s directAccessGrantsEnabled=false -i)
+    echo "created client sbam-api-admin"
+  fi
+  "$kc" update "clients/$cid" -r "$realm" -s "secret=$KEYCLOAK_ADMIN_CLIENT_SECRET"
+  # The organizations admin API needs manage-realm (manage-users is refused, Keycloak 26.8).
+  "$kc" add-roles -r "$realm" --uusername service-account-sbam-api-admin \
+    --cclientid realm-management --rolename manage-realm
+}
+
+ensure_api_admin_client
 ensure_org "$TENANT_A" "Tenant A" tenant-a.test
 ensure_org "$TENANT_B" "Tenant B" tenant-b.test
 

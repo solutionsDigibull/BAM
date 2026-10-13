@@ -24,6 +24,9 @@ _EXTRA_FIELDS = (
     "actor",
     "target",
     "reason",  # security audit lines (#48)
+    "action",
+    "entity",
+    "detail",  # identity audit events (#49)
 )
 _SECRET_VALUE = re.compile(
     r"(?i)\b(authorization|password|passwd|secret|token|api[_-]?key)\b(\s*[=:]\s*)(\"[^\"]*\"|\S+)"

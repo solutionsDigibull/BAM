@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.datastructures import State
 
 
 def engine_url(database_url: str) -> str:
@@ -28,3 +29,11 @@ def ping(engine: Engine) -> bool:
     """`SELECT 1` on the pool: the readiness check."""
     with engine.connect() as conn:
         return bool(conn.execute(text("SELECT 1")).scalar_one() == 1)
+
+
+def app_sessions(state: State) -> sessionmaker[Session]:
+    """The app's sessionmaker, built on first use from its settings (tests set `state.sessions`)."""
+    if getattr(state, "sessions", None) is None:
+        state.sessions = make_sessionmaker(make_engine(state.settings.database_url))
+    sessions: sessionmaker[Session] = state.sessions
+    return sessions

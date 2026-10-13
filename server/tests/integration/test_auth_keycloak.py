@@ -18,6 +18,7 @@ from sbam_api.main import create_app
 from sbam_contracts.api import API_BASE
 
 from .conftest import Compose, port
+from .test_db import url as db_url
 from .test_keycloak_realm import KC, login
 from .test_profiles import wait_healthy
 
@@ -27,7 +28,7 @@ pytestmark = pytest.mark.integration
 def app_client(tmp_path: Path) -> TestClient:
     settings = load_settings(
         _env_file=None,
-        database_url="postgresql://sbam@127.0.0.1:1/sbam",  # unused: no DB in this path
+        database_url=db_url(),  # the users mirror (#49) checks the token's tenant
         storage_root=tmp_path,
         temporal_host="127.0.0.1:1",
         keycloak_issuer=KC,
