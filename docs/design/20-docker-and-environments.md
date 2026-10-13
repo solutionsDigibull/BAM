@@ -183,7 +183,7 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 | bifrost | Bifrost with the mock provider, no aliases yet | #46 E1.15 (six `sbam-*` aliases, fallback, mock fixtures) |
 | tusd | tusd with file store on `storage`, no hooks | #61 E4.2 (pre-create / post-finish hooks) |
 | clamav | real clamd + freshclam; not yet called | #62 E4.3 (scan wiring) |
-| workers ×6 | `sbam-worker` image, heartbeat loop per queue | #40 E1.7 (bootstrap `--queues`) |
+| workers ×6 | real: Temporal bootstrap `--queues`, sample `PingWorkflow` on every queue (#40 E1.7) | — |
 | api-migrate | real: `alembic upgrade head` (#36 E1.5) | — |
 | sbam-mock-api | health-only HTTP server | #126 E13.5 |
 | otel-collector / langfuse (obs) | real (`compose.obs.yaml`, #42 E1.11) | — |

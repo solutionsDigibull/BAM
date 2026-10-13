@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from temporalio.client import Client
 
 from sbam_api.core.settings import Settings, jwks_url
 from sbam_api.db.session import make_engine, ping
@@ -21,15 +22,7 @@ CHECK_TIMEOUT_SECONDS = 2.0
 log = logging.getLogger("sbam_api.health")
 
 
-async def _tcp(host: str, port: int) -> bool:
-    _, writer = await asyncio.open_connection(host, port)
-    writer.close()
-    await writer.wait_closed()
-    return True
-
-
 def default_checks(settings: Settings) -> dict[str, Check]:
-    temporal_host, temporal_port = settings.temporal_host.rsplit(":", 1)
     jwks = jwks_url(settings)
 
     engine = make_engine(settings.database_url)  # lazy: connects on the first check
@@ -44,9 +37,13 @@ def default_checks(settings: Settings) -> dict[str, Check]:
         probe.unlink()
         return True
 
+    clients: list[Client] = []  # connected once, reused by later checks
+
     async def temporal() -> bool:
-        # ponytail: TCP reachability only; #40 (E1.7) swaps this for the client health check.
-        return await _tcp(temporal_host, int(temporal_port))
+        if not clients:
+            host, namespace = settings.temporal_host, settings.temporal_namespace
+            clients.append(await Client.connect(host, namespace=namespace))
+        return await clients[0].service_client.check_health()
 
     async def keycloak_jwks() -> bool:
         async with httpx.AsyncClient(timeout=CHECK_TIMEOUT_SECONDS) as client:

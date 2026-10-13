@@ -27,7 +27,6 @@ RUN groupadd --gid 10001 sbam \
  && chown -R sbam:sbam /data /tmp/sbam
 COPY --chmod=0755 compose/docker/server/healthcheck.py /usr/local/bin/sbam-healthcheck
 COPY --chmod=0755 compose/docker/server/migrate.sh /usr/local/bin/sbam-migrate
-COPY --chmod=0755 compose/docker/server/worker-stub.sh /usr/local/bin/sbam-worker-stub
 WORKDIR /app/server
 # Lockfile + every workspace member's pyproject first, so dependency layers cache across code changes.
 COPY server/pyproject.toml server/uv.lock server/.python-version ./
@@ -45,7 +44,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --package "${PACKAGE}" \
  && chown -R sbam:sbam /opt/venv
 USER 10001:10001
-CMD ["sh", "-c", "if [ \"$SBAM_ROLE\" = api ]; then exec uvicorn sbam_api.main:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-dir /app/server; else exec sbam-worker-stub; fi"]
+CMD ["sh", "-c", "if [ \"$SBAM_ROLE\" = api ]; then exec uvicorn sbam_api.main:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-dir /app/server; else exec python -m sbam_workers.bootstrap; fi"]
 
 # --- prod: code baked in, no dev tools, non-editable install ----------------------------------------
 FROM base AS prod
@@ -56,5 +55,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-editable --package "${PACKAGE}"
 USER 10001:10001
 EXPOSE 8000
-# api: the FastAPI app (#34). worker: heartbeat stub until #40 adds the Temporal bootstrap (--queues).
-CMD ["sh", "-c", "if [ \"$SBAM_ROLE\" = api ]; then exec uvicorn sbam_api.main:create_app --factory --host 0.0.0.0 --port 8000; else exec sbam-worker-stub; fi"]
+# api: the FastAPI app (#34). worker: the Temporal bootstrap (#40); queues from $SBAM_QUEUES.
+CMD ["sh", "-c", "if [ \"$SBAM_ROLE\" = api ]; then exec uvicorn sbam_api.main:create_app --factory --host 0.0.0.0 --port 8000; else exec python -m sbam_workers.bootstrap; fi"]

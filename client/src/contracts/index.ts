@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:0cd3132c20085df9b889f851e150a368b6a05982ed48e4c3a14ae17d2ea7909d
+// source-sha256:012a750edeb5d017407170a8394ca134994d528ff40151526412e3feb7c06c9d
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -98,6 +98,20 @@ export type ManifestStatus = "DRAFT" | "VALIDATING" | "APPROVED" | "SUPERSEDED";
  * via the `definition` "CertificationState".
  */
 export type CertificationState = "CERTIFIED" | "FROZEN";
+/**
+ * What a run works on; `subject_id` is that entity's id.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubjectType".
+ */
+export type SubjectType = "project" | "document_version" | "sub_skill";
+/**
+ * Execution state as mirrored in `temporal_runs` (Temporal's workflow execution status).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RunState".
+ */
+export type RunState = "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "TIMED_OUT";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "Actor".
@@ -198,6 +212,8 @@ export interface SbamContracts {
   FiletypePayload?: FiletypePayload;
   RagReference?: RagReference;
   SowDocument?: SowDocument;
+  Run?: Run;
+  RunAccepted?: RunAccepted;
   StateMachineStates?: StateMachineStates;
 }
 /**
@@ -1303,6 +1319,40 @@ export interface AssumptionsOpenPoints {
   citations: [Citation, ...Citation[]];
   assumptions: string[];
   open_points: string[];
+}
+/**
+ * One Temporal execution as the API returns it (mirror of `temporal_runs`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Run".
+ */
+export interface Run {
+  id: string;
+  /**
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
+   */
+  temporal_workflow_id: string;
+  temporal_run_id: string;
+  /**
+   * Workflow type name
+   */
+  type: string;
+  subject_type: SubjectType;
+  subject_id: string;
+  state: RunState;
+  current_stage?: string | null;
+  last_error?: string | null;
+  started_at: string;
+  updated_at: string;
+}
+/**
+ * `202 Accepted` body of every long-running command.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RunAccepted".
+ */
+export interface RunAccepted {
+  run: Run;
 }
 /**
  * Every state enum in one model, so the generated TypeScript exports them as string unions.

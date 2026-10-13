@@ -12,14 +12,17 @@ x-worker: &worker
     dockerfile: compose/docker/server.Dockerfile
     target: prod
     args: { PACKAGE: sbam-workers, ROLE: worker }
-  # Stub: heartbeat loop per queue until #40. Variables are passed one by one, never an env_file
-  # (the OpenRouter key must not reach workers, ADR 0001).
+  # Temporal worker (#40): `python -m sbam_workers.bootstrap --queues $SBAM_QUEUES`. Variables are passed
+  # one by one, never an env_file (the OpenRouter key must not reach workers, ADR 0001).
   environment: &worker-env
     SBAM_QUEUES: unset
     LLM_PROVIDER: ${LLM_PROVIDER:-mock}
     TEMPORAL_HOST: temporal:7233
+    TEMPORAL_NAMESPACE: sbam
+    DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
   depends_on:
+    api-migrate: { condition: service_completed_successfully } # temporal_runs (run mirror)
     postgres: { condition: service_healthy }
     temporal: { condition: service_healthy }
     temporal-namespace: { condition: service_completed_successfully }
@@ -156,7 +159,13 @@ services:
     entrypoint:
       - sh
       - -ec
-      - temporal operator namespace describe -n sbam >/dev/null 2>&1 || temporal operator namespace create -n sbam --retention 7d
+      - |
+        temporal operator namespace describe -n sbam >/dev/null 2>&1 || temporal operator namespace create -n sbam --retention 7d
+        # Search attributes for the Temporal UI / visibility queries (TD §13.1, #40). Idempotent.
+        for name in TenantId ProjectId SbamWorkflowId SkillId SbamStage; do
+          temporal operator search-attribute list -n sbam | grep -qw "$$name" ||
+            temporal operator search-attribute create -n sbam --name "$$name" --type Keyword
+        done
     networks: [sbam_internal]
     depends_on:
       temporal: { condition: service_healthy }
@@ -252,6 +261,8 @@ services:
       # Signs download URLs (#37). Empty = signed downloads answer 503; existing stacks keep starting.
       STORAGE_SIGNING_KEY: ${STORAGE_SIGNING_KEY:-}
       TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: sbam
+      ENABLE_PING: ${ENABLE_PING:-true} # sample command POST …/runs/ping (#40); local stack only
       # Tokens carry the browser-facing issuer (KC_HOSTNAME); keys are fetched inside the network (#48).
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/bullm
       KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bullm/protocol/openid-connect/certs
@@ -288,7 +299,8 @@ services:
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-llm }
   worker-build:
     <<: *worker
-    environment: { <<: *worker-env, SBAM_QUEUES: sbam-build }
+    # Also runs the run-mirror reconciler every 60 s (one worker is enough; passes are idempotent).
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-build, SBAM_RECONCILE_EVERY: "60" }
   worker-test:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-test }

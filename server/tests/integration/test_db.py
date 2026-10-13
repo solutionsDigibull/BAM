@@ -96,7 +96,7 @@ def test_e1_5_t01_upgrade_downgrade_upgrade_clean_and_no_drift(
         with scratch.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM sbam.alembic_version")).scalar()
             fn = conn.execute(text("SELECT to_regproc('sbam.forbid_frozen_change')")).scalar()
-        assert version == "0001_baseline"
+        assert version == "0002_temporal_runs"  # head; bump when a revision is added
         assert fn is not None
     finally:
         with admin.connect() as conn:

@@ -46,6 +46,16 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: sbam-api
+  # Workers (#40): activity spans join the API request's trace through the Temporal interceptor.
+  worker-ingest: &worker-obs
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: sbam-worker
+  worker-knowledge: *worker-obs
+  worker-llm: *worker-obs
+  worker-build: *worker-obs
+  worker-test: *worker-obs
+  worker-certify: *worker-obs
 
   # Grafana LGTM: OTel collector (OTLP 4317 gRPC / 4318 HTTP) + Tempo, Loki, Prometheus and Grafana.
   otel-collector:

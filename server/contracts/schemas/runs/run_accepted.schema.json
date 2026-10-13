@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:runs/run_accepted:0.1.0",
+  "$defs": {
+    "Run": {
+      "additionalProperties": false,
+      "description": "One Temporal execution as the API returns it (mirror of `temporal_runs`).",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "temporal_workflow_id": {
+          "pattern": "^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+          "title": "Temporal Workflow Id",
+          "type": "string"
+        },
+        "temporal_run_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Temporal Run Id",
+          "type": "string"
+        },
+        "type": {
+          "description": "Workflow type name",
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "subject_type": {
+          "$ref": "#/$defs/SubjectType"
+        },
+        "subject_id": {
+          "format": "uuid",
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/RunState"
+        },
+        "current_stage": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Stage"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Error"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "temporal_workflow_id",
+        "temporal_run_id",
+        "type",
+        "subject_type",
+        "subject_id",
+        "state",
+        "started_at",
+        "updated_at"
+      ],
+      "title": "Run",
+      "type": "object"
+    },
+    "RunState": {
+      "description": "Execution state as mirrored in `temporal_runs` (Temporal's workflow execution status).",
+      "enum": [
+        "RUNNING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+        "TERMINATED",
+        "TIMED_OUT"
+      ],
+      "title": "RunState",
+      "type": "string"
+    },
+    "SubjectType": {
+      "description": "What a run works on; `subject_id` is that entity's id.",
+      "enum": [
+        "project",
+        "document_version",
+        "sub_skill"
+      ],
+      "title": "SubjectType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`202 Accepted` body of every long-running command.",
+  "properties": {
+    "run": {
+      "$ref": "#/$defs/Run"
+    }
+  },
+  "required": [
+    "run"
+  ],
+  "title": "RunAccepted",
+  "type": "object"
+}
