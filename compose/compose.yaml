@@ -267,6 +267,9 @@ services:
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/bullm
       KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/bullm/protocol/openid-connect/certs
       KEYCLOAK_AUDIENCE: sbam-api
+      # Tenant creation (#49): the sbam-api-admin service account manages organizations. Empty = 503.
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/bullm
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
       MAX_BODY_BYTES: ${MAX_BODY_BYTES:-10485760}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes: [storage:/data/storage]

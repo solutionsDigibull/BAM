@@ -9,6 +9,8 @@ unassigned project, no tenant — identical to a missing resource), 423 via `loc
 The tables behind assignment and the audit log belong to later issues, so they sit behind ports
 with fail-closed defaults: `MembershipLookup` (#50 project_members; default: no projects) and
 `SecurityAudit` (#41 audit_log; default: a structured `sbam_api.security` log line).
+`UserDirectory` (#49) mirrors the caller into `users` and refuses suspended or mismatched tenants;
+`create_app` wires the SQL one, the default (tests) does nothing.
 """
 
 import logging
@@ -97,6 +99,9 @@ class CurrentUser:
     roles: frozenset[str]
     assigned_project_ids: frozenset[uuid.UUID] = field(default_factory=frozenset)
     username: str | None = None
+    email: str | None = None
+    display_name: str | None = None
+    session_id: str | None = None  # Keycloak `sid`: a new value means a new login
 
     def context(self, project_id: uuid.UUID | None = None) -> TenantContext:
         """For the tenant-scoped repository (#36). Only call on tenant routes."""
@@ -114,6 +119,11 @@ def _tenant(claims: dict[str, Any]) -> uuid.UUID | None:
         return uuid.UUID(orgs[0])
     except ValueError:
         return None
+
+
+def _text(value: Any, limit: int = 254) -> str | None:
+    """A short claim string (RFC 5321 caps an address at 254), else None."""
+    return value if isinstance(value, str) and 0 < len(value) <= limit else None
 
 
 class TokenVerifier:
@@ -152,7 +162,10 @@ class TokenVerifier:
             keycloak_sub=claims["sub"],
             tenant_id=_tenant(claims),
             roles=frozenset(r for r in roles if isinstance(r, str)),
-            username=claims.get("preferred_username"),
+            username=_text(claims.get("preferred_username")),
+            email=_text(claims.get("email")),
+            display_name=_text(claims.get("name")) or _text(claims.get("preferred_username")),
+            session_id=_text(claims.get("sid"), 64),
         )
 
 
@@ -177,6 +190,20 @@ class SecurityAudit(Protocol):
         """Record a denied access (#41 writes it to audit_log)."""
         ...
 
+    def event(
+        self,
+        *,
+        actor: str,
+        tenant_id: uuid.UUID | None,
+        action: str,
+        entity: str,
+        entity_id: str,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+    ) -> None:
+        """Record an identity event: LOGIN, TENANT_CREATED, TENANT_STATUS_CHANGED (#41)."""
+        ...
+
 
 class LogSecurityAudit:
     """Until #41 lands: one structured warning per denial (actor = sub, never the token)."""
@@ -187,12 +214,66 @@ class LogSecurityAudit:
             extra={"actor": actor.keycloak_sub, "route": route, "target": target, "reason": reason},
         )
 
+    def event(
+        self,
+        *,
+        actor: str,
+        tenant_id: uuid.UUID | None,
+        action: str,
+        entity: str,
+        entity_id: str,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+    ) -> None:
+        log.info(
+            "audit",
+            extra={
+                "actor": actor,
+                "action": action,
+                "entity": f"{entity}:{entity_id}",
+                "detail": {"tenant_id": str(tenant_id), "before": before, "after": after},
+            },
+        )
+
+
+class UserDirectory(Protocol):
+    def sync(self, user: CurrentUser) -> None:
+        """Mirror a tenant user on each request; raise 403 for a suspended or mismatched tenant."""
+        ...
+
+
+class NoDirectory:
+    def sync(self, user: CurrentUser) -> None:
+        return None
+
+
+class OrgDirectory(Protocol):
+    def create(self, tenant_id: uuid.UUID, name: str) -> str:
+        """Create the tenant's Keycloak organization (alias = tenant id); its id. 503 on failure."""
+        ...
+
+    def delete(self, org_id: str) -> None:
+        """Compensating delete when the tenant row can't be committed."""
+        ...
+
+
+class NoOrgs:
+    """Keycloak admin credentials not configured: tenant creation answers 503."""
+
+    def create(self, tenant_id: uuid.UUID, name: str) -> str:
+        raise idp_unavailable()
+
+    def delete(self, org_id: str) -> None:
+        return None
+
 
 @dataclass
 class Auth:
     verifier: TokenVerifier
     memberships: MembershipLookup = field(default_factory=NoMemberships)
     audit: SecurityAudit = field(default_factory=LogSecurityAudit)
+    directory: UserDirectory = field(default_factory=NoDirectory)
+    orgs: OrgDirectory = field(default_factory=NoOrgs)
 
 
 # --- Dependencies ----------------------------------------------------------------------------
@@ -208,6 +289,7 @@ def current_user(request: Request) -> CurrentUser:
         assigned = auth.memberships.assigned_projects(user.tenant_id, user.user_id)
         user = CurrentUser(**{**user.__dict__, "assigned_project_ids": assigned})
         set_request_context(tenant_id=str(user.tenant_id))  # logs + span, only after verification
+        auth.directory.sync(user)
     return user
 
 
@@ -235,7 +317,12 @@ def fde(user: CurrentUserDep) -> CurrentUser:
 def super_admin(user: CurrentUserDep) -> CurrentUser:
     """Platform APIs (`/admin/tenants`): super-admin, no tenant needed."""
     if ROLE_SUPER_ADMIN not in user.roles:
-        raise ApiError(403, ErrorCode.FORBIDDEN, "Super-admin only")
+        raise wrong_portal()
+    return user
+
+
+def authenticated(user: CurrentUserDep) -> CurrentUser:
+    """Any signed-in user, whatever the portal (`/me`)."""
     return user
 
 
@@ -243,7 +330,9 @@ def internal() -> None:
     """The route authenticates the caller itself (signed URL, hook secret); no user token."""
 
 
-POLICIES: frozenset[Callable[..., Any]] = frozenset({admin, fde, super_admin, internal})
+POLICIES: frozenset[Callable[..., Any]] = frozenset(
+    {admin, fde, super_admin, authenticated, internal}
+)
 
 
 def project_access(

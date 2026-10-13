@@ -112,6 +112,19 @@ class Audit:
     def denied(self, *, actor: CurrentUser, route: str, target: str | None, reason: str) -> None:
         self.entries.append({"actor": actor.keycloak_sub, "route": route, "target": target})
 
+    def event(
+        self,
+        *,
+        actor: str,
+        tenant_id: uuid.UUID | None,
+        action: str,
+        entity: str,
+        entity_id: str,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
+    ) -> None:
+        self.entries.append({"actor": actor, "action": action})
+
 
 class Harness:
     def __init__(self, tmp_path: Path) -> None:
@@ -148,7 +161,7 @@ class Harness:
         def admin_projects(user: Annotated[CurrentUser, Depends(admin)]) -> dict[str, str]:
             return {"tenant_id": str(user.tenant_id)}
 
-        @router.get("/admin/tenants")
+        @router.get("/admin/platform-check")
         def tenants(user: Annotated[CurrentUser, Depends(super_admin)]) -> list[str]:
             return []
 
@@ -293,9 +306,9 @@ def test_e2_2_user_with_both_roles_uses_both_portals(h: Harness) -> None:
 
 def test_e2_2_super_admin_routes(h: Harness) -> None:
     root = h.realm.token(tenant_id=None, realm_access={"roles": ["super-admin"]})
-    assert h.get("/admin/tenants", root).status_code == 200
+    assert h.get("/admin/platform-check", root).status_code == 200
     admin_token = h.realm.token(ADMIN_A, realm_access={"roles": ["sbam-admin"]})
-    problem(h.get("/admin/tenants", admin_token), 403, "FORBIDDEN")
+    problem(h.get("/admin/platform-check", admin_token), 403, "WRONG_PORTAL")  # E2.3-T04
 
 
 def test_e2_2_state_guard_is_423_after_authorization(h: Harness) -> None:

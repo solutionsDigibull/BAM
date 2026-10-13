@@ -61,6 +61,17 @@ Production ops access is limited to the platform group. A laptop in `dev-laptops
   4. If the key ever reached Git, tell the security owner. Revoking the key is the fix; never rewrite history just to hide the leak.
   5. Record the date and how long it took in the checklist below.
 
+## Keycloak service account for tenants (E2.3)
+
+`POST /admin/tenants` creates each tenant's Keycloak organization as the confidential client `sbam-api-admin`. The realm file stays free of secrets (E2.1-T08), so the client is created outside it:
+
+- **Laptops and CI.** `keycloak-seed` creates it from `KEYCLOAK_ADMIN_CLIENT_SECRET` in `compose/.env`. With the variable empty, tenant creation answers 503 `IDP_UNAVAILABLE` and nothing else changes.
+- **Dev VM, staging, prod.** Create it once in the `bullm` realm:
+  1. Confidential client, service account on, every other flow off.
+  2. Give its service account the `realm-management` role `manage-realm`. Keycloak 26.8 refuses the organizations API with `manage-users` alone.
+  3. Put the secret in the sbam-api environment as `KEYCLOAK_ADMIN_CLIENT_SECRET`, with `KEYCLOAK_INTERNAL_URL` pointing at the realm inside the network.
+- **Rotation.** Regenerate the secret in Keycloak, update sbam-api's environment, then restart sbam-api.
+
 ## KVM host not ready (fallback)
 
 If the sandbox host isn't ready by week 4, sandbox work continues on laptops with `make up PROFILES=sandbox-local`. That runs a `local-docker` sandbox (#42, #123). Runs from it are marked **non-certifying** and can never certify or freeze a version. Certification waits for the real CubeSandbox host (#28).

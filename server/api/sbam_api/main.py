@@ -13,18 +13,19 @@ from fastapi import APIRouter, FastAPI
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from sbam_contracts.api import API_BASE
-from sqlalchemy.orm import Session, sessionmaker
 
 import sbam_api
 from sbam_api.audit.security import AuditLogSecurityAudit
-from sbam_api.core.auth import POLICIES, Auth, Jwks, TokenVerifier
+from sbam_api.core.auth import POLICIES, Auth, Jwks, NoOrgs, TokenVerifier
 from sbam_api.core.errors import install_error_handlers
 from sbam_api.core.health import Check, default_checks, health_router
 from sbam_api.core.logging import configure_logging
 from sbam_api.core.middleware import BodyLimitMiddleware, CorrelationIdMiddleware
-from sbam_api.core.settings import Settings, jwks_url, load_settings
+from sbam_api.core.settings import Settings, jwks_url, keycloak_realm_url, load_settings
 from sbam_api.core.telemetry import configure_telemetry
-from sbam_api.db.session import make_engine, make_sessionmaker
+from sbam_api.db.session import app_sessions
+from sbam_api.identity.keycloak_admin import KeycloakOrgs
+from sbam_api.identity.service import SqlUserDirectory
 
 _NOT_FEATURE_MODULES = {"core", "main"}
 
@@ -59,6 +60,29 @@ def unguarded_routes(routers: list[APIRouter]) -> list[str]:
     ]
 
 
+def default_auth(app: FastAPI, settings: Settings) -> Auth:
+    """Production wiring: Keycloak JWKS, the users mirror (#49) and Keycloak organizations."""
+    # Denials and identity events go to audit_log (#41, ADR 0017); one sessionmaker per app.
+    audit = AuditLogSecurityAudit(lambda: app_sessions(app.state))
+    secret = settings.keycloak_admin_client_secret
+    return Auth(
+        TokenVerifier(
+            str(settings.keycloak_issuer), settings.keycloak_audience, Jwks(jwks_url(settings))
+        ),
+        audit=audit,
+        directory=SqlUserDirectory(lambda: app_sessions(app.state), audit),
+        orgs=(
+            KeycloakOrgs(
+                keycloak_realm_url(settings),
+                settings.keycloak_admin_client_id,
+                secret.get_secret_value(),
+            )
+            if secret
+            else NoOrgs()
+        ),
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     checks: Mapping[str, Check] | None = None,
@@ -76,19 +100,7 @@ def create_app(
         telemetry={"auto_configure": False, "tracing": False, "metrics": False, "logs": False},
     )
     app.state.settings = settings
-
-    def sessions() -> sessionmaker[Session]:  # one pool per app, built on first use
-        if getattr(app.state, "sessions", None) is None:
-            app.state.sessions = make_sessionmaker(make_engine(settings.database_url))
-        result: sessionmaker[Session] = app.state.sessions
-        return result
-
-    app.state.auth = auth or Auth(
-        TokenVerifier(
-            str(settings.keycloak_issuer), settings.keycloak_audience, Jwks(jwks_url(settings))
-        ),
-        audit=AuditLogSecurityAudit(sessions),  # denials go to audit_log (#41, ADR 0017)
-    )
+    app.state.auth = auth or default_auth(app, settings)
     install_error_handlers(app)
     app.include_router(health_router(checks if checks is not None else default_checks(settings)))
     routers = discover_routers()

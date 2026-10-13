@@ -13,6 +13,23 @@ services:
     volumes:
       - ../server:/app/server
       - storage:/data/storage
+    depends_on:
+      api-seed: { condition: service_completed_successfully }
+
+  # The dev tenants behind keycloak-seed's organizations, so their users pass the tenant check (#49).
+  api-seed:
+    image: sbam-api:local
+    build:
+      context: ..
+      dockerfile: compose/docker/server.Dockerfile
+      target: prod
+      args: { PACKAGE: sbam-api, ROLE: api }
+    command: ["python", "-m", "sbam_api.identity.seed"]
+    environment:
+      DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
+    networks: [sbam_internal]
+    depends_on:
+      api-migrate: { condition: service_completed_successfully }
 
   # Local seed users and tenants for realm bullm (#47). Laptops/CI only; staging/prod never load this file.
   keycloak-seed:
@@ -22,6 +39,7 @@ services:
       KC_URL: http://keycloak:8080
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
     volumes: [./keycloak/seed.sh:/seed/seed.sh:ro]
     networks: [sbam_internal]
     depends_on:
