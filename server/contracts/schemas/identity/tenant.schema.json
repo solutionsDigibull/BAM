@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:identity/tenant:0.1.0",
+  "$defs": {
+    "TenantStatus": {
+      "enum": [
+        "ACTIVE",
+        "SUSPENDED"
+      ],
+      "title": "TenantStatus",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "keycloak_org_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Keycloak Org Id"
+    },
+    "status": {
+      "$ref": "#/$defs/TenantStatus"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "keycloak_org_id",
+    "status",
+    "created_at"
+  ],
+  "title": "Tenant",
+  "type": "object"
+}

@@ -10,6 +10,7 @@ from typing import Final
 from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
+from sbam_contracts.identity import Me, Tenant, TenantCreate, TenantPatch
 from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
 from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
 from sbam_contracts.masters import (
@@ -45,4 +46,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("runs/run", Run),
     ("runs/run_accepted", RunAccepted),
     ("state_machines/states", StateMachineStates),
+    ("identity/tenant", Tenant),
+    ("identity/tenant_create", TenantCreate),
+    ("identity/tenant_patch", TenantPatch),
+    ("identity/me", Me),
 )
