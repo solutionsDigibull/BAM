@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:identity/tenant_patch:0.1.0",
+  "$defs": {
+    "TenantStatus": {
+      "enum": [
+        "ACTIVE",
+        "SUSPENDED"
+      ],
+      "title": "TenantStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "$ref": "#/$defs/TenantStatus"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "TenantPatch",
+  "type": "object"
+}

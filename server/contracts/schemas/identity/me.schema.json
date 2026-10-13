@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:identity/me:0.1.0",
+  "$defs": {
+    "Tenant": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "keycloak_org_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Keycloak Org Id"
+        },
+        "status": {
+          "$ref": "#/$defs/TenantStatus"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "keycloak_org_id",
+        "status",
+        "created_at"
+      ],
+      "title": "Tenant",
+      "type": "object"
+    },
+    "TenantStatus": {
+      "enum": [
+        "ACTIVE",
+        "SUSPENDED"
+      ],
+      "title": "TenantStatus",
+      "type": "string"
+    },
+    "UserProfile": {
+      "description": "The caller's row in the users mirror, refreshed from the token on login.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "keycloak_sub": {
+          "title": "Keycloak Sub",
+          "type": "string"
+        },
+        "tenant_id": {
+          "format": "uuid",
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Email"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Display Name"
+        },
+        "portal_roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Portal Roles",
+          "type": "array"
+        },
+        "last_login_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Login At"
+        }
+      },
+      "required": [
+        "id",
+        "keycloak_sub",
+        "tenant_id",
+        "email",
+        "display_name",
+        "portal_roles",
+        "last_login_at"
+      ],
+      "title": "UserProfile",
+      "type": "object"
+    }
+  },
+  "description": "GET /me. `user` and `tenant` are null for a platform super-admin, who has no tenant.",
+  "properties": {
+    "user": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UserProfile"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tenant": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Tenant"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "assigned_projects": {
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "title": "Assigned Projects",
+      "type": "array"
+    }
+  },
+  "required": [
+    "user",
+    "tenant",
+    "roles",
+    "assigned_projects"
+  ],
+  "title": "Me",
+  "type": "object"
+}

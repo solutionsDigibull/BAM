@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:012a750edeb5d017407170a8394ca134994d528ff40151526412e3feb7c06c9d
+// source-sha256:0d28557ae90b39b9ce3cdd32c0beeb7635e0109abf88a13615c7f08d4b73a56e
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -191,6 +191,11 @@ export type SubSkillState =
  * via the `definition` "AgentState".
  */
 export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TenantStatus".
+ */
+export type TenantStatus = "ACTIVE" | "SUSPENDED";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -215,6 +220,10 @@ export interface SbamContracts {
   Run?: Run;
   RunAccepted?: RunAccepted;
   StateMachineStates?: StateMachineStates;
+  Tenant?: Tenant;
+  TenantCreate?: TenantCreate;
+  TenantPatch?: TenantPatch;
+  Me?: Me;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1369,4 +1378,59 @@ export interface StateMachineStates {
   sow_version: SowVersionState;
   sub_skill: SubSkillState;
   agent: AgentState;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Tenant".
+ */
+export interface Tenant {
+  id: string;
+  name: string;
+  keycloak_org_id: string | null;
+  status: TenantStatus;
+  created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TenantCreate".
+ */
+export interface TenantCreate {
+  /**
+   * Pattern: `^[^\x00-\x1f\x7f-\x9f]+$`
+   */
+  name: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TenantPatch".
+ */
+export interface TenantPatch {
+  status: TenantStatus;
+}
+/**
+ * GET /me. `user` and `tenant` are null for a platform super-admin, who has no tenant.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Me".
+ */
+export interface Me {
+  user: UserProfile | null;
+  tenant: Tenant | null;
+  roles: string[];
+  assigned_projects: string[];
+}
+/**
+ * The caller's row in the users mirror, refreshed from the token on login.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UserProfile".
+ */
+export interface UserProfile {
+  id: string;
+  keycloak_sub: string;
+  tenant_id: string;
+  email: string | null;
+  display_name: string | null;
+  portal_roles: string[];
+  last_login_at: string | null;
 }
