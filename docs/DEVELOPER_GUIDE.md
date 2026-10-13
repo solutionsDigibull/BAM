@@ -130,6 +130,15 @@ A PR is mergeable only when all of the following hold (from PLAN §26.4):
 - Long-running work runs in Temporal activities only. API handlers never block on parsing, LLM, codegen or sandbox calls.
 - Temporal workflow code must be deterministic: no I/O, no `datetime.now()`, no randomness. Use `workflow.patched` for changes, and replay tests must pass.
 - Secrets come from environment/Docker secrets only. Never commit `.env`.
+- **State changes go through `sbam_api.state_machine`, never by setting `state` (TD §14.7, #41).**
+  - **Model:** a model with a lifecycle mixes in `Stateful` and adds `state_check(MachineName.X)`.
+  - **API handler:**
+    `transition(sessions, user.context(project_id), TransitionCommand(model, id, event, Actor.FDE, str(user.user_id), correlation_id, expected_row_version=<If-Match>))`.
+  - **Activity:** `Actor.SYSTEM`, `actor_id=SYSTEM_ACTOR_ID` and `idempotency_key="<temporal run id>:<step>"`, so a retry is a no-op.
+  - **New entities:** use `apply_create(...)` with the machine's creation event.
+  - **What the service does:** each call writes one `audit_log` row and one outbox notification, in the same transaction as the state change.
+  - **Errors it raises:** 409 `INVALID_TRANSITION`, 423 (locked state or frozen row), 412 (stale version) and 404 (other tenant or project).
+  - **`audit_log` is append-only:** a DB trigger rejects UPDATE, DELETE and TRUNCATE.
 
 ### TypeScript (`client/`)
 
