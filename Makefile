@@ -1,5 +1,5 @@
 # SBAM developer commands. On Windows run these from Git Bash or WSL2.
-.PHONY: doctor install lint typecheck test check contracts contracts-check migrations-check up ps down logs seed test-int e2e reset
+.PHONY: doctor install lint typecheck test check contracts contracts-check migrations-check up ps down logs seed test-int e2e reset runtime-registry
 
 # Compose stack (TD §20.3). ENV_FILE can point at another env file, e.g. `make up ENV_FILE=/tmp/ci.env`.
 ENV_FILE ?= compose/.env
@@ -22,6 +22,7 @@ install:
 
 lint:
 	cd server && uv run ruff check . && uv run black --check .
+	cd server && uv run python ../scripts/check_runtime_lock.py  # skill-runtime lock pinned + hashed (#67)
 	pnpm --dir client lint
 	pnpm --dir client format:check
 
@@ -71,6 +72,14 @@ test-int: up
 
 e2e:
 	pnpm --dir client e2e
+
+# skill-runtime image + its runtime registry, synced into the running stack (#67). Needs `make up`.
+runtime-registry:
+	docker build -q -f compose/docker/skill-runtime.Dockerfile -t skill-runtime:local .
+	docker run --rm --network none skill-runtime:local sbam-runtime-registry \
+	  --image-digest "$$(docker image inspect --format '{{.Id}}' skill-runtime:local)" > runtime_registry.json
+	cd server && DATABASE_URL="postgresql://sbam:$$(sed -n 's/^SBAM_DB_PASSWORD=//p' ../$(ENV_FILE))@127.0.0.1:$${POSTGRES_PORT:-5432}/sbam" \
+	  uv run python -m sbam_api.registry.sync ../runtime_registry.json --activate
 
 # The only destructive target: stops the stack and deletes every volume (database, storage, signatures,
 # and the profile volumes such as Langfuse's).

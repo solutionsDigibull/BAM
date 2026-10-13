@@ -23,6 +23,7 @@ from sbam_contracts.masters import (
     SkillsPayload,
 )
 from sbam_contracts.runs import Run, RunAccepted
+from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sow import SowDocument
 from sbam_contracts.state_machines import StateMachineStates
 
@@ -45,6 +46,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sow/sow_document", SowDocument),
     ("runs/run", Run),
     ("runs/run_accepted", RunAccepted),
+    ("runtime_registry/runtime_registry", RuntimeRegistry),
     ("state_machines/states", StateMachineStates),
     ("identity/tenant", Tenant),
     ("identity/tenant_create", TenantCreate),

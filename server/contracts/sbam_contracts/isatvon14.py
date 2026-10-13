@@ -475,9 +475,9 @@ def _check_sub_skill(
             found.append((8, idef + "n_notification.next", "must not point to itself"))
 
     # Rule 9: libraries.
-    allowed = {_package(p) for p in registry}
+    allowed = {normalize_package(p) for p in registry}
     for k, lib in enumerate(t.libraries):
-        name = _package(lib.package)
+        name = normalize_package(lib.package)
         path = f"{idef}t_tech_stack.libraries.{k}.package"
         if name in FORBIDDEN_LIBRARIES:
             found.append((9, path, f"{lib.package!r} is not allowed (PostgreSQL only)"))
@@ -493,7 +493,8 @@ def _check_sub_skill(
     return found
 
 
-def _package(name: str) -> str:
+def normalize_package(name: str) -> str:
+    """PEP 503 name normalisation: `Psycopg_Binary` -> `psycopg-binary`."""
     return re.sub(r"[-_.]+", "-", name.strip()).lower()
 
 

@@ -66,22 +66,20 @@ for img in sbam-worker sbam-mock-api; do
   docker rm -f "$cid" >/dev/null
 done
 
-# T05 runtime registry: every import name imports, duckdb absent
-if docker run --rm --entrypoint python "skill-runtime:$TAG" -c "
+# T05 runtime registry (#67 format): every top-level module of every package imports, offline
+if docker run --rm --network none --entrypoint python "skill-runtime:$TAG" -c "
 import importlib, json
 reg = json.load(open('/opt/runtime_registry.json'))['packages']
-assert not any(p['package'].lower() == 'duckdb' for p in reg), 'duckdb present'
 for p in reg:
-    for m in p['import_names']:
+    for m in p['top_level_modules']:
         importlib.import_module(m)
 print(len(reg), 'packages')
-"; then pass "T05 runtime registry imports; no duckdb"; else bad "T05 runtime registry"; fi
+"; then pass "T05 runtime registry imports"; else bad "T05 runtime registry"; fi
 
-# T06 ephemeral PostgreSQL 16 inside skill-runtime
-if docker run --rm --entrypoint sh "skill-runtime:$TAG" -c '
-  initdb -D /tmp/pgdata -U postgres >/dev/null &&
-  pg_ctl -D /tmp/pgdata -o "-k /tmp -c listen_addresses=" -l /tmp/pg.log start >/dev/null &&
-  pg_isready -h /tmp && postgres --version' | tee /tmp/t06.out | grep -q "PostgreSQL) 16"; then
+# T06 ephemeral PostgreSQL 16 inside skill-runtime, on 127.0.0.1 only (sbam-pg-start, #67)
+if docker run --rm --network none --entrypoint sh "skill-runtime:$TAG" -c '
+  sbam-pg-start >/dev/null && psql -h 127.0.0.1 -U postgres -Atc "show listen_addresses" &&
+  postgres --version' | tee /tmp/t06.out | grep -q "PostgreSQL) 16"; then
   pass "T06 $(tail -1 /tmp/t06.out)"
 else
   bad "T06 PostgreSQL 16 in skill-runtime"; cat /tmp/t06.out

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:0d28557ae90b39b9ce3cdd32c0beeb7635e0109abf88a13615c7f08d4b73a56e
+// source-sha256:4b1558b3167755c6918b3848d1e55f74e38f99fe8e0770039c88fed791426b80
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -219,6 +219,7 @@ export interface SbamContracts {
   SowDocument?: SowDocument;
   Run?: Run;
   RunAccepted?: RunAccepted;
+  RuntimeRegistry?: RuntimeRegistry;
   StateMachineStates?: StateMachineStates;
   Tenant?: Tenant;
   TenantCreate?: TenantCreate;
@@ -1362,6 +1363,43 @@ export interface Run {
  */
 export interface RunAccepted {
   run: Run;
+}
+/**
+ * `runtime_registry.json` as the generator writes it and the sync loads it.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RuntimeRegistry".
+ */
+export interface RuntimeRegistry {
+  image_digest?: string | null;
+  /**
+   * Pattern: `^\d+\.\d+\.\d+$`
+   */
+  python_version: string;
+  /**
+   * @minItems 1
+   */
+  packages: [RuntimePackage, ...RuntimePackage[]];
+  generated_at: string;
+  /**
+   * Pattern: `^sha256:[0-9a-f]{64}$`
+   */
+  content_sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RuntimePackage".
+ */
+export interface RuntimePackage {
+  /**
+   * Pattern: `^[a-z0-9]+(-[a-z0-9]+)*$`
+   */
+  name: string;
+  version: string;
+  /**
+   * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]*$`
+   */
+  top_level_modules: string[];
 }
 /**
  * Every state enum in one model, so the generated TypeScript exports them as string unions.
