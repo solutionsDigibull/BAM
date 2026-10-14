@@ -1,10 +1,10 @@
 // Shared bits of the Admin Projects screens (E3.9): API paths, the problem codes they branch on and the copy.
-import type { Project, ProjectCreate, UserProfile } from "@/contracts";
+import type { Project, ProjectCreate, ProjectMembers, TenantUser } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
 export const RESOURCE = "admin/projects";
 export const archivePath = (id: string) => `${RESOURCE}/${id}/archive`;
-// GET/PUT members and the FDE list come with #50 (E2.4), coded against TD §8.2 / §8.3.
+// GET/PUT members and the user list come with #50 (E2.4); shapes are the generated contracts.
 export const membersPath = (id: string) => `${RESOURCE}/${id}/members`;
 export const USERS_PATH = "admin/users";
 export const MAX_MEMBERS = 50;
@@ -20,10 +20,6 @@ export type ProjectForm = Pick<
   ProjectCreate,
   "name" | "client_name" | "description" | "context_notes"
 >;
-/** A row of GET /admin/users (#50). `active` is optional until #50 fixes the user contract. */
-export type TenantUser = UserProfile & { active?: boolean };
-/** GET/PUT members answer `{members}`: user objects, or bare ids. */
-export type Members = { members: (string | { id: string })[] };
 
 export const problemCode = (error: unknown): string | undefined =>
   (error as ApiError | null)?.problem?.code;
@@ -49,11 +45,11 @@ export const toForm = (p: Project): ProjectForm => ({
   context_notes: p.context_notes ?? undefined,
 });
 
-export const memberIds = (m: Members | undefined): string[] =>
-  (m?.members ?? []).map((x) => (typeof x === "string" ? x : x.id));
+export const memberIds = (m: ProjectMembers | undefined): string[] =>
+  (m?.members ?? []).map((u) => u.id);
 
-/** Only active FDEs of the caller's tenant (the API filters too; this is belt and braces). */
+/** Only ACTIVE `sbam-fde` users can be assigned (the API answers 422 for anyone else). */
 export const selectableFdes = (users: TenantUser[]): TenantUser[] =>
-  users.filter((u) => u.portal_roles.includes("sbam-fde") && u.active !== false);
+  users.filter((u) => u.portal_roles.includes("sbam-fde") && u.status === "ACTIVE");
 
 export const userLabel = (u: TenantUser) => u.display_name ?? u.email ?? u.id;

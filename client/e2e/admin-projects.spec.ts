@@ -22,12 +22,13 @@ const PROJECT = {
 };
 const FDE_A1 = {
   id: "0190f3a2-7b1c-7d4e-8f00-0000000000f1",
-  keycloak_sub: "fde-a1",
-  tenant_id: PROJECT.tenant_id,
   email: "fde-a1@acme.example",
   display_name: "fde-A1",
   portal_roles: ["sbam-fde"],
+  status: "ACTIVE",
   last_login_at: null,
+  created_at: "2026-10-14T09:00:00Z",
+  row_version: 1,
 };
 
 test("e3_9_t07 FDE on /admin/projects gets Forbidden and no data request", async ({
@@ -64,7 +65,10 @@ test("e3_9_t02 admin creates a project and assigns fde-A1", async ({ page, baseU
     if (method === "GET" && path === "/admin/users") return json(route, { items: [FDE_A1] });
     if (path === `/admin/projects/${PROJECT.id}/members`) {
       if (method === "PUT") members = (req.postDataJSON() as { user_ids: string[] }).user_ids;
-      return json(route, { members: members.map((id) => ({ id })) });
+      return json(route, {
+        project_id: PROJECT.id,
+        members: members.map((id) => ({ ...FDE_A1, id })),
+      });
     }
     return json(route, { status: 404, title: "Not found", code: "NOT_FOUND" }, 404);
   });

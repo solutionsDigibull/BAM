@@ -6,10 +6,8 @@ import { App } from "antd";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
 
-import type { Project } from "@/contracts";
+import type { Project, TenantUser } from "@/contracts";
 import { API_BASE, dataProvider } from "@/providers/data-provider";
-
-import type { TenantUser } from "./project-api";
 
 type Reply = { status?: number; body?: unknown; etag?: string };
 type Handler = Reply | ((init: RequestInit) => Reply);
@@ -39,16 +37,16 @@ export const user = (
   id: string,
   name: string,
   roles = ["sbam-fde"],
-  active = true,
+  status: TenantUser["status"] = "ACTIVE",
 ): TenantUser => ({
   id,
-  keycloak_sub: `sub-${id}`,
-  tenant_id: "0190f3a2-7b1c-7d4e-8f00-0000000000aa",
   email: `${name.toLowerCase().replace(/\W+/g, ".")}@acme.example`,
   display_name: name,
   portal_roles: roles,
+  status,
   last_login_at: null,
-  active,
+  created_at: "2026-10-01T10:00:00Z",
+  row_version: 1,
 });
 
 /** Routes are "METHOD /path" (after /api/v1, query string ignored). A list of replies is used in order. */

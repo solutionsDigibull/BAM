@@ -146,12 +146,17 @@ describe("Admin Projects screens (E3.9)", () => {
             user("u1", "Sourcing Engineer"),
             user("u2", "Cost Estimator"),
             user("u3", "Tenant Admin", ["sbam-admin"]),
-            user("u4", "Former FDE", ["sbam-fde"], false),
+            user("u4", "Former FDE", ["sbam-fde"], "DEACTIVATED"),
+            user("u5", "Invited FDE", ["sbam-fde"], "INVITED"),
           ],
         },
       },
-      [`GET /admin/projects/${P.id}/members`]: { body: { members: [{ id: "u1" }] } },
-      [`PUT /admin/projects/${P.id}/members`]: { body: { members: [{ id: "u1" }] } },
+      [`GET /admin/projects/${P.id}/members`]: {
+        body: { project_id: P.id, members: [user("u1", "Sourcing Engineer")] },
+      },
+      [`PUT /admin/projects/${P.id}/members`]: {
+        body: { project_id: P.id, members: [user("u1", "Sourcing Engineer")] },
+      },
     });
     renderWithRefine(<ProjectsScreen />);
     await openRowAction(/^FDEs of /);
@@ -163,6 +168,7 @@ describe("Admin Projects screens (E3.9)", () => {
     expect(within(listbox as HTMLElement).getAllByText("Cost Estimator").length).toBeGreaterThan(0);
     expect(screen.queryByText("Tenant Admin")).toBeNull();
     expect(screen.queryByText("Former FDE")).toBeNull();
+    expect(screen.queryByText("Invited FDE")).toBeNull();
 
     fireEvent.click(within(drawer).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(api.calls.some((c) => c.method === "PUT")).toBe(true));
@@ -177,7 +183,7 @@ describe("Admin Projects screens (E3.9)", () => {
     fakeApi({
       [LIST]: { body: { items: [P] } },
       "GET /admin/users": { body: { items: [] } },
-      [`GET /admin/projects/${P.id}/members`]: { body: { members: [] } },
+      [`GET /admin/projects/${P.id}/members`]: { body: { project_id: P.id, members: [] } },
     });
     renderWithRefine(<ProjectsScreen />);
     await openRowAction(/^FDEs of /);

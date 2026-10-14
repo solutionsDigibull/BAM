@@ -6,7 +6,7 @@ import { Alert, Avatar, Button, Drawer, Flex, Select, Space, Typography } from "
 import { useMemo, useState } from "react";
 
 import { ApiErrorState, EmptyState, LoadingState } from "@/components/ui-kit";
-import type { Project } from "@/contracts";
+import type { Project, ProjectMembers, TenantUser } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
 import {
@@ -17,8 +17,6 @@ import {
   membersPath,
   selectableFdes,
   userLabel,
-  type Members,
-  type TenantUser,
 } from "./project-api";
 
 const initials = (name: string) =>
@@ -44,8 +42,11 @@ export function MembersDrawer({
     method: "get",
     config: { query: { role: "sbam-fde", active: "true" } },
   });
-  const current = useCustom<Members, ApiError>({ url: membersPath(project.id), method: "get" });
-  const save = useCustomMutation<Members, ApiError>();
+  const current = useCustom<ProjectMembers, ApiError>({
+    url: membersPath(project.id),
+    method: "get",
+  });
+  const save = useCustomMutation<ProjectMembers, ApiError>();
   const [selected, setSelected] = useState<string[] | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
