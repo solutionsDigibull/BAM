@@ -11,6 +11,7 @@ also through the append-only audit log + outbox, and also idempotent per key.
 
 import logging
 
+import sbam_api.projects.models  # noqa: F401 - registers Project for entity_model (#54)
 from sbam_api.audit.outbox import LogSink, dispatch_pending
 from sbam_api.audit.repository import enqueue, find_by_key, record
 from sbam_api.core.conventions import ApiError

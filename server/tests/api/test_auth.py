@@ -157,7 +157,7 @@ class Harness:
         def edit_frozen(pid: project) -> None:
             raise locked()  # the state guard runs after authorization
 
-        @router.get("/admin/projects")
+        @router.get("/admin/admin-check")
         def admin_projects(user: Annotated[CurrentUser, Depends(admin)]) -> dict[str, str]:
             return {"tenant_id": str(user.tenant_id)}
 
@@ -225,7 +225,7 @@ def test_e2_2_t03_forged_tokens_are_401_and_nothing_runs(h: Harness) -> None:
     tampered = f"{header}.{_b64({**claims, 'tenant_id': [str(TENANT_B)]})}.{good.split('.')[2]}"
     for token in (unsigned, hs256, tampered, "not-a-jwt"):
         problem(h.get(f"/projects/{PROJECT_A1}/pipeline", token), 401, "UNAUTHENTICATED")
-        problem(h.get("/admin/projects", token), 401, "UNAUTHENTICATED")
+        problem(h.get("/admin/admin-check", token), 401, "UNAUTHENTICATED")
     assert h.handled == 0 and h.memberships.calls == 0  # no handler, no membership (DB) query
 
 
@@ -238,7 +238,7 @@ def test_e2_2_missing_or_malformed_authorization_is_401(h: Harness) -> None:
 
 
 def test_e2_2_t04_fde_on_admin_api_is_wrong_portal(h: Harness) -> None:
-    problem(h.get("/admin/projects", h.realm.token()), 403, "WRONG_PORTAL")
+    problem(h.get("/admin/admin-check", h.realm.token()), 403, "WRONG_PORTAL")
 
 
 def test_e2_2_t05_admin_on_fde_api_is_wrong_portal_and_nothing_starts(h: Harness) -> None:
@@ -295,12 +295,12 @@ def test_e2_2_no_single_tenant_uuid_means_404_on_tenant_routes(
     admin_token = h.realm.token(
         ADMIN_A, tenant_id=tenant_claim, realm_access={"roles": ["sbam-admin"]}
     )
-    problem(h.get("/admin/projects", admin_token), 404, "NOT_FOUND")
+    problem(h.get("/admin/admin-check", admin_token), 404, "NOT_FOUND")
 
 
 def test_e2_2_user_with_both_roles_uses_both_portals(h: Harness) -> None:
     token = h.realm.token(realm_access={"roles": ["sbam-admin", "sbam-fde"]})
-    assert h.get("/admin/projects", token).status_code == 200
+    assert h.get("/admin/admin-check", token).status_code == 200
     assert h.get(f"/projects/{PROJECT_A1}/pipeline", token).status_code == 200
 
 
