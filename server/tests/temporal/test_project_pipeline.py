@@ -144,12 +144,17 @@ async def start(
 
 
 async def until(handle: WorkflowHandle[Any, Any], stage: PipelineStage) -> PipelineStatus:
+    """Poll the status query through the API helper (it retries a query that races a
+    continue-as-new) until the pipeline reaches `stage`."""
+    project = uuid.UUID(handle.id.removeprefix("pipeline-"))
+    last = None
     for _ in range(600):
-        status: PipelineStatus = await handle.query("status", result_type=PipelineStatus)
-        if status.stage is stage:
+        status = await pipeline_status(handle._client, project)  # the handle's own client
+        if status is not None and status.stage is stage:
             return status
+        last = status.stage if status else None
         await asyncio.sleep(0.05)
-    raise AssertionError(f"pipeline never reached {stage}; last {status.stage}")
+    raise AssertionError(f"pipeline never reached {stage}; last {last}")
 
 
 async def approve(handle: WorkflowHandle[Any, Any]) -> None:
@@ -483,8 +488,14 @@ def test_e10_1_continue_as_new_keeps_state_and_mirror() -> None:
             await until(handle, PipelineStage.WAIT_SOW_APPROVAL)
             await approve(handle)
             await until(handle, PipelineStage.WAIT_GENERATE)
-            latest = await env.client.get_workflow_handle(handle.id).describe()
+            # The old run shows the wait stage while its `_enter` activity runs, then continues
+            # as new: poll for the switch rather than racing it.
             first_run = mirror_row(sessions, project).temporal_run_id
+            for _ in range(200):
+                latest = await env.client.get_workflow_handle(handle.id).describe()
+                if latest.run_id != first_run:
+                    break
+                await asyncio.sleep(0.05)
             assert latest.run_id != first_run  # it really continued as new
             await generate(handle)
             status = await finish(handle)

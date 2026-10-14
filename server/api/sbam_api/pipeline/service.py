@@ -9,6 +9,8 @@
   nothing is signalled.
 """
 
+import asyncio
+from datetime import timedelta
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -25,6 +27,17 @@ from sbam_api.temporal.client import OrchestratorUnavailable
 from sbam_api.temporal.service import StartSpec, start_run
 
 PIPELINE_QUEUE = TaskQueue.INGEST  # where ProjectPipeline's workflow tasks run
+QUERY_ATTEMPTS = 4
+QUERY_TIMEOUT = timedelta(seconds=5)
+QUERY_BACKOFF_SECONDS = 0.25
+TRANSIENT = frozenset(  # CANCELLED is how the client reports its own rpc_timeout expiring
+    {
+        RPCStatusCode.CANCELLED,
+        RPCStatusCode.DEADLINE_EXCEEDED,
+        RPCStatusCode.UNAVAILABLE,
+        RPCStatusCode.NOT_FOUND,
+    }
+)
 
 
 class PipelineNotWaiting(ApiError):  # noqa: N818 - name from the E7.1 / E10.1 specs
@@ -62,15 +75,29 @@ async def start_pipeline(
     )
 
 
-async def pipeline_status(client: Client, project_id: UUID) -> PipelineStatus | None:
+async def pipeline_status(
+    client: Client, project_id: UUID, *, attempts: int = QUERY_ATTEMPTS
+) -> PipelineStatus | None:
+    """The `status` query, or None if this project never started a pipeline.
+
+    A query can race a continue-as-new (it reaches the run that is closing) and come back
+    DEADLINE_EXCEEDED / UNAVAILABLE / NOT_FOUND for a moment; the next one reaches the new run. So
+    those are retried a few times, each with a short timeout, before answering None / 503.
+    """
     handle = client.get_workflow_handle(pipeline_workflow_id(project_id))
-    try:
-        status: PipelineStatus = await handle.query("status", result_type=PipelineStatus)
-    except RPCError as exc:
-        if exc.status == RPCStatusCode.NOT_FOUND:
-            return None
-        raise OrchestratorUnavailable() from None
-    return status
+    for attempt in range(1, attempts + 1):
+        try:
+            status: PipelineStatus = await handle.query(
+                "status", result_type=PipelineStatus, rpc_timeout=QUERY_TIMEOUT
+            )
+            return status
+        except RPCError as exc:
+            if exc.status not in TRANSIENT or attempt == attempts:
+                if exc.status == RPCStatusCode.NOT_FOUND:
+                    return None
+                raise OrchestratorUnavailable() from None
+            await asyncio.sleep(QUERY_BACKOFF_SECONDS * attempt)
+    return None  # attempts < 1
 
 
 async def signal_pipeline(
