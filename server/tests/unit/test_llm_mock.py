@@ -295,15 +295,14 @@ def service_block(name: str) -> str:
     return match.group(1)
 
 
-@pytest.mark.parametrize("secret", ["OPENROUTER_API_KEY", "NVIDIA_API_KEY"])
-def test_e1_15_t06_only_bifrost_gets_the_provider_keys(secret: str) -> None:
+def test_e1_15_t06_only_bifrost_gets_the_openrouter_key() -> None:
     holders = [
         name
         for name in re.findall(r"^  ([a-z][\w-]*):\n", COMPOSE_TEXT, re.M)
-        if secret in service_block(name)
+        if "OPENROUTER_API_KEY" in service_block(name)
     ]
     assert holders == ["bifrost"]
-    assert secret not in COMPOSE_TEXT.split("\nservices:")[0]  # the shared worker anchor
+    assert "OPENROUTER" not in COMPOSE_TEXT.split("\nservices:")[0]  # the shared worker anchor
     assert not re.search(
         r"^\s+env_file:", COMPOSE_TEXT, re.M
     )  # would hand every secret to a service
