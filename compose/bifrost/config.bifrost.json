@@ -13,32 +13,14 @@
           "models": [
             "google/gemini-3.8-flash",
             "anthropic/claude-haiku-5.5",
-            "anthropic/claude-sonnet-5.5"
+            "anthropic/claude-sonnet-5.5",
+            "openai/gpt-6-sol"
           ],
           "weight": 1.0
         }
       ],
       "network_config": {
         "max_retries": 1
-      }
-    },
-    "nvidia": {
-      "keys": [
-        {
-          "name": "sbam",
-          "value": "env.NVIDIA_API_KEY",
-          "models": [
-            "nvidia/nemotron-3-super-120b-a12b"
-          ],
-          "weight": 1.0
-        }
-      ],
-      "network_config": {
-        "base_url": "https://integrate.api.nvidia.com",
-        "max_retries": 1
-      },
-      "custom_provider_config": {
-        "base_provider_type": "openai"
       }
     }
   },
@@ -73,7 +55,7 @@
           }
         ],
         "fallbacks": [
-          "nvidia/nvidia/nemotron-3-super-120b-a12b"
+          "openrouter/openai/gpt-6-sol"
         ],
         "enabled": true,
         "priority": 2
@@ -90,7 +72,7 @@
           }
         ],
         "fallbacks": [
-          "nvidia/nvidia/nemotron-3-super-120b-a12b"
+          "openrouter/openai/gpt-6-sol"
         ],
         "enabled": true,
         "priority": 3
@@ -107,7 +89,7 @@
           }
         ],
         "fallbacks": [
-          "nvidia/nvidia/nemotron-3-super-120b-a12b"
+          "openrouter/openai/gpt-6-sol"
         ],
         "enabled": true,
         "priority": 4
@@ -124,7 +106,7 @@
           }
         ],
         "fallbacks": [
-          "nvidia/nvidia/nemotron-3-super-120b-a12b"
+          "openrouter/anthropic/claude-haiku-5.5"
         ],
         "enabled": true,
         "priority": 5
@@ -141,7 +123,7 @@
           }
         ],
         "fallbacks": [
-          "nvidia/nvidia/nemotron-3-super-120b-a12b"
+          "openrouter/openai/gpt-6-sol"
         ],
         "enabled": true,
         "priority": 6
