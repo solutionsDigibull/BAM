@@ -18,6 +18,7 @@ All work is tracked as **GitHub issues in [solutionsDigibull/BAM](https://github
 | Look up a task or decision referenced by an issue (`PLAN §x`, `SBAM-0xx`, `C-xx`, `O-xx`, `AR-xx`) | [plan/](plan/README.md) (index maps every PLAN § to its page) |
 | See the stakeholder answers behind decisions (`QA x`) | [plan/09-stakeholder-answers.md](plan/09-stakeholder-answers.md) |
 | See the source documents (ISATVON 1.4, Admin masters workbook, process doc, architecture diagrams) | [reference/](reference/) |
+| Build a screen to the UI team's approved design | [reference/ui/](reference/ui/README.md) (images per area + index) |
 | Record an architecture decision | [adr/README.md](adr/README.md) |
 
 ## Folder layout

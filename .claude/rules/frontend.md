@@ -19,3 +19,5 @@ paths:
   (owner D1).
 - The FDE UI has no "create Workflow" action. SBAM generates the Workflow from the approved SOW.
 - Component tests live next to the component (`*.test.tsx`). Name tests after the issue test-case IDs.
+- If the screen has a UI-team reference in `docs/reference/ui/` (see its index), build to it: layout, labels, tabs,
+  columns and actions. Behaviour still comes from the issue and TD §9.
