@@ -22,6 +22,7 @@ from sbam_contracts.masters import (
     RulesPayload,
     SkillsPayload,
 )
+from sbam_contracts.projects import Project, ProjectCreate, ProjectPatch
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sow import SowDocument
@@ -52,4 +53,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("identity/tenant_create", TenantCreate),
     ("identity/tenant_patch", TenantPatch),
     ("identity/me", Me),
+    ("projects/project", Project),
+    ("projects/project_create", ProjectCreate),
+    ("projects/project_patch", ProjectPatch),
 )

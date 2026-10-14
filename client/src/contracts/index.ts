@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:4b1558b3167755c6918b3848d1e55f74e38f99fe8e0770039c88fed791426b80
+// source-sha256:919c2a38804f1ffad4bc335e1919bf8de515b0b9d65422dded51a4061b570829
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -34,6 +34,7 @@ export type ErrorCode =
   | "LAST_ADMIN"
   | "USER_EXISTS"
   | "DUPLICATE_NAME"
+  | "PROJECT_ARCHIVED"
   | "DRAFT_EXISTS"
   | "STRUCTURE_MISMATCH"
   | "FILETYPE_FROZEN"
@@ -196,6 +197,11 @@ export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
  * via the `definition` "TenantStatus".
  */
 export type TenantStatus = "ACTIVE" | "SUSPENDED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectStatus".
+ */
+export type ProjectStatus = "ACTIVE" | "ARCHIVED";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -225,6 +231,9 @@ export interface SbamContracts {
   TenantCreate?: TenantCreate;
   TenantPatch?: TenantPatch;
   Me?: Me;
+  Project?: Project;
+  ProjectCreate?: ProjectCreate;
+  ProjectPatch?: ProjectPatch;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1471,4 +1480,46 @@ export interface UserProfile {
   display_name: string | null;
   portal_roles: string[];
   last_login_at: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Project".
+ */
+export interface Project {
+  id: string;
+  tenant_id: string;
+  name: string;
+  client_name: string | null;
+  description: string | null;
+  context_notes: string | null;
+  status: ProjectStatus;
+  pipeline_state: ProjectPipelineState;
+  row_version: number;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectCreate".
+ */
+export interface ProjectCreate {
+  /**
+   * Pattern: `^[^\x00-\x1f\x7f-\x9f]*$`
+   */
+  name: string;
+  client_name?: string | null;
+  description?: string | null;
+  context_notes?: string | null;
+}
+/**
+ * Partial update: only the fields sent change. `null` clears an optional field.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectPatch".
+ */
+export interface ProjectPatch {
+  name?: string | null;
+  client_name?: string | null;
+  description?: string | null;
+  context_notes?: string | null;
 }

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:projects/project:0.1.0",
+  "$defs": {
+    "ProjectPipelineState": {
+      "enum": [
+        "IDLE",
+        "INGESTING",
+        "KNOWLEDGE_BUILDING",
+        "SOW_GENERATING",
+        "SOW_REVIEW",
+        "SOW_APPROVED",
+        "WORKFLOW_CREATED",
+        "INGESTION_FAILED",
+        "KNOWLEDGE_FAILED",
+        "SOW_GENERATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "ProjectPipelineState",
+      "type": "string"
+    },
+    "ProjectStatus": {
+      "enum": [
+        "ACTIVE",
+        "ARCHIVED"
+      ],
+      "title": "ProjectStatus",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "tenant_id": {
+      "format": "uuid",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "client_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Client Name"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Description"
+    },
+    "context_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Context Notes"
+    },
+    "status": {
+      "$ref": "#/$defs/ProjectStatus"
+    },
+    "pipeline_state": {
+      "$ref": "#/$defs/ProjectPipelineState"
+    },
+    "row_version": {
+      "title": "Row Version",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "tenant_id",
+    "name",
+    "client_name",
+    "description",
+    "context_notes",
+    "status",
+    "pipeline_state",
+    "row_version",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "Project",
+  "type": "object"
+}
