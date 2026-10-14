@@ -277,6 +277,9 @@ services:
     environment:
       DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
       STORAGE_ROOT: /data/storage
+      # Startup guard (E1.15-T09): the API refuses LLM_PROVIDER=mock when SBAM_ENV is staging/production.
+      SBAM_ENV: ${SBAM_ENV:-development}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       # Signs download URLs (#37). Empty = signed downloads answer 503; existing stacks keep starting.
       STORAGE_SIGNING_KEY: ${STORAGE_SIGNING_KEY:-}
       TEMPORAL_HOST: temporal:7233

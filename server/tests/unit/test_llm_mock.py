@@ -270,3 +270,17 @@ def test_e1_15_t07_mock_runs_on_the_internal_network_without_secrets() -> None:
     assert "ports:" not in mock
     assert re.search(r"^  sbam_internal:\n    internal: true", COMPOSE_TEXT, re.M)  # no internet
     assert "sbam-llm-mock: { condition: service_healthy }" in service_block("bifrost")
+
+
+def test_e1_15_t09_api_receives_env_and_provider_for_its_startup_guard() -> None:
+    api = service_block("sbam-api")
+    assert "SBAM_ENV: ${SBAM_ENV:-development}" in api
+    assert "LLM_PROVIDER: ${LLM_PROVIDER:-mock}" in api
+
+
+def test_e1_15_t07_ci_runs_on_the_mock_and_monitors_openrouter_egress() -> None:
+    ci = (REPO / ".github/workflows/ci.yml").read_text()
+    assert re.search(r"^  LLM_PROVIDER: mock", ci, re.M)
+    start, verify = (f"scripts/ci-llm-egress-guard.sh {step}" for step in ("start", "verify"))
+    assert ci.index(start) < ci.index("run: make up") < ci.index("make test-int") < ci.index(verify)
+    assert (REPO / "scripts/ci-llm-egress-guard.sh").stat().st_mode & 0o111

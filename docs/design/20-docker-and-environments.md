@@ -137,8 +137,8 @@ get an `env_file`**. Each worker variable is passed one by one, so the OpenRoute
 | `KEYCLOAK_ADMIN_PASSWORD` | keycloak bootstrap admin | yes | admin console only on localhost / Netbird |
 | `SEED_USER_PASSWORD` | dev realm seed users (local/dev only) | yes | never set in staging/prod |
 | `OPENROUTER_API_KEY` | **bifrost only** | no | used only with `LLM_PROVIDER=bifrost`; an empty key does not fall back to the mock, calls fail |
-| `LLM_PROVIDER` | compose, workers | no | `mock` (default, CI): bifrost mounts `bifrost/config.mock.json` and routes to `sbam-llm-mock`. `bifrost`: `config.bifrost.json`, real OpenRouter models |
-| `SBAM_ENV` | sbam-llm-mock (as `ENV`) | no | default `development`. `staging` or `production` with `LLM_PROVIDER=mock` stops `sbam-llm-mock` at start, so the stack does not come up |
+| `LLM_PROVIDER` | compose, sbam-api, workers | no | `mock` (default, CI): bifrost mounts `bifrost/config.mock.json` and routes to `sbam-llm-mock`. `bifrost`: `config.bifrost.json`, real OpenRouter models |
+| `SBAM_ENV` | sbam-llm-mock (as `ENV`), sbam-api | no | default `development`. `staging` or `production` with `LLM_PROVIDER=mock` stops `sbam-llm-mock` at start and makes `sbam-api` refuse to start (`SettingsError`), so the stack does not come up. An unset `LLM_PROVIDER` counts as `mock`: set `LLM_PROVIDER=bifrost` there |
 | `TUSD_HOOK_SECRET` | tusd → sbam-api hooks | yes | |
 | `SBAM_DEV_AUTH` | sbam-web | no | `1` enables the dev role picker until Keycloak sign-in (#51); ignored in production builds |
 | `MAX_BODY_BYTES`, `LOG_LEVEL` | sbam-api | no | defaults 10 MiB, `INFO` |
