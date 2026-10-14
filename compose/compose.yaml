@@ -236,13 +236,26 @@ services:
     restart: unless-stopped
 
   tusd:
-    # Stub: file store on the storage volume, no hooks until #61.
+    # Uploads (#61): file store on the storage volume; the hooks in compose/tusd/hooks call the API
+    # (pre-create checks token, size, count and type; post-finish registers the document version).
+    # Downloads and termination are off: nothing reads an uploaded file before the scan (E4.3).
     image: tusproject/tusd:v2.10.1@sha256:7b1c552a8b42f4b36cb01f2a3bd49f82ab078b2eefd191459e716141dd50376c
-    command: ["-upload-dir=/data/storage/uploads", "-base-path=/files/", "-port=1080", "-behind-proxy"]
+    command:
+      - -upload-dir=/data/storage/uploads
+      - -base-path=/files/
+      - -port=1080
+      - -behind-proxy
+      - -hooks-dir=/srv/tusdhooks
+      - -hooks-enabled-events=pre-create,post-finish
+      - -max-size=15728640
+      - -disable-download
+      - -disable-termination
     user: "10001:10001"
     environment:
       TUSD_HOOK_SECRET: ${TUSD_HOOK_SECRET:?is required - set it in compose/.env (copy compose/.env.example)}
-    volumes: [storage:/data/storage]
+    volumes:
+      - storage:/data/storage
+      - ./tusd/hooks:/srv/tusdhooks:ro
     ports: ["127.0.0.1:${TUSD_PORT:-1080}:1080"]
     networks: [sbam_edge, sbam_internal]
     depends_on:
@@ -292,6 +305,9 @@ services:
       # Tenant creation (#49): the sbam-api-admin service account manages organizations. Empty = 503.
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/bullm
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
+      # Uploads (#61): tusd's hook secret (also signs upload tokens) and the URL the browser uploads to.
+      TUSD_HOOK_SECRET: ${TUSD_HOOK_SECRET:?is required - set it in compose/.env (copy compose/.env.example)}
+      TUSD_PUBLIC_URL: ${TUSD_PUBLIC_URL:-http://localhost:${TUSD_PORT:-1080}/files/}
       MAX_BODY_BYTES: ${MAX_BODY_BYTES:-10485760}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes: [storage:/data/storage]
