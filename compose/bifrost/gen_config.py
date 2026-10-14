@@ -7,8 +7,9 @@
 Compose mounts `config.${LLM_PROVIDER:-mock}.json`:
 - `mock`:       provider `openrouter` pointed at the sbam-llm-mock service. Models are `<alias>-primary` and
                 `<alias>-fallback`, so the mock can tell which alias a call was for.
-- `bifrost`:    the real OpenRouter models from `aliases.json`. The key is read from `OPENROUTER_API_KEY`
-                in the bifrost container only (ADR 0001).
+- `bifrost`:    the real models from `aliases.json`. Primaries and the `sbam-ocr` fallback go through OpenRouter
+                (`OPENROUTER_API_KEY`); a fallback with `"fallback_provider": "nvidia"` goes to NVIDIA's
+                OpenAI-compatible API (`NVIDIA_API_KEY`). Keys are read in the bifrost container only (ADR 0001).
 
 Each alias is a Bifrost routing rule (`model == "<alias>"` -> primary, with the fallback model). The provider
 key lists only these models, so any other model id (`gpt-4o`, `openrouter/openai/gpt-4o`) is rejected by
@@ -25,6 +26,10 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 MODES = ("mock", "bifrost")
 MOCK_BASE_URL = "http://sbam-llm-mock:8091"
+# NVIDIA's hosted API is OpenAI-compatible and not a built-in Bifrost provider, so it is a custom provider.
+# Bifrost adds /v1/chat/completions itself.
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com"
+DEFAULT_PROVIDER = "openrouter"
 
 
 def load_aliases() -> dict[str, dict[str, str]]:
@@ -38,31 +43,49 @@ def model_ids(alias: str, spec: dict[str, str], mode: str) -> tuple[str, str]:
     return spec["primary"], spec["fallback"]
 
 
+def fallback_provider(spec: dict[str, str], mode: str) -> str:
+    """Provider serving the fallback model. The mock answers every model, so mock mode keeps one provider."""
+    return (
+        DEFAULT_PROVIDER
+        if mode == "mock"
+        else spec.get("fallback_provider", DEFAULT_PROVIDER)
+    )
+
+
 def build_config(mode: str) -> dict[str, Any]:
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}")
     aliases = load_aliases()
     rules = []
-    allowed: list[str] = []
+    allowed: dict[str, list[str]] = {DEFAULT_PROVIDER: []}
     for priority, (alias, spec) in enumerate(aliases.items(), start=1):
         primary, fallback = model_ids(alias, spec, mode)
-        for model in (primary, fallback):
-            if model not in allowed:
-                allowed.append(model)
+        fb_provider = fallback_provider(spec, mode)
+        for provider, model in ((DEFAULT_PROVIDER, primary), (fb_provider, fallback)):
+            models = allowed.setdefault(provider, [])
+            if model not in models:
+                models.append(model)
         rules.append(
             {
                 "id": f"alias-{alias}",
                 "name": alias,
                 "cel_expression": f'model == "{alias}"',
-                "targets": [{"provider": "openrouter", "model": primary, "weight": 1}],
-                "fallbacks": [f"openrouter/{fallback}"],
+                "targets": [
+                    {"provider": DEFAULT_PROVIDER, "model": primary, "weight": 1}
+                ],
+                "fallbacks": [f"{fb_provider}/{fallback}"],
                 "enabled": True,
                 # Bifrost allows one rule per priority within a scope.
                 "priority": priority,
             }
         )
     if mode == "mock":
-        key = {"name": "mock", "value": "mock-key", "models": allowed, "weight": 1.0}
+        key = {
+            "name": "mock",
+            "value": "mock-key",
+            "models": allowed[DEFAULT_PROVIDER],
+            "weight": 1.0,
+        }
         network: dict[str, Any] = {
             "base_url": MOCK_BASE_URL,
             "allow_private_network": True,
@@ -72,15 +95,31 @@ def build_config(mode: str) -> dict[str, Any]:
         key = {
             "name": "sbam",
             "value": "env.OPENROUTER_API_KEY",
-            "models": allowed,
+            "models": allowed[DEFAULT_PROVIDER],
             "weight": 1.0,
         }
         network = {"max_retries": 1}
+    providers: dict[str, Any] = {
+        DEFAULT_PROVIDER: {"keys": [key], "network_config": network}
+    }
+    if "nvidia" in allowed:
+        providers["nvidia"] = {
+            "keys": [
+                {
+                    "name": "sbam",
+                    "value": "env.NVIDIA_API_KEY",
+                    "models": allowed["nvidia"],
+                    "weight": 1.0,
+                }
+            ],
+            "network_config": {"base_url": NVIDIA_BASE_URL, "max_retries": 1},
+            "custom_provider_config": {"base_provider_type": "openai"},
+        }
     return {
         "$schema": "https://www.getbifrost.ai/schema",
         # Bifrost listens on the internal network only (host port is 127.0.0.1); callers send no key.
         "client": {"drop_excess_requests": False, "enforce_auth_on_inference": False},
-        "providers": {"openrouter": {"keys": [key], "network_config": network}},
+        "providers": providers,
         "governance": {"routing_rules": rules},
         "source_of_truth": "config.json",
         "config_store": {
@@ -97,7 +136,9 @@ def render(mode: str) -> str:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--check", action="store_true", help="fail if a committed config is stale")
+    parser.add_argument(
+        "--check", action="store_true", help="fail if a committed config is stale"
+    )
     args = parser.parse_args(argv)
     stale = []
     for mode in MODES:
@@ -109,7 +150,10 @@ def main(argv: list[str]) -> int:
         else:
             path.write_text(text)
     if stale:
-        print(f"stale: {', '.join(stale)}; run python compose/bifrost/gen_config.py", file=sys.stderr)
+        print(
+            f"stale: {', '.join(stale)}; run python compose/bifrost/gen_config.py",
+            file=sys.stderr,
+        )
         return 1
     return 0
 

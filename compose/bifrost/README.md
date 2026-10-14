@@ -6,7 +6,10 @@ Callers send `model: "sbam-sow"` (one of the six aliases in `aliases.json`) to B
 | `LLM_PROVIDER` | Bifrost config mounted | Upstream |
 |---|---|---|
 | `mock` (default, CI) | `config.mock.json` | `sbam-llm-mock` (internal network, no key) |
-| `bifrost` | `config.bifrost.json` | OpenRouter, key from `OPENROUTER_API_KEY` (bifrost container only) |
+| `bifrost` | `config.bifrost.json` | OpenRouter primaries (`OPENROUTER_API_KEY`) and NVIDIA Nemotron fallbacks (`NVIDIA_API_KEY`); both keys reach the bifrost container only |
+
+`sbam-ocr` keeps an OpenRouter vision fallback because Nemotron Super is text-only. Mock mode serves every
+fallback through the mock, so the NVIDIA provider is only exercised in `bifrost` mode.
 
 ## Change a model or add an alias
 

@@ -21,7 +21,14 @@ from sbam_contracts.sow import SowDocument
 REPO = Path(__file__).resolve().parents[3]
 BIFROST_DIR = REPO / "compose/bifrost"
 FIXTURES = REPO / "server/tests/llm-mock"
-ALIASES = ["sbam-ocr", "sbam-sow", "sbam-isatvon", "sbam-codegen", "sbam-testgen", "sbam-corrector"]
+ALIASES = [
+    "sbam-ocr",
+    "sbam-sow",
+    "sbam-isatvon",
+    "sbam-codegen",
+    "sbam-testgen",
+    "sbam-corrector",
+]
 
 
 def load(name: str, path: Path) -> ModuleType:
@@ -45,7 +52,11 @@ def mock() -> Any:
 def chat(
     mock: Any, model: str, messages: Any = SMOKE, **metadata: str
 ) -> tuple[int, dict[str, Any]]:
-    body = {"model": model, "messages": messages, "metadata": {"prompt_id": "smoke", **metadata}}
+    body = {
+        "model": model,
+        "messages": messages,
+        "metadata": {"prompt_id": "smoke", **metadata},
+    }
     return mock.chat(body)  # type: ignore[no-any-return]
 
 
@@ -65,7 +76,9 @@ def test_e1_15_t01_six_aliases_each_with_primary_and_fallback() -> None:
             assert primary != fallback
             assert rule["cel_expression"] == f'model == "{alias}"'
             assert [t["model"] for t in rule["targets"]] == [primary]
-            assert rule["fallbacks"] == [f"openrouter/{fallback}"]
+            assert rule["fallbacks"] == [
+                f"{gen.fallback_provider(aliases[alias], mode)}/{fallback}"
+            ]
 
 
 def test_e1_15_committed_configs_match_aliases_json() -> None:
@@ -75,16 +88,41 @@ def test_e1_15_committed_configs_match_aliases_json() -> None:
 def test_e1_15_t02_only_alias_models_are_allowed_upstream() -> None:
     for mode in gen.MODES:
         config = gen.build_config(mode)
-        (key,) = config["providers"]["openrouter"]["keys"]
-        assert "gpt-4o" not in key["models"] and "openai/gpt-4o" not in key["models"]
-        targets = {t["model"] for r in config["governance"]["routing_rules"] for t in r["targets"]}
-        fallbacks = {
-            f.removeprefix("openrouter/")
-            for r in config["governance"]["routing_rules"]
-            for f in r["fallbacks"]
+        rules = config["governance"]["routing_rules"]
+        referenced = {f"openrouter/{t['model']}" for r in rules for t in r["targets"]} | {
+            f for r in rules for f in r["fallbacks"]
         }
-        assert set(key["models"]) == targets | fallbacks
+        allowed = {
+            f"{name}/{model}"
+            for name, provider in config["providers"].items()
+            for key in provider["keys"]
+            for model in key["models"]
+        }
+        assert allowed == referenced  # nothing else is callable upstream
+        assert "openrouter/gpt-4o" not in allowed and "openrouter/openai/gpt-4o" not in allowed
         assert config["client"]["enforce_auth_on_inference"] is False  # internal network only
+
+
+def test_e1_15_nemotron_fallback_goes_to_nvidia_and_ocr_keeps_a_vision_model() -> None:
+    config = gen.build_config("bifrost")
+    nvidia = config["providers"]["nvidia"]
+    assert nvidia["keys"][0]["value"] == "env.NVIDIA_API_KEY"  # env only, never a literal key
+    assert nvidia["custom_provider_config"]["base_provider_type"] == "openai"
+    assert nvidia["network_config"]["base_url"] == gen.NVIDIA_BASE_URL
+    by_alias = {r["name"]: r["fallbacks"] for r in config["governance"]["routing_rules"]}
+    assert by_alias["sbam-sow"] == ["nvidia/nvidia/nemotron-3-super-120b-a12b"]
+    assert by_alias["sbam-ocr"] == ["openrouter/anthropic/claude-haiku-5.5"]
+    assert "nvidia" not in gen.build_config("mock")["providers"]
+
+
+def test_e1_15_no_provider_key_literal_is_committed() -> None:
+    for name in (
+        "config.mock.json",
+        "config.bifrost.json",
+        "aliases.json",
+        "README.md",
+    ):
+        assert "nvapi-" not in (gen.HERE / name).read_text()
 
 
 def test_e1_15_openrouter_config_reads_key_from_env_and_mock_config_has_none() -> None:
@@ -136,7 +174,9 @@ def test_e1_15_t04_primary_5xx_leaves_the_fallback_model_answering(mock: Any) ->
     assert chat(mock, "sbam-sow-fallback", mock_scenario="5xx_all")[0] == 503
 
 
-def test_e1_15_t05_schema_invalid_scenario_returns_a_body_the_schema_rejects(mock: Any) -> None:
+def test_e1_15_t05_schema_invalid_scenario_returns_a_body_the_schema_rejects(
+    mock: Any,
+) -> None:
     status, ok = chat(mock, "sbam-sow-primary")
     SowDocument.model_validate_json(ok["choices"][0]["message"]["content"])
     status, bad = chat(mock, "sbam-sow-primary", mock_scenario="schema_invalid")
@@ -187,7 +227,11 @@ def test_e1_15_t02_mock_rejects_models_that_are_not_alias_models(mock: Any, mode
         {"model": "sbam-sow-primary", "messages": []},
         {"model": "sbam-sow-primary", "messages": "hi"},
         {"model": "sbam-sow-primary", "messages": SMOKE, "metadata": "x"},
-        {"model": "sbam-sow-primary", "messages": SMOKE, "metadata": {"mock_scenario": "boom"}},
+        {
+            "model": "sbam-sow-primary",
+            "messages": SMOKE,
+            "metadata": {"mock_scenario": "boom"},
+        },
     ],
 )
 def test_e1_15_mock_answers_malformed_requests_with_400(mock: Any, body: dict[str, Any]) -> None:

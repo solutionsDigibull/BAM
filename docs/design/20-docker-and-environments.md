@@ -137,7 +137,8 @@ get an `env_file`**. Each worker variable is passed one by one, so the OpenRoute
 | `KEYCLOAK_ADMIN_PASSWORD` | keycloak bootstrap admin | yes | admin console only on localhost / Netbird |
 | `SEED_USER_PASSWORD` | dev realm seed users (local/dev only) | yes | never set in staging/prod |
 | `OPENROUTER_API_KEY` | **bifrost only** | no | used only with `LLM_PROVIDER=bifrost`; an empty key does not fall back to the mock, calls fail |
-| `LLM_PROVIDER` | compose, workers | no | `mock` (default, CI): bifrost mounts `bifrost/config.mock.json` and routes to `sbam-llm-mock`. `bifrost`: `config.bifrost.json`, real OpenRouter models |
+| `NVIDIA_API_KEY` | **bifrost only** | no | NVIDIA Nemotron fallback (`integrate.api.nvidia.com`), used only with `LLM_PROVIDER=bifrost`. Empty key: the fallback fails, the primary still serves |
+| `LLM_PROVIDER` | compose, workers | no | `mock` (default, CI): bifrost mounts `bifrost/config.mock.json` and routes to `sbam-llm-mock`. `bifrost`: `config.bifrost.json`, real models (OpenRouter primaries, NVIDIA Nemotron fallbacks) |
 | `SBAM_ENV` | sbam-llm-mock (as `ENV`) | no | default `development`. `staging` or `production` with `LLM_PROVIDER=mock` stops `sbam-llm-mock` at start, so the stack does not come up |
 | `TUSD_HOOK_SECRET` | tusd → sbam-api hooks | yes | |
 | `SBAM_DEV_AUTH` | sbam-web | no | `1` enables the dev role picker until Keycloak sign-in (#51); ignored in production builds |

@@ -189,11 +189,12 @@ services:
   # --- LLM gateway, malware scanning, uploads ------------------------------------------------------
   bifrost:
     # The six sbam-* aliases (E1.15). The config is generated from bifrost/aliases.json: LLM_PROVIDER=mock
-    # (default) routes to sbam-llm-mock, LLM_PROVIDER=bifrost to the real OpenRouter models. The OpenRouter key is
-    # passed to bifrost only, never to api or workers (ADR 0001).
+    # (default) routes to sbam-llm-mock, LLM_PROVIDER=bifrost to the real models (OpenRouter primaries, NVIDIA
+    # Nemotron fallbacks). The provider keys are passed to bifrost only, never to api or workers (ADR 0001).
     image: maximhq/bifrost:v2.2.6@sha256:d0b4708ace1aa175766f94afa715fd9bba3a1b56c1dc2afff15a21edf3ae4e2a
     environment:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
     volumes:
       - ./bifrost/config.${LLM_PROVIDER:-mock}.json:/app/data/config.json:ro
     ports: ["127.0.0.1:${BIFROST_PORT:-8081}:8080"]
