@@ -22,6 +22,7 @@ from temporalio.common import (
     TypedSearchAttributes,
     WorkflowIDConflictPolicy,
 )
+from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError
 
 from sbam_api.core.conventions import ApiError
@@ -33,6 +34,16 @@ from sbam_api.temporal.repository import TemporalRunRepository, to_run
 TENANT_ID = SearchAttributeKey.for_keyword("TenantId")
 PROJECT_ID = SearchAttributeKey.for_keyword("ProjectId")
 SBAM_STAGE = SearchAttributeKey.for_keyword("SbamStage")
+
+
+class PipelineRunning(ApiError):  # noqa: N818 - name from the E10.1 spec
+    def __init__(self) -> None:
+        super().__init__(
+            409,
+            ErrorCode.PIPELINE_RUNNING,
+            "Pipeline already running",
+            "This project's pipeline is already running; follow the existing run.",
+        )
 
 
 class PayloadTooLarge(ApiError):  # noqa: N818 - name from the E1.7 spec
@@ -78,7 +89,10 @@ async def start_run(
     spec: StartSpec,
     *,
     with_search_attributes: bool = True,
+    conflict: WorkflowIDConflictPolicy = WorkflowIDConflictPolicy.USE_EXISTING,
 ) -> Run:
+    """Start `spec` and mirror it. `conflict=FAIL` (ProjectPipeline) answers 409 PIPELINE_RUNNING
+    when the workflow id is already running instead of returning the running execution."""
     check_payload(spec.input)
     try:
         handle = await client.start_workflow(
@@ -86,9 +100,11 @@ async def start_run(
             spec.input,
             id=spec.workflow_id,
             task_queue=spec.queue.value,
-            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            id_conflict_policy=conflict,
             search_attributes=search_attributes(spec) if with_search_attributes else None,
         )
+    except WorkflowAlreadyStartedError:
+        raise PipelineRunning() from None
     except (RPCError, RuntimeError):
         raise OrchestratorUnavailable() from None
     temporal_run_id = handle.result_run_id or handle.first_execution_run_id or ""

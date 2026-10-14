@@ -38,6 +38,7 @@ def entity_models(base: Any) -> dict[MachineName, type[Any]]:
         )
 
     return {
+        MachineName.PROJECT_PIPELINE: model(MachineName.PROJECT_PIPELINE, "t_projects"),
         MachineName.DOCUMENT_VERSION: model(MachineName.DOCUMENT_VERSION, "t_document_versions"),
         MachineName.SOW_VERSION: model(MachineName.SOW_VERSION, "t_sow_versions"),
         MachineName.WORKFLOW: model(MachineName.WORKFLOW, "t_workflows"),

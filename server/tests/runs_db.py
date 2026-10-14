@@ -14,6 +14,8 @@ from sbam_api.temporal.models import TemporalRun
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import WorkflowExecutionStatus
+from temporalio.common import WorkflowIDConflictPolicy
+from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 
 
@@ -62,6 +64,9 @@ class FakeClient:
         self.calls.append({"workflow": workflow, "arg": arg, **kwargs})
         if self.down:
             raise RPCError("connection refused", RPCStatusCode.UNAVAILABLE, b"")
+        policy = kwargs.get("id_conflict_policy")
+        if policy == WorkflowIDConflictPolicy.FAIL and kwargs["id"] in self.executions:
+            raise WorkflowAlreadyStartedError(kwargs["id"], workflow)
         run_id = self.executions.setdefault(kwargs["id"], f"run-{len(self.executions) + 1}")
         return FakeHandle(kwargs["id"], run_id, run_id)
 
