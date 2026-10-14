@@ -1,0 +1,16 @@
+{
+  "prompt_id": "smoke",
+  "input_hash": "30f675acc00bd97be6ac25215e1d8d94823bbd7676c2aa86b6c7ad3fba16cec7",
+  "messages": [
+    {
+      "role": "user",
+      "content": "sbam-mock-smoke"
+    }
+  ],
+  "valid": true,
+  "response": {
+    "isatvon_patch": null,
+    "bodies": {}
+  },
+  "note": "placeholder shape: the output contract for this alias is not in server/contracts yet"
+}

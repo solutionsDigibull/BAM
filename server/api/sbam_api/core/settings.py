@@ -3,8 +3,11 @@
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import AnyHttpUrl, Field, SecretStr, ValidationError
+from pydantic import AnyHttpUrl, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Environments where the deterministic LLM mock must never run (same list as sbam-llm-mock).
+MOCK_FORBIDDEN_ENVS = frozenset({"staging", "production", "prod"})
 
 
 class SettingsError(RuntimeError):
@@ -45,6 +48,19 @@ class Settings(BaseSettings):
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
     otel_exporter_otlp_endpoint: AnyHttpUrl | None = None
     otel_service_name: str = Field(default="sbam-api", min_length=1)
+    # LLM gateway guard (#46, E1.15-T09): the mock provider is for dev and CI only. Fail closed: an
+    # unset LLM_PROVIDER counts as `mock`, so staging/production must set LLM_PROVIDER=bifrost.
+    sbam_env: str = Field(default="development", min_length=1)
+    llm_provider: Literal["mock", "bifrost"] = "mock"
+
+    @model_validator(mode="after")
+    def _refuse_mock_provider_outside_dev(self) -> "Settings":
+        if self.llm_provider == "mock" and self.sbam_env.lower() in MOCK_FORBIDDEN_ENVS:
+            raise SettingsError(
+                f"LLM_PROVIDER=mock is forbidden when SBAM_ENV={self.sbam_env}. "
+                "Set LLM_PROVIDER=bifrost."
+            )
+        return self
 
 
 def jwks_url(settings: Settings) -> str:

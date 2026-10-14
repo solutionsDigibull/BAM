@@ -1,0 +1,268 @@
+{
+  "prompt_id": "smoke",
+  "input_hash": "30f675acc00bd97be6ac25215e1d8d94823bbd7676c2aa86b6c7ad3fba16cec7",
+  "messages": [
+    {
+      "role": "user",
+      "content": "sbam-mock-smoke"
+    }
+  ],
+  "valid": true,
+  "response": {
+    "overview": {
+      "client": "Alpha Dynamics Ltd (synthetic)",
+      "objective": "Let investors sign in to the fund portal securely with an OTP, within device limits, and complete KYC before access.",
+      "background": "Investors share credentials and register too many devices. Support unlocks accounts by hand.",
+      "topic": "Investor registration and access",
+      "history": "Device limits were introduced after credential-sharing incidents.",
+      "citations": [
+        {
+          "okf_ref_id": "chunk:text.pdf#c0",
+          "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+          "location": {
+            "page": 1,
+            "line": 1
+          }
+        }
+      ]
+    },
+    "users_authority": {
+      "roles": [
+        {
+          "role": "Retail investor",
+          "decision_rights": "May access only their own profile and holdings"
+        },
+        {
+          "role": "Platform operations",
+          "decision_rights": "Unlocks profiles after an escalation"
+        }
+      ],
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c1",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "line": 3
+          }
+        }
+      ]
+    },
+    "scope": {
+      "in_scope": [
+        "OTP sign-in with device limits",
+        "KYC check before first access"
+      ],
+      "out_of_scope": [
+        "Password reset",
+        "Portfolio reporting"
+      ],
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c2",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "line": 5
+          }
+        }
+      ]
+    },
+    "modules": [
+      {
+        "id": "M-ACCESS",
+        "name": "Investor Registration & Access",
+        "purpose": "Authenticate investors and verify them before they reach the portal",
+        "agent_role": "Access agent (AG-AUTH)",
+        "citations": [
+          {
+            "okf_ref_id": "chunk:text.pdf#c1",
+            "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+            "location": {
+              "page": 1,
+              "line": 3
+            }
+          }
+        ]
+      }
+    ],
+    "features": [
+      {
+        "id": "F-ACCESS-1",
+        "module_id": "M-ACCESS",
+        "name": "Investor OTP & Access Verifier",
+        "trigger": "Investor submits a login request with an OTP",
+        "action": "Validate OTP and enforce RBAC device limits",
+        "check": "Verify OTP matches secure vault and device count is under limit",
+        "bound": {
+          "max_attempts": 3,
+          "on_exhaustion": "lock the profile and alert platform operations"
+        },
+        "inputs_state": [
+          "mobile_number",
+          "otp_payload",
+          "device_fingerprint",
+          "failed_login_attempts",
+          "active_devices"
+        ],
+        "external_data": [],
+        "tools": {
+          "action": [
+            "Auth_MCP"
+          ],
+          "check": [
+            "RBAC_MCP"
+          ]
+        },
+        "tables": [
+          "investor_profiles",
+          "auth_event_audit_handoff"
+        ],
+        "success_criteria": [
+          "OTP matches and no RBAC policy violation within 3 attempts"
+        ],
+        "output": "auth_status, user_role and a JWT for the session",
+        "handoff": "Append each attempt with iteration pass, device fingerprint, OTP match evidence and access scope",
+        "notifications": [
+          "Show Looping [Pass x/3] while verifying",
+          "Notify platform ops on account lockout"
+        ],
+        "citations": [
+          {
+            "okf_ref_id": "chunk:text.pdf#c2",
+            "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+            "location": {
+              "page": 1,
+              "line": 6
+            }
+          }
+        ]
+      },
+      {
+        "id": "F-ACCESS-2",
+        "module_id": "M-ACCESS",
+        "name": "Investor KYC Verifier",
+        "trigger": "An authenticated investor has no completed KYC record",
+        "action": "Send the investor's identity documents to the KYC provider",
+        "check": "The provider's decision is APPROVED and the name matches the profile",
+        "bound": {
+          "max_attempts": 2,
+          "on_exhaustion": "send to platform operations for manual review"
+        },
+        "inputs_state": [
+          "investor_id",
+          "identity_documents",
+          "kyc_status"
+        ],
+        "external_data": [
+          "KYC provider API"
+        ],
+        "tools": {
+          "action": [
+            "KYC_MCP"
+          ],
+          "check": [
+            "Profile_Match_MCP"
+          ]
+        },
+        "tables": [
+          "investor_profiles",
+          "kyc_event_audit_handoff"
+        ],
+        "success_criteria": [
+          "KYC approved and profile name matches"
+        ],
+        "output": "kyc_status and the provider reference",
+        "handoff": "Append each submission with provider reference and decision",
+        "notifications": [
+          "Show Looping [Pass x/2] while waiting",
+          "Alert platform ops when KYC is escalated"
+        ],
+        "citations": [
+          {
+            "okf_ref_id": "chunk:openapi.yaml#c0",
+            "document_version_id": "a1b49a71-2421-5c5b-9852-4a0d0d61e9b7",
+            "location": {
+              "line": 1
+            }
+          }
+        ]
+      }
+    ],
+    "data_integrations": {
+      "sources": [
+        "Investor profiles in PostgreSQL",
+        "Secure OTP vault"
+      ],
+      "apis": [
+        "KYC provider API (see documents/openapi.yaml)"
+      ],
+      "tables": [
+        "investor_profiles",
+        "auth_event_audit_handoff",
+        "kyc_event_audit_handoff"
+      ],
+      "citations": [
+        {
+          "okf_ref_id": "chunk:openapi.yaml#c1",
+          "document_version_id": "a1b49a71-2421-5c5b-9852-4a0d0d61e9b7",
+          "location": {
+            "line": 4
+          }
+        }
+      ]
+    },
+    "rules_constraints": {
+      "rule_refs": [
+        "RULE-AUTH-LOCKOUT"
+      ],
+      "constraints": [
+        "At most 3 active devices per investor",
+        "Never store OTP values in audit tables"
+      ],
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.docx#c0",
+          "document_version_id": "1f8769d9-6b7f-528b-8389-d8517fc64350",
+          "location": {
+            "page": 1
+          }
+        }
+      ]
+    },
+    "deliverables_acceptance": {
+      "deliverables": [
+        "OTP sign-in Sub-Skill",
+        "KYC verification Sub-Skill"
+      ],
+      "acceptance_criteria": [
+        "Locked after 3 failed OTP attempts",
+        "No portal access without approved KYC"
+      ],
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c3",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "line": 9
+          }
+        }
+      ]
+    },
+    "assumptions_open_points": {
+      "assumptions": [
+        "The KYC provider answers within 30 seconds"
+      ],
+      "open_points": [
+        "Which KYC provider is used in production"
+      ],
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c3",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "line": 9
+          }
+        }
+      ]
+    }
+  }
+}

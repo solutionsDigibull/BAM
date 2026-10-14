@@ -1,0 +1,151 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "client": {
+    "drop_excess_requests": false,
+    "enforce_auth_on_inference": false
+  },
+  "providers": {
+    "openrouter": {
+      "keys": [
+        {
+          "name": "mock",
+          "value": "mock-key",
+          "models": [
+            "sbam-ocr-primary",
+            "sbam-ocr-fallback",
+            "sbam-sow-primary",
+            "sbam-sow-fallback",
+            "sbam-isatvon-primary",
+            "sbam-isatvon-fallback",
+            "sbam-codegen-primary",
+            "sbam-codegen-fallback",
+            "sbam-testgen-primary",
+            "sbam-testgen-fallback",
+            "sbam-corrector-primary",
+            "sbam-corrector-fallback"
+          ],
+          "weight": 1.0
+        }
+      ],
+      "network_config": {
+        "base_url": "http://sbam-llm-mock:8091",
+        "allow_private_network": true,
+        "max_retries": 0
+      }
+    }
+  },
+  "governance": {
+    "routing_rules": [
+      {
+        "id": "alias-sbam-ocr",
+        "name": "sbam-ocr",
+        "cel_expression": "model == \"sbam-ocr\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-ocr-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-ocr-fallback"
+        ],
+        "enabled": true,
+        "priority": 1
+      },
+      {
+        "id": "alias-sbam-sow",
+        "name": "sbam-sow",
+        "cel_expression": "model == \"sbam-sow\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-sow-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-sow-fallback"
+        ],
+        "enabled": true,
+        "priority": 2
+      },
+      {
+        "id": "alias-sbam-isatvon",
+        "name": "sbam-isatvon",
+        "cel_expression": "model == \"sbam-isatvon\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-isatvon-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-isatvon-fallback"
+        ],
+        "enabled": true,
+        "priority": 3
+      },
+      {
+        "id": "alias-sbam-codegen",
+        "name": "sbam-codegen",
+        "cel_expression": "model == \"sbam-codegen\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-codegen-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-codegen-fallback"
+        ],
+        "enabled": true,
+        "priority": 4
+      },
+      {
+        "id": "alias-sbam-testgen",
+        "name": "sbam-testgen",
+        "cel_expression": "model == \"sbam-testgen\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-testgen-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-testgen-fallback"
+        ],
+        "enabled": true,
+        "priority": 5
+      },
+      {
+        "id": "alias-sbam-corrector",
+        "name": "sbam-corrector",
+        "cel_expression": "model == \"sbam-corrector\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-corrector-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-corrector-fallback"
+        ],
+        "enabled": true,
+        "priority": 6
+      }
+    ]
+  },
+  "source_of_truth": "config.json",
+  "config_store": {
+    "enabled": true,
+    "type": "sqlite",
+    "config": {
+      "path": "/app/data/config.db"
+    }
+  }
+}

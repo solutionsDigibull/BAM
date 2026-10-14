@@ -188,19 +188,38 @@ services:
 
   # --- LLM gateway, malware scanning, uploads ------------------------------------------------------
   bifrost:
-    # Stub: no providers/aliases until #46. The OpenRouter key is passed to bifrost only.
+    # The six sbam-* aliases (E1.15). The config is generated from bifrost/aliases.json: LLM_PROVIDER=mock
+    # (default) routes to sbam-llm-mock, LLM_PROVIDER=bifrost to the real OpenRouter models. The OpenRouter key is
+    # passed to bifrost only, never to api or workers (ADR 0001).
     image: maximhq/bifrost:v2.2.6@sha256:d0b4708ace1aa175766f94afa715fd9bba3a1b56c1dc2afff15a21edf3ae4e2a
     environment:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     volumes:
-      - ./bifrost/config.json:/app/data/config.json:ro
+      - ./bifrost/config.${LLM_PROVIDER:-mock}.json:/app/data/config.json:ro
     ports: ["127.0.0.1:${BIFROST_PORT:-8081}:8080"]
+    depends_on:
+      sbam-llm-mock: { condition: service_healthy }
     networks: [sbam_edge, sbam_internal]
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
+
+  sbam-llm-mock:
+    # Deterministic OpenAI-compatible upstream for bifrost when LLM_PROVIDER=mock (E1.15). No secrets and no
+    # internet route. It refuses to start with LLM_PROVIDER=mock when SBAM_ENV is staging or production.
+    image: sbam-llm-mock:local
+    build:
+      context: ..
+      dockerfile: compose/docker/llm-mock.Dockerfile
+    environment:
+      ENV: ${SBAM_ENV:-development}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+    volumes:
+      - ../server/tests/llm-mock:/fixtures:ro
+    networks: [sbam_internal]
     restart: unless-stopped
 
   clamav:
@@ -258,6 +277,9 @@ services:
     environment:
       DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
       STORAGE_ROOT: /data/storage
+      # Startup guard (E1.15-T09): the API refuses LLM_PROVIDER=mock when SBAM_ENV is staging/production.
+      SBAM_ENV: ${SBAM_ENV:-development}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       # Signs download URLs (#37). Empty = signed downloads answer 503; existing stacks keep starting.
       STORAGE_SIGNING_KEY: ${STORAGE_SIGNING_KEY:-}
       TEMPORAL_HOST: temporal:7233

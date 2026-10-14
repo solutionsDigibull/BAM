@@ -229,6 +229,9 @@ jobs:
       # checkout belongs to the runner user, so `next dev` can't write next-env.d.ts. Throwaway checkout.
       - name: Make the checkout writable for the dev containers
         run: chmod -R a+rwX client
+      # E1.15-T07: block + count container egress to openrouter.ai for the whole job; verified after the tests.
+      - name: LLM egress monitor
+        run: scripts/ci-llm-egress-guard.sh start
       # Flaky first boot (image pulls, Keycloak import): retry once, then fail.
       - name: make up
         run: make up ENV_FILE="$ENV_FILE" || { echo "::warning::make up failed, retrying once"; make down ENV_FILE="$ENV_FILE"; make up ENV_FILE="$ENV_FILE"; }
@@ -248,6 +251,9 @@ jobs:
           echo "SKILL_RUNTIME_IMAGE=skill-runtime:ci" >> "$GITHUB_ENV"
       - name: make test-int
         run: make test-int ENV_FILE="$ENV_FILE"
+      - name: No egress to openrouter.ai (E1.15-T07)
+        run: scripts/ci-llm-egress-guard.sh verify
+        env: { ENV_FILE: compose/.env.ci }
       # Real browser logins through Keycloak against the running stack (#51, E2.5-T01..T08).
       - *setup-pnpm
       - *setup-node

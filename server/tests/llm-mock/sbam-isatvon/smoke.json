@@ -1,0 +1,147 @@
+{
+  "prompt_id": "smoke",
+  "input_hash": "30f675acc00bd97be6ac25215e1d8d94823bbd7676c2aa86b6c7ad3fba16cec7",
+  "messages": [
+    {
+      "role": "user",
+      "content": "sbam-mock-smoke"
+    }
+  ],
+  "valid": true,
+  "response": [
+    {
+      "skill_metadata": {
+        "macro_category": "MS01_Investor_Registration_Access",
+        "skill_id": "MS01.1_Investor_Auth_Manager",
+        "skill_name": "Investor OTP & Access Verifier"
+      },
+      "isatvon_definition": {
+        "i_instructions": {
+          "statement": "Triggered by login request. Action: Validate OTP and enforce RBAC device limits. Check: Verify OTP matches secure vault and device count is under limit. Bound: Allow up to 3 OTP retry loops before locking the profile.",
+          "trigger": "Investor submits a login request with an OTP",
+          "action": "Validate OTP and enforce RBAC device limits",
+          "check": "Verify OTP matches secure vault and device count is under limit",
+          "bound": "Allow up to 3 OTP retry loops before locking the profile",
+          "user_role": {
+            "level": "External investor",
+            "persona": "Retail investor signing in to the portal",
+            "authority": "May access only their own profile and holdings"
+          },
+          "task": {
+            "goal": "Authenticate the investor within 3 attempts or lock the profile",
+            "method": "Bounded OTP verification with an independent RBAC policy check",
+            "steps": [
+              "Trigger: receive login request",
+              "Action Step: compare OTP and compute device limits",
+              "Fixed Check: evaluate otp_match and policy_violation",
+              "Loop or Resolve: retry up to 3 times, then authenticate or lock"
+            ]
+          },
+          "context": {
+            "background": "Investor portal for a fictional fund (Alpha Dynamics Ltd)",
+            "topic": "Investor registration and access",
+            "history": "Device limits were introduced after credential-sharing incidents"
+          }
+        },
+        "s_source": {
+          "required_inputs": [
+            "mobile_number",
+            "otp_payload",
+            "device_fingerprint"
+          ],
+          "fresh_state_parameters": [
+            "failed_login_attempts",
+            "active_devices",
+            "user_status"
+          ]
+        },
+        "a_automation": {
+          "orchestration_layer": "BuLLM_DMR",
+          "trigger_mode": "HTTP_POST_Payload_plus_Variables",
+          "action_step": "Compare provided OTP against Auth_MCP memory and calculate device fingerprint limits.",
+          "acceptance_check": "Programmatically evaluate if otp_match == True AND active_devices <= max_device_limit.",
+          "srim_metadata": "FastMCP_Execution_Engine with PostgreSQL JSONB state in investor_profiles"
+        },
+        "t_tech_stack": {
+          "execution_layer": "FastMCP",
+          "action_tool": "Auth_MCP (Session & OTP Evaluator)",
+          "fixed_check_tool": "RBAC_MCP (Policy & Limit Validator)",
+          "gateway_routing": "MCP_Jungle_Gateway",
+          "libraries": [
+            {
+              "package": "fastmcp",
+              "version_constraint": ">=2.0"
+            },
+            {
+              "package": "psycopg",
+              "version_constraint": ">=3.2"
+            },
+            {
+              "package": "pyjwt"
+            }
+          ]
+        },
+        "v_variables": {
+          "max_iterations": 3,
+          "success_gate": "otp_match == True AND policy_violation == False",
+          "no_op_condition": "user_status is 'LOCKED'",
+          "escalation_condition": "failed_login_attempts >= max_iterations",
+          "budget_limit": "5000ms timeout per validation cycle",
+          "tables": [
+            "investor_profiles",
+            "auth_event_audit_handoff"
+          ],
+          "parameters": [
+            {
+              "name": "max_device_limit",
+              "type": "integer",
+              "value": 3
+            }
+          ],
+          "secrets": [
+            "AUTH_VAULT_KEY",
+            "JWT_SIGNING_KEY"
+          ]
+        },
+        "o_outcome": {
+          "json_schema": {
+            "auth_status": [
+              "AUTHENTICATED",
+              "REJECTED",
+              "LOCKED"
+            ],
+            "user_role": "string",
+            "jwt_token": "string",
+            "otp_match": "boolean",
+            "policy_violation": "boolean"
+          },
+          "state_handoff_file": {
+            "table": "auth_event_audit_handoff",
+            "mode": "append_only",
+            "required_fields": [
+              "iteration_pass",
+              "device_fingerprint",
+              "otp_match",
+              "access_scope"
+            ],
+            "description": "Log iteration_pass, device fingerprint used, OTP boolean match evidence and final access scope."
+          },
+          "success_criteria": "OTP matches and no RBAC policy violation within 3 attempts"
+        },
+        "n_notification": {
+          "ui_updates": [
+            "Status: Verifying -> Looping [Pass 2/3]: Incorrect OTP -> Authenticated",
+            "Status: Escalated - Account Locked"
+          ],
+          "database_updates": [
+            "Update investor_profiles with failed attempts or new active session state"
+          ],
+          "alerts": [
+            "Notify platform ops on account lockout (Escalation)"
+          ],
+          "next": "MS01.2_Investor_KYC_Verifier"
+        }
+      }
+    }
+  ]
+}
