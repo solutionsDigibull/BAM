@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:identity/user_invite:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "email": {
+      "maxLength": 254,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "title": "Email",
+      "type": "string"
+    },
+    "roles": {
+      "items": {
+        "enum": [
+          "sbam-admin",
+          "sbam-fde"
+        ],
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "email",
+    "roles"
+  ],
+  "title": "UserInvite",
+  "type": "object"
+}

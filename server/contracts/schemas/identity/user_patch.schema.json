@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:identity/user_patch:0.1.0",
+  "additionalProperties": false,
+  "description": "Partial update: `roles` replaces the user's portal roles; `active=false` deactivates.",
+  "properties": {
+    "roles": {
+      "anyOf": [
+        {
+          "items": {
+            "enum": [
+              "sbam-admin",
+              "sbam-fde"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Roles"
+    },
+    "active": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Active"
+    }
+  },
+  "title": "UserPatch",
+  "type": "object"
+}

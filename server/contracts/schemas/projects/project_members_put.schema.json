@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:projects/project_members_put:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "user_ids": {
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "User Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "user_ids"
+  ],
+  "title": "ProjectMembersPut",
+  "type": "object"
+}
