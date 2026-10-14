@@ -4,6 +4,7 @@ Needs `make up` with the default LLM_PROVIDER=mock. Scenarios are set per call w
 `metadata.mock_scenario`, which Bifrost forwards to the upstream, so no admin port is published.
 """
 
+import asyncio
 import json
 import urllib.error
 import urllib.request
@@ -11,6 +12,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sbam_contracts.sow import SowDocument
+from sbam_workers.llm.reask import (
+    MAX_REASKS,
+    LlmCall,
+    Message,
+    Reply,
+    SchemaInvalidAfterRetries,
+    run_structured,
+)
 
 from .conftest import REPO, Compose, is_open, port
 
@@ -66,9 +76,12 @@ def test_e1_15_t02_models_that_are_not_aliases_are_rejected(model: str) -> None:
 
 
 def test_e1_15_t03_same_request_gives_identical_completion() -> None:
-    first = call(fixture_body("sbam-sow"))[2]
-    second = call(fixture_body("sbam-sow"))[2]
-    assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+    def stable(body: dict[str, Any]) -> str:
+        # Bifrost stamps its own measured timings (ms) into extra_fields; the rest is the mock's.
+        extra = {k: v for k, v in body["extra_fields"].items() if "latency" not in k}
+        return json.dumps({**body, "extra_fields": extra}, sort_keys=True)
+
+    assert stable(call(fixture_body("sbam-sow"))[2]) == stable(call(fixture_body("sbam-sow"))[2])
 
 
 def test_e1_15_t04_primary_503_is_answered_by_the_fallback_model() -> None:
@@ -100,6 +113,34 @@ def test_e1_15_t08_unseen_input_fails_with_mock_fixture_missing() -> None:
     assert err["error"]["code"] == "MOCK_FIXTURE_MISSING"
 
 
+def bifrost_call(scenario: str) -> LlmCall:
+    """The re-ask loop's `LlmCall` over the real gateway: alias in, answering model out."""
+
+    async def send(messages: list[Message]) -> Reply:
+        body = {
+            "model": "sbam-sow",
+            "messages": messages,
+            "metadata": {"prompt_id": "smoke", "mock_scenario": scenario},
+        }
+        status, _, data = await asyncio.to_thread(call, body)
+        assert status == 200, data
+        return Reply(data["choices"][0]["message"]["content"], data["model"])
+
+    return send
+
+
+def test_e1_15_t05_schema_invalid_through_bifrost_stops_after_three_reasks() -> None:
+    with pytest.raises(SchemaInvalidAfterRetries) as caught:
+        asyncio.run(run_structured(bifrost_call("schema_invalid"), SMOKE, SowDocument))
+    assert len(caught.value.attempts) == MAX_REASKS + 1
+
+
+def test_e1_15_t05_two_invalid_answers_then_valid_through_bifrost() -> None:
+    result = asyncio.run(run_structured(bifrost_call("schema_invalid:2"), SMOKE, SowDocument))
+    assert [a.status for a in result.attempts] == ["SCHEMA_INVALID", "SCHEMA_INVALID", "SUCCEEDED"]
+    assert result.attempts[-1].model == "sbam-sow-primary"
+
+
 @pytest.mark.parametrize("service", ["sbam-api", "worker-llm", "worker-knowledge"])
 def test_e1_15_t06_openrouter_key_is_absent_from_api_and_workers(
     compose: Compose, service: str
@@ -107,7 +148,7 @@ def test_e1_15_t06_openrouter_key_is_absent_from_api_and_workers(
     out = compose("exec", "-T", service, "printenv")
     if out.returncode != 0:
         pytest.skip(f"{service} is not running")
-    assert "OPENROUTER" not in out.stdout
+    assert "OPENROUTER" not in out.stdout and "NVIDIA" not in out.stdout
 
 
 def test_e1_15_t07_mock_container_has_no_route_to_openrouter(compose: Compose) -> None:

@@ -10,7 +10,10 @@ a `MOCK_FIXTURE_MISSING` error that names the hash to record. The same input alw
 Scenarios, set with `PUT /__mock/scenario {"alias": "sbam-sow" | "*", "scenario": ...}` or per call with
 `metadata.mock_scenario`:
     ok              the fixture (default)
-    schema_invalid  the fixture's `invalid_response`, else truncated JSON that no schema accepts
+    schema_invalid  the fixture's `invalid_response`, else truncated JSON that no schema accepts. Every answer is
+                    invalid; `schema_invalid:2` is invalid for the first two calls of a prompt and valid after
+                    that (the re-ask loop's "invalid, invalid, valid"). A re-ask appends an assistant and a user
+                    turn, so the mock counts assistant turns and finds the fixture by the original prompt.
     timeout         sleep LLM_MOCK_TIMEOUT_S (default 65, longer than Bifrost's 30 s), then 504
     5xx             503 from the primary model only, so Bifrost falls back to the fallback model
     5xx_all         503 from both models
@@ -41,7 +44,9 @@ def check_env(env: str, provider: str) -> None:
 
 
 def input_hash(messages: Any) -> str:
-    canonical = json.dumps(messages, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    canonical = json.dumps(
+        messages, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
@@ -65,12 +70,38 @@ def alias_of(model: str, aliases: set[str]) -> tuple[str, str] | None:
     return None
 
 
+def parse_scenario(scenario: str) -> tuple[str, int | None] | None:
+    """`ok` -> ("ok", None); `schema_invalid:2` -> ("schema_invalid", 2); anything unknown -> None."""
+    name, _, count = scenario.partition(":")
+    if name not in SCENARIOS:
+        return None
+    if not count:
+        return name, None
+    if name != "schema_invalid" or not count.isdigit():
+        return None
+    return name, int(count)
+
+
+def reasks_in(messages: list[Any]) -> int:
+    """Re-asks already made: each one appends an assistant turn and a user turn to a single-shot prompt."""
+    return sum(
+        1 for m in messages if isinstance(m, dict) and m.get("role") == "assistant"
+    )
+
+
+def original_prompt(messages: list[Any]) -> list[Any]:
+    """The prompt before any re-ask, so a re-ask is served by the same fixture as the first call."""
+    return messages[: max(len(messages) - 2 * reasks_in(messages), 1)]
+
+
 def error(status: int, code: str, message: str) -> tuple[int, dict[str, Any]]:
     return status, {"error": {"message": message, "type": "mock_error", "code": code}}
 
 
 class Mock:
-    def __init__(self, fixtures: dict[tuple[str, str, str], dict[str, Any]], aliases: set[str]):
+    def __init__(
+        self, fixtures: dict[tuple[str, str, str], dict[str, Any]], aliases: set[str]
+    ):
         self.fixtures = fixtures
         self.aliases = aliases
         self.scenarios: dict[str, str] = {}
@@ -84,7 +115,9 @@ class Mock:
             self.calls.clear()
 
     def set_scenario(self, alias: str, scenario: str) -> None:
-        if scenario not in SCENARIOS or (alias != "*" and alias not in self.aliases):
+        if parse_scenario(scenario) is None or (
+            alias != "*" and alias not in self.aliases
+        ):
             raise ValueError(f"bad alias/scenario: {alias!r}/{scenario!r}")
         with self._lock:
             self.scenarios[alias] = scenario
@@ -93,7 +126,9 @@ class Mock:
         model = str(body.get("model", ""))
         found = alias_of(model, self.aliases)
         if found is None:
-            return error(404, "MOCK_UNKNOWN_MODEL", f"model {model!r} is not an sbam alias model")
+            return error(
+                404, "MOCK_UNKNOWN_MODEL", f"model {model!r} is not an sbam alias model"
+            )
         alias, role = found
         messages = body.get("messages")
         if not isinstance(messages, list) or not messages:
@@ -102,7 +137,8 @@ class Mock:
         if not isinstance(metadata, dict):
             return error(400, "MOCK_BAD_REQUEST", "metadata must be an object")
         prompt_id = str(metadata.get("prompt_id", DEFAULT_PROMPT_ID))
-        digest = input_hash(messages)
+        reasks = reasks_in(messages)
+        digest = input_hash(original_prompt(messages))
         with self._lock:
             scenario = str(
                 metadata.get("mock_scenario")
@@ -111,10 +147,18 @@ class Mock:
                 or "ok"
             )
             self.calls.append(
-                {"alias": alias, "role": role, "model": model, "prompt_id": prompt_id, "hash": digest}
+                {
+                    "alias": alias,
+                    "role": role,
+                    "model": model,
+                    "prompt_id": prompt_id,
+                    "hash": digest,
+                }
             )
-        if scenario not in SCENARIOS:
+        parsed = parse_scenario(scenario)
+        if parsed is None:
             return error(400, "MOCK_BAD_SCENARIO", f"unknown scenario {scenario!r}")
+        scenario, invalid_times = parsed
         if scenario == "5xx_all" or (scenario == "5xx" and role == "primary"):
             return error(503, "MOCK_UPSTREAM_DOWN", f"mock {scenario} for {model}")
         if scenario == "timeout":
@@ -127,7 +171,10 @@ class Mock:
                 "MOCK_FIXTURE_MISSING",
                 f"no fixture for alias={alias} prompt_id={prompt_id} input_hash={digest}",
             )
-        content = fixture_content(fixture, scenario == "schema_invalid")
+        invalid = scenario == "schema_invalid" and (
+            invalid_times is None or reasks < invalid_times
+        )
+        content = fixture_content(fixture, invalid)
         completion = {
             "id": f"chatcmpl-mock-{digest[:16]}",
             "object": "chat.completion",
@@ -188,8 +235,18 @@ def make_handler(mock: Mock) -> type[BaseHTTPRequestHandler]:
             if self.path == "/health":
                 self._send(200, {"status": "ok"})
             elif self.path == "/v1/models":
-                ids = [f"{a}-{r}" for a in sorted(mock.aliases) for r in ("primary", "fallback")]
-                self._send(200, {"object": "list", "data": [{"id": i, "object": "model"} for i in ids]})
+                ids = [
+                    f"{a}-{r}"
+                    for a in sorted(mock.aliases)
+                    for r in ("primary", "fallback")
+                ]
+                self._send(
+                    200,
+                    {
+                        "object": "list",
+                        "data": [{"id": i, "object": "model"} for i in ids],
+                    },
+                )
             elif self.path == "/v1/auth/key":
                 self._send(200, {"data": {"label": "mock"}})
             elif self.path == "/__mock/state":
@@ -210,7 +267,9 @@ def make_handler(mock: Mock) -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 body = self._json_body()
-                mock.set_scenario(str(body.get("alias", "*")), str(body.get("scenario", "")))
+                mock.set_scenario(
+                    str(body.get("alias", "*")), str(body.get("scenario", ""))
+                )
             except ValueError as exc:
                 self._send(*error(400, "MOCK_BAD_REQUEST", str(exc)))
                 return
@@ -240,12 +299,17 @@ def build(fixtures_dir: Path, aliases_file: Path) -> Mock:
 
 
 def main() -> None:
-    check_env(os.environ.get("ENV", "development"), os.environ.get("LLM_PROVIDER", "mock"))
+    check_env(
+        os.environ.get("ENV", "development"), os.environ.get("LLM_PROVIDER", "mock")
+    )
     mock = build(
         Path(os.environ.get("LLM_MOCK_FIXTURES", "/fixtures")),
         Path(os.environ.get("LLM_MOCK_ALIASES", "/app/aliases.json")),
     )
-    print(json.dumps({"level": "INFO", "msg": f"{len(mock.fixtures)} fixtures loaded"}), flush=True)
+    print(
+        json.dumps({"level": "INFO", "msg": f"{len(mock.fixtures)} fixtures loaded"}),
+        flush=True,
+    )
     ThreadingHTTPServer((HOST, PORT), make_handler(mock)).serve_forever()
 
 

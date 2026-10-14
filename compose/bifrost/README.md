@@ -36,7 +36,11 @@ test fails when they drift (`--check`).
   `messages`), the recorded `messages` and `response` (JSON) or `response_text`. An unseen input is a 422
   `MOCK_FIXTURE_MISSING` whose message gives the hash to record. Same input, same bytes.
 - Scenarios, per call with `metadata.mock_scenario` or for an alias with `PUT /__mock/scenario` from inside the
-  network: `ok`, `schema_invalid`, `timeout`, `5xx` (primary model only), `5xx_all`.
+  network: `ok`, `schema_invalid`, `schema_invalid:N` (invalid for the first N calls of a prompt, then valid),
+  `timeout`, `5xx` (primary model only), `5xx_all`. A re-ask adds an assistant and a user turn; the mock counts
+  the assistant turns and finds the fixture by the original prompt, so re-asks work without new fixtures.
+- Callers re-ask with `sbam_workers.llm.reask.run_structured` (E1.15-T05): at most 3 re-asks, errors only in the
+  re-ask message, then `SchemaInvalidAfterRetries`. It takes any async caller, so the E6.1 Bifrost client reuses it.
 - It refuses to start with `LLM_PROVIDER=mock` when `SBAM_ENV` is `staging` or `production`.
 - `sbam-sow`, `sbam-isatvon` and `sbam-ocr` fixtures are real (the first two validate against `SowDocument` and
   `SubSkill`). `sbam-codegen`, `sbam-testgen` and `sbam-corrector` use a placeholder shape because their output
