@@ -11,7 +11,15 @@ from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.documents import UploadRequest, UploadToken
-from sbam_contracts.identity import Me, Tenant, TenantCreate, TenantPatch
+from sbam_contracts.identity import (
+    Me,
+    Tenant,
+    TenantCreate,
+    TenantPatch,
+    TenantUser,
+    UserInvite,
+    UserPatch,
+)
 from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
 from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
 from sbam_contracts.masters import (
@@ -23,7 +31,13 @@ from sbam_contracts.masters import (
     RulesPayload,
     SkillsPayload,
 )
-from sbam_contracts.projects import Project, ProjectCreate, ProjectPatch
+from sbam_contracts.projects import (
+    Project,
+    ProjectCreate,
+    ProjectMembers,
+    ProjectMembersPut,
+    ProjectPatch,
+)
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sow import SowDocument
@@ -54,9 +68,14 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("identity/tenant_create", TenantCreate),
     ("identity/tenant_patch", TenantPatch),
     ("identity/me", Me),
+    ("identity/user_invite", UserInvite),
+    ("identity/user_patch", UserPatch),
+    ("identity/tenant_user", TenantUser),
     ("projects/project", Project),
     ("projects/project_create", ProjectCreate),
     ("projects/project_patch", ProjectPatch),
+    ("projects/project_members_put", ProjectMembersPut),
+    ("projects/project_members", ProjectMembers),
     ("documents/upload_request", UploadRequest),
     ("documents/upload_token", UploadToken),
 )

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:cc2bec5aff95d5e706eb5b0c2e73726327c56131611c4b98e73457b81f145df1
+// source-sha256:69d7a66c542f8237afd44f562ffb45e2be776506bbd4aa664ae6c709f11a92e6
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -199,6 +199,11 @@ export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
 export type TenantStatus = "ACTIVE" | "SUSPENDED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UserStatus".
+ */
+export type UserStatus = "INVITED" | "ACTIVE" | "DEACTIVATED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ProjectStatus".
  */
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
@@ -231,9 +236,14 @@ export interface SbamContracts {
   TenantCreate?: TenantCreate;
   TenantPatch?: TenantPatch;
   Me?: Me;
+  UserInvite?: UserInvite;
+  UserPatch?: UserPatch;
+  TenantUser?: TenantUser;
   Project?: Project;
   ProjectCreate?: ProjectCreate;
   ProjectPatch?: ProjectPatch;
+  ProjectMembersPut?: ProjectMembersPut;
+  ProjectMembers?: ProjectMembers;
   UploadRequest?: UploadRequest;
   UploadToken?: UploadToken;
 }
@@ -1485,6 +1495,43 @@ export interface UserProfile {
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UserInvite".
+ */
+export interface UserInvite {
+  /**
+   * Pattern: `^[^@\s]+@[^@\s]+\.[^@\s]+$`
+   */
+  email: string;
+  roles: ("sbam-admin" | "sbam-fde")[];
+}
+/**
+ * Partial update: `roles` replaces the user's portal roles; `active=false` deactivates.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UserPatch".
+ */
+export interface UserPatch {
+  roles?: ("sbam-admin" | "sbam-fde")[] | null;
+  active?: boolean | null;
+}
+/**
+ * A user of the caller's tenant, as the admin sees it. The ETag header carries row_version.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TenantUser".
+ */
+export interface TenantUser {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  portal_roles: string[];
+  status: UserStatus;
+  last_login_at: string | null;
+  created_at: string;
+  row_version: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "Project".
  */
 export interface Project {
@@ -1524,6 +1571,24 @@ export interface ProjectPatch {
   client_name?: string | null;
   description?: string | null;
   context_notes?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectMembersPut".
+ */
+export interface ProjectMembersPut {
+  /**
+   * @maxItems 50
+   */
+  user_ids: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectMembers".
+ */
+export interface ProjectMembers {
+  project_id: string;
+  members: TenantUser[];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

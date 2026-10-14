@@ -9,6 +9,9 @@ Rules worth knowing
   * Archive answers 409 PIPELINE_RUNNING unless `pipeline_state` is idle, failed, in SOW review,
     has a Workflow created, or is cancelled.
   * Edits need `If-Match` (428 when missing, 412 when stale).
+  * Members (E2.4): PUT replaces the whole set. Every id must be an ACTIVE `sbam-fde` user of the
+    tenant (422 on `user_ids.<i>` otherwise); at most 50, no duplicates. An archived project
+    answers 409 PROJECT_ARCHIVED.
 """
 
 from datetime import datetime
@@ -16,9 +19,10 @@ from enum import StrEnum
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from sbam_contracts._jsonschema import contract_schema
+from sbam_contracts.identity import TenantUser
 from sbam_contracts.state_machines import ProjectPipelineState
 
 _NO_CONTROL = r"^[^\x00-\x1f\x7f-\x9f]*$"
@@ -79,11 +83,29 @@ class Project(BaseModel):
     updated_at: datetime
 
 
+class ProjectMembersPut(_Request):
+    user_ids: list[UUID] = Field(max_length=50)
+
+    @field_validator("user_ids")
+    @classmethod
+    def _unique(cls, value: list[UUID]) -> list[UUID]:
+        if len(set(value)) != len(value):
+            raise ValueError("user_ids must be unique")
+        return value
+
+
+class ProjectMembers(BaseModel):
+    project_id: UUID
+    members: list[TenantUser]
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/projects/`."""
     models: dict[str, type[BaseModel]] = {
         "project": Project,
         "project_create": ProjectCreate,
         "project_patch": ProjectPatch,
+        "project_members_put": ProjectMembersPut,
+        "project_members": ProjectMembers,
     }
     return {stem: contract_schema(model, f"projects/{stem}") for stem, model in models.items()}

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:identity/tenant_user:0.1.0",
+  "$defs": {
+    "UserStatus": {
+      "enum": [
+        "INVITED",
+        "ACTIVE",
+        "DEACTIVATED"
+      ],
+      "title": "UserStatus",
+      "type": "string"
+    }
+  },
+  "description": "A user of the caller's tenant, as the admin sees it. The ETag header carries row_version.",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "email": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Email"
+    },
+    "display_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Display Name"
+    },
+    "portal_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Portal Roles",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/UserStatus"
+    },
+    "last_login_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Last Login At"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "row_version": {
+      "title": "Row Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "email",
+    "display_name",
+    "portal_roles",
+    "status",
+    "last_login_at",
+    "created_at",
+    "row_version"
+  ],
+  "title": "TenantUser",
+  "type": "object"
+}
