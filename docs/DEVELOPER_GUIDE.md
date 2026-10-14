@@ -249,6 +249,7 @@ make down                                 # stop (data kept);  make reset CONFIR
 | http://localhost:8000/health/ready | API readiness (db, storage, temporal, keycloak) |
 | http://localhost:8080 | Keycloak admin (realm `bullm`) |
 | http://localhost:8233 | Temporal UI |
+| http://localhost:8025 | Mailpit: catches Keycloak invite and password emails (dev only) |
 | http://localhost:3001 / :3002 | Langfuse / Grafana (profile `obs`) |
 
 If a port is already in use on your machine, change it in `compose/.env` (`API_PORT`, `WEB_PORT`, …).
