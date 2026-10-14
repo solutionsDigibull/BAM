@@ -1,7 +1,7 @@
 """users status and project members (RBAC)
 
-Revision ID: 0007_rbac
-Revises: 0006_projects
+Revision ID: 0008_rbac
+Revises: 0007_documents
 Create Date: 2026-10-14
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -13,8 +13,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0007_rbac"
-down_revision: str | Sequence[str] | None = "0006_projects"
+revision: str = "0008_rbac"
+down_revision: str | Sequence[str] | None = "0007_documents"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
