@@ -187,6 +187,7 @@ def test_e4_2_tusd_refuses_over_15_mb_and_serves_no_downloads(scope: Scope) -> N
     token = scope.slot("ok.pdf", len(data))
     _, headers, _ = create(scope, token, "ok.pdf", len(data))
     assert patch(headers["Location"], 0, data) == 204
+    scope.wait_for_versions(1)  # let post-finish finish before the fixture removes the rows
     assert tus("GET", headers["Location"])[0] in (404, 405)  # -disable-download
     assert tus("DELETE", headers["Location"])[0] in (404, 405)  # -disable-termination
 
