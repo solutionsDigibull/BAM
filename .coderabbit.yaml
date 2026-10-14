@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Feature PRs target `dev`, not the default branch (`main`), and CodeRabbit only reviews the
+# default branch unless the others are listed here (#208).
+reviews:
+  auto_review:
+    base_branches:
+      - dev
+      - main
