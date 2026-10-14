@@ -12,8 +12,8 @@ pytestmark = pytest.mark.integration
 
 CORE = [
     "postgres", "keycloak", "temporal", "temporal-ui", "bifrost", "clamav", "tusd", "sbam-api",
-    "sbam-mock-api", "sbam-llm-mock", "sbam-web", "worker-ingest", "worker-knowledge", "worker-llm", "worker-build",
-    "worker-test", "worker-certify",
+    "sbam-mock-api", "sbam-llm-mock", "sbam-web", "worker-ingest", "worker-knowledge", "worker-llm",
+    "worker-build", "worker-test", "worker-certify",
 ]  # fmt: skip
 ONE_OFF = ["storage-init", "temporal-schema", "temporal-namespace", "api-migrate"]
 

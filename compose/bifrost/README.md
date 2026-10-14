@@ -35,5 +35,6 @@ test fails when they drift (`--check`).
 - Scenarios, per call with `metadata.mock_scenario` or for an alias with `PUT /__mock/scenario` from inside the
   network: `ok`, `schema_invalid`, `timeout`, `5xx` (primary model only), `5xx_all`.
 - It refuses to start with `LLM_PROVIDER=mock` when `SBAM_ENV` is `staging` or `production`.
-- Only `sbam-sow` and `sbam-ocr` fixtures are real. The other four use a placeholder shape because their output
-  contracts are not in `server/contracts` yet. Replace them when the contract lands.
+- `sbam-sow`, `sbam-isatvon` and `sbam-ocr` fixtures are real (the first two validate against `SowDocument` and
+  `SubSkill`). `sbam-codegen`, `sbam-testgen` and `sbam-corrector` use a placeholder shape because their output
+  contracts are not in `server/contracts` yet. Replace them when the contracts land.

@@ -99,6 +99,8 @@ class Mock:
         if not isinstance(messages, list) or not messages:
             return error(400, "MOCK_BAD_REQUEST", "messages must be a non-empty list")
         metadata = body.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            return error(400, "MOCK_BAD_REQUEST", "metadata must be an object")
         prompt_id = str(metadata.get("prompt_id", DEFAULT_PROMPT_ID))
         digest = input_hash(messages)
         with self._lock:

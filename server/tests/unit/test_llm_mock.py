@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from sbam_contracts.isatvon14 import SubSkill
 from sbam_contracts.sow import SowDocument
 
 REPO = Path(__file__).resolve().parents[3]
@@ -178,6 +179,26 @@ def test_e1_15_t02_mock_rejects_models_that_are_not_alias_models(mock: Any, mode
     status, body = chat(mock, model)
     assert status == 404 and body["error"]["code"] == "MOCK_UNKNOWN_MODEL"
     assert mock.calls == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"model": "sbam-sow-primary", "messages": []},
+        {"model": "sbam-sow-primary", "messages": "hi"},
+        {"model": "sbam-sow-primary", "messages": SMOKE, "metadata": "x"},
+        {"model": "sbam-sow-primary", "messages": SMOKE, "metadata": {"mock_scenario": "boom"}},
+    ],
+)
+def test_e1_15_mock_answers_malformed_requests_with_400(mock: Any, body: dict[str, Any]) -> None:
+    status, payload = mock.chat(body)
+    assert status == 400 and payload["error"]["code"].startswith("MOCK_")
+
+
+def test_e1_15_isatvon_fixture_is_schema_valid_sub_skills() -> None:
+    fixture = json.loads((FIXTURES / "sbam-isatvon/smoke.json").read_text())
+    for raw in fixture["response"]:
+        SubSkill.model_validate(raw)
 
 
 # --- production guard -----------------------------------------------------------------------------
