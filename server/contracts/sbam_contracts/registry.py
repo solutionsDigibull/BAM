@@ -10,6 +10,7 @@ from typing import Final
 from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
+from sbam_contracts.documents import UploadRequest, UploadToken
 from sbam_contracts.identity import Me, Tenant, TenantCreate, TenantPatch
 from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
 from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
@@ -56,4 +57,6 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("projects/project", Project),
     ("projects/project_create", ProjectCreate),
     ("projects/project_patch", ProjectPatch),
+    ("documents/upload_request", UploadRequest),
+    ("documents/upload_token", UploadToken),
 )

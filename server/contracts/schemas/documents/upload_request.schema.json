@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/upload_request:0.1.0",
+  "$defs": {
+    "UploadFile": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^/\\\\\\x00-\\x1f\\x7f-\\x9f]+$",
+          "title": "Name",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 1,
+          "title": "Size",
+          "type": "integer"
+        },
+        "mime": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Mime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "size",
+        "mime"
+      ],
+      "title": "UploadFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "files": {
+      "items": {
+        "$ref": "#/$defs/UploadFile"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Files",
+      "type": "array"
+    }
+  },
+  "required": [
+    "files"
+  ],
+  "title": "UploadRequest",
+  "type": "object"
+}
