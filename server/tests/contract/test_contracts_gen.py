@@ -16,6 +16,7 @@ from fixtures import fixture_path
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel
 from sbam_contracts import (
+    documents,
     identity,
     isatvon14,
     manifest,
@@ -199,6 +200,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
     from_modules = {
         f"{folder}/{stem}"
         for folder, module in (
+            ("documents", documents),
             ("identity", identity),
             ("isatvon", isatvon14),
             ("manifest", manifest),

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:919c2a38804f1ffad4bc335e1919bf8de515b0b9d65422dded51a4061b570829
+// source-sha256:5b3daaa4100f4b31289313bc43dbce8b310d62429ea5d47b69519226a78bd2c6
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -234,6 +234,8 @@ export interface SbamContracts {
   Project?: Project;
   ProjectCreate?: ProjectCreate;
   ProjectPatch?: ProjectPatch;
+  UploadRequest?: UploadRequest;
+  UploadToken?: UploadToken;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1522,4 +1524,251 @@ export interface ProjectPatch {
   client_name?: string | null;
   description?: string | null;
   context_notes?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UploadRequest".
+ */
+export interface UploadRequest {
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  files:
+    | [UploadFile]
+    | [UploadFile, UploadFile]
+    | [UploadFile, UploadFile, UploadFile]
+    | [UploadFile, UploadFile, UploadFile, UploadFile]
+    | [UploadFile, UploadFile, UploadFile, UploadFile, UploadFile]
+    | [UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile]
+    | [UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile]
+    | [UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile]
+    | [UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile, UploadFile]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ]
+    | [
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile,
+        UploadFile
+      ];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UploadFile".
+ */
+export interface UploadFile {
+  /**
+   * Pattern: `^[^/\\\x00-\x1f\x7f-\x9f]+$`
+   */
+  name: string;
+  size: number;
+  mime: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UploadToken".
+ */
+export interface UploadToken {
+  token: string;
+  tus_endpoint: string;
+  expires_at: string;
+  accepted: AcceptedFile[];
+  rejected: RejectedFile[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AcceptedFile".
+ */
+export interface AcceptedFile {
+  name: string;
+  size: number;
+  mime: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RejectedFile".
+ */
+export interface RejectedFile {
+  name: string;
+  code: ErrorCode;
 }
