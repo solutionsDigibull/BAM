@@ -1,0 +1,32 @@
+{
+  "sbam-ocr": {
+    "use": "OCR of scanned pages/images (vision)",
+    "primary": "google/gemini-3.8-flash",
+    "fallback": "anthropic/claude-haiku-5.5"
+  },
+  "sbam-sow": {
+    "use": "One-shot SOW (SowDocument)",
+    "primary": "anthropic/claude-sonnet-5.5",
+    "fallback": "openai/gpt-6-sol"
+  },
+  "sbam-isatvon": {
+    "use": "Macro and Sub-Skill extraction",
+    "primary": "anthropic/claude-sonnet-5.5",
+    "fallback": "openai/gpt-6-sol"
+  },
+  "sbam-codegen": {
+    "use": "Function bodies (CodeBodies)",
+    "primary": "anthropic/claude-sonnet-5.5",
+    "fallback": "openai/gpt-6-sol"
+  },
+  "sbam-testgen": {
+    "use": "Test scenarios + data (TestSuiteSpec)",
+    "primary": "google/gemini-3.8-flash",
+    "fallback": "anthropic/claude-haiku-5.5"
+  },
+  "sbam-corrector": {
+    "use": "Correction (CorrectionPatch)",
+    "primary": "anthropic/claude-sonnet-5.5",
+    "fallback": "openai/gpt-6-sol"
+  }
+}

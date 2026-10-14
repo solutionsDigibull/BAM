@@ -58,7 +58,7 @@ profile core (always):
   keycloak (+ realm import) · temporal (+ temporal-schema, temporal-namespace one-offs) · temporal-ui · bifrost
   clamav (clamd + freshclam) · storage-init (one-off)
   worker-ingest · worker-knowledge · worker-llm · worker-build · worker-test · worker-certify
-  sbam-mock-api
+  sbam-mock-api · sbam-llm-mock
   volumes: pgdata, storage (uploads, derived, okf, code, tests, exports), cognee_data, clamav_db
 profile obs:        otel-collector · grafana-lgtm (Loki, Tempo, Prometheus, Grafana) · langfuse-web · langfuse-worker
                     · clickhouse · redis · minio (internal, only for Langfuse blob storage)
@@ -87,6 +87,7 @@ or not, so profile-only required secrets would break plain `make up` for an `.en
 | clamav                 | not published (internal only)   | `clamdcheck.sh`                     | —                                     |
 | workers (×6)           | not published                   | heartbeat file younger than 30 s    | temporal, postgres, bifrost           |
 | sbam-mock-api          | not published                   | HTTP `/health`                      | —                                     |
+| sbam-llm-mock          | not published                   | HTTP `/health`                      | — (bifrost waits for it)              |
 | langfuse (obs)         | 3001                            | HTTP                                | postgres, clickhouse, redis, minio    |
 | grafana-lgtm (obs)     | 3002 / 4317 / 4318              | HTTP                                | —                                     |
 | posthog (analytics)    | 8010                            | HTTP                                | own deps                              |
@@ -135,8 +136,9 @@ get an `env_file`**. Each worker variable is passed one by one, so the OpenRoute
 | `SBAM_DB_PASSWORD`, `TEMPORAL_DB_PASSWORD`, `KEYCLOAK_DB_PASSWORD`, `LANGFUSE_DB_PASSWORD` | one login role per database | yes | created by the init SQL |
 | `KEYCLOAK_ADMIN_PASSWORD` | keycloak bootstrap admin | yes | admin console only on localhost / Netbird |
 | `SEED_USER_PASSWORD` | dev realm seed users (local/dev only) | yes | never set in staging/prod |
-| `OPENROUTER_API_KEY` | **bifrost only** | no | empty → Bifrost serves the mock provider (`LLM_PROVIDER=mock`) |
-| `LLM_PROVIDER` | workers | no | `mock` (default, CI) or `bifrost` |
+| `OPENROUTER_API_KEY` | **bifrost only** | no | used only with `LLM_PROVIDER=bifrost`; an empty key does not fall back to the mock, calls fail |
+| `LLM_PROVIDER` | compose, workers | no | `mock` (default, CI): bifrost mounts `bifrost/config.mock.json` and routes to `sbam-llm-mock`. `bifrost`: `config.bifrost.json`, real OpenRouter models |
+| `SBAM_ENV` | sbam-llm-mock (as `ENV`) | no | default `development`. `staging` or `production` with `LLM_PROVIDER=mock` stops `sbam-llm-mock` at start, so the stack does not come up |
 | `TUSD_HOOK_SECRET` | tusd → sbam-api hooks | yes | |
 | `SBAM_DEV_AUTH` | sbam-web | no | `1` enables the dev role picker until Keycloak sign-in (#51); ignored in production builds |
 | `MAX_BODY_BYTES`, `LOG_LEVEL` | sbam-api | no | defaults 10 MiB, `INFO` |
@@ -197,7 +199,7 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 | Service | Stub until then | Replaced by |
 |---|---|---|
 | keycloak realm | real: hardened realm + local seed job (#47 E2.1) | — |
-| bifrost | Bifrost with the mock provider, no aliases yet | #46 E1.15 (six `sbam-*` aliases, fallback, mock fixtures) |
+| bifrost | real: six `sbam-*` aliases with fallback, mock or OpenRouter (#46 E1.15; see `compose/bifrost/gen_config.py`) | — |
 | tusd | tusd with file store on `storage`, no hooks | #61 E4.2 (pre-create / post-finish hooks) |
 | clamav | real clamd + freshclam; not yet called | #62 E4.3 (scan wiring) |
 | workers ×6 | real: Temporal bootstrap `--queues`, sample `PingWorkflow` on every queue (#40 E1.7) | — |

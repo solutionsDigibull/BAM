@@ -1,0 +1,141 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "client": {
+    "drop_excess_requests": false,
+    "enforce_auth_on_inference": false
+  },
+  "providers": {
+    "openrouter": {
+      "keys": [
+        {
+          "name": "sbam",
+          "value": "env.OPENROUTER_API_KEY",
+          "models": [
+            "google/gemini-3.8-flash",
+            "anthropic/claude-haiku-5.5",
+            "anthropic/claude-sonnet-5.5",
+            "openai/gpt-6-sol"
+          ],
+          "weight": 1.0
+        }
+      ],
+      "network_config": {
+        "max_retries": 1
+      }
+    }
+  },
+  "governance": {
+    "routing_rules": [
+      {
+        "id": "alias-sbam-ocr",
+        "name": "sbam-ocr",
+        "cel_expression": "model == \"sbam-ocr\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "google/gemini-3.8-flash",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/anthropic/claude-haiku-5.5"
+        ],
+        "enabled": true,
+        "priority": 1
+      },
+      {
+        "id": "alias-sbam-sow",
+        "name": "sbam-sow",
+        "cel_expression": "model == \"sbam-sow\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-5.5",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/gpt-6-sol"
+        ],
+        "enabled": true,
+        "priority": 2
+      },
+      {
+        "id": "alias-sbam-isatvon",
+        "name": "sbam-isatvon",
+        "cel_expression": "model == \"sbam-isatvon\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-5.5",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/gpt-6-sol"
+        ],
+        "enabled": true,
+        "priority": 3
+      },
+      {
+        "id": "alias-sbam-codegen",
+        "name": "sbam-codegen",
+        "cel_expression": "model == \"sbam-codegen\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-5.5",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/gpt-6-sol"
+        ],
+        "enabled": true,
+        "priority": 4
+      },
+      {
+        "id": "alias-sbam-testgen",
+        "name": "sbam-testgen",
+        "cel_expression": "model == \"sbam-testgen\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "google/gemini-3.8-flash",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/anthropic/claude-haiku-5.5"
+        ],
+        "enabled": true,
+        "priority": 5
+      },
+      {
+        "id": "alias-sbam-corrector",
+        "name": "sbam-corrector",
+        "cel_expression": "model == \"sbam-corrector\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "anthropic/claude-sonnet-5.5",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/gpt-6-sol"
+        ],
+        "enabled": true,
+        "priority": 6
+      }
+    ]
+  },
+  "source_of_truth": "config.json",
+  "config_store": {
+    "enabled": true,
+    "type": "sqlite",
+    "config": {
+      "path": "/app/data/config.db"
+    }
+  }
+}
