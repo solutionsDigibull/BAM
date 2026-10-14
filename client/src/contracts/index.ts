@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:5b3daaa4100f4b31289313bc43dbce8b310d62429ea5d47b69519226a78bd2c6
+// source-sha256:cc2bec5aff95d5e706eb5b0c2e73726327c56131611c4b98e73457b81f145df1
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.

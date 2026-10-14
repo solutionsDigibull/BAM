@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 from sbam_contracts.documents import (
+    DOCUMENT_INGESTION,
     MAX_ACTIVE_FILES,
     MAX_FILE_BYTES,
     UPLOAD_TOKEN_TTL_SECONDS,
@@ -29,6 +30,7 @@ def test_e4_2_limits_are_the_documented_numbers() -> None:
     assert MAX_FILE_BYTES == 15_728_640
     assert MAX_ACTIVE_FILES == 20
     assert UPLOAD_TOKEN_TTL_SECONDS == 900
+    assert DOCUMENT_INGESTION == "DocumentIngestion"
 
 
 def test_e4_2_t01_valid_request_is_accepted() -> None:
@@ -39,8 +41,13 @@ def test_e4_2_t03_exactly_15_mb_is_accepted() -> None:
     assert UploadRequest.model_validate(request(size=15_728_640)).files[0].size == 15_728_640
 
 
-@pytest.mark.parametrize("size", [0, -1, 15_728_641])
-def test_e4_2_t02_size_outside_1_to_15_mb_points_at_the_size(size: int) -> None:
+def test_e4_2_t02_over_15_mb_is_left_to_the_service_to_answer_413() -> None:
+    # The model must not turn it into a 422: the service rejects the file as FILE_TOO_LARGE.
+    assert UploadRequest.model_validate(request(size=15_728_641)).files[0].size == 15_728_641
+
+
+@pytest.mark.parametrize("size", [0, -1])
+def test_e4_2_size_below_1_byte_points_at_the_size(size: int) -> None:
     assert error_paths(request(size=size)) == [("files", 0, "size")]
 
 
