@@ -30,6 +30,7 @@
         "LAST_ADMIN",
         "USER_EXISTS",
         "DUPLICATE_NAME",
+        "PROJECT_ARCHIVED",
         "DRAFT_EXISTS",
         "STRUCTURE_MISMATCH",
         "FILETYPE_FROZEN",
