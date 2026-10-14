@@ -44,6 +44,19 @@ services:
     networks: [sbam_internal]
     depends_on:
       keycloak: { condition: service_healthy }
+      mailpit: { condition: service_healthy } # the realm's SMTP server
+
+  # Catches Keycloak's invite and password emails (#50): UI and API on localhost:8025, SMTP mailpit:1025.
+  mailpit:
+    image: axllent/mailpit:v1.31.5@sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea
+    ports: ["127.0.0.1:${MAILPIT_PORT:-8025}:8025"]
+    networks: [sbam_edge, sbam_internal]
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   sbam-web:
     build:

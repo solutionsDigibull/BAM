@@ -7,24 +7,30 @@
 * Names are unique per tenant ignoring case. The pre-check gives the friendly answer; the unique
   index decides a race (IntegrityError -> 409 DUPLICATE_NAME).
 * Archive locks the row (SELECT … FOR UPDATE), so a pipeline transition waits for it or wins first.
+* Members (E2.4): PUT replaces the set under the same row lock. Every id must be an ACTIVE sbam-fde
+  of the tenant; each bad one is a 422 error on `user_ids.<i>` (another tenant's user looks
+  missing). PROJECT_MEMBERS_CHANGED carries the ids before and after.
 """
 
 import uuid
 from typing import Any
 
-from sbam_contracts.api import ErrorCode
-from sbam_contracts.projects import ProjectCreate, ProjectPatch, ProjectStatus
+from sbam_contracts.api import ErrorCode, FieldError
+from sbam_contracts.identity import UserStatus
+from sbam_contracts.projects import ProjectCreate, ProjectMembersPut, ProjectPatch, ProjectStatus
 from sbam_contracts.state_machines import Actor
 from sbam_contracts.state_machines import ProjectPipelineState as P
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
-from sbam_api.core.auth import CurrentUser
+from sbam_api.core.auth import ROLE_FDE, CurrentUser
 from sbam_api.core.conventions import ApiError, check_if_match, not_found
 from sbam_api.core.logging import correlation_id_var
-from sbam_api.projects.models import Project
-from sbam_api.projects.repository import ProjectRepository
+from sbam_api.identity.models import User
+from sbam_api.identity.repository import UserRepository
+from sbam_api.projects.models import Project, ProjectMember
+from sbam_api.projects.repository import MemberRepository, ProjectRepository
 from sbam_api.state_machine import apply_create
 
 FIELDS = ("name", "client_name", "description", "context_notes")
@@ -163,6 +169,57 @@ def archive(session: Session, user: CurrentUser, project_id: uuid.UUID) -> Proje
     )
     session.commit()
     return project
+
+
+def members(session: Session, user: CurrentUser, project_id: uuid.UUID) -> list[User]:
+    get(session, user, project_id)  # 404 for a missing or other-tenant project
+    ids = MemberRepository(session, user.context()).user_ids(project_id)
+    return _sorted(UserRepository(session, user.context()).among(ids).values())
+
+
+def set_members(
+    session: Session, user: CurrentUser, project_id: uuid.UUID, body: ProjectMembersPut
+) -> list[User]:
+    ctx = user.context()
+    project: Project | None = _repo(session, user).get_for_update(project_id)
+    if project is None:
+        raise not_found()
+    require_active(project)
+    found = UserRepository(session, ctx).among(body.user_ids)
+    errors = [
+        FieldError(path=f"user_ids.{i}", message="not an active FDE of this tenant")
+        for i, uid in enumerate(body.user_ids)
+        if not _assignable(found.get(uid))
+    ]
+    if errors:
+        raise ApiError(
+            422, ErrorCode.VALIDATION_ERROR, "Only active FDEs can be assigned", errors=errors
+        )
+    repo = MemberRepository(session, ctx)
+    before, after = repo.user_ids(project.id), set(body.user_ids)
+    if before != after:
+        repo.remove(project.id, before - after)
+        for uid in sorted(after - before):
+            member = ProjectMember(project_id=project.id, user_id=uid, created_by=user.keycloak_sub)
+            repo.add(member)
+        _audit(
+            session,
+            user,
+            "PROJECT_MEMBERS_CHANGED",
+            project,
+            {"user_ids": sorted(map(str, before))},
+            {"user_ids": sorted(map(str, after))},
+        )
+        session.commit()
+    return _sorted(found.values())
+
+
+def _assignable(row: User | None) -> bool:
+    return row is not None and row.status == UserStatus.ACTIVE and ROLE_FDE in row.portal_roles
+
+
+def _sorted(users: Any) -> list[User]:
+    return sorted(users, key=lambda u: u.id)
 
 
 def _fields(project: Project, names: Any) -> dict[str, Any]:

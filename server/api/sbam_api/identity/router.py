@@ -1,6 +1,7 @@
-"""Identity API (E2.3): super-admin tenants and the caller's own profile.
+"""Identity API: super-admin tenants and the caller's own profile (E2.3), tenant users (E2.4).
 
 `/admin/tenants` is platform-level (super-admin, no tenant); an sbam-admin gets 403 WRONG_PORTAL.
+`/admin/users` is the caller's tenant only (another tenant's user: 404).
 `/me` answers for any signed-in user.
 """
 
@@ -10,19 +11,28 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request, Response
 from sbam_contracts.api import Page
-from sbam_contracts.identity import Me, TenantCreate, TenantPatch, UserProfile
+from sbam_contracts.identity import (
+    Me,
+    TenantCreate,
+    TenantPatch,
+    TenantUser,
+    UserInvite,
+    UserPatch,
+    UserProfile,
+)
 from sbam_contracts.identity import Tenant as TenantOut
 from sqlalchemy.orm import Session
 
-from sbam_api.core.auth import Auth, CurrentUser, authenticated, super_admin
+from sbam_api.core.auth import Auth, CurrentUser, admin, authenticated, super_admin
 from sbam_api.core.conventions import etag
 from sbam_api.db.session import app_sessions
 from sbam_api.identity import repository, service
-from sbam_api.identity.models import Tenant
+from sbam_api.identity.models import Tenant, User
 
 router = APIRouter(tags=["identity"])
 
 SuperAdmin = Annotated[CurrentUser, Depends(super_admin)]
+Admin = Annotated[CurrentUser, Depends(admin)]
 
 
 def db(request: Request) -> Iterator[Session]:
@@ -72,6 +82,39 @@ def patch_tenant(
     )
     response.headers["ETag"] = etag(tenant.row_version)
     return _out(tenant)
+
+
+def tenant_user(row: User, response: Response | None = None) -> TenantUser:
+    if response is not None:
+        response.headers["ETag"] = etag(row.row_version)
+    return TenantUser.model_validate(row, from_attributes=True)
+
+
+@router.get("/admin/users")
+def list_users(user: Admin, session: Db) -> Page[TenantUser]:
+    return Page[TenantUser](items=[tenant_user(u) for u in service.list_users(session, user)])
+
+
+@router.post("/admin/users/invite", status_code=201)
+def invite_user(
+    body: UserInvite, user: Admin, session: Db, request: Request, response: Response
+) -> TenantUser:
+    row = service.invite_user(session, _auth(request).users, user, body)
+    return tenant_user(row, response)
+
+
+@router.patch("/admin/users/{user_id}")
+def patch_user(
+    user_id: uuid.UUID,
+    body: UserPatch,
+    user: Admin,
+    session: Db,
+    request: Request,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> TenantUser:
+    row = service.update_user(session, _auth(request).users, user, user_id, body, if_match)
+    return tenant_user(row, response)
 
 
 @router.get("/me")
