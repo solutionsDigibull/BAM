@@ -53,11 +53,33 @@ def test_e1_7_missing_settings_exit_2(
 
 def test_e1_7_every_queue_serves_ping_and_mirror() -> None:
     registry.load_all()
+    common = {"ping", "update_run_mirror", "apply_pipeline_transition", "notify"}
     for queue in TaskQueue:
         workflows, activities = registry.collect(queue)
-        assert [w.__name__ for w in workflows] == ["PingWorkflow"]
-        names = sorted(getattr(a, "__temporal_activity_definition").name for a in activities)
-        assert names == ["ping", "update_run_mirror"]
+        assert "PingWorkflow" in [w.__name__ for w in workflows]
+        names = {getattr(a, "__temporal_activity_definition").name for a in activities}
+        assert common <= names, queue
+
+
+def test_e10_1_pipeline_workflows_and_stubs_on_their_queues() -> None:
+    registry.load_all()
+
+    def served(queue: TaskQueue) -> tuple[set[str], set[str]]:
+        workflows, activities = registry.collect(queue)
+        return (
+            {w.__name__ for w in workflows},
+            {getattr(a, "__temporal_activity_definition").name for a in activities},
+        )
+
+    assert served(TaskQueue.INGEST)[0] >= {"ProjectPipeline"}
+    assert served(TaskQueue.BUILD)[0] >= {"SubSkillBuild"}
+    assert "ingest_documents" in served(TaskQueue.INGEST)[1]
+    assert {"build_knowledge", "build_okf_bundle"} <= served(TaskQueue.KNOWLEDGE)[1]
+    llm = {"generate_sow", "create_workflow", "extract_macro_skills", "extract_sub_skills"}
+    assert llm <= served(TaskQueue.LLM)[1]
+    assert {"build_schema_sql", "build_sub_skill"} <= served(TaskQueue.BUILD)[1]
+    certify = {"certify_macros", "validate_workflow", "certify_workflow", "freeze_and_version"}
+    assert certify <= served(TaskQueue.CERTIFY)[1]
 
 
 def test_e1_7_registry_needs_a_queue() -> None:
