@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from sbam_api.db.base import Base, TenantOwned, status_check
 from sbam_api.state_machine import Stateful, state_check
+from sbam_api.state_machine.registry import register_entity
 
 
 class Project(Stateful, TenantOwned, Base):
@@ -28,3 +29,6 @@ class Project(Stateful, TenantOwned, Base):
 
 # Unique per tenant ignoring case; the contract already trimmed the name.
 Index("uq_projects_tenant_name_ci", Project.tenant_id, func.lower(Project.name), unique=True)
+
+# The pipeline's transition activity finds the projects table here (E10.1).
+register_entity(MachineName.PROJECT_PIPELINE, Project)
