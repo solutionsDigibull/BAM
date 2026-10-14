@@ -1,0 +1,19 @@
+#!/bin/sh
+# tusd file hook (E4.2, TD §5.2). tusd runs this once an upload is complete: tell the API, which
+# stores the file, registers the document version and starts ingestion. tusd does not retry a file
+# hook, so retry here for a minute in case the API is restarting.
+set -eu
+body=$(mktemp)
+trap 'rm -f "$body"' EXIT
+cat > "$body"
+for wait in 1 2 4 8 16 30; do
+  if wget -q -O /dev/null -T 30 \
+    --header "X-Tusd-Hook-Secret: ${TUSD_HOOK_SECRET}" \
+    --header "Content-Type: application/json" \
+    --post-file="$body" \
+    "${API_HOOK_URL:-http://sbam-api:8000/api/v1/internal/tusd/hooks}"; then
+    exit 0
+  fi
+  sleep "$wait"
+done
+exit 1

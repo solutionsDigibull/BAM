@@ -1,0 +1,14 @@
+#!/bin/sh
+# tusd file hook (E4.2, TD §5.2). tusd runs this before it creates an upload and reads the answer
+# from stdout: forward the event to the API, which checks the upload token, size, count and type
+# and answers accept or RejectUpload. If the API cannot be reached the script fails and tusd
+# refuses the upload: no answer, no upload.
+set -eu
+body=$(mktemp)
+trap 'rm -f "$body"' EXIT
+cat > "$body"
+wget -q -O - -T 10 \
+  --header "X-Tusd-Hook-Secret: ${TUSD_HOOK_SECRET}" \
+  --header "Content-Type: application/json" \
+  --post-file="$body" \
+  "${API_HOOK_URL:-http://sbam-api:8000/api/v1/internal/tusd/hooks}"
