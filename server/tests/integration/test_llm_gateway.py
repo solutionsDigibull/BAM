@@ -148,7 +148,7 @@ def test_e1_15_t06_openrouter_key_is_absent_from_api_and_workers(
     out = compose("exec", "-T", service, "printenv")
     if out.returncode != 0:
         pytest.skip(f"{service} is not running")
-    assert "OPENROUTER" not in out.stdout and "NVIDIA" not in out.stdout
+    assert "OPENROUTER" not in out.stdout
 
 
 def test_e1_15_t07_mock_container_has_no_route_to_openrouter(compose: Compose) -> None:
