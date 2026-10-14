@@ -71,9 +71,19 @@ ensure_api_admin_client() { # sbam-api's service account for tenant organization
   # The organizations admin API needs manage-realm (manage-users is refused, Keycloak 26.8).
   "$kc" add-roles -r "$realm" --uusername service-account-sbam-api-admin \
     --cclientid realm-management --rolename manage-realm
+  # Inviting and editing tenant users (#50).
+  "$kc" add-roles -r "$realm" --uusername service-account-sbam-api-admin \
+    --cclientid realm-management --rolename manage-users --rolename view-users \
+    --rolename query-users
+}
+
+ensure_smtp() { # invite emails (#50) go to Mailpit locally; staging/prod configure a real server
+  "$kc" update "realms/$realm" -s smtpServer.host=mailpit -s smtpServer.port=1025 \
+    -s smtpServer.from=no-reply@sbam.test -s smtpServer.fromDisplayName=SBAM
 }
 
 ensure_api_admin_client
+ensure_smtp
 ensure_org "$TENANT_A" "Tenant A" tenant-a.test
 ensure_org "$TENANT_B" "Tenant B" tenant-b.test
 

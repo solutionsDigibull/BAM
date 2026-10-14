@@ -1,6 +1,5 @@
 """Projects API (E3.1): admin CRUD + archive under `/admin/projects`, and the FDE's `/projects`.
-
-Members (`PUT /admin/projects/{id}/members`) arrive with E2.4 (#50).
+Members (E2.4): `GET/PUT /admin/projects/{id}/members`.
 """
 
 import uuid
@@ -10,12 +9,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Request, Response
 from sbam_contracts.api import Page
 from sbam_contracts.projects import Project as ProjectOut
-from sbam_contracts.projects import ProjectCreate, ProjectPatch
+from sbam_contracts.projects import ProjectCreate, ProjectMembers, ProjectMembersPut, ProjectPatch
 from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser, admin, fde
 from sbam_api.core.conventions import etag
 from sbam_api.db.session import app_sessions
+from sbam_api.identity.models import User
+from sbam_api.identity.router import tenant_user
 from sbam_api.projects import service
 from sbam_api.projects.models import Project
 
@@ -75,6 +76,22 @@ def archive_project(
     project_id: uuid.UUID, user: Admin, session: Db, response: Response
 ) -> ProjectOut:
     return _out(service.archive(session, user, project_id), response)
+
+
+def _members(project_id: uuid.UUID, users: list[User]) -> ProjectMembers:
+    return ProjectMembers(project_id=project_id, members=[tenant_user(u) for u in users])
+
+
+@router.get("/admin/projects/{project_id}/members")
+def get_members(project_id: uuid.UUID, user: Admin, session: Db) -> ProjectMembers:
+    return _members(project_id, service.members(session, user, project_id))
+
+
+@router.put("/admin/projects/{project_id}/members")
+def put_members(
+    project_id: uuid.UUID, body: ProjectMembersPut, user: Admin, session: Db
+) -> ProjectMembers:
+    return _members(project_id, service.set_members(session, user, project_id, body))
 
 
 @router.get("/projects")

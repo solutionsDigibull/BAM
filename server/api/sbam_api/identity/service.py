@@ -7,18 +7,23 @@ the unique name (or fails otherwise) deletes the organization again.
 The mirror runs on every tenant user's request (`core.auth.current_user`): the tenant must exist and
 be ACTIVE, the user's row is created on first sight (`ON CONFLICT DO NOTHING`, so two tabs make one
 row) and refreshed from the token when something changed. A user never moves to another tenant.
+`portal_roles` is taken from the token only on a new login: an admin's role change (E2.4) is
+written here first, and a still-valid older token must not write the old roles back. An INVITED
+user becomes ACTIVE on first sight; a DEACTIVATED one gets 401 even with an unexpired token.
 """
 
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from sbam_contracts.api import ErrorCode
-from sbam_contracts.identity import TenantStatus
+from sbam_contracts.identity import TenantStatus, UserInvite, UserPatch, UserStatus
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.exc import StaleDataError
 
+from sbam_api.audit.repository import record
 from sbam_api.core.auth import (
     ROLE_ADMIN,
     ROLE_FDE,
@@ -26,12 +31,17 @@ from sbam_api.core.auth import (
     CurrentUser,
     OrgDirectory,
     SecurityAudit,
+    UserAdmin,
+    unauthenticated,
 )
 from sbam_api.core.conventions import ApiError, check_if_match, not_found
 from sbam_api.core.ids import uuid7
+from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.identity import repository
+from sbam_api.identity.keycloak_admin import user_exists
 from sbam_api.identity.models import Tenant, User
+from sbam_api.identity.repository import UserRepository
 
 PORTAL_ROLES = (ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_FDE)
 
@@ -112,6 +122,119 @@ def set_tenant_status(
     return tenant
 
 
+# --- Tenant users (sbam-admin, E2.4) -----------------------------------------------------------
+#
+# The row is written (flushed) first, then Keycloak, then the commit: a stale row is 412 before
+# Keycloak is touched, and a Keycloak failure is 503 and rolls the row back. Role changes and
+# deactivation revoke the user's sessions, so they apply at once.
+
+
+def last_admin() -> ApiError:
+    return ApiError(409, ErrorCode.LAST_ADMIN, "The tenant must keep at least one active admin")
+
+
+def list_users(session: Session, actor: CurrentUser) -> list[User]:
+    # ponytail: one page of 100, oldest first; cursor paging when a tenant has more users.
+    return UserRepository(session, actor.context()).list()
+
+
+def invite_user(session: Session, users: UserAdmin, actor: CurrentUser, body: UserInvite) -> User:
+    if repository.email_taken(session, body.email):  # any tenant; the answer doesn't say which
+        raise user_exists()
+    tenant = session.get(Tenant, actor.tenant_id)
+    if tenant is None:
+        raise not_found()
+    roles = sorted(map(str, body.roles))
+    kc_id = users.invite(tenant.id, tenant.keycloak_org_id, body.email, roles)
+    try:
+        row = UserRepository(session, actor.context()).add(
+            User(
+                id=uuid.UUID(kc_id),
+                keycloak_sub=kc_id,
+                email=body.email,
+                portal_roles=roles,
+                status=UserStatus.INVITED.value,
+                created_by=actor.keycloak_sub,
+            )
+        )
+        _audit(session, actor, "USER_INVITED", row, None, {"email": body.email, "roles": roles})
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        users.delete(kc_id)
+        if isinstance(exc, IntegrityError):
+            raise user_exists() from None
+        raise
+    return row
+
+
+def update_user(
+    session: Session,
+    users: UserAdmin,
+    actor: CurrentUser,
+    user_id: uuid.UUID,
+    body: UserPatch,
+    if_match: str | None,
+) -> User:
+    repo = UserRepository(session, actor.context())
+    repository.lock_tenant(session, repo.ctx.tenant_id)
+    row = repo.get(user_id)
+    if row is None:
+        raise not_found()
+    check_if_match(if_match, row.row_version)
+    roles = sorted(map(str, body.roles)) if body.roles is not None else list(row.portal_roles)
+    status = row.status
+    if body.active is False:
+        status = UserStatus.DEACTIVATED.value
+    elif body.active and row.status == UserStatus.DEACTIVATED:
+        status = UserStatus.ACTIVE.value
+    roles_changed, status_changed = roles != row.portal_roles, status != row.status
+    if not (roles_changed or status_changed):
+        return row
+    was_admin = row.status == UserStatus.ACTIVE and ROLE_ADMIN in row.portal_roles
+    stays_admin = status == UserStatus.ACTIVE and ROLE_ADMIN in roles
+    if was_admin and not stays_admin and not repo.other_active_admins(row.id):
+        raise last_admin()
+
+    old_roles, old_status = list(row.portal_roles), row.status
+    row.portal_roles, row.status = roles, status
+    repo.update(row, row.row_version)  # flushed, not committed: a concurrent writer -> 412 here
+    if status_changed:
+        users.set_enabled(row.keycloak_sub, status != UserStatus.DEACTIVATED)
+    if roles_changed:
+        users.set_roles(row.keycloak_sub, old_roles, roles)
+    if status == UserStatus.DEACTIVATED or roles_changed:
+        users.logout(row.keycloak_sub)
+    if roles_changed:
+        _audit(session, actor, "ROLE_CHANGED", row, {"roles": old_roles}, {"roles": roles})
+    if status_changed:
+        action = "USER_DEACTIVATED" if status == UserStatus.DEACTIVATED else "USER_REACTIVATED"
+        _audit(session, actor, action, row, {"status": old_status}, {"status": status})
+    session.commit()
+    return row
+
+
+def _audit(
+    session: Session,
+    actor: CurrentUser,
+    action: str,
+    row: User,
+    before: dict[str, Any] | None,
+    after: dict[str, Any],
+) -> None:
+    record(
+        session,
+        tenant_id=row.tenant_id,
+        actor_id=str(actor.user_id),
+        action=action,
+        entity_type="user",
+        entity_id=str(row.id),
+        before=before,
+        after=after,
+        correlation_id=correlation_id_var.get() or "unknown",
+    )
+
+
 # --- The users mirror ------------------------------------------------------------------------
 
 
@@ -138,6 +261,9 @@ class SqlUserDirectory:
             if row is None or row.tenant_id != tenant.id:  # never move a user between tenants
                 self._deny(user, "tenant mismatch")
                 raise tenant_mismatch()
+            if row.status == UserStatus.DEACTIVATED:
+                self._deny(user, "deactivated")
+                raise unauthenticated()
             self._refresh(session, row, user, created)
 
     def _insert(self, session: Session, user: CurrentUser) -> bool:
@@ -168,11 +294,15 @@ class SqlUserDirectory:
         )
         old_email = row.email
         changed = False
-        for column, value in (
+        fields: list[tuple[str, object]] = [
             ("email", user.email),
             ("display_name", user.display_name),
-            ("portal_roles", roles),
-        ):
+        ]
+        if created or new_login:
+            fields.append(("portal_roles", roles))
+        if row.status == UserStatus.INVITED:
+            fields.append(("status", UserStatus.ACTIVE.value))
+        for column, value in fields:
             if getattr(row, column) != value:
                 setattr(row, column, value)
                 changed = True
