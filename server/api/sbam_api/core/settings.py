@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     keycloak_internal_url: AnyHttpUrl | None = None
     keycloak_admin_client_id: str = Field(default="sbam-api-admin", min_length=1)
     keycloak_admin_client_secret: SecretStr | None = None
+    # Uploads (#61): tusd calls the hook endpoint with this secret; no secret = hooks and upload
+    # tokens answer 503. The browser reaches tusd at `tusd_public_url`.
+    tusd_hook_secret: SecretStr | None = None
+    tusd_public_url: str = "http://localhost:1080/files/"
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     log_level: str = "INFO"
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
