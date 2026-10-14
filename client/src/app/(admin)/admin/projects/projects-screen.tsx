@@ -1,30 +1,26 @@
 "use client";
 
-import {
-  EditOutlined,
-  InboxOutlined,
-  PlusOutlined,
-  SearchOutlined,
-  TeamOutlined,
-} from "@ant-design/icons";
+// Layout follows the UI team's admin reference (docs/reference/ui/README.md, "Shared patterns"): title +
+// description with actions on the right, tabs with count badges, search + "n of m rows", a bordered grid with
+// small upper-case headers, and a footer line under the grid.
+
+import { EditOutlined, InboxOutlined, PlusOutlined, TeamOutlined } from "@ant-design/icons";
 import { useInvalidate, useList } from "@refinedev/core";
 import {
   App,
   Button,
-  Card,
-  Col,
+  ConfigProvider,
   Flex,
   Input,
-  Row,
-  Segmented,
-  Statistic,
   Table,
+  Tabs,
   Tag,
+  theme,
   Tooltip,
   Typography,
 } from "antd";
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { ApiErrorState, EmptyState, LoadingState, StatusBadge } from "@/components/ui-kit";
 import type { Project, ProjectStatus } from "@/contracts";
@@ -35,10 +31,38 @@ import { MembersDrawer } from "./members-drawer";
 import { EMPTY_MESSAGE, RESOURCE } from "./project-api";
 import { ProjectFormDrawer } from "./project-form-drawer";
 
-// Pipeline states in which SBAM is working on the project (TD §14), counted as "processing".
-const BUSY = new Set(["INGESTING", "KNOWLEDGE_BUILDING", "SOW_GENERATING", "SOW_APPROVED"]);
-
 type Editor = { mode: "create" } | { mode: "edit"; id: string };
+
+const MUTED = "#64748b";
+const head = (label: string) => (
+  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.3, color: MUTED }}>
+    {label.toUpperCase()}
+  </span>
+);
+
+function CountBadge({ n, active }: { n: number; active: boolean }) {
+  const { token } = theme.useToken(); // follow the app theme, like the tab underline
+  return (
+    <span
+      style={{
+        marginLeft: 6,
+        padding: "0 7px",
+        borderRadius: 10,
+        fontSize: 11,
+        lineHeight: "18px",
+        display: "inline-block",
+        background: active ? token.colorPrimaryBg : "#f1f5f9",
+        color: active ? token.colorPrimary : MUTED,
+      }}
+    >
+      {n}
+    </span>
+  );
+}
+
+function Meta({ children }: { children: ReactNode }) {
+  return <Typography.Text style={{ fontSize: 12, color: MUTED }}>{children}</Typography.Text>;
+}
 
 export function ProjectsScreen() {
   const { message } = App.useApp();
@@ -60,10 +84,10 @@ export function ProjectsScreen() {
     () => ({
       ACTIVE: projects.filter((p) => p.status === "ACTIVE").length,
       ARCHIVED: projects.filter((p) => p.status === "ARCHIVED").length,
-      busy: projects.filter((p) => p.status === "ACTIVE" && BUSY.has(p.pipeline_state)).length,
     }),
     [projects],
   );
+  const inTab = counts[tab];
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return projects
@@ -83,38 +107,41 @@ export function ProjectsScreen() {
     </Button>
   );
 
-  let body;
-  if (query.isLoading) body = <LoadingState />;
-  else if (query.isError)
-    body = <ApiErrorState error={query.error} onRetry={() => query.refetch()} />;
-  else if (projects.length === 0) body = <EmptyState message={EMPTY_MESSAGE} action={newProject} />;
-  else
-    body = (
-      <>
-        <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 16 }}>
-          <Segmented<ProjectStatus>
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: "ACTIVE", label: `Active (${counts.ACTIVE})` },
-              { value: "ARCHIVED", label: `Archived (${counts.ARCHIVED})` },
-            ]}
-          />
-          <Input
-            allowClear
-            prefix={<SearchOutlined />}
-            placeholder="Search name or client"
-            aria-label="Search projects"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 280, maxWidth: "100%" }}
-          />
-        </Flex>
+  const grid = (
+    <>
+      <Flex justify="space-between" align="center" wrap gap={12} style={{ margin: "16px 0" }}>
+        <Input
+          allowClear
+          placeholder="Search projects..."
+          aria-label="Search projects"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 340, maxWidth: "100%" }}
+        />
+        <Meta>
+          {rows.length} of {inTab} rows
+        </Meta>
+      </Flex>
+      <ConfigProvider
+        theme={{
+          components: {
+            Table: {
+              headerBg: "#f8fafc",
+              headerSplitColor: "transparent",
+              borderColor: "#e5e7eb",
+              rowHoverBg: "#f5f9ff",
+              cellPaddingBlock: 14,
+            },
+          },
+        }}
+      >
         <Table<Project>
           rowKey="id"
+          bordered={false}
           dataSource={rows}
           pagination={rows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
-          scroll={{ x: 760 }}
+          scroll={{ x: 820 }}
+          style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}
           locale={{
             emptyText: (
               <EmptyState
@@ -130,53 +157,57 @@ export function ProjectsScreen() {
           }}
           columns={[
             {
-              title: "Project",
+              title: head("Project"),
               key: "name",
               render: (_, p) => (
-                <Flex vertical style={{ minWidth: 0 }}>
-                  <Typography.Text strong ellipsis={{ tooltip: p.name }} style={{ maxWidth: 360 }}>
-                    {p.name}
-                  </Typography.Text>
-                  {p.client_name && (
-                    <Typography.Text
-                      type="secondary"
-                      ellipsis={{ tooltip: p.client_name }}
-                      style={{ maxWidth: 360, fontSize: 12 }}
-                    >
-                      {p.client_name}
-                    </Typography.Text>
-                  )}
-                </Flex>
+                <Typography.Text ellipsis={{ tooltip: p.name }} style={{ maxWidth: 320 }}>
+                  {p.name}
+                </Typography.Text>
               ),
             },
             {
-              title: "Pipeline",
+              title: head("Client"),
+              key: "client",
+              width: 220,
+              render: (_, p) =>
+                p.client_name ? (
+                  <Typography.Text
+                    type="secondary"
+                    ellipsis={{ tooltip: p.client_name }}
+                    style={{ maxWidth: 200 }}
+                  >
+                    {p.client_name}
+                  </Typography.Text>
+                ) : (
+                  <Meta>—</Meta>
+                ),
+            },
+            {
+              title: head("Pipeline"),
               key: "pipeline",
-              width: 190,
+              width: 180,
               render: (_, p) => <StatusBadge status={p.pipeline_state} />,
             },
             {
-              title: "Updated",
+              title: head("Updated"),
               key: "updated",
-              width: 170,
+              width: 160,
               render: (_, p) => (
                 <Tooltip title={dayjs(p.updated_at).format("YYYY-MM-DD HH:mm:ss")}>
-                  <Typography.Text type="secondary">
-                    {dayjs(p.updated_at).format("D MMM YYYY, HH:mm")}
-                  </Typography.Text>
+                  <Meta>{dayjs(p.updated_at).format("D MMM YYYY, HH:mm")}</Meta>
                 </Tooltip>
               ),
             },
             {
-              title: "Actions",
+              title: head("Actions"),
               key: "actions",
-              width: 300,
+              width: 260,
               align: "right",
               render: (_, p) =>
                 p.status === "ARCHIVED" ? (
                   <Tag icon={<InboxOutlined />}>Read-only</Tag>
                 ) : (
-                  <Flex gap={4} justify="flex-end">
+                  <Flex gap={2} justify="flex-end">
                     <Button
                       size="small"
                       type="text"
@@ -210,42 +241,58 @@ export function ProjectsScreen() {
             },
           ]}
         />
-      </>
+      </ConfigProvider>
+      <Flex justify="space-between" wrap gap={8} style={{ marginTop: 12 }}>
+        <Meta>5 columns · newest first · archived projects are read-only</Meta>
+        <Meta>Edit opens the project · FDEs assigns members · Archive asks for the name</Meta>
+      </Flex>
+      <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 12, paddingTop: 10 }}>
+        <Meta>
+          <strong style={{ color: "#475569" }}>More fields →</strong> Description · Context notes
+          (Markdown, with the masters template and document guide) — in Edit
+        </Meta>
+      </div>
+    </>
+  );
+
+  let body;
+  if (query.isLoading) body = <LoadingState />;
+  else if (query.isError)
+    body = <ApiErrorState error={query.error} onRetry={() => query.refetch()} />;
+  else if (projects.length === 0) body = <EmptyState message={EMPTY_MESSAGE} action={newProject} />;
+  else
+    body = (
+      <Tabs
+        activeKey={tab}
+        destroyOnHidden
+        onChange={(key) => setTab(key as ProjectStatus)}
+        items={(["ACTIVE", "ARCHIVED"] as const).map((key) => ({
+          key,
+          label: (
+            <span>
+              {key === "ACTIVE" ? "Active projects" : "Archived"}
+              <CountBadge n={counts[key]} active={tab === key} />
+            </span>
+          ),
+          children: grid,
+        }))}
+      />
     );
 
   return (
-    <Flex vertical gap={16}>
-      <Flex justify="space-between" align="flex-start" wrap gap={12}>
+    <div>
+      <Flex justify="space-between" align="flex-start" wrap gap={12} style={{ marginBottom: 20 }}>
         <div>
-          <Typography.Title level={1} style={{ margin: 0, fontSize: 24 }}>
+          <Typography.Title level={1} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
             Projects
           </Typography.Title>
-          <Typography.Text type="secondary">
-            Create projects, add context notes and assign the FDEs who will build them.
+          <Typography.Text style={{ color: MUTED }}>
+            Create tenant projects, add context notes and assign the FDEs who build them
           </Typography.Text>
         </div>
         {projects.length > 0 && newProject}
       </Flex>
-      {projects.length > 0 && (
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={8}>
-            <Card size="small">
-              <Statistic title="Active projects" value={counts.ACTIVE} />
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card size="small">
-              <Statistic title="Processing now" value={counts.busy} />
-            </Card>
-          </Col>
-          <Col xs={24} sm={8}>
-            <Card size="small">
-              <Statistic title="Archived" value={counts.ARCHIVED} />
-            </Card>
-          </Col>
-        </Row>
-      )}
-      <Card>{body}</Card>
+      {body}
 
       {editor && (
         <ProjectFormDrawer
@@ -280,6 +327,6 @@ export function ProjectsScreen() {
           }}
         />
       )}
-    </Flex>
+    </div>
   );
 }

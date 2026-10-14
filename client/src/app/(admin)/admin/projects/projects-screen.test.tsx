@@ -43,7 +43,7 @@ describe("Admin Projects screens (E3.9)", () => {
     renderWithRefine(<ProjectsScreen />);
     expect(await screen.findByText(P.name)).toBeDefined();
     expect(screen.queryByText("Cable assembly")).toBeNull();
-    fireEvent.click(screen.getByText("Archived (1)"));
+    fireEvent.click(screen.getByRole("tab", { name: /Archived/ }));
     expect(await screen.findByText("Cable assembly")).toBeDefined();
     expect(screen.getByText("Read-only")).toBeDefined();
     expect(screen.queryByRole("button", { name: /Archive Cable assembly/ })).toBeNull();
