@@ -12,6 +12,12 @@ Rules worth knowing
   * Members (E2.4): PUT replaces the whole set. Every id must be an ACTIVE `sbam-fde` user of the
     tenant (422 on `user_ids.<i>` otherwise); at most 50, no duplicates. An archived project
     answers 409 PROJECT_ARCHIVED.
+  * Workspace (E4.1): `GET /projects/{id}/pipeline` returns `state` (always equal to
+    `pipeline_state`), the `steps` in pipeline order and the document `counts`. A step is
+    `pending` until the pipeline reaches it; `started_at` / `ended_at` come from the audit trail.
+    Counts ignore deleted and purged versions: `uploaded` = received and not yet settled (uploaded,
+    scanning, parsing), `parsed`, `rejected` (malware) and `failed` (scan or parse failed).
+    `GET /projects/{id}/workflows` is read-only: Workflows are created by SBAM, never by a client.
 """
 
 from datetime import datetime
@@ -23,7 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.identity import TenantUser
-from sbam_contracts.state_machines import ProjectPipelineState
+from sbam_contracts.state_machines import ProjectPipelineState, WorkflowState
 
 _NO_CONTROL = r"^[^\x00-\x1f\x7f-\x9f]*$"
 
@@ -99,6 +105,47 @@ class ProjectMembers(BaseModel):
     members: list[TenantUser]
 
 
+class PipelineStepStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class PipelineStep(BaseModel):
+    name: ProjectPipelineState
+    status: PipelineStepStatus
+    started_at: datetime | None
+    ended_at: datetime | None
+
+
+class PipelineCounts(BaseModel):
+    uploaded: int = Field(ge=0)
+    parsed: int = Field(ge=0)
+    rejected: int = Field(ge=0)
+    failed: int = Field(ge=0)
+
+
+class PipelineTimeline(BaseModel):
+    """`GET /projects/{id}/pipeline`: the dashboard's pipeline panel."""
+
+    state: ProjectPipelineState
+    steps: list[PipelineStep]
+    counts: PipelineCounts
+
+
+class WorkflowSummary(BaseModel):
+    """One Workflow SBAM created for an approved SOW version (read-only)."""
+
+    id: UUID
+    project_id: UUID
+    sow_version_id: UUID
+    version: int
+    state: WorkflowState
+    created_at: datetime
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/projects/`."""
     models: dict[str, type[BaseModel]] = {
@@ -107,5 +154,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "project_patch": ProjectPatch,
         "project_members_put": ProjectMembersPut,
         "project_members": ProjectMembers,
+        "pipeline_timeline": PipelineTimeline,
+        "workflow_summary": WorkflowSummary,
     }
     return {stem: contract_schema(model, f"projects/{stem}") for stem, model in models.items()}

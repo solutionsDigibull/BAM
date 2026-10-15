@@ -41,7 +41,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.identity.models import Tenant, User
 from sbam_api.identity.service import SqlUserDirectory
-from sbam_api.ingest.models import Document
+from sbam_api.ingest.models import Document, DocumentVersion
 from sbam_api.main import create_app
 from sbam_api.masters.models import MasterEntry, MasterSnapshot
 from sbam_api.projects.models import Project
@@ -53,7 +53,7 @@ from sbam_api.temporal.models import TemporalRun
 from sbam_contracts.api import API_BASE
 from sbam_contracts.build import BuildStage, SubSkillBuildStatus
 from sbam_contracts.runs import RunState, SubjectType, build_workflow_id
-from sbam_contracts.state_machines import SubSkillState
+from sbam_contracts.state_machines import DocumentVersionState, SubSkillState
 from sqlalchemy import func, pool, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -267,6 +267,18 @@ class World:
                 ("b", self.tenant_b, self.project_b),
             ):
                 doc = Document(tenant_id=tenant, project_id=project, title=f"spec-{name}.pdf")
+                s.add(doc)
+                s.flush()
+                version = DocumentVersion(
+                    tenant_id=tenant,
+                    project_id=project,
+                    document_id=doc.id,
+                    storage_key=f"{tenant}/{project}/uploads/spec-{name}",
+                    sha256=f"{name:0>64}",
+                    size=1024,
+                    mime="application/pdf",
+                    state=DocumentVersionState.PARSED.value,
+                )
                 run = TemporalRun(
                     tenant_id=tenant,
                     project_id=project,
@@ -279,7 +291,7 @@ class World:
                     state=RunState.RUNNING.value,
                     current_stage="ingest",
                 )
-                s.add_all([doc, run])
+                s.add_all([version, run])
                 s.flush()
                 self.docs[name], self.runs[name] = doc.id, run.id
             s.commit()

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:191619139c504dbc9b2d19e9b249dc6b79b3160ddd689adbd6147df634d746b6
+// source-sha256:743883715a77563a092d0fbde933b779f06853714e477e1b465eb777f2da9338
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -210,6 +210,11 @@ export type UserStatus = "INVITED" | "ACTIVE" | "DEACTIVATED";
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PipelineStepStatus".
+ */
+export type PipelineStepStatus = "pending" | "running" | "done" | "failed" | "cancelled";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ScanStatus".
  */
 export type ScanStatus = "CLEAN" | "INFECTED" | "SCAN_FAILED";
@@ -266,6 +271,8 @@ export interface SbamContracts {
   ProjectPatch?: ProjectPatch;
   ProjectMembersPut?: ProjectMembersPut;
   ProjectMembers?: ProjectMembers;
+  PipelineTimeline?: PipelineTimeline;
+  WorkflowSummary?: WorkflowSummary;
   UploadRequest?: UploadRequest;
   UploadToken?: UploadToken;
   ScanOutcome?: ScanOutcome;
@@ -1639,6 +1646,51 @@ export interface ProjectMembersPut {
 export interface ProjectMembers {
   project_id: string;
   members: TenantUser[];
+}
+/**
+ * `GET /projects/{id}/pipeline`: the dashboard's pipeline panel.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PipelineTimeline".
+ */
+export interface PipelineTimeline {
+  state: ProjectPipelineState;
+  steps: PipelineStep[];
+  counts: PipelineCounts;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PipelineStep".
+ */
+export interface PipelineStep {
+  name: ProjectPipelineState;
+  status: PipelineStepStatus;
+  started_at: string | null;
+  ended_at: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PipelineCounts".
+ */
+export interface PipelineCounts {
+  uploaded: number;
+  parsed: number;
+  rejected: number;
+  failed: number;
+}
+/**
+ * One Workflow SBAM created for an approved SOW version (read-only).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowSummary".
+ */
+export interface WorkflowSummary {
+  id: string;
+  project_id: string;
+  sow_version_id: string;
+  version: number;
+  state: WorkflowState;
+  created_at: string;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

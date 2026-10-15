@@ -143,8 +143,8 @@ class Harness:
         router = APIRouter()
         project = Annotated[uuid.UUID, Depends(project_access)]
 
-        @router.get("/projects/{project_id}/pipeline")
-        def pipeline(pid: project) -> dict[str, str]:
+        @router.get("/projects/{project_id}/auth-probe")
+        def probe(pid: project) -> dict[str, str]:
             self.handled += 1
             return {"project_id": str(pid), "state": "IDLE"}
 
@@ -192,14 +192,14 @@ def problem(res: Any, status: int, code: str) -> dict[str, Any]:
 
 
 def test_e2_2_t01_valid_fde_request_on_assigned_project(h: Harness) -> None:
-    res = h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token())
+    res = h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token())
     assert res.status_code == 200
     assert res.json() == {"project_id": str(PROJECT_A1), "state": "IDLE"}
 
 
 def test_e2_2_t02_expired_token_is_401(h: Harness) -> None:
     now = int(time.time())
-    res = h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token(exp=now - 60, iat=now - 400))
+    res = h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token(exp=now - 60, iat=now - 400))
     problem(res, 401, "UNAUTHENTICATED")
     assert res.headers["www-authenticate"] == "Bearer"
 
@@ -224,15 +224,15 @@ def test_e2_2_t03_forged_tokens_are_401_and_nothing_runs(h: Harness) -> None:
     hs256 = f"{hs_signing_input}.{base64.urlsafe_b64encode(hs_sig).rstrip(b'=').decode()}"
     tampered = f"{header}.{_b64({**claims, 'tenant_id': [str(TENANT_B)]})}.{good.split('.')[2]}"
     for token in (unsigned, hs256, tampered, "not-a-jwt"):
-        problem(h.get(f"/projects/{PROJECT_A1}/pipeline", token), 401, "UNAUTHENTICATED")
+        problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", token), 401, "UNAUTHENTICATED")
         problem(h.get("/admin/admin-check", token), 401, "UNAUTHENTICATED")
     assert h.handled == 0 and h.memberships.calls == 0  # no handler, no membership (DB) query
 
 
 def test_e2_2_missing_or_malformed_authorization_is_401(h: Harness) -> None:
-    problem(h.get(f"/projects/{PROJECT_A1}/pipeline", None), 401, "UNAUTHENTICATED")
+    problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", None), 401, "UNAUTHENTICATED")
     res = h.client.get(
-        f"{API_BASE}/projects/{PROJECT_A1}/pipeline", headers={"authorization": "Basic abc"}
+        f"{API_BASE}/projects/{PROJECT_A1}/auth-probe", headers={"authorization": "Basic abc"}
     )
     problem(res, 401, "UNAUTHENTICATED")
 
@@ -257,25 +257,25 @@ def without_correlation(body: dict[str, Any]) -> dict[str, Any]:
 
 def test_e2_2_t06_unassigned_project_is_404_identical_to_a_missing_one(h: Harness) -> None:
     token = h.realm.token(FDE_A2)  # same tenant, not a member of PROJECT_A1
-    unassigned = problem(h.get(f"/projects/{PROJECT_A1}/pipeline", token), 404, "NOT_FOUND")
-    missing = problem(h.get(f"/projects/{uuid7()}/pipeline", token), 404, "NOT_FOUND")
+    unassigned = problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", token), 404, "NOT_FOUND")
+    missing = problem(h.get(f"/projects/{uuid7()}/auth-probe", token), 404, "NOT_FOUND")
     assert without_correlation(unassigned) == without_correlation(missing)
 
 
 def test_e2_2_t07_e0_7_t07_cross_tenant_is_404_and_audited(h: Harness) -> None:
     token = h.realm.token(FDE_B1, tenant_id=[str(TENANT_B)])
     h.memberships.assigned[(TENANT_B, FDE_B1)] = frozenset({PROJECT_B1})
-    cross = problem(h.get(f"/projects/{PROJECT_A1}/pipeline", token), 404, "NOT_FOUND")
-    random = problem(h.get(f"/projects/{uuid7()}/pipeline", token), 404, "NOT_FOUND")
+    cross = problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", token), 404, "NOT_FOUND")
+    random = problem(h.get(f"/projects/{uuid7()}/auth-probe", token), 404, "NOT_FOUND")
     assert without_correlation(cross) == without_correlation(random)  # E0.7-T07
     entry = next(e for e in h.audit.entries if e["target"] == str(PROJECT_A1))
     assert entry["actor"] == str(FDE_B1)
-    assert entry["route"] == f"{API_BASE}/projects/{PROJECT_A1}/pipeline"
+    assert entry["route"] == f"{API_BASE}/projects/{PROJECT_A1}/auth-probe"
 
 
 def test_e2_2_malformed_project_id_is_404_not_422(h: Harness) -> None:
     for bad in ("not-a-uuid", str(uuid.uuid4())):  # garbage, and a UUID that isn't v7
-        problem(h.get(f"/projects/{bad}/pipeline", h.realm.token()), 404, "NOT_FOUND")
+        problem(h.get(f"/projects/{bad}/auth-probe", h.realm.token()), 404, "NOT_FOUND")
 
 
 def test_e2_2_tenant_comes_only_from_the_token(h: Harness) -> None:
@@ -291,7 +291,7 @@ def test_e2_2_no_single_tenant_uuid_means_404_on_tenant_routes(
     h: Harness, tenant_claim: list[str] | None
 ) -> None:
     token = h.realm.token(tenant_id=tenant_claim)
-    problem(h.get(f"/projects/{PROJECT_A1}/pipeline", token), 404, "NOT_FOUND")
+    problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", token), 404, "NOT_FOUND")
     admin_token = h.realm.token(
         ADMIN_A, tenant_id=tenant_claim, realm_access={"roles": ["sbam-admin"]}
     )
@@ -301,7 +301,7 @@ def test_e2_2_no_single_tenant_uuid_means_404_on_tenant_routes(
 def test_e2_2_user_with_both_roles_uses_both_portals(h: Harness) -> None:
     token = h.realm.token(realm_access={"roles": ["sbam-admin", "sbam-fde"]})
     assert h.get("/admin/admin-check", token).status_code == 200
-    assert h.get(f"/projects/{PROJECT_A1}/pipeline", token).status_code == 200
+    assert h.get(f"/projects/{PROJECT_A1}/auth-probe", token).status_code == 200
 
 
 def test_e2_2_super_admin_routes(h: Harness) -> None:
@@ -328,7 +328,7 @@ def test_e2_2_wrong_issuer_audience_or_future_nbf_is_401(h: Harness) -> None:
         {"sub": "not-a-uuid"},
     ):
         problem(
-            h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token(**overrides)),
+            h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token(**overrides)),
             401,
             "UNAUTHENTICATED",
         )
@@ -337,40 +337,40 @@ def test_e2_2_wrong_issuer_audience_or_future_nbf_is_401(h: Harness) -> None:
 def test_e2_2_clock_skew_within_30_s_is_accepted(h: Harness) -> None:
     now = int(time.time())
     token = h.realm.token(exp=now - 20, iat=now - 320)
-    assert h.get(f"/projects/{PROJECT_A1}/pipeline", token).status_code == 200
+    assert h.get(f"/projects/{PROJECT_A1}/auth-probe", token).status_code == 200
 
 
 @pytest.mark.filterwarnings("ignore::jwt.warnings.InsecureKeyLengthWarning")  # on purpose
 def test_e2_2_rsa_keys_under_2048_bits_are_refused(h: Harness) -> None:
     h.realm.rotate("weak", bits=1024)
-    problem(h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token()), 401, "UNAUTHENTICATED")
+    problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token()), 401, "UNAUTHENTICATED")
 
 
 def test_e2_2_key_rotation_and_unknown_kid_cooldown(h: Harness) -> None:
-    assert h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token()).status_code == 200
+    assert h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token()).status_code == 200
     fetches = h.realm.fetches
     forged = Realm()
     forged.rotate("forged-1")
     for i in range(5):  # forged kids must not make us hammer Keycloak
         forged.rotate(f"forged-{i}")
-        problem(h.get(f"/projects/{PROJECT_A1}/pipeline", forged.token()), 401, "UNAUTHENTICATED")
+        problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", forged.token()), 401, "UNAUTHENTICATED")
     assert h.realm.fetches - fetches <= 1
 
 
 def test_e2_2_t08_keycloak_down_cached_keys_still_verify(h: Harness) -> None:
-    assert h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token()).status_code == 200
+    assert h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token()).status_code == 200
     h.realm.down = True
-    assert h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token()).status_code == 200
+    assert h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token()).status_code == 200
     h.jwks.jwk_set_cache = None  # the 10-minute cache has expired too: last good keys still work
-    assert h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token()).status_code == 200
+    assert h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token()).status_code == 200
 
 
 def test_e2_2_t09_keycloak_down_and_unknown_kid_is_503(h: Harness) -> None:
-    assert h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token()).status_code == 200
+    assert h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token()).status_code == 200
     h.realm.down = True
     h.jwks.jwk_set_cache = None  # no cooldown shortcut: the client must try Keycloak
     h.realm.rotate("kid-2")  # Keycloak rotated before it went down; this kid was never seen
-    problem(h.get(f"/projects/{PROJECT_A1}/pipeline", h.realm.token()), 503, "IDP_UNAVAILABLE")
+    problem(h.get(f"/projects/{PROJECT_A1}/auth-probe", h.realm.token()), 503, "IDP_UNAVAILABLE")
     assert h.handled == 1
 
 
@@ -394,7 +394,9 @@ def test_e2_2_tokens_never_reach_the_logs(h: Harness, capsys: pytest.CaptureFixt
 
     configure_logging()
     token = h.realm.token(FDE_B1, tenant_id=[str(TENANT_B)])
-    h.get(f"/projects/{PROJECT_A1}/pipeline", token)  # denied: an audit/access log line is written
+    h.get(
+        f"/projects/{PROJECT_A1}/auth-probe", token
+    )  # denied: an audit/access log line is written
     out = capsys.readouterr().out
     assert token not in out and token.split(".")[2] not in out
     assert log_lines(out)
