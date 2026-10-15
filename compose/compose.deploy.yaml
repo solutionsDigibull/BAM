@@ -1,0 +1,295 @@
+# SBAM deployed environments (E16.3, #142, TD §20.1/§20.5): the layer shared by dev, staging and prod VMs.
+# It is NOT used on laptops (`make up` loads compose.override.yaml instead) and never alone. Invoke:
+#
+#   docker compose --env-file /etc/sbam/<env>.env --env-file <release>.env \
+#     -f compose/compose.yaml -f compose/compose.deploy.yaml -f compose/compose.<env>.yaml \
+#     [-f compose/compose.deploy.obs.yaml] [-f compose/compose.deploy.analytics.yaml] up -d
+#
+# See docs/runbooks/environments.md. What this file changes relative to the base:
+#   - images: own images come from the GHCR digests in the release env file (SBAM_*_IMAGE), never built here;
+#     every third-party image is already pinned by digest in compose.yaml. No :latest anywhere.
+#   - secrets: Docker secrets from files in ${SBAM_SECRETS_DIR} (default /etc/sbam/secrets, root, mode 0400),
+#     mounted at /run/secrets/<name> (long syntax: container uid, mode 0400). compose/secrets/with-secrets.sh
+#     turns each NAME_FILE variable into NAME inside the container, so no secret is in this file, in an image
+#     layer or in `docker inspect`. The `${X:?}` guards of compose.yaml still want a value for the
+#     secret variables, so env files carry inert placeholders for them (compose/.env.example); the
+#     placeholders are dropped from the resolved config below.
+#   - exposure: only the proxy is public. postgres, temporal, api, tusd, bifrost, web and clamav publish no
+#     port. The two ops UIs that need one (Temporal UI, Keycloak) bind to ${SBAM_OPS_BIND}, the VM's Netbird
+#     address (TD §20.5). The Keycloak admin console is therefore never routed by the proxy.
+#   - Keycloak runs `start` (production mode) behind the proxy; the web app and API use the public URLs.
+#   - the dev tools of compose.override.yaml (source mounts, seed jobs, mailpit) are absent.
+
+x-secrets-wrapper: &wrapper-mount ./secrets/with-secrets.sh:/sbam/with-secrets.sh:ro
+x-wrapper: &wrapper ["/bin/sh", "/sbam/with-secrets.sh"]
+
+# The prod image's CMD (compose/docker/server.Dockerfile, prod stage). Restated because overriding
+# `entrypoint` clears the image CMD; test_e16_3_deploy_commands_match_images keeps the two in sync.
+x-api-command: &server-command
+  - sh
+  - -c
+  - if [ "$$SBAM_ROLE" = api ]; then exec uvicorn sbam_api.main:create_app --factory --host 0.0.0.0 --port 8000; else exec python -m sbam_workers.bootstrap; fi
+
+x-worker-deploy: &worker-deploy
+  image: ${SBAM_WORKER_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-worker@sha256:...)}
+  build: !reset null
+  entrypoint: *wrapper
+  command: *server-command
+  environment:
+    DATABASE_URL: !reset null
+    DATABASE_URL_TEMPLATE: postgresql://sbam:__SBAM_DB_PASSWORD__@postgres:5432/sbam
+    SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
+    LLM_PROVIDER: ${LLM_PROVIDER:-bifrost}
+  volumes: [*wrapper-mount]
+  secrets:
+    - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
+
+services:
+  # --- data -------------------------------------------------------------------------------------
+  postgres:
+    entrypoint: [/bin/sh, /sbam/with-secrets.sh, docker-entrypoint.sh]
+    command: [postgres]
+    environment:
+      POSTGRES_PASSWORD: !reset null
+      SBAM_DB_PASSWORD: !reset null
+      TEMPORAL_DB_PASSWORD: !reset null
+      KEYCLOAK_DB_PASSWORD: !reset null
+      LANGFUSE_DB_PASSWORD: !reset null
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
+      TEMPORAL_DB_PASSWORD_FILE: /run/secrets/temporal_db_password
+      KEYCLOAK_DB_PASSWORD_FILE: /run/secrets/keycloak_db_password
+      LANGFUSE_DB_PASSWORD_FILE: /run/secrets/langfuse_db_password
+    volumes: [*wrapper-mount]
+    ports: !reset null
+    networks: !override [sbam_internal]
+    secrets:
+      - { source: postgres_password, target: postgres_password, uid: "0", gid: "0", mode: 0400 }
+      - { source: sbam_db_password, target: sbam_db_password, uid: "0", gid: "0", mode: 0400 }
+      - { source: temporal_db_password, target: temporal_db_password, uid: "0", gid: "0", mode: 0400 }
+      - { source: keycloak_db_password, target: keycloak_db_password, uid: "0", gid: "0", mode: 0400 }
+      - { source: langfuse_db_password, target: langfuse_db_password, uid: "0", gid: "0", mode: 0400 }
+
+  # --- identity ---------------------------------------------------------------------------------
+  keycloak:
+    entrypoint: [/bin/bash, /sbam/with-secrets.sh, /opt/keycloak/bin/kc.sh]
+    command: [start, --import-realm]
+    environment:
+      KC_DB_PASSWORD: !reset null
+      KC_BOOTSTRAP_ADMIN_PASSWORD: !reset null
+      SEED_USER_PASSWORD: !reset null
+      KC_DB_PASSWORD_FILE: /run/secrets/keycloak_db_password
+      KC_BOOTSTRAP_ADMIN_PASSWORD_FILE: /run/secrets/keycloak_admin_password
+      # Production mode behind the TLS-terminating proxy: plain HTTP inside the network only.
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME: https://${SBAM_AUTH_HOST:?set the public Keycloak hostname, e.g. auth.example.com}
+      # Admin console and admin REST links point at the Netbird address (or an SSH-forwarded URL), not the
+      # public hostname, which the proxy answers with 404 for those paths. Browsers need a secure context
+      # for the admin console: use a Netbird DNS name with a certificate, or SBAM_KC_ADMIN_URL=http://localhost:8080
+      # through an SSH port forward (docs/runbooks/environments.md).
+      KC_HOSTNAME_ADMIN: ${SBAM_KC_ADMIN_URL:-http://${SBAM_OPS_BIND:?set the VM Netbird address}:${KEYCLOAK_PORT:-8080}}
+    volumes:
+      - *wrapper-mount
+      # The realm file rendered for this environment's public origin (compose/keycloak/render_realm.py).
+      - ${SBAM_REALM_FILE:?render it with compose/keycloak/render_realm.py and set the path}:/opt/keycloak/data/import/realm-bullm.json:ro
+    ports: !override
+      - ${SBAM_OPS_BIND:?set the VM Netbird address}:${KEYCLOAK_PORT:-8080}:8080
+    secrets:
+      - { source: keycloak_db_password, target: keycloak_db_password, uid: "1000", gid: "0", mode: 0400 }
+      - { source: keycloak_admin_password, target: keycloak_admin_password, uid: "1000", gid: "0", mode: 0400 }
+
+  # --- workflow engine --------------------------------------------------------------------------
+  temporal-schema:
+    entrypoint:
+      - /bin/sh
+      - /sbam/with-secrets.sh
+      - sh
+      - -ec
+      # Same script as compose.yaml (test_e16_3_deploy_commands_match_images keeps them identical).
+      - |
+        schema=/etc/temporal/schema/postgresql/v12
+        temporal-sql-tool --db temporal setup-schema -v 0.0
+        temporal-sql-tool --db temporal update-schema -d $$schema/temporal/versioned
+        temporal-sql-tool --db temporal_visibility setup-schema -v 0.0
+        temporal-sql-tool --db temporal_visibility update-schema -d $$schema/visibility/versioned
+    environment:
+      SQL_PASSWORD: !reset null
+      SQL_PASSWORD_FILE: /run/secrets/temporal_db_password
+    volumes: [*wrapper-mount]
+    secrets:
+      - { source: temporal_db_password, target: temporal_db_password, uid: "1000", gid: "1000", mode: 0400 }
+
+  temporal:
+    entrypoint: *wrapper
+    command: [/etc/temporal/entrypoint.sh]
+    environment:
+      POSTGRES_PWD: !reset null
+      POSTGRES_PWD_FILE: /run/secrets/temporal_db_password
+    volumes: [*wrapper-mount]
+    ports: !reset null
+    networks: !override [sbam_internal]
+    secrets:
+      - { source: temporal_db_password, target: temporal_db_password, uid: "1000", gid: "1000", mode: 0400 }
+
+  temporal-ui:
+    # Ops UI: Netbird only (TD §20.5). Never routed by the proxy.
+    ports: !override
+      - ${SBAM_OPS_BIND:?set the VM Netbird address}:${TEMPORAL_UI_PORT:-8233}:8080
+
+  # --- LLM gateway, malware scanning, uploads ------------------------------------------------------
+  bifrost:
+    entrypoint: [/bin/sh, /sbam/with-secrets.sh, /app/docker-entrypoint.sh]
+    command: [/app/main]
+    environment:
+      OPENROUTER_API_KEY: !reset null
+      OPENROUTER_API_KEY_FILE: /run/secrets/openrouter_api_key
+    volumes: [*wrapper-mount]
+    ports: !reset null
+    secrets:
+      # Only bifrost gets the OpenRouter key, never api or workers (ADR 0001). 0400 root-owned on the host
+      # (the file may be empty on dev VMs that use the mock provider).
+      - { source: openrouter_api_key, target: openrouter_api_key, uid: "1000", gid: "0", mode: 0400 }
+
+  clamav:
+    ports: !reset null
+
+  tusd:
+    entrypoint: [/bin/sh, /sbam/with-secrets.sh, /usr/local/share/docker-entrypoint.sh]
+    environment:
+      TUSD_HOOK_SECRET: !reset null
+      TUSD_HOOK_SECRET_FILE: /run/secrets/tusd_hook_secret
+    volumes:
+      - *wrapper-mount
+    ports: !reset null
+    networks: !override [sbam_internal]
+    secrets:
+      - { source: tusd_hook_secret, target: tusd_hook_secret, uid: "10001", gid: "10001", mode: 0400 }
+
+  # --- SBAM -------------------------------------------------------------------------------------
+  api-migrate:
+    image: ${SBAM_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-api@sha256:...)}
+    build: !reset null
+    entrypoint: *wrapper
+    command: [sbam-migrate]
+    environment:
+      DATABASE_URL: !reset null
+      DATABASE_URL_TEMPLATE: postgresql://sbam:__SBAM_DB_PASSWORD__@postgres:5432/sbam
+      SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
+    volumes: [*wrapper-mount]
+    secrets:
+      - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
+
+  sbam-api:
+    image: ${SBAM_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-api@sha256:...)}
+    build: !reset null
+    entrypoint: *wrapper
+    command: *server-command
+    environment:
+      DATABASE_URL: !reset null
+      STORAGE_SIGNING_KEY: !reset null
+      KEYCLOAK_ADMIN_CLIENT_SECRET: !reset null
+      TUSD_HOOK_SECRET: !reset null
+      DATABASE_URL_TEMPLATE: postgresql://sbam:__SBAM_DB_PASSWORD__@postgres:5432/sbam
+      SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
+      STORAGE_SIGNING_KEY_FILE: /run/secrets/storage_signing_key
+      KEYCLOAK_ADMIN_CLIENT_SECRET_FILE: /run/secrets/keycloak_admin_client_secret
+      TUSD_HOOK_SECRET_FILE: /run/secrets/tusd_hook_secret
+      LLM_PROVIDER: ${LLM_PROVIDER:-bifrost}
+      ENABLE_PING: "false" # sample command: local stack only
+      KEYCLOAK_ISSUER: https://${SBAM_AUTH_HOST:?set the public Keycloak hostname}/realms/bullm
+      TUSD_PUBLIC_URL: https://${SBAM_PORTAL_HOST:?set the public portal hostname}/files/
+    volumes: [*wrapper-mount]
+    ports: !reset null
+    networks: !override [sbam_internal]
+    secrets:
+      - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: storage_signing_key, target: storage_signing_key, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: keycloak_admin_client_secret, target: keycloak_admin_client_secret, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: tusd_hook_secret, target: tusd_hook_secret, uid: "10001", gid: "10001", mode: 0400 }
+
+  worker-ingest: *worker-deploy
+  worker-knowledge: *worker-deploy
+  worker-llm: *worker-deploy
+  worker-build: *worker-deploy
+  worker-test: *worker-deploy
+  worker-certify: *worker-deploy
+
+  sbam-mock-api:
+    image: ${SBAM_MOCK_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-mock-api@sha256:...)}
+    build: !reset null
+
+  sbam-web:
+    image: ${SBAM_WEB_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-web@sha256:...)}
+    build: !reset null
+    entrypoint: *wrapper
+    command: [node, server.js]
+    environment:
+      AUTH_SECRET: !reset null
+      AUTH_SECRET_FILE: /run/secrets/auth_secret
+      SBAM_DEV_AUTH: "" # the dev role picker is never on in a deployed environment
+      AUTH_URL: https://${SBAM_PORTAL_HOST:?set the public portal hostname}
+      KEYCLOAK_ISSUER: https://${SBAM_AUTH_HOST:?set the public Keycloak hostname}/realms/bullm
+    volumes: [*wrapper-mount]
+    ports: !reset null
+    networks: !override [sbam_internal]
+    secrets:
+      - { source: auth_secret, target: auth_secret, uid: "10001", gid: "10001", mode: 0400 }
+
+  # --- edge -------------------------------------------------------------------------------------
+  proxy:
+    # Reverse proxy (compose/proxy/Caddyfile): the only public service. Terminates TLS 1.2+, adds HSTS, routes
+    # the portal (sbam-web, /files to tusd) and the Keycloak login paths, answers everything else with 404.
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    environment:
+      SBAM_PORTAL_HOST: ${SBAM_PORTAL_HOST:?set the public portal hostname}
+      SBAM_AUTH_HOST: ${SBAM_AUTH_HOST:?set the public Keycloak hostname}
+      SBAM_TLS: ${SBAM_TLS:-}
+      SBAM_ACME_EMAIL: ${SBAM_ACME_EMAIL:?set the ACME contact email (unused with SBAM_TLS=internal or provided certificates)}
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${SBAM_TLS_CERT_DIR:-/etc/sbam/tls}:/certs:ro # provided certificate mode only
+      - caddy_data:/data # ACME account and certificates: keep across restarts (rate limits)
+      - caddy_config:/config
+    # Dev and staging: the VM's Netbird address (not public). Prod hard-codes 0.0.0.0 in compose.prod.yaml.
+    ports: ["${SBAM_PROXY_BIND:-127.0.0.1}:80:80", "${SBAM_PROXY_BIND:-127.0.0.1}:443:443"]
+    networks: [sbam_edge, sbam_internal]
+    depends_on:
+      sbam-web: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+      tusd: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 0.5
+    restart: unless-stopped
+
+networks:
+  sbam_edge: {}
+  sbam_internal: {}
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  postgres_password: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/postgres_password" }
+  sbam_db_password: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/sbam_db_password" }
+  temporal_db_password: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/temporal_db_password" }
+  keycloak_db_password: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/keycloak_db_password" }
+  langfuse_db_password: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/langfuse_db_password" }
+  keycloak_admin_password: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/keycloak_admin_password" }
+  keycloak_admin_client_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/keycloak_admin_client_secret" }
+  tusd_hook_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/tusd_hook_secret" }
+  storage_signing_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/storage_signing_key" }
+  auth_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/auth_secret" }
+  openrouter_api_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/openrouter_api_key" }

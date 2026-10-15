@@ -1,0 +1,15 @@
+# Deployed `obs` profile (E16.3, #142, TD §20.5): load AFTER compose.obs.yaml, with compose.deploy.yaml:
+#   -f compose.yaml -f compose.deploy.yaml -f compose.obs.yaml -f compose.deploy.obs.yaml -f compose.<env>.yaml
+# Grafana and Langfuse are ops UIs: reachable over Netbird only, never through the proxy. This file moves their
+# ports from loopback to the VM's Netbird address (${SBAM_OPS_BIND}) and stops publishing the OTLP ports
+# (telemetry stays inside the Compose network).
+# Known gap, owned by #140/#141: compose.obs.yaml still passes its secrets as inline environment values and
+# runs minio from a :latest tag pinned by digest. scripts/compose_lint.py reports both as warnings for obs
+# until those issues move them to Docker secrets; the core stack has no such warnings.
+services:
+  otel-collector:
+    ports: !override
+      - ${SBAM_OPS_BIND:?set the VM Netbird address}:${GRAFANA_PORT:-3002}:3000
+  langfuse-web:
+    ports: !override
+      - ${SBAM_OPS_BIND:?set the VM Netbird address}:${LANGFUSE_PORT:-3001}:3000

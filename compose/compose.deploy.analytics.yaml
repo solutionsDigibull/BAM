@@ -1,0 +1,7 @@
+# Deployed `analytics` profile (E16.3, #142): load AFTER compose.analytics.yaml. PostHog is an ops UI, reachable
+# over Netbird only (TD §20.5): its port moves from loopback to the VM's Netbird address. The service is
+# still the stub of compose.analytics.yaml until #141 deploys the real one.
+services:
+  posthog:
+    ports: !override
+      - ${SBAM_OPS_BIND:?set the VM Netbird address}:${POSTHOG_PORT:-8010}:8000
