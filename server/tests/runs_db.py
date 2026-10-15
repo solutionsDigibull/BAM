@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from sbam_api.temporal.models import TemporalRun
+from sbam_contracts.build import SubSkillBuildStatus
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import WorkflowExecutionStatus
@@ -51,6 +52,24 @@ class FakeHandle:
 
 
 @dataclass
+class FakeBuildHandle:
+    """A SubSkillBuild child, queried/signalled the way `builds/service.py` expects."""
+
+    id: str
+    status: SubSkillBuildStatus
+    signals: list[tuple[str, str, Any]]
+
+    async def describe(self, **_: Any) -> None:
+        return None
+
+    async def query(self, name: str, **_: Any) -> SubSkillBuildStatus:
+        return self.status
+
+    async def signal(self, name: str, payload: Any) -> None:
+        self.signals.append((self.id, name, payload))
+
+
+@dataclass
 class FakeClient:
     """Mimics `Client.start_workflow` with USE_EXISTING: one execution per workflow id."""
 
@@ -59,6 +78,8 @@ class FakeClient:
     calls: list[dict[str, Any]] = field(default_factory=list)
     statuses: dict[str, WorkflowExecutionStatus] = field(default_factory=dict)
     missing: set[str] = field(default_factory=set)
+    builds: dict[str, SubSkillBuildStatus] = field(default_factory=dict)
+    build_signals: list[tuple[str, str, Any]] = field(default_factory=list)
 
     async def start_workflow(self, workflow: str, arg: Any, **kwargs: Any) -> FakeHandle:
         self.calls.append({"workflow": workflow, "arg": arg, **kwargs})
@@ -70,7 +91,16 @@ class FakeClient:
         run_id = self.executions.setdefault(kwargs["id"], f"run-{len(self.executions) + 1}")
         return FakeHandle(kwargs["id"], run_id, run_id)
 
-    def get_workflow_handle(self, workflow_id: str, *, run_id: str) -> FakeHandle:
+    def get_workflow_handle(
+        self, workflow_id: str, *, run_id: str | None = None
+    ) -> FakeHandle | FakeBuildHandle:
+        """`run_id` is how run-based callers (pipeline/start) ask; SubSkillBuild callers
+        (builds/service.py) never pass it, so that's how a build lookup is told apart."""
+        if run_id is None:
+            status = self.builds.get(workflow_id)
+            if status is None:
+                raise RPCError("workflow not found", RPCStatusCode.NOT_FOUND, b"")
+            return FakeBuildHandle(workflow_id, status, self.build_signals)
         return FakeHandle(
             workflow_id,
             run_id,
