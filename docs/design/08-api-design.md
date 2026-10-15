@@ -113,6 +113,8 @@ Paths below are relative to `/api/v1`. **P** = `/projects/{project_id}` (project
 | POST   | `W/isatvon/validate`                   | —                            | validation report                   | —                                                        |
 | GET    | `W/isatvon/export.xlsx`                | —                            | 302 xlsx                            | —                                                        |
 
+`GET /schemas/isatvon/{version}` (E8.6) is readable by any signed-in user and holds no tenant data. Only `1.4` is served; any other version is 404 problem+json. The body is `{version, json_schema, grid}`: `json_schema` is the `SubSkill` JSON Schema and `grid.column_groups` lists the groups Metadata, I, S, A, T, V, O, N, Status in that order. Each child column has `field_path` (dotted, e.g. `isatvon_definition.v_variables.max_iterations`), `header`, `type`, `editor` (one of `text`, `largeText`, `number`, `boolean`, `json`, `expression`, `stringList`, `select`, `readonly`), `required`, `editable`, `platform` and optionally `enum`, `min`, `max`, `width`. Columns are generated from the model, so a new field gets the default editor for its type. Platform fields (`skill_id`, `state`, `content_sha256`, `validation_errors`) are `editable: false`; the last three live on the Sub-Skill row, so their paths are not in `json_schema`. The response carries a strong `ETag` and `Cache-Control: private, max-age=300, must-revalidate`; a matching `If-None-Match` answers 304 with no body.
+
 ## 8.9 Manifests
 
 | Method | Endpoint                           | Request                                 | Response                                                         | Errors                        |
