@@ -12,10 +12,11 @@ also through the append-only audit log + outbox, and also idempotent per key.
 import logging
 
 import sbam_api.projects.models  # noqa: F401 - registers Project for entity_model (#54)
-from sbam_api.audit.outbox import LogSink, dispatch_pending
+from sbam_api.audit.outbox import dispatch_pending
 from sbam_api.audit.repository import enqueue, find_by_key, record
 from sbam_api.core.conventions import ApiError
 from sbam_api.db.repository import TenantContext
+from sbam_api.notifications.sink import InAppSink
 from sbam_api.state_machine import TransitionCommand, apply_create, apply_transition
 from sbam_api.state_machine.registry import entity_model
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
@@ -106,8 +107,9 @@ def notify(req: NotifyRequest) -> None:
 
 
 def _dispatch() -> None:
-    """After commit only; a failed dispatch leaves the row pending for the next pass."""
+    """After commit only; a failed dispatch leaves the row pending for the next pass. The sink is
+    the in-app `notifications` table (E10.4)."""
     try:
-        dispatch_pending(sessions(), LogSink())
+        dispatch_pending(sessions(), InAppSink(sessions()))
     except Exception as exc:
         log.warning("notification dispatch failed", extra={"exc_type": type(exc).__name__})

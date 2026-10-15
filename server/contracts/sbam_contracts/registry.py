@@ -46,6 +46,7 @@ from sbam_contracts.masters_api import (
     MastersSnapshot,
     MasterVersionCreate,
 )
+from sbam_contracts.notifications import Notification
 from sbam_contracts.projects import (
     PipelineTimeline,
     Project,
@@ -107,4 +108,5 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/purge_target", PurgeTarget),
     ("documents/purge_request", PurgeRequest),
     ("documents/purge_result", PurgeResult),
+    ("notifications/notification", Notification),
 )

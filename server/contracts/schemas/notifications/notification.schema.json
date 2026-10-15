@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:notifications/notification:0.1.0",
+  "$defs": {
+    "NotificationType": {
+      "enum": [
+        "SOW_READY",
+        "BREAKDOWN_READY",
+        "SUBSKILL_NEEDS_REVIEW",
+        "WORKFLOW_CERTIFIED",
+        "WORKFLOW_FROZEN",
+        "EXPORT_READY",
+        "DOCUMENT_REJECTED",
+        "GENERATION_FAILED",
+        "STAGE_COMPLETED",
+        "REMINDER"
+      ],
+      "title": "NotificationType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Project Id"
+    },
+    "workflow_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Workflow Id"
+    },
+    "type": {
+      "$ref": "#/$defs/NotificationType"
+    },
+    "title": {
+      "maxLength": 120,
+      "title": "Title",
+      "type": "string"
+    },
+    "body": {
+      "maxLength": 1000,
+      "title": "Body",
+      "type": "string"
+    },
+    "link": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Link"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "read_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Read At"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "workflow_id",
+    "type",
+    "title",
+    "body",
+    "link",
+    "created_at",
+    "read_at"
+  ],
+  "title": "Notification",
+  "type": "object"
+}
