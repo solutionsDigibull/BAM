@@ -66,7 +66,8 @@ def test_e10_4_t02_temporal_one_notification_per_stage_per_recipient() -> None:
         assert all(r.link and service.safe_link(r.link) == r.link for r in mine)
         assert all("Acme onboarding" in r.body for r in mine if r.type == "SOW_READY")
         frozen = next(r for r in mine if r.type == "WORKFLOW_FROZEN")
-        assert frozen.workflow_id is not None and frozen.link.endswith("/versions")
+        assert frozen.workflow_id is not None and frozen.link is not None
+        assert frozen.link.endswith("/versions")
     assert rows(sessions, world["bystander"]) == []
     with sessions() as session:  # every notification-worthy outbox row was dispatched once
         pending = session.scalars(
