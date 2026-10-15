@@ -43,6 +43,7 @@ from sbam_api.identity.models import Tenant, User
 from sbam_api.identity.service import SqlUserDirectory
 from sbam_api.ingest.models import Document
 from sbam_api.main import create_app
+from sbam_api.masters.models import MasterEntry, MasterSnapshot
 from sbam_api.projects.models import Project
 from sbam_api.projects.repository import SqlMemberships
 from sbam_api.registry.sync import sync as sync_registry
@@ -294,6 +295,18 @@ class World:
             waiting_for_retry=True,
         )
         sync_registry(self.sessions, sample_registry(), activate=True)
+        self.master_a = self._create_master("admin_a")
+        self.master_b = self._create_master("admin_b")
+        with self.sessions() as s:  # a pinned snapshot of project A's masters (E3.2)
+            snapshot = MasterSnapshot(
+                tenant_id=self.tenant_a,
+                project_id=self.project_a,
+                entries=[],
+                sha256="sha256:" + "0" * 64,
+            )
+            s.add(snapshot)
+            s.commit()
+            self.snapshot_a = snapshot.id
         stored = LocalDiskBackend(self.tmp).put(
             b"alpha export", StorageScope(self.tenant_a, self.project_a), Kind.EXPORTS, ""
         )
@@ -305,6 +318,12 @@ class World:
 
     def _create_project(self, role: str, name: str) -> uuid.UUID:
         res = self.call("POST", "/admin/projects", role, json={"name": name})
+        assert res.status_code == 201, res.text
+        return uuid.UUID(res.json()["id"])
+
+    def _create_master(self, role: str) -> uuid.UUID:
+        body = {"payload": {"domain_rule": "RULE-BOM: applies to BOM. Policy: compare"}}
+        res = self.call("POST", "/admin/masters/RULES", role, json=body)
         assert res.status_code == 201, res.text
         return uuid.UUID(res.json()["id"])
 
@@ -354,6 +373,9 @@ class World:
             "sub_a": self.sub_a,
             "doc_a": self.docs["a"],
             "file_key": self.file_key,
+            "master_a": self.master_a,
+            "master_b": self.master_b,
+            "snapshot_a": self.snapshot_a,
         }
         if name in fixed:
             return str(fixed[name])
@@ -366,12 +388,14 @@ class World:
         raise KeyError(f"unknown placeholder @{name}")
 
     def version(self, what: str) -> int:
-        """row_version of `tenant_a`, `project_a` or `user_<role>`."""
+        """row_version of `tenant_a`, `project_a`, `master_a` or `user_<role>`."""
         with self.sessions() as s:
             if what.startswith("user_"):
                 row: Any = s.get(User, self.actors[what.removeprefix("user_")].id)
             elif what.startswith("tenant_"):
                 row = s.get(Tenant, uuid.UUID(self.value(what)))
+            elif what.startswith("master_"):
+                row = s.get(MasterEntry, uuid.UUID(self.value(what)))
             else:
                 row = s.get(Project, uuid.UUID(self.value(what)))
             assert row is not None
