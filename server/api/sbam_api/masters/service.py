@@ -19,7 +19,15 @@ from typing import Any
 
 from pydantic import ValidationError
 from sbam_contracts.api import ErrorCode, FieldError
-from sbam_contracts.masters import ADMIN_EDITABLE, MasterIdentity, MasterType, identify
+from sbam_contracts.masters import (
+    ADMIN_EDITABLE,
+    MasterIdentity,
+    MasterStatus,
+    MasterType,
+    SourceKind,
+    identify,
+    with_status,
+)
 from sbam_contracts.masters_api import MasterEntryCreate, MasterVersionCreate, SnapshotEntry
 from sbam_contracts.masters_workbook import PAYLOAD_MODELS, ROW_LABEL_PREFIX, TOOLING_LABEL
 from sbam_contracts.projects import ProjectStatus
@@ -28,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser
-from sbam_api.core.conventions import ApiError, etag, not_found
+from sbam_api.core.conventions import ApiError, check_if_match, etag, not_found
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion, MasterSnapshot
@@ -196,21 +204,78 @@ def new_version(
                 )
             ]
         )
-    number = entry.current_version + 1
     try:
-        version = repo.add_version(
-            MasterEntryVersion(
-                entry_id=entry.id, version=number, payload=payload, created_by=user.keycloak_sub
-            )
-        )
-        entry.current_version = number
-        entry.status = identity.status.value
-        repo.update(entry, entry.row_version)  # a concurrent writer since load -> stale
+        version = _store_version(repo, user, entry, payload, identity.status)
         _audit(session, user, "MASTER_VERSION_CREATED", entry, version)
         session.commit()
     except (IntegrityError, StaleRowVersion):  # lost the race on (entry, version n+1)
         session.rollback()
         raise version_conflict() from None
+    return entry, version
+
+
+def _store_version(
+    repo: MasterEntryRepository,
+    user: CurrentUser,
+    entry: MasterEntry,
+    payload: dict[str, Any],
+    status: MasterStatus,
+) -> MasterEntryVersion:
+    """Version n+1 with `payload`; the entry points at it and carries its status."""
+    number = entry.current_version + 1
+    version = repo.add_version(
+        MasterEntryVersion(
+            entry_id=entry.id, version=number, payload=payload, created_by=user.keycloak_sub
+        )
+    )
+    entry.current_version = number
+    entry.status = status.value
+    repo.update(entry, entry.row_version)  # a concurrent writer since load -> stale
+    return version
+
+
+def change_status(
+    session: Session,
+    user: CurrentUser,
+    master_type: MasterType,
+    entry_id: uuid.UUID,
+    status: MasterStatus,
+    if_match: str | None,
+) -> tuple[MasterEntry, MasterEntryVersion]:
+    """Write `status` back into the row (E3.5): a new version whose payload differs only in the
+    status text, the entry's status updated, the change audited with before/after. Admin only
+    (the router's policy), so APPROVED is never set by an FDE or taken from LLM output."""
+    _editable(master_type)
+    repo = _repo(session, user)
+    entry = repo.get_for_update(entry_id)
+    if entry is None or entry.master_type != master_type.value:
+        raise not_found()
+    check_if_match(if_match, entry.row_version)  # missing 428, stale 412 (E3.5-T08)
+    if entry.source_kind == SourceKind.BAM_0_2_SAMPLE.value and status != MasterStatus.ILLUSTRATIVE:
+        raise _invalid(
+            [FieldError(path="status", message="the BAM 0.2 sample row is always ILLUSTRATIVE")]
+        )
+    current = repo.version(entry)
+    if current is None:
+        raise not_found()
+    if entry.status == status.value:
+        return entry, current  # already there: no new version
+    model = PAYLOAD_MODELS[master_type].model_validate(current.payload)
+    try:
+        updated = with_status(model, status)
+    except ValueError as exc:  # e.g. two Status fragments in Misc
+        raise _invalid([FieldError(path="status", message=str(exc))]) from None
+    payload, identity = _identity(master_type, entry.row_label, updated.model_dump(by_alias=True))
+    before = entry.status
+    try:
+        version = _store_version(repo, user, entry, payload, identity.status)
+        _audit(session, user, "MASTER_STATUS_CHANGED", entry, version, before={"status": before})
+        session.commit()
+    except (IntegrityError, StaleRowVersion):
+        session.rollback()
+        raise ApiError(
+            412, ErrorCode.PRECONDITION_FAILED, "Resource changed since you loaded it; reload"
+        ) from None
     return entry, version
 
 
@@ -308,6 +373,7 @@ def _audit(
     action: str,
     entry: MasterEntry,
     version: MasterEntryVersion,
+    before: dict[str, Any] | None = None,
 ) -> None:
     record(
         session,
@@ -316,6 +382,7 @@ def _audit(
         action=action,
         entity_type="master_entry",
         entity_id=str(entry.id),
+        before=before,
         after={
             "master_type": entry.master_type,
             "stable_id": entry.stable_id,

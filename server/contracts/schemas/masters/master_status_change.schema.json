@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/master_status_change:0.1.0",
+  "$defs": {
+    "MasterStatus": {
+      "enum": [
+        "PROPOSED",
+        "ILLUSTRATIVE",
+        "APPROVED",
+        "RETIRED"
+      ],
+      "title": "MasterStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "PATCH .../status (E3.5): the status is written back into the row (Misc, or Tooling's own\nStatus column) as a new version. The entry's ETag goes in `If-Match`.",
+  "properties": {
+    "status": {
+      "$ref": "#/$defs/MasterStatus"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "MasterStatusChange",
+  "type": "object"
+}

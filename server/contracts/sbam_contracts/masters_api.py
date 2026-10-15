@@ -48,6 +48,13 @@ class MasterVersionCreate(_Request):
     payload: dict[str, Any]
 
 
+class MasterStatusChange(_Request):
+    """PATCH .../status (E3.5): the status is written back into the row (Misc, or Tooling's own
+    Status column) as a new version. The entry's ETag goes in `If-Match`."""
+
+    status: MasterStatus
+
+
 class MasterEntry(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -84,6 +91,7 @@ def schemas() -> dict[str, dict[str, Any]]:
     models: dict[str, type[BaseModel]] = {
         "master_entry_create": MasterEntryCreate,
         "master_version_create": MasterVersionCreate,
+        "master_status_change": MasterStatusChange,
         "master_entry": MasterEntry,
         "masters_snapshot": MastersSnapshot,
     }

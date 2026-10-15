@@ -15,6 +15,7 @@ from sbam_contracts.masters_api import (
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
+    MasterStatusChange,
     MasterVersionCreate,
 )
 from sqlalchemy.orm import Session
@@ -119,4 +120,21 @@ def create_version(
     if_match: Annotated[str | None, Header()] = None,
 ) -> MasterEntry:
     entry, version = service.new_version(session, user, master_type, entry_id, body, if_match)
+    return _out(entry, version, response)
+
+
+@router.patch("/admin/masters/{master_type}/{entry_id}/status", status_code=201)
+def change_status(
+    master_type: MasterType,
+    entry_id: uuid.UUID,
+    body: MasterStatusChange,
+    user: Admin,
+    session: Db,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> MasterEntry:
+    """E3.5: write the status back into the row as version n+1. The same status changes nothing."""
+    entry, version = service.change_status(
+        session, user, master_type, entry_id, body.status, if_match
+    )
     return _out(entry, version, response)

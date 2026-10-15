@@ -46,6 +46,7 @@ from sbam_contracts.masters_api import (
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
+    MasterStatusChange,
     MasterVersionCreate,
 )
 from sbam_contracts.notifications import Notification
@@ -104,6 +105,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/scan_outcome", ScanOutcome),
     ("masters/master_entry_create", MasterEntryCreate),
     ("masters/master_version_create", MasterVersionCreate),
+    ("masters/master_status_change", MasterStatusChange),
     ("masters/master_entry", MasterEntry),
     ("masters/masters_snapshot", MastersSnapshot),
     ("documents/document", DocumentOut),

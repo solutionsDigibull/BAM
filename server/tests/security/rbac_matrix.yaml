@@ -230,6 +230,19 @@ routes:
       <<: *tenant_admin_a_resource
       admin_a: "201"
 
+  # E3.5: status write-back is a new version, admin of the entry's tenant only (APPROVED is never
+  # set by an FDE).
+  change_status_api_v1_admin_masters__master_type___entry_id__status_patch:
+    request:
+      method: PATCH
+      path: /api/v1/admin/masters/{master_type}/{entry_id}/status
+      params: {master_type: RULES, entry_id: "@master_a"}
+      headers: {if-match: "@etag_master_a"}
+      json: {status: APPROVED}
+    expect:
+      <<: *tenant_admin_a_resource
+      admin_a: "201"
+
   get_snapshot_api_v1_admin_masters_snapshots__snapshot_id__get:
     request:
       method: GET

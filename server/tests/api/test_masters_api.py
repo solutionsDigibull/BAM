@@ -300,3 +300,92 @@ def test_e3_2_snapshots_are_append_only(h: MastersHarness) -> None:
             s.execute(text("UPDATE master_snapshots SET sha256 = 'x'"))
         s.rollback()
         assert len(s.scalars(select(MasterSnapshot)).all()) == 1
+
+
+# --- E3.5: status write-back -------------------------------------------------------------------
+
+COST_RULE = {
+    "domain_rule": "RULE-BOM: applies to BOM.",
+    "misc": "Cost override x. Status: Proposed",
+}
+
+
+def _status(h: MastersHarness, entry: dict[str, Any], status: str, etag: str | None) -> Any:
+    headers = {"if-match": etag} if etag else {}
+    path = f"/admin/masters/{entry['master_type']}/{entry['id']}/status"
+    return h.call("PATCH", path, h.admin_a(), json={"status": status}, headers=headers)
+
+
+def test_e3_5_t06_status_write_back_is_a_new_version_with_only_misc_changed(
+    h: MastersHarness,
+) -> None:
+    entry = h.entry(payload=COST_RULE)
+    res = _status(h, entry, "APPROVED", '"1"')
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert (body["status"], body["version"]) == ("APPROVED", 2)
+    assert res.headers["etag"] == '"2"'
+    assert body["payload"]["misc"] == "Cost override x. Status: Approved"
+    assert {k: v for k, v in body["payload"].items() if k != "misc"} == {
+        k: v for k, v in entry["payload"].items() if k != "misc"
+    }
+    with h.sessions() as s:
+        audit = s.scalars(
+            select(AuditLog).where(
+                AuditLog.entity_id == entry["id"], AuditLog.action == "MASTER_STATUS_CHANGED"
+            )
+        ).one()
+    assert audit.before == {"status": "PROPOSED"}
+    assert audit.after is not None and audit.after["status"] == "APPROVED"
+
+
+def test_e3_5_t08_stale_status_edit_is_412(h: MastersHarness) -> None:
+    entry = h.entry(payload=COST_RULE)
+    assert _status(h, entry, "APPROVED", '"1"').status_code == 201
+    problem(_status(h, entry, "RETIRED", '"1"'), 412, "PRECONDITION_FAILED")
+    problem(_status(h, entry, "RETIRED", None), 428, "PRECONDITION_REQUIRED")
+
+
+def test_e3_5_same_status_writes_no_new_version(h: MastersHarness) -> None:
+    entry = h.entry(payload=COST_RULE)
+    res = _status(h, entry, "PROPOSED", '"1"')
+    assert res.status_code == 201 and res.json()["version"] == 1
+    with h.sessions() as s:
+        assert len(s.scalars(select(MasterEntryVersion)).all()) == 1
+
+
+def test_e3_5_sample_row_stays_illustrative(h: MastersHarness) -> None:
+    sample = h.entry(payload={"domain_rule": "Engineering rules"}, row_label="Rule #1")
+    assert sample["status"] == "ILLUSTRATIVE" and sample["source_kind"] == "BAM_0_2_SAMPLE"
+    body = problem(_status(h, sample, "APPROVED", '"1"'), 422, "VALIDATION_ERROR")
+    assert [e["path"] for e in body["errors"]] == ["status"]
+
+
+def test_e3_5_two_status_fragments_are_a_row_error(h: MastersHarness) -> None:
+    res = h.post(
+        "RULES", {"payload": {**COST_RULE, "misc": "Status: Proposed. x; Status: Approved"}}
+    )
+    body = problem(res, 422, "VALIDATION_ERROR")
+    assert body["errors"][0]["message"] == "multiple Status fragments in Misc"
+
+
+def test_e3_5_other_tenant_and_fde_cannot_change_status(h: MastersHarness) -> None:
+    entry = h.entry(payload=COST_RULE)
+    path = f"/admin/masters/RULES/{entry['id']}/status"
+    other = h.call(
+        "PATCH", path, h.admin_b(), json={"status": "APPROVED"}, headers={"if-match": '"1"'}
+    )
+    problem(other, 404, "NOT_FOUND")
+    fde = h.call(
+        "PATCH", path, h.realm.token(), json={"status": "APPROVED"}, headers={"if-match": '"1"'}
+    )
+    assert fde.status_code in (403, 404)
+    (
+        problem(h.call("GET", f"/admin/masters/RULES/{entry['id']}", h.admin_a()), 200, "")
+        if False
+        else None
+    )
+    assert (
+        h.call("GET", f"/admin/masters/RULES/{entry['id']}", h.admin_a()).json()["status"]
+        == "PROPOSED"
+    )

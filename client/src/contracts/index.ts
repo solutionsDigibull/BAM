@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:61e342f1852aca2c7277b22495988b8233c7d88e1a5b27fe00357ce0f3194be5
+// source-sha256:ef40183a89cf67478c06d04f212d91ce201338fb505861d6f74668fcc9418ea3
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -221,14 +221,14 @@ export type PipelineStepStatus = "pending" | "running" | "done" | "failed" | "ca
 export type ScanStatus = "CLEAN" | "INFECTED" | "SCAN_FAILED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "MasterType".
- */
-export type MasterType = "ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS" | "TOOLING" | "FILETYPE";
-/**
- * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterStatus".
  */
 export type MasterStatus = "PROPOSED" | "ILLUSTRATIVE" | "APPROVED" | "RETIRED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterType".
+ */
+export type MasterType = "ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS" | "TOOLING" | "FILETYPE";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SourceKind".
@@ -294,6 +294,7 @@ export interface SbamContracts {
   ScanOutcome?: ScanOutcome;
   MasterEntryCreate?: MasterEntryCreate;
   MasterVersionCreate?: MasterVersionCreate;
+  MasterStatusChange?: MasterStatusChange;
   MasterEntry?: MasterEntry;
   MastersSnapshot?: MastersSnapshot;
   DocumentOut?: DocumentOut;
@@ -1992,6 +1993,16 @@ export interface MasterVersionCreate {
   payload: {
     [k: string]: unknown | undefined;
   };
+}
+/**
+ * PATCH .../status (E3.5): the status is written back into the row (Misc, or Tooling's own
+ * Status column) as a new version. The entry's ETag goes in `If-Match`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterStatusChange".
+ */
+export interface MasterStatusChange {
+  status: MasterStatus;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

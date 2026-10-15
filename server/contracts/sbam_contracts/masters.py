@@ -267,6 +267,68 @@ def extract_tooling_status(status: str) -> MasterStatus:
     return MasterStatus.PROPOSED
 
 
+# --- Status write-back (E3.5) ---------------------------------------------------------------
+
+# The trailing fragment, split so only the value is swapped: (keep)(Status:<spaces>)(value)(.?<ws>)
+_STATUS_WRITE = re.compile(r"((?:^|[\s;])Status:\s*)(\S+?)(\.?\s*)$", re.IGNORECASE)
+
+
+def status_word(status: MasterStatus) -> str:
+    """How a status is written in a cell: `Approved`, as in the workbook."""
+    return status.value.capitalize()
+
+
+def replace_status(misc: str, status: MasterStatus) -> str:
+    """Misc with its status set to `status`; every other character stays exactly as it was.
+
+    * a trailing `Status: X` fragment: only `X` is replaced (its spacing and final dot kept);
+    * an empty cell becomes `Status: <X>`;
+    * text without a fragment gets `; Status: <X>` appended (` Status: <X>` after a full stop);
+    * an ambiguous cell (two fragments) raises, like `extract_status`.
+    The result always reads back as `status`.
+    """
+    extract_status(misc)  # raises on two fragments or an unknown value already in the cell
+    word = status_word(status)
+    match = _STATUS_WRITE.search(misc)
+    if match:
+        written = misc[: match.start(2)] + word + misc[match.end(2) :]
+    elif not misc.strip():
+        written = f"Status: {word}"
+    else:
+        body = misc.rstrip()
+        sep = " " if body.endswith((".", ";")) else "; "
+        written = f"{body}{sep}Status: {word}{misc[len(body):]}"
+    if extract_status(written) is not status:
+        raise ValueError("Misc can't carry this status unambiguously; edit the cell instead")
+    return written
+
+
+def replace_tooling_status(record_status: str, status: MasterStatus) -> str:
+    """Tooling's Status column: swap a leading status word, else put `<X>; ` in front."""
+    word = status_word(status)
+    match = _TOOLING_STATUS.match(record_status)
+    if match and match.group(1).upper() in MasterStatus.__members__:
+        written = record_status[: match.start(1)] + word + record_status[match.end(1) :]
+    elif not record_status.strip():
+        written = word
+    else:
+        written = f"{word}; {record_status}"
+    return written
+
+
+def with_status(payload: MasterPayload, status: MasterStatus) -> MasterPayload:
+    """The payload with its status written back where the workbook keeps it (E3.5)."""
+    if isinstance(payload, OrganizationPayload):
+        return payload.model_copy(update={"misc_audit": replace_status(payload.misc_audit, status)})
+    if isinstance(payload, RulesPayload | AgentsPayload | SkillsPayload):
+        return payload.model_copy(update={"misc": replace_status(payload.misc, status)})
+    if isinstance(payload, ToolingPayload):
+        return payload.model_copy(
+            update={"record_status": replace_tooling_status(payload.record_status, status)}
+        )
+    raise ValueError("Filetype rows carry no status")
+
+
 def _row_number(row_label: str) -> int | None:
     match = re.search(r"#(\d+)\s*$", row_label)
     return int(match.group(1)) if match else None
