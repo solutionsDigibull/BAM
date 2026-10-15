@@ -1,6 +1,7 @@
 """Queries on `audit_log` and `notification_outbox`. Audit rows are only ever inserted or read."""
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -66,6 +67,40 @@ def entity_history(
         .order_by(AuditLog.id)
     )
     return list(session.scalars(query))
+
+
+def search(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    actor_id: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    before_id: uuid.UUID | None = None,
+    limit: int,
+) -> list[AuditLog]:
+    """The tenant's rows, newest first (uuid7 ids sort by time), for `GET /admin/audit` (E2.8).
+
+    The tenant is required: platform rows (tenant_id NULL) and other tenants' rows never match.
+    `limit + 1` rows tell the caller whether another page exists.
+    """
+    query = select(AuditLog).where(AuditLog.tenant_id == tenant_id)
+    for column, value in (
+        (AuditLog.entity_type, entity_type),
+        (AuditLog.entity_id, entity_id),
+        (AuditLog.actor_id, actor_id),
+    ):
+        if value is not None:
+            query = query.where(column == value)
+    if start is not None:
+        query = query.where(AuditLog.at >= start)
+    if end is not None:
+        query = query.where(AuditLog.at <= end)
+    if before_id is not None:
+        query = query.where(AuditLog.id < before_id)
+    return list(session.scalars(query.order_by(AuditLog.id.desc()).limit(limit + 1)))
 
 
 def enqueue(
