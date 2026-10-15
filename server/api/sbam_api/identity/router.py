@@ -1,7 +1,7 @@
 """Identity API: super-admin tenants and the caller's own profile (E2.3), tenant users (E2.4).
 
 `/admin/tenants` is platform-level (super-admin, no tenant); an sbam-admin gets 403 WRONG_PORTAL.
-`/admin/users` is the caller's tenant only (another tenant's user: 404).
+`/admin/users` and `/admin/audit` are the caller's tenant only (another tenant's user: 404).
 `/me` answers for any signed-in user.
 """
 
@@ -9,8 +9,9 @@ import uuid
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from sbam_contracts.api import Page
+from sbam_contracts.audit import AuditEntry
 from sbam_contracts.identity import (
     Me,
     TenantCreate,
@@ -128,6 +129,50 @@ def patch_user(
 ) -> TenantUser:
     row = service.update_user(session, _auth(request).users, user, user_id, body, if_match)
     return tenant_user(row, response)
+
+
+@router.get("/admin/audit")
+def list_audit(
+    user: Admin,
+    session: Db,
+    request: Request,
+    limit: str | None = None,
+    cursor: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    actor: str | None = None,
+    start: Annotated[str | None, Query(alias="from")] = None,
+    end: Annotated[str | None, Query(alias="to")] = None,
+) -> Page[AuditEntry]:
+    """`?entity_type=&entity_id=&actor=&from=&to=&limit=1..100 (25)&cursor=`, newest first."""
+    secret = request.app.state.settings.cursor_secret.get_secret_value().encode()
+    rows, next_cursor = service.list_audit(
+        session,
+        user,
+        secret,
+        limit=limit,
+        cursor=cursor,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        actor_id=actor,
+        start=start,
+        end=end,
+    )
+    items = [
+        AuditEntry(
+            id=r.id,
+            action=r.action,
+            entity_type=r.entity_type,
+            entity_id=r.entity_id,
+            actor_id=r.actor_id,
+            before=r.before,
+            after=r.after,
+            correlation_id=r.correlation_id,
+            created_at=r.at,
+        )
+        for r in rows
+    ]
+    return Page[AuditEntry](items=items, next_cursor=next_cursor)
 
 
 @router.get("/me")

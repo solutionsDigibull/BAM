@@ -12,9 +12,10 @@ written here first, and a still-valid older token must not write the old roles b
 user becomes ACTIVE on first sight; a DEACTIVATED one gets 401 even with an unexpired token.
 """
 
+import re
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sbam_contracts.api import ErrorCode, FieldError
@@ -23,6 +24,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.exc import StaleDataError
 
+from sbam_api.audit import repository as audit_repository
+from sbam_api.audit.models import AuditLog
 from sbam_api.audit.repository import record
 from sbam_api.core.auth import (
     ROLE_ADMIN,
@@ -141,6 +144,8 @@ def last_admin() -> ApiError:
 
 
 LIST_ROLES = (ROLE_ADMIN, ROLE_FDE)
+AUDIT_MAX_RANGE = timedelta(days=92)
+ENTITY_TYPE = re.compile(r"^[a-z_]{1,64}$")
 
 
 def bad_param(path: str, message: str, code: ErrorCode = ErrorCode.VALIDATION_ERROR) -> ApiError:
@@ -285,6 +290,80 @@ def _audit(
         after=after,
         correlation_id=correlation_id_var.get() or "unknown",
     )
+
+
+# --- Audit log (admin, E2.8) -----------------------------------------------------------------
+
+
+def list_audit(
+    session: Session,
+    actor: CurrentUser,
+    secret: bytes,
+    *,
+    limit: str | None,
+    cursor: str | None,
+    entity_type: str | None,
+    entity_id: str | None,
+    actor_id: str | None,
+    start: str | None,
+    end: str | None,
+) -> tuple[list[AuditLog], str | None]:
+    """One page of the tenant's audit rows, newest first, and the next page's cursor (or None).
+
+    `from`/`to` are ISO 8601 with a timezone, at most 92 days apart; with only one of them the
+    other end is 92 days away. A bad query is 400 on the parameter (docs/api-conventions.md).
+    """
+    size = parse_limit(limit)
+    if entity_type is not None and not ENTITY_TYPE.match(entity_type):
+        raise bad_param("entity_type", "must be lowercase letters and underscores")
+    for name, value in (("entity_id", entity_id), ("actor", actor_id)):
+        if value is not None and not 1 <= len(value) <= 255:
+            raise bad_param(name, "must be 1 to 255 characters")
+    lo, hi = _instant("from", start), _instant("to", end)
+    if lo and hi and lo > hi:
+        raise bad_param("from", "must not be after `to`")
+    if lo and hi and hi - lo > AUDIT_MAX_RANGE:
+        raise bad_param("from", "the range can be at most 92 days")
+    if lo and not hi:
+        hi = lo + AUDIT_MAX_RANGE
+    elif hi and not lo:
+        lo = hi - AUDIT_MAX_RANGE
+    tenant = str(actor.tenant_id)
+    before_id = None
+    if cursor:
+        position = decode_cursor(cursor, tenant, secret)
+        try:
+            before_id = uuid.UUID(str(position["before"]))
+        except (KeyError, ValueError):
+            bad = bad_param("cursor", "invalid or expired cursor", ErrorCode.INVALID_CURSOR)
+            raise bad from None
+    rows = audit_repository.search(
+        session,
+        actor.context().tenant_id,  # the token's tenant, never a parameter
+        entity_type=entity_type,
+        entity_id=entity_id,
+        actor_id=actor_id,
+        start=lo,
+        end=hi,
+        before_id=before_id,
+        limit=size,
+    )
+    if len(rows) <= size:
+        return rows, None
+    rows = rows[:size]
+    return rows, encode_cursor({"before": str(rows[-1].id)}, tenant, secret)
+
+
+def _instant(name: str, raw: str | None) -> datetime | None:
+    if raw is None:
+        return None
+    try:
+        value = datetime.fromisoformat(raw)
+    except ValueError:
+        raise bad_param(name, "must be an ISO 8601 date-time") from None
+    if value.tzinfo is None:
+        raise bad_param(name, "must include a timezone, e.g. 2026-10-15T00:00:00Z")
+    return value
 
 
 # --- The users mirror ------------------------------------------------------------------------

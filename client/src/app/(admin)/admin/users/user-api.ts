@@ -25,9 +25,24 @@ export const LAST_ADMIN_MESSAGE = "At least one active admin is required";
 export const STALE_USER_MESSAGE = "This user was changed by someone else";
 export const USER_EXISTS_MESSAGE = "A user with this email already exists.";
 
-// Same shape check as the API's `Email` contract (RFC 5322 in full is follow-up #212).
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-export const isEmail = (value: string) => value.length <= 254 && EMAIL.test(value.trim());
+// Mirrors the API's `Email` contract (RFC 5322 via email-validator, E2.8) for instant feedback; the API
+// stays authoritative and its 422 lands on the field. Unquoted local part (dot-atom), at most 64
+// characters; a domain of dot-separated labels with a dot, no leading/trailing hyphen; 254 in total.
+const LOCAL = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
+const LABEL = /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+export function isEmail(value: string): boolean {
+  const email = value.trim();
+  const at = email.lastIndexOf("@");
+  if (email.length > 254 || at < 1) return false;
+  const local = email.slice(0, at);
+  const labels = email.slice(at + 1).split(".");
+  return (
+    local.length <= 64 &&
+    LOCAL.test(local) &&
+    labels.length >= 2 &&
+    labels.every((label) => LABEL.test(label))
+  );
+}
 
 export const isActiveAdmin = (u: TenantUser) =>
   u.status === "ACTIVE" && u.portal_roles.includes("sbam-admin");

@@ -59,11 +59,11 @@ def test_e2_4_t01_invite_sends_the_keycloak_email(admin: str, email: str) -> Non
 
     mail = httpx.get(f"{MAILPIT}/search", params={"query": f"to:{email}"}, timeout=10).json()
     assert mail["messages_count"] >= 1
-    action = sql(
-        "SELECT action FROM sbam.audit_log WHERE entity_id = :id AND action = 'USER_INVITED'",
-        id=user_id,
-    )
-    assert action
+    # The audit row, read back through the API (E2.8).
+    trail = call("GET", "/admin/audit", admin, params={"entity_type": "user", "entity_id": user_id})
+    assert trail.status_code == 200, trail.text
+    assert [r["action"] for r in trail.json()["items"]] == ["USER_INVITED"]
+    assert trail.json()["items"][0]["after"] == {"email": email, "roles": ["sbam-fde"]}
 
 
 def test_e2_4_t08_deactivate_revokes_sessions(admin: str) -> None:
