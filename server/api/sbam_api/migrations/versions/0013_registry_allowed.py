@@ -1,7 +1,7 @@
 """runtime registry: allowed flag per package
 
-Revision ID: 0011_registry_allowed
-Revises: 0010_masters
+Revision ID: 0013_registry_allowed
+Revises: 0012_notifications
 Create Date: 2026-10-15
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0011_registry_allowed"
-down_revision: str | Sequence[str] | None = "0010_masters"
+revision: str = "0013_registry_allowed"
+down_revision: str | Sequence[str] | None = "0012_notifications"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
