@@ -4,6 +4,7 @@ import logging
 import re
 import time
 import traceback
+from collections.abc import Mapping
 from pathlib import Path
 
 from opentelemetry import trace
@@ -96,24 +97,29 @@ class _BodyTooLargeError(Exception):
 
 
 class BodyLimitMiddleware:
-    """413 problem+json when Content-Length, or the streamed body, exceeds `max_bytes`."""
+    """413 problem+json when Content-Length, or the streamed body, exceeds `max_bytes` (or the
+    path's own limit in `per_path`, e.g. the 15 MB masters workbook import)."""
 
-    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+    def __init__(
+        self, app: ASGIApp, max_bytes: int, per_path: Mapping[str, int] | None = None
+    ) -> None:
         self.app = app
         self.max_bytes = max_bytes
+        self.per_path = dict(per_path or {})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        max_bytes = self.per_path.get(scope["path"], self.max_bytes)
         too_large = ApiError(
             413,
             ErrorCode.PAYLOAD_TOO_LARGE,
             "Request body too large",
-            f"The limit is {self.max_bytes} bytes.",
+            f"The limit is {max_bytes} bytes.",
         )
         length = _header(scope, b"content-length")
-        if length.isdigit() and int(length) > self.max_bytes:
+        if length.isdigit() and int(length) > max_bytes:
             await send_problem(send, too_large)
             return
 
@@ -124,7 +130,7 @@ class BodyLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > self.max_bytes:
+                if received > max_bytes:
                     raise _BodyTooLargeError
             return message
 

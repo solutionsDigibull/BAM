@@ -110,7 +110,12 @@ def create_app(
     for router in routers:
         app.include_router(router, prefix=API_BASE)
     # Last added runs first: correlation id wraps the body limit so a 413 also carries the id.
-    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_body_bytes)
+    app.add_middleware(
+        BodyLimitMiddleware,
+        max_bytes=settings.max_body_bytes,
+        # The workbook import takes a 15 MB .xlsx plus the multipart framing (E3.3).
+        per_path={f"{API_BASE}/admin/masters/import": 16 * 1024 * 1024},
+    )
     app.add_middleware(CorrelationIdMiddleware)
     configure_telemetry(app, settings)  # wraps the whole stack: one server span per request
     return app
