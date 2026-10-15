@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # again at page 1); set CURSOR_SECRET once the API runs more than one replica.
     cursor_secret: SecretStr = Field(default_factory=lambda: SecretStr(secrets.token_hex(32)))
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
+    # The masters workbook import (E3.3) scans the upload with clamd before reading it. Unreachable
+    # clamd = the import answers 503 SCAN_UNAVAILABLE; nothing is read unscanned.
+    clamav_host: str = Field(default="clamav", min_length=1)
+    clamav_port: int = Field(default=3310, ge=1, le=65535)
+    clamav_timeout: float = Field(default=60.0, gt=0)
     log_level: str = "INFO"
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
     otel_exporter_otlp_endpoint: AnyHttpUrl | None = None

@@ -9,11 +9,12 @@ first). Reading the .xlsx with openpyxl belongs to the importer (E3.3). Error pa
 import json
 import re
 from collections.abc import Iterable, Mapping, Sequence
+from importlib.resources import files
 from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from sbam_contracts.api import ErrorCode, FieldError
+from sbam_contracts.api import DiffKind, ErrorCode, FieldError, StructureDiff
 from sbam_contracts.masters import (
     README_MAX_COLUMNS,
     AgentsPayload,
@@ -31,6 +32,12 @@ from sbam_contracts.masters import (
 )
 
 MAX_WORKBOOK_BYTES: Final = 15 * 1024 * 1024
+# Zip-bomb guard (E3.3): the members may expand to 100 MB in total, at most 100x their packed size.
+MAX_UNPACKED_BYTES: Final = 100 * 1024 * 1024
+MAX_PACK_RATIO: Final = 100
+SPREADSHEET_MAIN: Final = (
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+)
 FILETYPE_COUNT: Final = 43
 README_TAB: Final = "README"
 HEADER_ROWS: Final = 3  # Metadata, Name, Description; data starts on row 4
@@ -205,6 +212,48 @@ def check_workbook_container(
     return errors
 
 
+def frozen_filetype() -> list[FiletypePayload]:
+    """The 43 frozen Filetype rows of BAM 0.2, #1 first. Only super-admin changes them."""
+    data = files("sbam_contracts").joinpath("masters_filetype.json").read_text(encoding="utf-8")
+    return [FiletypePayload.model_validate(row) for row in json.loads(data)]
+
+
+def check_archive(members: Iterable[tuple[str, int, int]]) -> FieldError | None:
+    """Zip-bomb guard from the zip directory alone (name, unpacked size, packed size), before any
+    member is inflated: at most 100 MB unpacked in total and a ratio of at most 100."""
+    unpacked = packed = 0
+    for _, size, compressed in members:
+        unpacked += size
+        packed += compressed
+    if unpacked > MAX_UNPACKED_BYTES:
+        return FieldError(path="file", message="workbook expands beyond 100 MB")
+    if unpacked > MAX_PACK_RATIO * max(packed, 1):
+        return FieldError(path="file", message="workbook compression ratio is above 100")
+    return None
+
+
+def check_content_types(content_types_xml: str) -> FieldError | None:
+    """An .xlsx declares the spreadsheetml main part; macro-enabled or other OOXML files don't."""
+    if "macroEnabled" in content_types_xml:
+        return FieldError(path="file", message="workbooks with macros are not accepted")
+    if SPREADSHEET_MAIN not in content_types_xml:
+        return FieldError(path="file", message="the file is not an Excel .xlsx workbook")
+    return None
+
+
+def _diff_kind(
+    want: str | None, got: str | None, expected: list[str], actual: list[str]
+) -> DiffKind:
+    """Name the kind of a header mismatch at one position."""
+    if want is None or (got is not None and got not in expected and want in actual):
+        return DiffKind.ADDED
+    if got is None or (want not in actual and got in expected):
+        return DiffKind.REMOVED
+    if got in expected and want in actual:
+        return DiffKind.REORDERED
+    return DiffKind.RENAMED
+
+
 def _col_path(master_type: MasterType, row: int, index: int) -> str:
     return f"{TABS[master_type]}!row{row}:col{COLUMN_NUMBER_START[master_type] + index}"
 
@@ -236,7 +285,9 @@ def _validate_headers(master_type: MasterType, grid: Grid) -> list[FieldError]:
         got = actual[index] if index < len(actual) else None
         if want != got:
             path = _col_path(master_type, NAME_HEADER_ROW, index)
-            errors.append(FieldError(path=path, message=_header_problem(want, got)))
+            kind = _diff_kind(want, got, expected, actual)
+            diff = StructureDiff(tab=tab, expected=want, actual=got, kind=kind)
+            errors.append(FieldError(path=path, message=_header_problem(want, got), diff=diff))
     return errors
 
 
@@ -281,7 +332,20 @@ def validate_structure(sheets: Mapping[str, Grid]) -> list[FieldError]:
             f"missing {missing}, unexpected {extra}" if missing or extra else "tabs are reordered"
         )
         message = f"expected tabs {list(TAB_ORDER)}; {detail}"
-        return [FieldError(path="workbook!tabs", message=message)]
+        if missing:
+            diff = StructureDiff(
+                tab="workbook", expected=missing[0], actual=None, kind=DiffKind.REMOVED
+            )
+        elif extra:
+            diff = StructureDiff(
+                tab="workbook", expected=None, actual=extra[0], kind=DiffKind.ADDED
+            )
+        else:
+            order = ", ".join(sheets)
+            diff = StructureDiff(
+                tab="workbook", expected=", ".join(TAB_ORDER), actual=order, kind=DiffKind.REORDERED
+            )
+        return [FieldError(path="workbook!tabs", message=message, diff=diff)]
     errors: list[FieldError] = []
     for master_type, tab in TABS.items():
         if tab in sheets:

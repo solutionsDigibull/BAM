@@ -16,9 +16,14 @@ Rules worth knowing
     entries with the same stable id; ILLUSTRATIVE, RETIRED and Restricted entries are left out.
     `sha256` is `canonical.sha256_of({project_id, entries})` (RFC 8785, `sha256:<hex>`), so the same
     versions always give the same hash.
+  * Workbook import (E3.3, `POST /admin/masters/import`) answers an `ImportReport`. Rows are matched
+    on (master type, stable id, scope); a changed payload is a new version, an equal one is
+    `unchanged`. `upsert` writes all or nothing: any row error leaves `applied: false`. Entries in
+    the database that the workbook no longer holds are kept and counted as `missing`.
 """
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -79,6 +84,36 @@ class MastersSnapshot(BaseModel):
     created_at: datetime
 
 
+class ImportMode(StrEnum):
+    VALIDATE_ONLY = "validate-only"
+    UPSERT = "upsert"
+
+
+class ImportRowError(BaseModel):
+    tab: str
+    row: int | None = Field(default=None, ge=1)  # the sheet row; None for a tab-level problem
+    column: str | None = None  # the row-2 header name
+    message: str
+
+
+class ImportTabReport(BaseModel):
+    name: str
+    created: int = Field(default=0, ge=0)
+    updated: int = Field(default=0, ge=0)
+    unchanged: int = Field(default=0, ge=0)
+    missing: int = Field(default=0, ge=0)
+    errors: list[ImportRowError] = Field(default_factory=list)
+
+
+class ImportReport(BaseModel):
+    mode: ImportMode
+    applied: bool  # true only for an upsert that wrote its changes
+    sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")  # of the uploaded file
+    tabs: list[ImportTabReport]
+    stable_ids: list[str]  # of every parsed row, in workbook order
+    statuses: dict[MasterStatus, int]  # parsed rows per status
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/masters/`."""
     models: dict[str, type[BaseModel]] = {
@@ -86,6 +121,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "master_version_create": MasterVersionCreate,
         "master_entry": MasterEntry,
         "masters_snapshot": MastersSnapshot,
+        "import_report": ImportReport,
     }
     return {stem: contract_schema(model, f"masters/{stem}") for stem, model in models.items()}
 

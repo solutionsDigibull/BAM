@@ -230,6 +230,13 @@ routes:
       <<: *tenant_admin_a_resource
       admin_a: "201"
 
+  import_workbook_api_v1_admin_masters_import_post:  # E3.3; no file = 422 once the role passes
+    request: {method: POST, path: /api/v1/admin/masters/import}
+    expect:
+      <<: *tenant_admin_list
+      admin_a: "422 VALIDATION_ERROR"
+      admin_b: "422 VALIDATION_ERROR"
+
   get_snapshot_api_v1_admin_masters_snapshots__snapshot_id__get:
     request:
       method: GET

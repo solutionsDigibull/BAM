@@ -8,6 +8,7 @@ dependencies = [
     "boto3>=1.40,<2",
     "fastapi>=0.142.2",
     "httpx>=0.28.1",
+    "openpyxl>=3.1.5",
     "opentelemetry-exporter-otlp-proto-http>=1.44.0,<1.45",
     "opentelemetry-instrumentation-fastapi>=0.65b0,<0.66",
     "opentelemetry-instrumentation-httpx>=0.65b0,<0.66",
@@ -16,6 +17,7 @@ dependencies = [
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.15.0",
     "pyjwt[crypto]>=2.10,<3",
+    "python-multipart>=0.0.20",
     "sbam-contracts",
     "sqlalchemy>=2.0.54,<2.1",  # OTel sqlalchemy instrumentation supports <2.1 only
     "temporalio[opentelemetry]>=1.33,<1.34",

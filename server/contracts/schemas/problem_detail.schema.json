@@ -2,6 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:sbam:contracts:problem_detail:0.1.0",
   "$defs": {
+    "DiffKind": {
+      "enum": [
+        "renamed",
+        "added",
+        "removed",
+        "reordered"
+      ],
+      "title": "DiffKind",
+      "type": "string"
+    },
     "ErrorCode": {
       "description": "Stable machine-readable error codes. Add new codes here; never rename or reuse one.",
       "enum": [
@@ -94,6 +104,17 @@
           "minLength": 1,
           "title": "Message",
           "type": "string"
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StructureDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -101,6 +122,50 @@
         "message"
       ],
       "title": "FieldError",
+      "type": "object"
+    },
+    "StructureDiff": {
+      "additionalProperties": false,
+      "description": "How an uploaded layout differs from the frozen one (workbook import, E3.3).",
+      "properties": {
+        "tab": {
+          "minLength": 1,
+          "title": "Tab",
+          "type": "string"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected"
+        },
+        "actual": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actual"
+        },
+        "kind": {
+          "$ref": "#/$defs/DiffKind"
+        }
+      },
+      "required": [
+        "tab",
+        "expected",
+        "actual",
+        "kind"
+      ],
+      "title": "StructureDiff",
       "type": "object"
     }
   },
