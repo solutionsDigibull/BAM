@@ -24,12 +24,17 @@
           },
           "title": "Top Level Modules",
           "type": "array"
+        },
+        "allowed": {
+          "title": "Allowed",
+          "type": "boolean"
         }
       },
       "required": [
         "name",
         "version",
-        "top_level_modules"
+        "top_level_modules",
+        "allowed"
       ],
       "title": "RuntimePackage",
       "type": "object"

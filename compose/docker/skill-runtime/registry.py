@@ -6,10 +6,15 @@ Runs inside the skill-runtime image, at build time and in CI. It reads what is r
 the image has no SBAM packages. The output validates as `sbam_contracts.runtime_registry`:
 
     {"content_sha256": "sha256:…", "generated_at": "…", "image_digest": null | "sha256:…",
-     "packages": [{"name": "psycopg", "top_level_modules": ["psycopg"], "version": "3.3.6"}, …],
+     "packages": [{"allowed": true, "name": "psycopg", "top_level_modules": ["psycopg"],
+                   "version": "3.3.6"}, …],
      "python_version": "3.12.15"}
 
+`allowed` (E3.12): the package is one of the allowed libraries in requirements.in (copied into the
+image); everything else installed is a transitive dependency that Sub-Skills must not import.
+
 Usage: sbam-runtime-registry [--image-digest sha256:…] [--generated-at ISO-8601] [--output FILE]
+                             [--allowed requirements.in]
 The digest only exists after the build, so CI passes it in; `content_sha256` ignores generated_at.
 """
 
@@ -23,6 +28,8 @@ from datetime import UTC, datetime
 from importlib.metadata import Distribution, distributions
 
 TOOLING = {"pip", "setuptools", "wheel"}  # the venv's own tools, not libraries for Sub-Skills
+ALLOWED_FILE = "/opt/sbam/allowed-libraries.in"  # requirements.in, copied in by the Dockerfile
+REQUIREMENT_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 MODULE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -30,6 +37,19 @@ MODULE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 def normalize(name: str) -> str:
     """PEP 503 (same rule as sbam_contracts.isatvon14.normalize_package)."""
     return re.sub(r"[-_.]+", "-", name.strip()).lower()
+
+
+def allowed_names(path: str) -> set[str]:
+    """Normalised names from a requirements.in: `psycopg[binary]>=3 ; extra` -> `psycopg`."""
+    names = set()
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            match = REQUIREMENT_NAME.match(line.split("#", 1)[0])
+            if match:
+                names.add(normalize(match.group(1)))
+    if not names:
+        raise ValueError(f"no allowed libraries in {path}")
+    return names
 
 
 def top_level_modules(dist: Distribution) -> list[str]:
@@ -54,7 +74,7 @@ def top_level_modules(dist: Distribution) -> list[str]:
     return sorted(m for m in modules if MODULE.match(m) and m != "__pycache__")
 
 
-def packages() -> list[dict[str, object]]:
+def packages(allowed: set[str]) -> list[dict[str, object]]:
     seen: dict[str, dict[str, object]] = {}
     for dist in distributions():
         name = normalize(dist.metadata["Name"] or "")
@@ -64,6 +84,7 @@ def packages() -> list[dict[str, object]]:
             "name": name,
             "version": dist.version,
             "top_level_modules": top_level_modules(dist),
+            "allowed": name in allowed,
         }
     return [seen[n] for n in sorted(seen)]
 
@@ -75,13 +96,21 @@ def content_sha256(registry: dict[str, object]) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def build(image_digest: str | None = None, generated_at: str | None = None) -> dict[str, object]:
+def build(
+    image_digest: str | None = None,
+    generated_at: str | None = None,
+    allowed_file: str = ALLOWED_FILE,
+) -> dict[str, object]:
     if image_digest is not None and not DIGEST.match(image_digest):
         raise ValueError(f"image digest must look like sha256:<64 hex>, got {image_digest!r}")
+    try:
+        allowed = allowed_names(allowed_file)
+    except OSError:
+        raise ValueError(f"allowed libraries file not found: {allowed_file}") from None
     registry: dict[str, object] = {
         "image_digest": image_digest,
         "python_version": platform.python_version(),
-        "packages": packages(),
+        "packages": packages(allowed),
         "generated_at": generated_at or datetime.now(UTC).isoformat(timespec="seconds"),
     }
     registry["content_sha256"] = content_sha256(registry)
@@ -95,9 +124,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--image-digest", help="sha256:<64 hex> of the built image (CI)")
     parser.add_argument("--generated-at", help="fixed timestamp (tests); default: now, UTC")
     parser.add_argument("--output", help="write here instead of stdout")
+    parser.add_argument("--allowed", default=ALLOWED_FILE, help="the allowed requirements.in")
     args = parser.parse_args(argv)
     try:
-        registry = build(args.image_digest, args.generated_at)
+        registry = build(args.image_digest, args.generated_at, args.allowed)
     except ValueError as exc:
         print(f"sbam-runtime-registry: {exc}", file=sys.stderr)
         return 2

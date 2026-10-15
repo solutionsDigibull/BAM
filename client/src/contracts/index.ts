@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:d3a4df7f59fd244b63e0edebec11103cafc65ea48a9bfdfd7616e565d57c16ca
+// source-sha256:61e342f1852aca2c7277b22495988b8233c7d88e1a5b27fe00357ce0f3194be5
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -1501,6 +1501,7 @@ export interface RuntimePackage {
    * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]*$`
    */
   top_level_modules: string[];
+  allowed: boolean;
 }
 /**
  * Every state enum in one model, so the generated TypeScript exports them as string unions.

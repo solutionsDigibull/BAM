@@ -46,6 +46,7 @@ RUN apt-get update \
  && groupadd --gid 10001 sbam \
  && useradd --uid 10001 --gid sbam --create-home --shell /usr/sbin/nologin sbam
 COPY --from=libs /opt/venv /opt/venv
+COPY --chmod=0644 compose/docker/skill-runtime/requirements.in /opt/sbam/allowed-libraries.in
 COPY --chmod=0755 compose/docker/skill-runtime/registry.py /usr/local/bin/sbam-runtime-registry
 COPY --chmod=0755 compose/docker/skill-runtime/pg-start.sh /usr/local/bin/sbam-pg-start
 RUN sbam-runtime-registry --output /opt/runtime_registry.json \
