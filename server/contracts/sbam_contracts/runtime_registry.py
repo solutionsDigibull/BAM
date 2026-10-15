@@ -10,6 +10,8 @@ Rules worth knowing
   * `content_sha256` covers everything except `generated_at` (and itself): two builds of the same
     image give the same hash (E12.1-T02). It must match the content, so a tampered file is rejected.
   * Sorting: packages by name, modules alphabetically, so the JSON is byte-stable.
+  * `allowed` (E3.12): the package is one of the allowed libraries (skill-runtime requirements.in);
+    false for transitive dependencies, which Sub-Skills must not import. It is part of the content.
 """
 
 from datetime import datetime
@@ -32,6 +34,7 @@ class RuntimePackage(BaseModel):
     name: Annotated[str, Field(pattern=PACKAGE_NAME_PATTERN, max_length=200)]
     version: Annotated[str, Field(min_length=1, max_length=100)]
     top_level_modules: list[Annotated[str, Field(pattern=MODULE_PATTERN)]]
+    allowed: bool
 
     @model_validator(mode="after")
     def _sorted(self) -> Self:

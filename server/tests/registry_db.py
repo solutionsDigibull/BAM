@@ -38,11 +38,14 @@ def _generator() -> Any:
 
 
 GENERATOR = _generator()
+ALLOWED_IN = str(REPO / "compose/docker/skill-runtime/requirements.in")
 
 
 def sample_registry(digest_byte: str = "ab", **overrides: Any) -> RuntimeRegistry:
     """A real registry (from this Python environment) for image digest sha256:<digest_byte * 32>."""
-    raw = GENERATOR.build("sha256:" + digest_byte * 32, "2026-10-13T00:00:00+00:00")
+    raw = GENERATOR.build(
+        "sha256:" + digest_byte * 32, "2026-10-13T00:00:00+00:00", allowed_file=ALLOWED_IN
+    )
     raw.update(overrides)
     if overrides:
         raw["content_sha256"] = GENERATOR.content_sha256(raw)

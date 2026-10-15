@@ -50,6 +50,7 @@ def upsert_registry(session: Session, registry: RuntimeRegistry, activate: bool)
                 name=p.name,
                 version=p.version,
                 top_level_modules=list(p.top_level_modules),
+                allowed=p.allowed,
             )
             for p in registry.packages
         )
@@ -83,7 +84,12 @@ def active_registry(session: Session) -> RuntimeRegistry | None:
         image_digest=row.image_digest,
         python_version=row.python_version,
         packages=[
-            RuntimePackage(name=p.name, version=p.version, top_level_modules=p.top_level_modules)
+            RuntimePackage(
+                name=p.name,
+                version=p.version,
+                top_level_modules=p.top_level_modules,
+                allowed=p.allowed,
+            )
             for p in packages
         ],
         generated_at=row.generated_at.replace(tzinfo=row.generated_at.tzinfo or UTC),

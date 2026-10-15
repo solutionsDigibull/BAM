@@ -8,7 +8,10 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/tenants", label: "Tenants" },
 ];
 
-export const FDE_NAV: NavItem[] = [{ href: "/projects", label: "My projects" }];
+export const FDE_NAV: NavItem[] = [
+  { href: "/projects", label: "My projects" },
+  { href: "/registry", label: "Runtime registry" }, // read-only (E3.12)
+];
 
 // No "create Workflow" entry anywhere: SBAM generates the Workflow from the approved SOW.
 export const projectNav = (base: string): NavItem[] => [

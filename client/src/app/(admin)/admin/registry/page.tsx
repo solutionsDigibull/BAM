@@ -1,7 +1,7 @@
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { RegistryView } from "@/components/registry/registry-view";
 
 export const metadata = { title: "Runtime registry" };
 
 export default function RuntimeRegistryPage() {
-  return <PagePlaceholder title="Runtime registry" empty="No runtime libraries registered yet." />;
+  return <RegistryView endpoint="admin/registry" />;
 }
