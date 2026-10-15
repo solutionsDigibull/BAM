@@ -32,6 +32,7 @@ from sbam_api.pipeline.service import (
     signal_pipeline,
     start_pipeline,
 )
+from sbam_contracts.build import BuildStageInput
 from sbam_contracts.pipeline import (
     Cancel,
     Generate,
@@ -42,8 +43,6 @@ from sbam_contracts.pipeline import (
     RebuildSubSkills,
     SowApproved,
     StageRef,
-    SubSkillBuildInput,
-    SubSkillBuildResult,
 )
 from sbam_contracts.runs import MirrorUpdate, TaskQueue, pipeline_workflow_id
 from sbam_workers import mirror, registry
@@ -270,14 +269,14 @@ def test_e10_1_sow_approved_before_the_wait_is_buffered() -> None:
 def test_e10_1_t04_duplicate_generate_builds_once() -> None:
     builds: list[uuid.UUID] = []
 
-    @activity.defn(name="build_sub_skill")
-    async def counting_build(inp: SubSkillBuildInput) -> SubSkillBuildResult:
+    @activity.defn(name="build_manifest")  # the first stage of every SubSkillBuild (#107)
+    async def counting_build(inp: BuildStageInput) -> IdResult:
         builds.append(inp.sub_skill_id)
-        return SubSkillBuildResult(sub_skill_id=inp.sub_skill_id, certified=True)
+        return IdResult(id=uuid.uuid4())
 
     async def scenario(sessions: sessionmaker[Session]) -> None:
         project = new_project(sessions, TENANT)
-        async with environment({"build_sub_skill": counting_build}) as env:
+        async with environment({"build_manifest": counting_build}) as env:
             handle = await start(env, sessions, project)
             await until(handle, PipelineStage.WAIT_SOW_APPROVAL)
             await approve(handle)
@@ -337,15 +336,15 @@ def test_e10_1_t05_worker_crash_during_extraction_resumes_without_duplicates() -
 
 
 def test_e10_1_t06_cancel_during_building() -> None:
-    @activity.defn(name="build_sub_skill")
-    async def slow_build(inp: SubSkillBuildInput) -> SubSkillBuildResult:
+    @activity.defn(name="run_sandbox_tests")  # a long-running stage of SubSkillBuild (#107)
+    async def slow_build(inp: BuildStageInput) -> IdResult:
         while True:  # heartbeats so the cancellation reaches it
             activity.heartbeat()
             await asyncio.sleep(0.1)
 
     async def scenario(sessions: sessionmaker[Session]) -> tuple[uuid.UUID, PipelineStatus]:
         project = new_project(sessions, TENANT)
-        async with environment({"build_sub_skill": slow_build}) as env:
+        async with environment({"run_sandbox_tests": slow_build}) as env:
             handle = await start(env, sessions, project)
             await until(handle, PipelineStage.WAIT_SOW_APPROVAL)
             await approve(handle)
@@ -439,15 +438,16 @@ def test_e10_1_t08_one_reminder_after_three_days_still_waiting() -> None:
 def test_e10_1_sub_skill_needs_review_then_rebuild() -> None:
     attempts: dict[uuid.UUID, int] = {}
 
-    @activity.defn(name="build_sub_skill")
-    async def flaky_build(inp: SubSkillBuildInput) -> SubSkillBuildResult:
+    @activity.defn(name="render_skeleton")  # a TemplateError ends a SubSkillBuild uncertified
+    async def flaky_build(inp: BuildStageInput) -> IdResult:
         attempts[inp.sub_skill_id] = attempts.get(inp.sub_skill_id, 0) + 1
-        first_try_of_first = len(attempts) == 1 and attempts[inp.sub_skill_id] == 1
-        return SubSkillBuildResult(sub_skill_id=inp.sub_skill_id, certified=not first_try_of_first)
+        if len(attempts) == 1 and attempts[inp.sub_skill_id] == 1:
+            raise ApplicationError("template broke", type="TemplateError", non_retryable=True)
+        return IdResult(id=uuid.uuid4())
 
     async def scenario(sessions: sessionmaker[Session]) -> uuid.UUID:
         project = new_project(sessions, TENANT)
-        async with environment({"build_sub_skill": flaky_build}) as env:
+        async with environment({"render_skeleton": flaky_build}) as env:
             handle = await start(env, sessions, project)
             await until(handle, PipelineStage.WAIT_SOW_APPROVAL)
             await approve(handle)

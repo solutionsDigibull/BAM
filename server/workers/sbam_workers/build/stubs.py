@@ -1,15 +1,24 @@
-"""Build stages (owners: E11.x, #107).
+"""Build stages (owners: E11.x, #112 templates, E12 gates, #107 the SubSkillBuild flow).
 
-STUBS for the ProjectPipeline skeleton (E10.1): fixed activity names and Pydantic in/out
-(sbam_contracts.pipeline). The owning issue replaces the bodies and keeps names and types.
+STUBS: fixed activity names and Pydantic in/out (sbam_contracts.pipeline / .build). `SubSkillBuild`
+(#107) runs them in the TD §13.2 order; the owning issue replaces a body and keeps names and types.
+Every real stage upserts by (sub_skill_id, build_no, cycle, attempt, stage), so a retried activity
+never writes a second row (TD §13.4). Gates raise `ApplicationError(type=GateFailed,
+non_retryable=True)` with the persisted finding ids as details.
 """
 
-from sbam_contracts.pipeline import IdResult, SubSkillBuildInput, SubSkillBuildResult, WorkflowRef
+from sbam_contracts.build import (
+    BuildStageInput,
+    CorrectionInput,
+    LibraryCheckResult,
+    LibraryStatus,
+)
+from sbam_contracts.pipeline import IdResult, WorkflowRef
 from sbam_contracts.runs import TaskQueue
 from temporalio import activity
 
 from sbam_workers.registry import activity_for
-from sbam_workers.stub_ids import stub_id
+from sbam_workers.stub_ids import stage_stub_id, stub_id
 
 
 @activity_for(TaskQueue.BUILD)
@@ -20,7 +29,57 @@ async def build_schema_sql(inp: WorkflowRef) -> IdResult:
 
 
 @activity_for(TaskQueue.BUILD)
-@activity.defn(name="build_sub_skill")
-async def build_sub_skill(inp: SubSkillBuildInput) -> SubSkillBuildResult:
-    """#107 replaces the SubSkillBuild internals (render, generate, gates, tests, correction)."""
-    return SubSkillBuildResult(sub_skill_id=inp.sub_skill_id, certified=True)
+@activity.defn(name="build_manifest")
+async def build_manifest(inp: BuildStageInput) -> IdResult:
+    """Real: the Sub-Skill's manifest + ISATVON hash (a new hash means a re-render)."""
+    return IdResult(id=stage_stub_id(inp, "manifest"))
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name="check_libraries")
+async def check_libraries(inp: BuildStageInput) -> LibraryCheckResult:
+    """Real: MISSING libraries -> DEPENDENCY_FAILED (findings persisted, ids returned)."""
+    return LibraryCheckResult(status=LibraryStatus.OK)
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name="render_skeleton")
+async def render_skeleton(inp: BuildStageInput) -> IdResult:
+    """Real (#112 templates): non-retryable TemplateError."""
+    return IdResult(id=stage_stub_id(inp, "skeleton"))
+
+
+@activity_for(TaskQueue.LLM)
+@activity.defn(name="generate_bodies")
+async def generate_bodies(inp: BuildStageInput) -> IdResult:
+    """Real: LLM fills the function bodies through the Bifrost `sbam-codegen` alias."""
+    return IdResult(id=stage_stub_id(inp, "bodies"))
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name="assemble")
+async def assemble(inp: BuildStageInput) -> IdResult:
+    """Real: skeleton + bodies -> the Sub-Skill's code; non-retryable TemplateError."""
+    return IdResult(id=stage_stub_id(inp, "assembled"))
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name="ast_gate")
+async def ast_gate(inp: BuildStageInput) -> IdResult:
+    """Real (E11/E12): AST checks; raises GateFailed with finding ids."""
+    return IdResult(id=stage_stub_id(inp, "ast_gate"))
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name="static_gate")
+async def static_gate(inp: BuildStageInput) -> IdResult:
+    """Real (E11/E12): static analysis; raises GateFailed with finding ids."""
+    return IdResult(id=stage_stub_id(inp, "static_gate"))
+
+
+@activity_for(TaskQueue.LLM)
+@activity.defn(name="correct")
+async def correct(inp: CorrectionInput) -> IdResult:
+    """Real: LLM (`sbam-corrector`) rewrites the failing bodies from the findings; stores them
+    as the next attempt's bodies and returns their id."""
+    return IdResult(id=stage_stub_id(inp, "correction"))

@@ -4,12 +4,20 @@ STUBS for the ProjectPipeline skeleton (E10.1): fixed activity names and Pydanti
 (sbam_contracts.pipeline). The owning issue replaces the bodies and keeps names and types.
 """
 
+from sbam_contracts.build import BuildStageInput
 from sbam_contracts.pipeline import FreezeResult, IdResult, IdsResult, WorkflowRef
 from sbam_contracts.runs import TaskQueue
 from temporalio import activity
 
 from sbam_workers.registry import activity_for
-from sbam_workers.stub_ids import stub_id
+from sbam_workers.stub_ids import stage_stub_id, stub_id
+
+
+@activity_for(TaskQueue.CERTIFY)
+@activity.defn(name="certify_sub_skill")
+async def certify_sub_skill(inp: BuildStageInput) -> IdResult:
+    """Real: hashes the passing build, writes the certificate; non-retryable HashMismatch."""
+    return IdResult(id=stage_stub_id(inp, "certify_sub_skill"))
 
 
 @activity_for(TaskQueue.CERTIFY)
