@@ -269,6 +269,33 @@ routes:
       fde_a_unassigned: "404 NOT_FOUND"
       fde_b: "404 NOT_FOUND"
 
+  list_documents_api_v1_projects__project_id__documents_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/documents
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  delete_document_api_v1_projects__project_id__documents__document_id__delete:
+    request:
+      method: DELETE
+      path: /api/v1/projects/{project_id}/documents/{document_id}
+      params: {project_id: "@project_a", document_id: "@doc_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "204"
+
+  restore_document_api_v1_projects__project_id__documents__document_id__restore_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/documents/{document_id}/restore
+      params: {project_id: "@project_a", document_id: "@doc_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 CONFLICT"
+
   start_api_v1_projects__project_id__pipeline_start_post:
     request:
       method: POST

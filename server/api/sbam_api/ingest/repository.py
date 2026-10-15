@@ -64,13 +64,22 @@ class DocumentVersionRepository(StatefulRepository):
 
     def others_using_key(self, storage_key: str, exclude: uuid.UUID) -> int:
         """Other versions (any state but REJECTED / PURGED) that point at this stored file. Deleted
-        versions count: restoring one must still find its file."""
-        query = self._scoped(include_deleted=True).where(
-            DocumentVersion.storage_key == storage_key,
-            DocumentVersion.id != exclude,
-            DocumentVersion.state.not_in((S.REJECTED.value, S.PURGED.value)),
+        versions count: restoring one must still find its file.
+
+        Row-locked (`FOR UPDATE`) so two documents sharing a `storage_key` can never purge at the
+        same time: whichever gets here first blocks the other until its PURGED transition commits,
+        so the later call sees the up-to-date state instead of racing to both skip the delete.
+        """
+        query = (
+            self._scoped(include_deleted=True)
+            .where(
+                DocumentVersion.storage_key == storage_key,
+                DocumentVersion.id != exclude,
+                DocumentVersion.state.not_in((S.REJECTED.value, S.PURGED.value)),
+            )
+            .with_for_update()
         )
-        return self.session.scalar(select(func.count()).select_from(query.subquery())) or 0
+        return len(self.session.scalars(query).all())
 
     def of_documents(self, document_ids: list[uuid.UUID]) -> dict[uuid.UUID, DocumentVersion]:
         """The version of each document (one file per document today), keyed by document id."""
