@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "SBAM Temporal workers"
 requires-python = "==3.12.*"
 dependencies = [
+    "jinja2>=3.1.6,<4",
+    "jsonschema>=4.25",
+    "pyyaml>=6",
     "sbam-api",
     "sbam-contracts",
     "temporalio[opentelemetry]>=1.33,<1.34",
