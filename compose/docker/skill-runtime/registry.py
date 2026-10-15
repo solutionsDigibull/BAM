@@ -28,7 +28,7 @@ from datetime import UTC, datetime
 from importlib.metadata import Distribution, distributions
 
 TOOLING = {"pip", "setuptools", "wheel"}  # the venv's own tools, not libraries for Sub-Skills
-ALLOWED_FILE = "/opt/sbam/allowed-libraries.in"  # requirements.in, copied in by the Dockerfile
+ALLOWED_FILE = "/opt/runtime_allowed_libraries.in"  # requirements.in, copied in by the Dockerfile
 REQUIREMENT_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 MODULE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -105,8 +105,10 @@ def build(
         raise ValueError(f"image digest must look like sha256:<64 hex>, got {image_digest!r}")
     try:
         allowed = allowed_names(allowed_file)
-    except OSError:
+    except FileNotFoundError:
         raise ValueError(f"allowed libraries file not found: {allowed_file}") from None
+    except OSError as exc:  # e.g. permissions: say what really happened
+        raise ValueError(f"can't read allowed libraries file {allowed_file}: {exc}") from None
     registry: dict[str, object] = {
         "image_digest": image_digest,
         "python_version": platform.python_version(),
