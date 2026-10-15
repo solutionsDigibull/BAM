@@ -41,6 +41,9 @@ storage/
 # ...but not the StorageBackend package (TD §6)
 !server/api/sbam_api/storage/
 secrets/
+# ...but not the deploy secret loader (E16.3, #142)
+!compose/secrets/
+!compose/secrets/with-secrets.sh
 *.key
 
 # Next.js generated
