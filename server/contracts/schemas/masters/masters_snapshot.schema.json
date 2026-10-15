@@ -2,6 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:sbam:contracts:masters/masters_snapshot:0.1.0",
   "$defs": {
+    "MasterStatus": {
+      "enum": [
+        "PROPOSED",
+        "ILLUSTRATIVE",
+        "APPROVED",
+        "RETIRED"
+      ],
+      "title": "MasterStatus",
+      "type": "string"
+    },
     "MasterType": {
       "enum": [
         "ORGANIZATION",
@@ -15,6 +25,7 @@
       "type": "string"
     },
     "SnapshotEntry": {
+      "description": "One pinned entry. The snapshot pins every live entry of the project; whoever uses it decides\ninclusion from `status` and `restricted` (E3.6: ILLUSTRATIVE / RETIRED never, Restricted only\nwhen the project allows it).",
       "properties": {
         "entry_id": {
           "format": "uuid",
@@ -32,13 +43,22 @@
           "minimum": 1,
           "title": "Version",
           "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/MasterStatus"
+        },
+        "restricted": {
+          "default": false,
+          "title": "Restricted",
+          "type": "boolean"
         }
       },
       "required": [
         "entry_id",
         "master_type",
         "stable_id",
-        "version"
+        "version",
+        "status"
       ],
       "title": "SnapshotEntry",
       "type": "object"

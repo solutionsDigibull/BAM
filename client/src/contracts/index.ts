@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:087d3727ca80b9754e12dda71afa69dfa241f184f2185f5a045a15c25cea4a80
+// source-sha256:8fa892f239e91ccef4fddbbee06751dd2e2fe8f7fc275be7f54247c35f571b92
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -39,6 +39,7 @@ export type ErrorCode =
   | "DRAFT_EXISTS"
   | "STRUCTURE_MISMATCH"
   | "FILETYPE_FROZEN"
+  | "SNAPSHOT_PROJECT_MISMATCH"
   | "SECRET_VALUE_NOT_ALLOWED"
   | "FILE_TOO_LARGE"
   | "FILE_LIMIT_REACHED"
@@ -297,6 +298,7 @@ export interface SbamContracts {
   MasterEntry?: MasterEntry;
   FiletypeInfo?: FiletypeInfo;
   MastersSnapshot?: MastersSnapshot;
+  InclusionReport?: InclusionReport;
   DocumentOut?: DocumentOut;
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
@@ -1620,6 +1622,7 @@ export interface Project {
   client_name: string | null;
   description: string | null;
   context_notes: string | null;
+  allow_restricted?: boolean;
   status: ProjectStatus;
   pipeline_state: ProjectPipelineState;
   row_version: number;
@@ -1650,6 +1653,7 @@ export interface ProjectPatch {
   client_name?: string | null;
   description?: string | null;
   context_notes?: string | null;
+  allow_restricted?: boolean | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -2049,6 +2053,10 @@ export interface MastersSnapshot {
   created_at: string;
 }
 /**
+ * One pinned entry. The snapshot pins every live entry of the project; whoever uses it decides
+ * inclusion from `status` and `restricted` (E3.6: ILLUSTRATIVE / RETIRED never, Restricted only
+ * when the project allows it).
+ *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SnapshotEntry".
  */
@@ -2057,6 +2065,33 @@ export interface SnapshotEntry {
   master_type: MasterType;
   stable_id: string;
   version: number;
+  status: MasterStatus;
+  restricted?: boolean;
+}
+/**
+ * What went into masters.jsonl and what didn't; included + excluded = snapshot size.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "InclusionReport".
+ */
+export interface InclusionReport {
+  snapshot_id: string;
+  dataset: string;
+  storage_key: string;
+  sha256: string;
+  included: string[];
+  excluded: ExcludedEntry[];
+  refresh_due: string[];
+  warnings: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ExcludedEntry".
+ */
+export interface ExcludedEntry {
+  stable_id: string;
+  master_type: MasterType;
+  reason: "RESTRICTED" | "ILLUSTRATIVE" | "RETIRED";
 }
 /**
  * A document with the state of its stored file (`GET`, `POST .../restore`).
