@@ -77,6 +77,13 @@ jobs:
       - *setup-pnpm
       - *setup-node
       - run: make install
+      # test_e16_3_deploy.py (#142) resolves compose.deploy.yaml's !reset/!override tags via
+      # `docker compose config`; the runner image's bundled compose plugin predates that compose-spec
+      # support, so pin a version that has it before those tests run.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y --only-upgrade docker-compose-plugin
+          docker compose version
       # unit + contract + temporal (workflow replay tests live in tests/temporal)
       - run: cd server && uv run pytest tests/unit tests/contract tests/temporal --junitxml=../reports/server-unit.xml
       - run: pnpm --dir client test
