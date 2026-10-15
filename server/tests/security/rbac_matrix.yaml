@@ -392,3 +392,40 @@ routes:
       params: {key: "@file_key"}
       query: {exp: "@file_exp", sig: "@file_sig"}
     expect: *open
+
+  # ---- notifications: the signed-in user's own in-app notifications -----------------------
+
+  list_notifications_api_v1_notifications_get:
+    request: {method: GET, path: /api/v1/notifications}
+    expect: &notifications_own_data
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "404 NOT_FOUND"
+      admin_a: "200"
+      admin_b: "200"
+      fde_a_assigned: "200"
+      fde_a_unassigned: "200"
+      fde_b: "200"
+
+  read_all_api_v1_notifications_read_all_post:
+    request: {method: POST, path: /api/v1/notifications/read-all}
+    expect:
+      <<: *notifications_own_data
+      admin_a: "204"
+      admin_b: "204"
+      fde_a_assigned: "204"
+      fde_a_unassigned: "204"
+      fde_b: "204"
+
+  read_one_api_v1_notifications__notification_id__read_post:
+    request:
+      method: POST
+      path: /api/v1/notifications/{notification_id}/read
+      params: {notification_id: "00000000-0000-0000-0000-000000000000"}
+    expect:
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "404 NOT_FOUND"
+      admin_a: "404 NOT_FOUND"
+      admin_b: "404 NOT_FOUND"
+      fde_a_assigned: "404 NOT_FOUND"
+      fde_a_unassigned: "404 NOT_FOUND"
+      fde_b: "404 NOT_FOUND"
