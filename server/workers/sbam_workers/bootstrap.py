@@ -107,6 +107,7 @@ async def serve(
             for worker in build_workers(client, queues, executor):
                 await stack.enter_async_context(worker)
             log.info("worker serving %s", ", ".join(q.value for q in queues))
+            await registry.run_startup(client, queues)  # e.g. the PurgeDeleted schedule (E4.9)
             tasks = [
                 asyncio.create_task(
                     _heartbeat(Path(settings.heartbeat_file), settings.heartbeat_seconds)

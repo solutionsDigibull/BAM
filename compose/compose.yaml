@@ -335,11 +335,12 @@ services:
       <<: *worker-env
       SBAM_QUEUES: sbam-ingest
       # Scan (#62): the stored upload is streamed to clamd, which is on the internal network only.
+      # Purge (#75): the daily PurgeDeleted job removes the files of documents deleted 90+ days ago.
       STORAGE_ROOT: /data/storage
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
       CLAMAV_MAX_SIGNATURE_AGE_HOURS: ${CLAMAV_MAX_SIGNATURE_AGE_HOURS:-48}
-    volumes: [storage:/data/storage] # only this worker reads uploaded files
+    volumes: [storage:/data/storage] # only this worker reads/removes stored files
     depends_on:
       <<: *worker-depends
       clamav: { condition: service_healthy }

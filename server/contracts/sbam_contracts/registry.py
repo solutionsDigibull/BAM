@@ -10,7 +10,15 @@ from typing import Final
 from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
-from sbam_contracts.documents import ScanOutcome, UploadRequest, UploadToken
+from sbam_contracts.documents import (
+    DocumentOut,
+    PurgeRequest,
+    PurgeResult,
+    PurgeTarget,
+    ScanOutcome,
+    UploadRequest,
+    UploadToken,
+)
 from sbam_contracts.identity import (
     Me,
     Tenant,
@@ -95,4 +103,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/master_version_create", MasterVersionCreate),
     ("masters/master_entry", MasterEntry),
     ("masters/masters_snapshot", MastersSnapshot),
+    ("documents/document", DocumentOut),
+    ("documents/purge_target", PurgeTarget),
+    ("documents/purge_request", PurgeRequest),
+    ("documents/purge_result", PurgeResult),
 )

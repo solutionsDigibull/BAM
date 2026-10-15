@@ -24,11 +24,16 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.api import ErrorCode
+from sbam_contracts.state_machines import DocumentVersionState
 
 MAX_FILE_BYTES: Final = 15 * 1024 * 1024  # 15728640
 MAX_ACTIVE_FILES: Final = 20
 UPLOAD_TOKEN_TTL_SECONDS: Final = 15 * 60
 DOCUMENT_INGESTION: Final = "DocumentIngestion"  # workflow type; id `ingest-<document_version_id>`
+PURGE_RETENTION_DAYS: Final = 90  # a deleted document is restorable for this long, then purged
+PURGE_DELETED: Final = "PurgeDeleted"  # workflow type of the daily purge (E4.9)
+PURGE_SCHEDULE_ID: Final = "purge-deleted"  # Temporal Schedule id (and the workflow id prefix)
+PURGE_CRON: Final = "0 2 * * *"  # 02:00 UTC every day
 
 _NO_SEPARATORS_OR_CONTROL = r"^[^/\\\x00-\x1f\x7f-\x9f]+$"
 
@@ -95,11 +100,58 @@ class ScanOutcome(BaseModel):
     signature_version: str | None = None  # clamd VERSION, e.g. `ClamAV 1.5.4/27800/<date>`
 
 
+class DocumentOut(BaseModel):
+    """A document with the state of its stored file (`GET`, `POST .../restore`)."""
+
+    id: UUID
+    title: str
+    state: DocumentVersionState
+    size: int
+    mime: str
+    sha256: str
+    created_at: datetime
+    deleted_at: datetime | None = None  # set while the document is in the 90-day bin
+    deleted_by: str | None = None
+    purge_after: datetime | None = None  # deleted_at + 90 days
+
+
+class PurgeTarget(BaseModel):
+    """One deleted document that is due for purging (IDs only, like every workflow input)."""
+
+    tenant_id: UUID
+    project_id: UUID
+    document_id: UUID
+
+
+class PurgeRequest(BaseModel):
+    """Input of the per-document purge activity; `as_of` is the workflow clock (workflow.now())."""
+
+    target: PurgeTarget
+    as_of: datetime
+
+
+class PurgeOutcome(StrEnum):
+    PURGED = "PURGED"  # bytes removed, version PURGED
+    SKIPPED = "SKIPPED"  # restored, not yet due, or already purged: nothing to do
+
+
+class PurgeResult(BaseModel):
+    """What one `PurgeDeleted` run did. `failed` documents are retried by the next run."""
+
+    purged: int = 0
+    skipped: int = 0
+    failed: int = 0
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/documents/`."""
     models: dict[str, type[BaseModel]] = {
         "upload_request": UploadRequest,
         "upload_token": UploadToken,
         "scan_outcome": ScanOutcome,
+        "document": DocumentOut,
+        "purge_target": PurgeTarget,
+        "purge_request": PurgeRequest,
+        "purge_result": PurgeResult,
     }
     return {stem: contract_schema(model, f"documents/{stem}") for stem, model in models.items()}

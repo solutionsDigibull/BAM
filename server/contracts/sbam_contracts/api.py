@@ -39,6 +39,7 @@ class ErrorCode(StrEnum):
     VERSION_CONFLICT = "VERSION_CONFLICT"
     INVALID_TRANSITION = "INVALID_TRANSITION"
     READ_ONLY = "READ_ONLY"
+    GONE = "GONE"  # 410: permanently removed (a purged document cannot be restored)
     # Identity and tenancy
     TENANT_MISMATCH = "TENANT_MISMATCH"
     TENANT_SUSPENDED = "TENANT_SUSPENDED"
