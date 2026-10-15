@@ -1,5 +1,6 @@
 """E0.8 unit tests: the golden fixture pack (checksums, README, EICAR, sizes, PII scan)."""
 
+import base64
 import email
 import email.policy
 import hashlib
@@ -16,6 +17,7 @@ import openpyxl
 import pytest
 from fixtures import FIXTURES_DIR, MAX_FILE_BYTES, blob, copy_to_tmp, eicar_bytes, fixture_path
 from fixtures.check_fixture_readme import fixture_files, undocumented
+from msg_reader import read_msg
 
 REPO = Path(__file__).resolve().parents[3]
 DOCS = FIXTURES_DIR / "documents"
@@ -57,7 +59,7 @@ def test_e0_8_t02_checksums_cover_every_fixture_file_and_nothing_else() -> None:
 
 def test_e0_8_t03_every_file_is_documented() -> None:
     assert undocumented() == []
-    assert len(fixture_files()) == 33
+    assert len(fixture_files()) == 35
 
 
 def test_e0_8_t03_readme_lists_no_file_that_does_not_exist() -> None:
@@ -85,8 +87,32 @@ def test_e0_8_t04_eicar_is_the_68_byte_test_string() -> None:
     )  # needle built in pieces: see the tree scan below
 
 
+EICAR_SHA256 = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"  # public value
+
+
+def test_e0_17_t03_the_joined_halves_are_exactly_the_eicar_string() -> None:
+    assert hashlib.sha256(eicar_bytes()).hexdigest() == EICAR_SHA256
+    assert len(eicar_bytes()) == 68
+
+
+def test_e0_17_t03_neither_stored_half_is_the_eicar_string_in_any_form() -> None:
+    whole = eicar_bytes()
+    parts = [fixture_path("malware", name) for name in ("eicar.part1.b64", "eicar.part2.b64")]
+    decoded = [base64.b64decode(part.read_text("ascii").strip()) for part in parts]
+    assert b"".join(decoded) == whole
+    for part, piece in zip(parts, decoded, strict=True):
+        assert piece != whole and piece in whole and 0 < len(piece) < len(whole)
+        assert base64.b64encode(whole) not in part.read_bytes()  # not the whole thing, encoded
+        assert whole not in part.read_bytes()
+    assert not (FIXTURES_DIR / "malware" / "eicar.b64").exists()  # the one-piece file is gone
+
+
 def test_e0_8_t04_eicar_literal_is_not_in_the_repository_tree() -> None:
-    needles = [eicar_bytes(), b"STANDARD-ANTIVIRUS" + b"-TEST-FILE"]
+    needles = [
+        eicar_bytes(),
+        base64.b64encode(eicar_bytes()),  # the whole string in one base64 piece (#202)
+        b"STANDARD-ANTIVIRUS" + b"-TEST-FILE",
+    ]
     roots = [REPO / "server/tests", REPO / "scripts", REPO / "docs", REPO / "spikes"]
     hits = [
         str(path.relative_to(REPO))
@@ -135,7 +161,9 @@ def test_e0_8_t05_no_stored_fixture_is_large() -> None:
 def searchable_text(path: Path) -> Iterator[str]:
     suffixes = "".join(path.suffixes).lower()
     data = path.read_bytes()
-    if suffixes.endswith((".docx", ".xlsx", ".zip")):
+    if suffixes.endswith(".msg"):  # UTF-16 properties: decode the text ones, skip the attachment
+        yield from read_msg(path).texts()
+    elif suffixes.endswith((".docx", ".xlsx", ".zip")):
         with zipfile.ZipFile(path) as archive:
             for member in archive.namelist():
                 yield archive.read(member).decode("utf-8", errors="ignore")
@@ -251,11 +279,11 @@ def test_e0_8_documents_docx_is_a_zip_with_a_document_part() -> None:
 
 
 def test_e0_8_t07_every_mvp_loader_extension_has_a_fixture() -> None:
-    # `.msg` is the one documented gap (see the README coverage table).
     wanted = {
         ".md",
         ".txt",
         ".eml",
+        ".msg",
         ".json",
         ".xml",
         ".yaml",
