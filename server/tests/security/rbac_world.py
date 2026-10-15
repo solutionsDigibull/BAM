@@ -24,7 +24,7 @@ from typing import Any
 from urllib.parse import quote, urlencode, urlsplit
 
 import jwt
-import yaml  # type: ignore[import-untyped]  # PyYAML ships no stubs; it comes with moto
+import yaml
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -50,7 +50,9 @@ from sbam_api.storage import Kind, StorageScope, signed_url
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.temporal.models import TemporalRun
 from sbam_contracts.api import API_BASE
-from sbam_contracts.runs import RunState, SubjectType
+from sbam_contracts.build import BuildStage, SubSkillBuildStatus
+from sbam_contracts.runs import RunState, SubjectType, build_workflow_id
+from sbam_contracts.state_machines import SubSkillState
 from sqlalchemy import func, pool, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -280,6 +282,17 @@ class World:
                 s.flush()
                 self.docs[name], self.runs[name] = doc.id, run.id
             s.commit()
+        self.workflow_a, self.sub_a = uuid.uuid4(), uuid.uuid4()
+        self.temporal.builds[build_workflow_id(self.sub_a, 1)] = SubSkillBuildStatus(
+            tenant_id=self.tenant_a,
+            project_id=self.project_a,
+            workflow_id=self.workflow_a,
+            sub_skill_id=self.sub_a,
+            build_no=1,
+            state=SubSkillState.NEEDS_FDE_REVIEW,
+            stage=BuildStage.WAIT_RETRY,
+            waiting_for_retry=True,
+        )
         sync_registry(self.sessions, sample_registry(), activate=True)
         stored = LocalDiskBackend(self.tmp).put(
             b"alpha export", StorageScope(self.tenant_a, self.project_a), Kind.EXPORTS, ""
@@ -337,6 +350,8 @@ class World:
             "project_b": self.project_b,
             "run_a": self.runs["a"],
             "run_b": self.runs["b"],
+            "workflow_a": self.workflow_a,
+            "sub_a": self.sub_a,
             "doc_a": self.docs["a"],
             "file_key": self.file_key,
         }
