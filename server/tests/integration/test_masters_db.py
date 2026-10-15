@@ -132,7 +132,7 @@ def test_e3_2_t06_concurrent_versions_one_wins_one_409(sessions: sessionmaker[Se
 def test_e3_2_migration_downgrades_and_upgrades_cleanly(
     sessions: sessionmaker[Session],
 ) -> None:
-    command.downgrade(config(), "0008_rbac")
+    command.downgrade(config(), "0009_document_scan")
     with sessions() as s:
         assert s.execute(text("SELECT to_regclass('sbam.master_entries')")).scalar() is None
     command.upgrade(config(), "head")

@@ -1,7 +1,7 @@
 """masters engine
 
-Revision ID: 0009_masters
-Revises: 0008_rbac
+Revision ID: 0010_masters
+Revises: 0009_document_scan
 Create Date: 2026-10-15
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -15,8 +15,8 @@ from alembic import op
 from sbam_api.masters.sql import create_append_only_guard, drop_append_only_guard
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0009_masters"
-down_revision: str | Sequence[str] | None = "0008_rbac"
+revision: str = "0010_masters"
+down_revision: str | Sequence[str] | None = "0009_document_scan"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
