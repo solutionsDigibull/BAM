@@ -28,6 +28,7 @@ class Kind(StrEnum):
     CODE = "code"
     TESTS = "tests"
     EXPORTS = "exports"
+    QUARANTINE = "quarantine"  # infected uploads, never served (E4.3)
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,10 @@ class StorageBackend(Protocol):
     def get(self, key: str, *, verify: bool = False) -> bytes: ...
 
     def exists(self, key: str) -> bool: ...
+
+    def delete(self, key: str) -> None:
+        """Remove an object; a missing key is fine (moves an infected upload out of `uploads`)."""
+        ...
 
 
 def chunks(data: BinaryIO | bytes) -> Iterable[bytes]:

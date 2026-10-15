@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:69d7a66c542f8237afd44f562ffb45e2be776506bbd4aa664ae6c709f11a92e6
+// source-sha256:4860c644ff4ff980972ecb73f805ada44460f2adebcbf8709ae60625286b6b7d
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -50,6 +50,7 @@ export type ErrorCode =
   | "PARSE_ERROR"
   | "SCAN_UNAVAILABLE"
   | "OCR_UNAVAILABLE"
+  | "MALWARE"
   | "KNOWLEDGE_BUILDING"
   | "KNOWLEDGE_NOT_READY"
   | "COGNEE_ACL_DISABLED"
@@ -207,6 +208,11 @@ export type UserStatus = "INVITED" | "ACTIVE" | "DEACTIVATED";
  * via the `definition` "ProjectStatus".
  */
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ScanStatus".
+ */
+export type ScanStatus = "CLEAN" | "INFECTED" | "SCAN_FAILED";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -246,6 +252,7 @@ export interface SbamContracts {
   ProjectMembers?: ProjectMembers;
   UploadRequest?: UploadRequest;
   UploadToken?: UploadToken;
+  ScanOutcome?: ScanOutcome;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1836,4 +1843,15 @@ export interface AcceptedFile {
 export interface RejectedFile {
   name: string;
   code: ErrorCode;
+}
+/**
+ * Result of the `scan_clamav` activity: the verdict and the signature set that gave it.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ScanOutcome".
+ */
+export interface ScanOutcome {
+  document_version_id: string;
+  verdict: ScanStatus;
+  signature_version?: string | null;
 }

@@ -102,3 +102,13 @@ class LocalDiskBackend:
 
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
+
+    def delete(self, key: str) -> None:
+        path = self._path(key)
+        try:
+            path.chmod(0o600)  # objects are 0444, and Windows refuses to delete a read-only file
+            path.unlink()
+        except FileNotFoundError:
+            return
+        except OSError:
+            raise StorageUnavailable() from None
