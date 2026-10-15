@@ -108,6 +108,10 @@ routes:
       fde_a_unassigned: "403 WRONG_PORTAL"
       fde_b: "403 WRONG_PORTAL"
 
+  list_audit_api_v1_admin_audit_get:  # E2.8: the tenant's own rows only
+    request: {method: GET, path: /api/v1/admin/audit}
+    expect: *tenant_admin_list
+
   invite_user_api_v1_admin_users_invite_post:
     request:
       method: POST
