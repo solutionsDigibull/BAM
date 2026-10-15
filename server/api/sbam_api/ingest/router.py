@@ -29,6 +29,7 @@ from sbam_api.core.settings import Settings
 from sbam_api.db.repository import TenantContext
 from sbam_api.ingest import retention, service, tusd
 from sbam_api.ingest.ingestion import start_waiting
+from sbam_api.ingest.rules import STAGING
 from sbam_api.storage.router import backend
 from sbam_api.temporal.deps import session_factory, temporal_client
 
@@ -37,8 +38,6 @@ router = APIRouter(tags=["ingest"])
 Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
-
-STAGING = "uploads"  # tusd's -upload-dir, under STORAGE_ROOT (compose/compose.yaml)
 
 
 def _secret(settings: Settings) -> str:
