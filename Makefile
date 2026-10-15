@@ -1,5 +1,5 @@
 # SBAM developer commands. On Windows run these from Git Bash or WSL2.
-.PHONY: doctor install lint typecheck test check contracts contracts-check migrations-check up ps down logs seed test-int e2e reset runtime-registry
+.PHONY: doctor install lint typecheck test check contracts contracts-check migrations-check up ps down logs seed test-int e2e reset runtime-registry compose-lint
 
 # Compose stack (TD §20.3). ENV_FILE can point at another env file, e.g. `make up ENV_FILE=/tmp/ci.env`.
 ENV_FILE ?= compose/.env
@@ -25,6 +25,9 @@ lint:
 	cd server && uv run python ../scripts/check_runtime_lock.py  # skill-runtime lock pinned + hashed (#67)
 	pnpm --dir client lint
 	pnpm --dir client format:check
+
+compose-lint: # deployed envs (dev/staging/prod): digests, ports, secrets, startup order (E16.3, #142); needs docker
+	python3 scripts/compose_lint.py
 
 typecheck:
 	cd server && uv run mypy

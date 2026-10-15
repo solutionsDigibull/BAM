@@ -1,0 +1,58 @@
+# Dev VM overrides (E16.3, #142): load after compose.yaml and compose.deploy.yaml (docs/runbooks/environments.md).
+# This file changes only sizing, the environment flag and the LLM provider. It never changes an image
+# tag or digest of a service the other environments also run.
+# SBAM_ENV=development lets the mock LLM provider run (LLM_PROVIDER from the env file, default mock), so the
+# mock upstream is part of the dev stack, from its own digest in the release env file.
+# The dev VM is reached over Netbird only: the proxy binds to ${SBAM_PROXY_BIND} (the VM's Netbird address).
+
+x-worker: &worker { cpus: 0.5, mem_limit: 512m }
+
+services:
+  postgres:
+    cpus: 1.0
+    mem_limit: 1g
+  keycloak:
+    cpus: 1.0
+    mem_limit: 1g
+  temporal:
+    cpus: 1.0
+    mem_limit: 1g
+  temporal-ui:
+    cpus: 0.25
+    mem_limit: 128m
+  bifrost:
+    cpus: 0.5
+    mem_limit: 256m
+  clamav:
+    cpus: 1.0
+    mem_limit: 2g
+  tusd:
+    cpus: 0.25
+    mem_limit: 128m
+  sbam-api:
+    cpus: 1.0
+    mem_limit: 1g
+    environment:
+      SBAM_ENV: development
+  sbam-web:
+    cpus: 0.5
+    mem_limit: 512m
+  sbam-mock-api:
+    cpus: 0.25
+    mem_limit: 128m
+  proxy:
+    cpus: 0.25
+    mem_limit: 128m
+  worker-ingest: *worker
+  worker-knowledge: *worker
+  worker-llm: *worker
+  worker-build: *worker
+  worker-test: *worker
+  worker-certify: *worker
+  sbam-llm-mock:
+    image: ${SBAM_LLM_MOCK_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-llm-mock@sha256:...)}
+    build: !reset null
+    cpus: 0.25
+    mem_limit: 128m
+    environment:
+      ENV: development

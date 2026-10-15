@@ -1,0 +1,63 @@
+{
+  "_about": "Netbird groups and policies for SBAM (E16.3, #142, TD 20.5). This file is the source of truth that the Netbird dashboard (or API/Terraform) must match; scripts/netbird_matrix.py computes the expected reachability matrix from it and, on a Netbird peer, probes the live network against it. Every policy is one-way (source initiates). The default 'All to All' policy of a new Netbird account MUST be deleted, otherwise this file is bypassed. Applying it needs a Netbird admin and was not done by this change (docs/runbooks/environments.md, section Netbird).",
+  "groups": {
+    "dev-laptops": "developer laptops",
+    "platform": "platform developers only; the only humans who reach vm-prod ops ports",
+    "vm-dev": "shared dev VM",
+    "vm-staging": "staging VM",
+    "vm-prod": "production VM(s)",
+    "sandbox-host": "KVM server running CubeSandbox"
+  },
+  "services": {
+    "ssh": { "proto": "tcp", "port": 22, "note": "sshd listens on the Netbird address only" },
+    "portal": { "proto": "tcp", "port": 443, "note": "dev and staging portals are private: their proxy binds to the Netbird address. Prod's 443 is public and needs no policy" },
+    "temporal-ui": { "proto": "tcp", "port": 8233, "note": "TEMPORAL_UI_PORT" },
+    "keycloak-admin": { "proto": "tcp", "port": 8080, "note": "KEYCLOAK_PORT: the Keycloak console and admin REST (the proxy never routes them)" },
+    "grafana": { "proto": "tcp", "port": 3002, "note": "GRAFANA_PORT, obs profile" },
+    "langfuse": { "proto": "tcp", "port": 3001, "note": "LANGFUSE_PORT, obs profile" },
+    "posthog": { "proto": "tcp", "port": 8010, "note": "POSTHOG_PORT, analytics profile" },
+    "sandbox-api": { "proto": "tcp", "port": 3000, "note": "CubeSandbox API on the sandbox host. Port is the assumed default: confirm with the CubeSandbox install issue (#123) before applying" }
+  },
+  "ops_services": ["portal", "temporal-ui", "keycloak-admin", "grafana", "langfuse", "posthog"],
+  "policies": [
+    {
+      "name": "laptops-to-dev-staging-ops",
+      "description": "Developer laptops reach the dev and staging VMs: SSH and the ops UIs. Never vm-prod.",
+      "sources": ["dev-laptops"],
+      "destinations": ["vm-dev", "vm-staging"],
+      "services": ["ssh", "portal", "temporal-ui", "keycloak-admin", "grafana", "langfuse", "posthog"]
+    },
+    {
+      "name": "platform-to-vm-ops",
+      "description": "Platform developers reach every VM's SSH and ops UIs, including production.",
+      "sources": ["platform"],
+      "destinations": ["vm-dev", "vm-staging", "vm-prod"],
+      "services": ["ssh", "portal", "temporal-ui", "keycloak-admin", "grafana", "langfuse", "posthog"]
+    },
+    {
+      "name": "platform-to-sandbox-host-ssh",
+      "description": "Platform developers administer the sandbox host.",
+      "sources": ["platform"],
+      "destinations": ["sandbox-host"],
+      "services": ["ssh"]
+    },
+    {
+      "name": "vms-to-sandbox-api",
+      "description": "Workers (on the VMs) call the sandbox host API. The sandbox host initiates nothing.",
+      "sources": ["vm-dev", "vm-staging", "vm-prod"],
+      "destinations": ["sandbox-host"],
+      "services": ["sandbox-api"]
+    }
+  ],
+  "must_deny": [
+    { "source": "dev-laptops", "destination": "vm-prod", "services": ["ssh", "portal", "temporal-ui", "keycloak-admin", "grafana", "langfuse", "posthog"], "why": "E16.3-T07: production ops access is for the platform group only" },
+    { "source": "dev-laptops", "destination": "sandbox-host", "services": ["ssh", "sandbox-api"], "why": "only the VMs' workers call the sandbox API" },
+    { "source": "sandbox-host", "destination": "vm-prod", "services": ["ssh", "portal", "temporal-ui", "keycloak-admin"], "why": "the sandbox host initiates nothing" },
+    { "source": "vm-dev", "destination": "vm-prod", "services": ["ssh", "keycloak-admin", "temporal-ui"], "why": "environments are isolated from each other" },
+    { "source": "vm-staging", "destination": "vm-prod", "services": ["ssh", "keycloak-admin", "temporal-ui"], "why": "environments are isolated from each other" }
+  ],
+  "open_items": [
+    "A CI/deploy peer group (SSH to the VMs over Netbird, TD 20.4) is defined with the deploy workflows (#143), not here.",
+    "Dev and staging proxies are private, so ACME HTTP-01 cannot validate them: use SBAM_TLS=internal or provided certificates there."
+  ]
+}

@@ -1,0 +1,92 @@
+# SBAM reverse proxy (E16.3 / #142, TD §20.1 and §20.5). The only service that is ever public (prod: 80 and 443).
+# Hostnames, TLS mode and ACME email come from the environment (compose.deploy.yaml):
+#   SBAM_PORTAL_HOST  admin + FDE portals, /api via the web proxy route, tusd uploads at /files/
+#   SBAM_AUTH_HOST    Keycloak login only (OIDC endpoints); everything else is 404
+#   SBAM_TLS          ""                        ACME (Let's Encrypt) with automatic renewal
+#                     "/certs/fullchain.pem /certs/privkey.pem"  certificate files you provide (mounted at /certs)
+#                     "internal"                Caddy's own CA (dev only, browsers will warn)
+# Default-deny: a path not listed here is a 404. HTTP on port 80 is redirected to HTTPS by Caddy itself
+# (automatic HTTPS) for every hostname below.
+
+{
+	admin off
+	email {$SBAM_ACME_EMAIL}
+	# HTTP/1.1 and HTTP/2 over TCP only: UDP 443 (HTTP/3) is not published.
+	servers {
+		protocols h1 h2
+	}
+}
+
+# Shared by both sites: HSTS, and the Keycloak admin console and admin REST never leave the private network
+# (E16.3-T06). /admin/master/* is the master-realm console, /admin/realms/* the admin REST, /realms/master/*
+# the master realm. The regexp is case-insensitive and tolerates repeated leading slashes. /admin/masters
+# (a portal page) is not matched. This is a `handle`, evaluated before the routes of the importing site.
+(hardening) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	@kc_admin path_regexp (?i)^/+(admin/(master|realms)|realms/master)(/|$)
+	handle @kc_admin {
+		respond 404
+	}
+}
+
+# TLS 1.2 and 1.3 only. Caddy's default cipher suites are AEAD-only (no RC4, 3DES, CBC-SHA1 export suites).
+(tls_policy) {
+	tls {$SBAM_TLS:} {
+		protocols tls1.2 tls1.3
+	}
+}
+
+{$SBAM_PORTAL_HOST} {
+	import hardening
+	import tls_policy
+
+	# The dev-only error pages are a development aid, never served through the proxy.
+	@dev_pages path /dev /dev/*
+	handle @dev_pages {
+		respond 404
+	}
+
+	# tusd resumable uploads (-base-path=/files/). The API's pre-create hook checks the upload token.
+	# 16 MB: the 15 MiB file cap plus tus framing headroom.
+	handle /files /files/* {
+		request_body {
+			max_size 16MB
+		}
+		reverse_proxy tusd:1080
+	}
+
+	# Everything else is the Next.js app: the admin and FDE portals, Auth.js (/api/auth) and the API proxy
+	# route (/api/proxy/...). sbam-api itself is not routed here. Unknown paths are the app's own 404.
+	handle {
+		reverse_proxy sbam-web:3000 {
+			health_uri /api/health
+			health_interval 15s
+		}
+	}
+}
+
+# Keycloak serves the login pages publicly, but only the OIDC, login-action, discovery and account paths of
+# realm bullm plus its static resources. Master realm, admin console, admin REST, dynamic client
+# registration, metrics and health are not in the list, so they are 404.
+{$SBAM_AUTH_HOST} {
+	import hardening
+	import tls_policy
+
+	@oidc path /realms/bullm/protocol/openid-connect/* /realms/bullm/login-actions/* /realms/bullm/.well-known/* /realms/bullm/account /realms/bullm/account/* /resources/*
+	handle @oidc {
+		reverse_proxy keycloak:8080
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+# Container healthcheck target: plain HTTP on an internal port that is never published.
+http://:8081 {
+	respond /healthz "ok" 200
+}

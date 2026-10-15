@@ -1,0 +1,63 @@
+# Prod VM overrides (E16.3, #142): load after compose.yaml and compose.deploy.yaml (docs/runbooks/environments.md).
+# This file changes only sizing, the environment flag and the LLM provider. It never changes an image, so a
+# promoted release has the same digest manifest as staging (scripts/compose_lint.py --manifest).
+# Prod runs the real LLM path (SBAM_ENV=production, LLM_PROVIDER=bifrost, no mock upstream). The proxy's ports
+# 80 and 443 are the only public ports: published on all addresses here, by design, and nowhere else.
+
+x-worker: &worker { cpus: 2.0, mem_limit: 2g }
+
+x-worker-real: &worker-real
+  cpus: 2.0
+  mem_limit: 2g
+  environment: { LLM_PROVIDER: bifrost }
+
+services:
+  postgres:
+    cpus: 2.0
+    mem_limit: 4g
+  keycloak:
+    cpus: 2.0
+    mem_limit: 2g
+  temporal:
+    cpus: 2.0
+    mem_limit: 2g
+  temporal-ui:
+    cpus: 0.5
+    mem_limit: 256m
+  bifrost:
+    cpus: 1.0
+    mem_limit: 512m
+    # The mock upstream is off in this environment, so bifrost no longer waits for it.
+    depends_on: !reset null
+    volumes:
+      - ./bifrost/config.bifrost.json:/app/data/config.json:ro
+  clamav:
+    cpus: 2.0
+    mem_limit: 3g
+  tusd:
+    cpus: 0.5
+    mem_limit: 256m
+  sbam-api:
+    cpus: 2.0
+    mem_limit: 2g
+    environment:
+      SBAM_ENV: production
+      LLM_PROVIDER: bifrost
+  sbam-web:
+    cpus: 1.0
+    mem_limit: 1g
+  sbam-mock-api:
+    cpus: 0.25
+    mem_limit: 128m
+  proxy:
+    cpus: 0.5
+    mem_limit: 256m
+    ports: !override ["0.0.0.0:80:80", "0.0.0.0:443:443"] # the only public ports of the platform
+  worker-ingest: *worker-real
+  worker-knowledge: *worker-real
+  worker-llm: *worker-real
+  worker-build: *worker-real
+  worker-test: *worker-real
+  worker-certify: *worker-real
+  sbam-llm-mock:
+    profiles: [mock-llm] # never started here; staging and prod use the real provider
