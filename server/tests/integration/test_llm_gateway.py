@@ -52,7 +52,7 @@ def call(body: dict[str, Any]) -> tuple[int, dict[str, str], dict[str, Any]]:
 
 
 def fixture_body(alias: str, **metadata: str) -> dict[str, Any]:
-    path = next((FIXTURES / alias).glob("*.json"))
+    path = next(p for p in sorted((FIXTURES / alias).glob("*.json")) if p.stem != "e6_1_wrapper")
     data = json.loads(Path(path).read_text())
     meta = {"prompt_id": data["prompt_id"], **metadata}
     return {"model": alias, "messages": data["messages"], "metadata": meta}

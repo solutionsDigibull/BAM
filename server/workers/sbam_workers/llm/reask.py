@@ -30,6 +30,10 @@ _FENCE = re.compile(r"\A```[A-Za-z0-9_-]*[ \t]*\n(.*?)\n?```\Z", re.S)
 class Reply:
     text: str
     model: str  # the model that answered; after a Bifrost failover this is the fallback
+    tokens_in: int = 0  # usage as the gateway reported it (E6.1 writes it to llm_calls)
+    tokens_out: int = 0
+    cost_usd: float = 0.0
+    latency_ms: int = 0
 
 
 @dataclass(frozen=True)
