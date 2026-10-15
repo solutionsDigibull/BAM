@@ -296,6 +296,24 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"
 
+  pipeline_api_v1_projects__project_id__pipeline_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/pipeline
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  workflows_api_v1_projects__project_id__workflows_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   # ---- isatvon ------------------------------------------------------------------------------
   # Describes the model, carries no tenant data: any signed-in user may read it (E8.6).
   isatvon_schema_api_v1_schemas_isatvon__version__get:
