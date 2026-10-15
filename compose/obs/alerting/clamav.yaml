@@ -1,0 +1,48 @@
+# Grafana alert rule for E4.3 (#62), provisioned into the `obs` profile (compose.obs.yaml).
+# `clamav_signature_age_seconds` is exported by worker-ingest (it asks clamd for its signature date
+# every 15 s). The scan refuses to run on signatures older than 24 h (CLAMAV_MAX_SIGNATURE_AGE_HOURS),
+# so this alert tells an operator before every upload starts failing with SCAN_FAILED.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: clamav
+    folder: SBAM
+    interval: 1m
+    rules:
+      - uid: sbam-clamav-signatures-stale
+        title: ClamAV signatures are older than 24 hours
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+          service: clamav
+        annotations:
+          summary: ClamAV signatures are older than 24 hours
+          description: >-
+            Uploads are refused (SCAN_FAILED) until freshclam updates the signatures. Check the
+            clamav container's logs and that it can reach the signature mirrors.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max(clamav_signature_age_seconds)
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [86400] }

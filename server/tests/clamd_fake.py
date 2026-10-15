@@ -1,6 +1,7 @@
 """A fake clamd for tests (E4.3): speaks VERSION and INSTREAM over a real TCP socket on 127.0.0.1.
 
-It calls a file infected when it holds the EICAR test string, like the real clamd does. The string
+It calls a file infected when it starts with the EICAR test string, like real ClamAV (a prefix hides
+it: the signature matches the 68-byte test file from offset 0). The string
 comes from `fixtures.eicar_bytes()`, which assembles it at run time, so no file in the repo holds it
 (E0.8-T04) and Windows Defender stays quiet.
 """
@@ -27,8 +28,15 @@ class FakeClamd:
     reply.
     """
 
-    def __init__(self, version: str | None = None, behaviour: str = "normal") -> None:
+    def __init__(
+        self,
+        version: str | None = None,
+        behaviour: str = "normal",
+        version_after_reload: str | None = None,
+    ) -> None:
         self.version = version if version is not None else version_string()
+        self.version_after_reload = version_after_reload  # what VERSION says once RELOAD is sent
+        self.reloads = 0
         self.behaviour = behaviour
         self.scans = 0
         self.sizes: list[int] = []
@@ -72,6 +80,11 @@ class FakeClamd:
                 command += block
             if command == b"zVERSION\0":
                 conn.sendall(self.version.encode() + b"\0")
+            elif command == b"zRELOAD\0":
+                self.reloads += 1
+                if self.version_after_reload is not None:
+                    self.version = self.version_after_reload
+                conn.sendall(b"RELOADING\0")
             elif command == b"zINSTREAM\0":
                 self._instream(conn)
 
@@ -96,7 +109,7 @@ class FakeClamd:
             conn.sendall(b"stream: something odd\0")
         elif self.behaviour == "limit":
             conn.sendall(b"INSTREAM size limit exceeded. ERROR\0")
-        elif eicar_bytes() in body:
+        elif body.startswith(eicar_bytes()):  # like the real signature: the file starts with it
             conn.sendall(b"stream: Win.Test.EICAR_HDB-1 FOUND\0")
         else:
             conn.sendall(b"stream: OK\0")

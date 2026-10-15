@@ -70,7 +70,10 @@ services:
     networks:
       sbam_edge: {}
       sbam_internal: { aliases: [grafana-lgtm] } # sbam-api/workers export to otel-collector:4317
-    volumes: [lgtm_data:/data]
+    volumes:
+      - lgtm_data:/data
+      # Alert rules provisioned into Grafana (E4.3: ClamAV signatures older than 24 h).
+      - ./obs/alerting/clamav.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/clamav.yaml:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/api/health && curl -s -o /dev/null http://127.0.0.1:4318/v1/traces"]
       interval: 10s

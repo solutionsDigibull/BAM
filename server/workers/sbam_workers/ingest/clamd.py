@@ -11,6 +11,7 @@ VERSION) is a `ClamdError`: the activity retries it and, after the last attempt,
 
 import socket
 import struct
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import BinaryIO
@@ -55,13 +56,20 @@ def signature_age(version: ClamVersion, now: datetime) -> timedelta | None:
     return None if version.signature_date is None else now - version.signature_date
 
 
-def require_fresh(version: ClamVersion, now: datetime, max_age: timedelta) -> None:
-    """Raise `SignatureStaleError` unless the signatures are at most `max_age` old."""
+def stale_reason(version: ClamVersion, now: datetime, max_age: timedelta) -> str | None:
+    """Why the signatures are too old (or None when they are fresh enough)."""
     age = signature_age(version, now)
     if age is None:
-        raise SignatureStaleError("clamd did not report a signature date")
+        return "clamd did not report a signature date"
     if age > max_age:
-        raise SignatureStaleError(f"signatures are {age} old; the limit is {max_age}")
+        return f"signatures are {age} old; the limit is {max_age}"
+    return None
+
+
+def require_fresh(version: ClamVersion, now: datetime, max_age: timedelta) -> None:
+    """Raise `SignatureStaleError` unless the signatures are at most `max_age` old."""
+    if (reason := stale_reason(version, now, max_age)) is not None:
+        raise SignatureStaleError(reason)
 
 
 class ClamdClient:
@@ -84,6 +92,28 @@ class ClamdClient:
         if not reply:
             raise ClamdError("empty VERSION reply")
         return parse_version(reply)
+
+    def refresh_signatures(
+        self, previous: ClamVersion, wait: float = 30.0, poll: float = 2.0
+    ) -> ClamVersion:
+        """Ask clamd to reload its database from disk, then wait for a different VERSION.
+
+        A fresh clamd serves the old database baked into the image until its own self-check (every
+        10 minutes) notices what freshclam wrote. RELOAD answers at once and loads in the
+        background, so this polls VERSION until it changes or `wait` seconds pass.
+        """
+        with self._connect() as sock:
+            try:
+                sock.sendall(b"zRELOAD\0")
+                _read_reply(sock)
+            except OSError as exc:
+                raise ClamdError(f"RELOAD failed: {type(exc).__name__}") from None
+        deadline = time.monotonic() + wait
+        latest = self.version()
+        while latest.raw == previous.raw and time.monotonic() < deadline:
+            time.sleep(min(poll, max(deadline - time.monotonic(), 0.0)))
+            latest = self.version()
+        return latest
 
     def scan(self, stream: BinaryIO) -> ScanVerdict:
         with self._connect() as sock:

@@ -31,6 +31,16 @@ class DocumentVersionRepository(StatefulRepository):
         )
         return self.session.scalars(query.order_by(DocumentVersion.id).limit(1)).first()
 
+    def others_using_key(self, storage_key: str, exclude: uuid.UUID) -> int:
+        """Other versions (any state but REJECTED / PURGED) that point at this stored file. Deleted
+        versions count: restoring one must still find its file."""
+        query = self._scoped(include_deleted=True).where(
+            DocumentVersion.storage_key == storage_key,
+            DocumentVersion.id != exclude,
+            DocumentVersion.state.not_in((S.REJECTED.value, S.PURGED.value)),
+        )
+        return self.session.scalar(select(func.count()).select_from(query.subquery())) or 0
+
     def waiting_to_start(self) -> list[DocumentVersion]:
         """Registered but not yet handed to Temporal (it was down), oldest first."""
         query = self._scoped().where(

@@ -37,7 +37,7 @@ def test_e4_3_t01_clean_stream_is_ok() -> None:
 
 def test_e4_3_t02_eicar_is_found() -> None:
     with FakeClamd() as server:
-        verdict = client(server).scan(io.BytesIO(b"prefix " + eicar_bytes() + b" suffix"))
+        verdict = client(server).scan(io.BytesIO(eicar_bytes() + b"\r\n"))
     assert verdict.infected and verdict.signature == "Win.Test.EICAR_HDB-1"
 
 
