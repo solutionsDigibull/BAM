@@ -17,7 +17,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from sbam_contracts.api import ErrorCode
+from sbam_contracts.api import ErrorCode, FieldError
 from sbam_contracts.identity import TenantStatus, UserInvite, UserPatch, UserStatus
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -34,7 +34,14 @@ from sbam_api.core.auth import (
     UserAdmin,
     unauthenticated,
 )
-from sbam_api.core.conventions import ApiError, check_if_match, not_found
+from sbam_api.core.conventions import (
+    ApiError,
+    check_if_match,
+    decode_cursor,
+    encode_cursor,
+    not_found,
+    parse_limit,
+)
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import StaleRowVersion
@@ -133,9 +140,54 @@ def last_admin() -> ApiError:
     return ApiError(409, ErrorCode.LAST_ADMIN, "The tenant must keep at least one active admin")
 
 
-def list_users(session: Session, actor: CurrentUser) -> list[User]:
-    # ponytail: one page of 100, oldest first; cursor paging when a tenant has more users.
-    return UserRepository(session, actor.context()).list()
+LIST_ROLES = (ROLE_ADMIN, ROLE_FDE)
+
+
+def bad_param(path: str, message: str, code: ErrorCode = ErrorCode.VALIDATION_ERROR) -> ApiError:
+    """400 on a query parameter, the same shape as `parse_limit`'s."""
+    return ApiError(400, code, "Invalid request", errors=[FieldError(path=path, message=message)])
+
+
+def list_users(
+    session: Session,
+    actor: CurrentUser,
+    secret: bytes,
+    *,
+    limit: str | None,
+    cursor: str | None,
+    role: str | None,
+    active: str | None,
+) -> tuple[list[User], str | None]:
+    """One page of the tenant's users, oldest first, and the cursor of the next page (or None).
+
+    The cursor is signed for this tenant: edited, forged or another tenant's -> INVALID_CURSOR.
+    """
+    size = parse_limit(limit)
+    if role is not None and role not in LIST_ROLES:
+        raise bad_param("role", f"must be one of {', '.join(LIST_ROLES)}")
+    if active not in (None, "true", "false"):
+        raise bad_param("active", "must be true or false")
+    tenant = str(actor.tenant_id)
+    after = None
+    if cursor:
+        position = decode_cursor(cursor, tenant, secret)
+        try:
+            after = (
+                datetime.fromisoformat(str(position["created"])),
+                uuid.UUID(str(position["id"])),
+            )
+        except (KeyError, ValueError):
+            bad = bad_param("cursor", "invalid or expired cursor", ErrorCode.INVALID_CURSOR)
+            raise bad from None
+    rows = UserRepository(session, actor.context()).page(
+        after=after, limit=size, role=role, active=None if active is None else active == "true"
+    )
+    if len(rows) <= size:
+        return rows, None
+    rows = rows[:size]
+    last = rows[-1]
+    position = {"created": last.created_at.isoformat(), "id": str(last.id)}
+    return rows, encode_cursor(position, tenant, secret)
 
 
 def invite_user(session: Session, users: UserAdmin, actor: CurrentUser, body: UserInvite) -> User:

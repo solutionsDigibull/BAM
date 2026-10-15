@@ -11,11 +11,12 @@ uses them:
 
 import uuid
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
 from sbam_contracts.api import PAGE_LIMIT_MAX
 from sbam_contracts.identity import UserStatus
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import Session
 
@@ -66,6 +67,37 @@ class UserRepository(TenantScopedRepository[User]):
     def among(self, ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, User]:
         rows = self.session.scalars(self._scoped().where(User.id.in_(list(ids))))
         return {row.id: row for row in rows}
+
+    def page(
+        self,
+        *,
+        after: tuple[datetime, uuid.UUID] | None,
+        limit: int,
+        role: str | None,
+        active: bool | None,
+    ) -> list[User]:
+        """Oldest first, after the `(created_at, id)` of the previous page's last row. Ids are
+        Keycloak subjects (random UUIDs), so `id` only breaks ties. `limit + 1` rows tell the
+        caller whether another page exists."""
+        query = self._scoped()
+        if after is not None:
+            created, last = after
+            query = query.where(
+                or_(User.created_at > created, and_(User.created_at == created, User.id > last))
+            )
+        if role is not None:
+            query = query.where(self._has_role(role))
+        if active is not None:
+            is_active = User.status == UserStatus.ACTIVE.value
+            query = query.where(is_active if active else ~is_active)
+        ordered = query.order_by(User.created_at, User.id)
+        return list(self.session.scalars(ordered.limit(limit + 1)))
+
+    def _has_role(self, role: str) -> ColumnElement[bool]:
+        """`role` is one of the fixed portal roles (validated by the caller)."""
+        if self.session.get_bind().dialect.name == "postgresql":
+            return User.portal_roles.contains([role])
+        return cast(User.portal_roles, String).like(f'%"{role}"%')  # SQLite: JSON text
 
     def other_active_admins(self, user_id: uuid.UUID) -> int:
         # ponytail: filters roles in Python; a tenant has a handful of users, not thousands.

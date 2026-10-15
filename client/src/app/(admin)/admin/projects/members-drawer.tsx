@@ -40,7 +40,7 @@ export function MembersDrawer({
   const users = useCustom<{ items: TenantUser[] }, ApiError>({
     url: USERS_PATH,
     method: "get",
-    config: { query: { role: "sbam-fde", active: "true" } },
+    config: { query: { role: "sbam-fde", active: "true", limit: "100" } },
   });
   const current = useCustom<ProjectMembers, ApiError>({
     url: membersPath(project.id),

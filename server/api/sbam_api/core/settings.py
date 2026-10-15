@@ -1,5 +1,6 @@
 """Environment-driven settings. Secrets come from env / Docker secrets only, never from code."""
 
+import secrets
 from pathlib import Path
 from typing import Any, Literal
 
@@ -43,6 +44,10 @@ class Settings(BaseSettings):
     # tokens answer 503. The browser reaches tusd at `tusd_public_url`.
     tusd_hook_secret: SecretStr | None = None
     tusd_public_url: str = "http://localhost:1080/files/"
+    # List cursors are HMAC-signed (core.conventions.encode_cursor).
+    # ponytail: a random key per process when unset, so cursors die on restart (the client starts
+    # again at page 1); set CURSOR_SECRET once the API runs more than one replica.
+    cursor_secret: SecretStr = Field(default_factory=lambda: SecretStr(secrets.token_hex(32)))
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     log_level: str = "INFO"
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).

@@ -353,3 +353,68 @@ def test_e2_4_members_input_limits(h: Harness) -> None:
     assert [e["path"] for e in body["errors"]] == ["user_ids"]
     too_many = [uuid.uuid4() for _ in range(51)]
     problem(h.assign(project, *too_many), 422, "VALIDATION_ERROR")
+
+
+# --- User list: limit, cursor, filters (E2.6 list inputs) ------------------------------------
+
+
+def _list(h: Harness, token: str | None = None, **params: str) -> Any:
+    return h.call("GET", "/admin/users", token or h.admin_a(), params=params)
+
+
+def _add_fdes(h: Harness, n: int) -> list[uuid.UUID]:
+    ids = [uuid.uuid4() for _ in range(n)]
+    for i in ids:
+        assert h.call("GET", "/me", h.realm.token(i, **FDE)).status_code == 200
+    return ids
+
+
+def test_e2_6_list_pages_with_a_signed_cursor(h: Harness) -> None:
+    added = _add_fdes(h, 5)  # tenant A: admin-a, fde-a1 and 5 more = 7
+    seen: list[str] = []
+    cursor: str | None = None
+    sizes = []
+    while True:
+        params = {"limit": "3", **({"cursor": cursor} if cursor else {})}
+        body = _list(h, **params).json()
+        sizes.append(len(body["items"]))
+        seen += [u["id"] for u in body["items"]]
+        cursor = body["next_cursor"]
+        if cursor is None:
+            break
+    assert sizes == [3, 3, 1]
+    # Oldest first (ids are random Keycloak UUIDs, so this is creation order), no repeats.
+    assert seen == [str(i) for i in (ADMIN_A, FDE_A1, *added)]
+    everything = _list(h).json()  # default limit 25
+    assert len(everything["items"]) == 7 and everything["next_cursor"] is None
+
+
+@pytest.mark.parametrize("limit", ["0", "101", "x"])
+def test_e2_6_list_limit_bounds(h: Harness, limit: str) -> None:
+    body = problem(_list(h, limit=limit), 400, "VALIDATION_ERROR")
+    assert [e["path"] for e in body["errors"]] == ["limit"]
+
+
+def test_e2_6_list_cursor_is_tamper_proof_and_tenant_bound(h: Harness) -> None:
+    _add_fdes(h, 2)
+    cursor = _list(h, limit="1").json()["next_cursor"]
+    assert cursor
+    forged = cursor[:-2] + ("AA" if not cursor.endswith("AA") else "BB")
+    problem(_list(h, cursor=forged), 400, "INVALID_CURSOR")
+    problem(_list(h, cursor="not-a-cursor"), 400, "INVALID_CURSOR")
+    problem(_list(h, h.admin_b(), cursor=cursor), 400, "INVALID_CURSOR")  # tenant A's cursor
+
+
+def test_e2_6_list_filters_by_role_and_active(h: Harness) -> None:
+    fdes = _add_fdes(h, 2)
+    admins = [u["id"] for u in _list(h, role="sbam-admin").json()["items"]]
+    assert admins == [str(ADMIN_A)]
+    assert h.patch(fdes[0], {"active": False}).status_code == 200
+    active_fdes = {u["id"] for u in _list(h, role="sbam-fde", active="true").json()["items"]}
+    assert active_fdes == {str(FDE_A1), str(fdes[1])}
+    inactive = [u["id"] for u in _list(h, active="false").json()["items"]]
+    assert inactive == [str(fdes[0])]
+    problem(_list(h, role="super-admin"), 400, "VALIDATION_ERROR")
+    problem(_list(h, active="maybe"), 400, "VALIDATION_ERROR")
+    # Tenant B never sees tenant A's users, filters or not.
+    assert str(FDE_A1) not in {u["id"] for u in _list(h, h.admin_b()).json()["items"]}
