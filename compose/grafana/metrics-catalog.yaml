@@ -1,0 +1,163 @@
+# Metric contract between the code and the Grafana dashboards/alerts (E16.1, TD §17).
+# Every metric a dashboard or alert queries must be listed here, and
+# server/tests/unit/test_grafana_provisioning.py fails otherwise. Names are the Prometheus names Grafana sees.
+#
+# status:
+#   emitted  the code produces it today. `evidence` names the file and the text that proves it.
+#   planned  nothing in the code emits it yet. `owner` names the issue that must, and `emitter` says how. The
+#            test fails if a planned name shows up under server/ (flip it to emitted and add evidence).
+#            Panels and alerts on planned metrics stay empty (and "no data" rules follow their noDataState)
+#            until the owner lands.
+#
+# `labels` is every label the dashboards may use. Tenant ids are allowed as labels; personal data, document
+# names/contents and unbounded ids (user, email, file, project, run) are not (the test enforces the allowlist).
+
+label_allowlist: [service, span_name, span_kind, status_code, task_queue, namespace, stage, outcome, gate, attempt, mode, alias, state, mountpoint, tenant_id]
+
+metrics:
+  # --- Tempo span-metrics: derived by grafana/otel-lgtm from the spans sbam-api already exports (E1.4). ---
+  # FastAPI server spans are marked STATUS_CODE_ERROR for 5xx responses and unhandled exceptions.
+  - name: traces_spanmetrics_calls_total
+    type: counter
+    source: tempo-span-metrics
+    status: emitted
+    labels: [service, span_name, span_kind, status_code]
+    evidence: {file: server/api/sbam_api/core/telemetry.py, contains: FastAPIInstrumentor.instrument_app}
+  - name: traces_spanmetrics_latency_bucket
+    type: histogram
+    source: tempo-span-metrics
+    status: emitted
+    labels: [service, span_name, span_kind, status_code]
+    evidence: {file: server/api/sbam_api/core/telemetry.py, contains: FastAPIInstrumentor.instrument_app}
+
+  # --- Temporal SDK metrics: need a Temporal Runtime with an OTLP metrics exporter in the workers. ---
+  - name: temporal_activity_schedule_to_start_latency_seconds_bucket
+    type: histogram
+    source: temporal-sdk
+    status: planned
+    labels: [task_queue, namespace]
+    owner: "D3, workers bootstrap (Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(...)))); follow-up issue needed"
+    emitter: Temporal Python SDK core metric temporal_activity_schedule_to_start_latency
+  - name: temporal_workflow_task_schedule_to_start_latency_seconds_bucket
+    type: histogram
+    source: temporal-sdk
+    status: planned
+    labels: [task_queue, namespace]
+    owner: "D3, workers bootstrap; same follow-up as above"
+    emitter: Temporal Python SDK core metric temporal_workflow_task_schedule_to_start_latency
+  - name: temporal_activity_execution_failed_total
+    type: counter
+    source: temporal-sdk
+    status: planned
+    labels: [task_queue, namespace]
+    owner: "D3, workers bootstrap; same follow-up as above"
+    emitter: Temporal Python SDK core metric temporal_activity_execution_failed
+  - name: temporal_activity_execution_latency_seconds_bucket
+    type: histogram
+    source: temporal-sdk
+    status: planned
+    labels: [task_queue, namespace]
+    owner: "D3, workers bootstrap; same follow-up as above"
+    emitter: Temporal Python SDK core metric temporal_activity_execution_latency
+
+  # --- SBAM domain metrics: an OTel Meter in the owning module, exported to the same collector. ---
+  - name: sbam_pipeline_stage_completions_total
+    type: counter
+    source: sbam-otel-meter
+    status: planned
+    labels: [stage, outcome, tenant_id]
+    owner: "#79 E10.1 / D3 (PipelineStage values; outcome ok|failed)"
+    emitter: counter incremented when a ProjectPipeline stage ends
+  - name: sbam_gate_evaluations_total
+    type: counter
+    source: sbam-otel-meter
+    status: planned
+    labels: [gate, outcome, tenant_id]
+    owner: "codegen gates (E11.x) and certification gates (E14.x); outcome pass|fail"
+    emitter: counter incremented per gate evaluation
+  - name: sbam_codegen_attempts_total
+    type: counter
+    source: sbam-otel-meter
+    status: planned
+    labels: [attempt, outcome, tenant_id]
+    owner: "correction loop (E11.x); attempt initial|correction"
+    emitter: counter per code generation attempt; correction rate = correction / initial
+  - name: sbam_subskill_builds_total
+    type: counter
+    source: sbam-otel-meter
+    status: planned
+    labels: [outcome, tenant_id]
+    owner: "#107 SubSkillBuild; outcome ok|needs_fde_review"
+    emitter: counter incremented when a SubSkillBuild ends
+  - name: sbam_sandbox_runs_total
+    type: counter
+    source: sbam-otel-meter
+    status: planned
+    labels: [outcome, mode, tenant_id]
+    owner: "#123 E13.2 sandbox adapter; outcome passed|failed|infra_error, mode cubesandbox|local_docker_noncert"
+    emitter: counter per sandbox run (infra_error = INFRA_ERROR failure category, TESTING_BLOCKED)
+  - name: sbam_sandbox_run_duration_seconds_bucket
+    type: histogram
+    source: sbam-otel-meter
+    status: planned
+    labels: [outcome, mode]
+    owner: "#123 E13.2 sandbox adapter"
+    emitter: histogram of sandbox_runs.duration_ms in seconds
+  - name: sbam_sandbox_host_up
+    type: gauge
+    source: sbam-otel-meter
+    status: planned
+    labels: []
+    owner: "#123 E13.2 sandbox adapter (health probe every 30 s: 1 reachable, 0 not)"
+    emitter: gauge set by the sandbox host health probe, reported even when no runs happen
+  - name: sbam_llm_requests_total
+    type: counter
+    source: sbam-otel-meter
+    status: planned
+    labels: [alias, outcome, tenant_id]
+    owner: "Bifrost client (E1.15 follow-up); alias is one of the six sbam-* aliases, outcome ok|error"
+    emitter: counter per Bifrost call, next to the llm_calls row
+  - name: sbam_llm_request_duration_seconds_bucket
+    type: histogram
+    source: sbam-otel-meter
+    status: planned
+    labels: [alias, outcome]
+    owner: "Bifrost client (E1.15 follow-up)"
+    emitter: histogram of Bifrost call latency
+  - name: sbam_llm_cost_usd_total
+    type: counter
+    source: sbam-otel-meter
+    status: planned
+    labels: [alias, tenant_id]
+    owner: "Bifrost client (E1.15 follow-up)"
+    emitter: counter of llm_calls.cost in USD
+  - name: sbam_clamav_signature_age_seconds
+    type: gauge
+    source: sbam-otel-meter
+    status: planned
+    labels: []
+    owner: "#62 E4.3 ClamAV scan (or a probe beside it): now minus the signature database build time"
+    emitter: gauge refreshed every few minutes from clamd VERSION or the clamav_db volume
+  - name: sbam_frozen_hash_mismatches
+    type: gauge
+    source: sbam-otel-meter
+    status: planned
+    labels: []
+    owner: "nightly frozen-manifest verification job (E14.x / E16.5)"
+    emitter: gauge set at the end of each verification run (0 = all frozen hashes match)
+  - name: sbam_frozen_hash_verify_last_success_timestamp_seconds
+    type: gauge
+    source: sbam-otel-meter
+    status: planned
+    labels: []
+    owner: "nightly frozen-manifest verification job (E14.x / E16.5)"
+    emitter: unix time of the last run that completed
+
+  # --- Host metrics: need an OTel hostmetrics receiver (or node agent) on each VM; the lgtm image has none. ---
+  - name: system_filesystem_usage_bytes
+    type: gauge
+    source: hostmetrics
+    status: planned
+    labels: [state, mountpoint]
+    owner: "#142 E16.3 environment VMs: run an OTel Collector with the hostmetrics filesystem scraper, OTLP to otel-collector"
+    emitter: OTel hostmetrics receiver, system.filesystem.usage

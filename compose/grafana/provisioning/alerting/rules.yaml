@@ -1,0 +1,525 @@
+# Operator alerts (E16.1, TD §17.3). Evaluated every minute; each rule needs its `for` period to hold before it fires.
+# Metric names are checked against compose/grafana/metrics-catalog.yaml by server/tests/unit/test_grafana_provisioning.py.
+# Grafana expands environment references in provisioning files, so every literal dollar sign in a template is doubled.
+# noDataState Alerting is deliberate where silence is itself the failure: sandbox host (no runs => no error rate),
+# ClamAV age, and the frozen-hash job. Ratio rules use OK: no traffic is not an incident.
+apiVersion: 1
+groups:
+- orgId: 1
+  name: sbam-operator-alerts
+  folder: SBAM Operations
+  interval: 1m
+  rules:
+  - uid: sbam-api-5xx-ratio
+    title: SBAM API 5xx ratio above 2% for 5 minutes
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: 100 * sum(rate(traces_spanmetrics_calls_total{service="sbam-api",span_kind="SPAN_KIND_SERVER",status_code="STATUS_CODE_ERROR"}[5m])) / sum(rate(traces_spanmetrics_calls_total{service="sbam-api",span_kind="SPAN_KIND_SERVER"}[5m]))
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 2
+    noDataState: OK
+    execErrState: Error
+    for: 2m
+    isPaused: false
+    annotations:
+      summary: sbam-api is answering 5xx on more than 2% of requests
+      description: 5xx ratio over the last 5 minutes is {{ printf "%.1f" $$values.B.Value }}% (threshold 2%). Open the SBAM API health dashboard, then the failing traces in Tempo.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: critical
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-temporal-schedule-to-start
+    title: Temporal schedule-to-start above 2 minutes
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: histogram_quantile(0.95, sum by (le, task_queue) (rate(temporal_activity_schedule_to_start_latency_seconds_bucket[5m])))
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 120
+    noDataState: OK
+    execErrState: Error
+    for: 2m
+    isPaused: false
+    annotations:
+      summary: Tasks wait more than 2 minutes for a worker on queue {{ $$labels.task_queue }}
+      description: p95 activity schedule-to-start on {{ $$labels.task_queue }} is {{ printf "%.0f" $$values.B.Value }} s (threshold 120 s). Workers for that queue are down, saturated or not polling.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-sandbox-infra-errors
+    title: Sandbox infrastructure errors above 10% over 30 minutes
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 1800
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: 100 * sum(increase(sbam_sandbox_runs_total{outcome="infra_error"}[30m])) / sum(increase(sbam_sandbox_runs_total[30m]))
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 10
+    noDataState: OK
+    execErrState: Error
+    for: 5m
+    isPaused: false
+    annotations:
+      summary: More than 10% of sandbox runs failed for infrastructure reasons
+      description: Infra-error share over the last 30 minutes is {{ printf "%.1f" $$values.B.Value }}% (threshold 10%). Runs go to TESTING_BLOCKED, not to correction. Check the CubeSandbox host.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: critical
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-sandbox-host-down
+    title: Sandbox host unreachable for 2 minutes
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 300
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: min(sbam_sandbox_host_up)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    noDataState: Alerting
+    execErrState: Error
+    for: 2m
+    isPaused: false
+    annotations:
+      summary: The CubeSandbox host health probe is failing
+      description: The sandbox host health probe has failed for 2 minutes, or has stopped reporting. With no runs there is no infra-error rate, so this probe is the only signal. Certification is blocked.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: critical
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-clamav-signatures-stale
+    title: ClamAV signatures older than 24 hours
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 1800
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max(sbam_clamav_signature_age_seconds)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 86400
+    noDataState: Alerting
+    execErrState: Error
+    for: 10m
+    isPaused: false
+    annotations:
+      summary: ClamAV signature database is stale (or its age is not reported)
+      description: Signature age is {{ printf "%.0f" $$values.B.Value }} s (threshold 86400 s). Uploads are scanned against old signatures. Check freshclam.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-disk-usage
+    title: Disk usage above 80%
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: 100 * max by (mountpoint) (system_filesystem_usage_bytes{state="used"} / ignoring(state) (system_filesystem_usage_bytes{state="used"} + ignoring(state) system_filesystem_usage_bytes{state="free"}))
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 80
+    noDataState: OK
+    execErrState: Error
+    for: 2m
+    isPaused: false
+    annotations:
+      summary: Filesystem {{ $$labels.mountpoint }} is above 80% full
+      description: '{{ $$labels.mountpoint }} is {{ printf "%.1f" $$values.B.Value }}% full (threshold 80%). Storage, Postgres or Docker volumes may stop accepting writes.'
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-frozen-hash-mismatch
+    title: Frozen manifest hash verification failed
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max(sbam_frozen_hash_mismatches)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    noDataState: OK
+    execErrState: Error
+    for: 0s
+    isPaused: false
+    annotations:
+      summary: A frozen manifest no longer matches its recorded hash
+      description: 'The nightly verification found {{ printf "%.0f" $$values.B.Value }} frozen manifest(s) whose hash does not match. Frozen versions must be immutable: treat as an integrity incident.'
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: critical
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-frozen-hash-verify-stale
+    title: Nightly frozen-hash verification has not succeeded for 36 hours
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: time() - max(sbam_frozen_hash_verify_last_success_timestamp_seconds)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 129600
+    noDataState: Alerting
+    execErrState: Error
+    for: 10m
+    isPaused: false
+    annotations:
+      summary: The frozen-hash verification job is not running
+      description: No successful verification for {{ printf "%.0f" $$values.B.Value }} s (threshold 36 h), or the job reports nothing. A green hash alert means nothing while the job is dead.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-telemetry-missing
+    title: No API telemetry reaching Grafana for 10 minutes
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 900
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: absent_over_time(traces_spanmetrics_calls_total{service="sbam-api",span_kind="SPAN_KIND_SERVER"}[10m])
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    noDataState: OK
+    execErrState: Error
+    for: 1m
+    isPaused: false
+    annotations:
+      summary: sbam-api spans stopped arriving (collector down or exporter dropping)
+      description: No sbam-api server spans were turned into metrics for 10 minutes. Every other alert is blind until this clears. Health checks normally keep this series alive.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}

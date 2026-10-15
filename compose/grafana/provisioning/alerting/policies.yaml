@@ -1,0 +1,19 @@
+apiVersion: 1
+
+# Routing (E16.1). Flapping is damped twice: every rule has a `for` period, and notifications are grouped
+# (group_interval) and repeated no more often than repeat_interval. Datasource errors and "no data" alerts
+# carry no severity label, so they take the root route and still reach the operators.
+policies:
+  - orgId: 1
+    receiver: sbam-operators
+    group_by: [alertname, task_queue, mountpoint]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      - receiver: sbam-operators
+        object_matchers:
+          - [severity, "=", critical]
+        group_wait: 10s
+        group_interval: 5m
+        repeat_interval: 1h

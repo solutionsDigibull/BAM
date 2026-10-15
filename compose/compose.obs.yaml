@@ -63,6 +63,13 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?is required for PROFILES=obs - set it in compose/.env}
+      # The image defaults to anonymous Admin access. Operators sign in (over Netbird off-box), nobody else (E16.1-T06).
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Read by compose/grafana/provisioning/alerting/*.yaml (Grafana expands ${VAR} there). The webhook is the
+      # operator channel for this environment; the default is a discard address, so alerts go nowhere until set.
+      GRAFANA_ALERT_WEBHOOK_URL: ${GRAFANA_ALERT_WEBHOOK_URL:-http://127.0.0.1:9/sbam-operator-alerts}
+      SBAM_ENV: ${SBAM_ENV:-development}
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3002}:3000"
       - "127.0.0.1:${OTLP_GRPC_PORT:-4317}:4317"
@@ -74,6 +81,10 @@ services:
       - lgtm_data:/data
       # Alert rules provisioned into Grafana (E4.3: ClamAV signatures older than 24 h).
       - ./obs/alerting/clamav.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/clamav.yaml:ro
+      # Dashboards and operator alerts as code (E16.1, TD §17.3); see compose/grafana/README.md.
+      - ./grafana/provisioning/dashboards/sbam.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/sbam.yaml:ro
+      - ./grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/sbam:ro
+      - ./grafana/provisioning/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/api/health && curl -s -o /dev/null http://127.0.0.1:4318/v1/traces"]
       interval: 10s
