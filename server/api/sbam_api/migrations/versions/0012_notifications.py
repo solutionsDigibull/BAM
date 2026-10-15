@@ -1,7 +1,7 @@
 """in-app notifications
 
-Revision ID: 0011_notifications
-Revises: 0010_document_deletion
+Revision ID: 0012_notifications
+Revises: 0011_masters
 Create Date: 2026-10-15
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -13,8 +13,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0011_notifications"
-down_revision: str | Sequence[str] | None = "0010_document_deletion"
+revision: str = "0012_notifications"
+down_revision: str | Sequence[str] | None = "0011_masters"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

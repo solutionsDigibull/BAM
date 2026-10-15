@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:03b663b4ffcaae76b45c8e883e71246da4eb24358027d045fb89b6acdeb4803f
+// source-sha256:86825c219149285389002142e91415c2eaaae4ba9b4e5ceecb99d420d8d2c877
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -234,6 +234,21 @@ export type MasterStatus = "PROPOSED" | "ILLUSTRATIVE" | "APPROVED" | "RETIRED";
  * via the `definition` "SourceKind".
  */
 export type SourceKind = "BAM_0_2_SAMPLE" | "TEMPLATE_ROW" | "ADMIN_ENTRY";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "NotificationType".
+ */
+export type NotificationType =
+  | "SOW_READY"
+  | "BREAKDOWN_READY"
+  | "SUBSKILL_NEEDS_REVIEW"
+  | "WORKFLOW_CERTIFIED"
+  | "WORKFLOW_FROZEN"
+  | "EXPORT_READY"
+  | "DOCUMENT_REJECTED"
+  | "GENERATION_FAILED"
+  | "STAGE_COMPLETED"
+  | "REMINDER";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -285,6 +300,7 @@ export interface SbamContracts {
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
   PurgeResult?: PurgeResult;
+  Notification?: Notification;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -2071,4 +2087,19 @@ export interface PurgeResult {
   purged?: number;
   skipped?: number;
   failed?: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Notification".
+ */
+export interface Notification {
+  id: string;
+  project_id: string | null;
+  workflow_id: string | null;
+  type: NotificationType;
+  title: string;
+  body: string;
+  link: string | null;
+  created_at: string;
+  read_at: string | null;
 }
