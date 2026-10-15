@@ -30,16 +30,17 @@ x-api-command: &server-command
   - -c
   - if [ "$$SBAM_ROLE" = api ]; then exec uvicorn sbam_api.main:create_app --factory --host 0.0.0.0 --port 8000; else exec python -m sbam_workers.bootstrap; fi
 
+# Shared by the six workers. `!reset` is NOT honoured when it arrives through an alias or a merge
+# key, so each worker below restates `build: !reset null` and `DATABASE_URL: !reset null` itself.
+x-worker-deploy-env: &worker-deploy-env
+  DATABASE_URL_TEMPLATE: postgresql://sbam:__SBAM_DB_PASSWORD__@postgres:5432/sbam
+  SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
+  LLM_PROVIDER: ${LLM_PROVIDER:-bifrost}
+
 x-worker-deploy: &worker-deploy
   image: ${SBAM_WORKER_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-worker@sha256:...)}
-  build: !reset null
   entrypoint: *wrapper
   command: *server-command
-  environment:
-    DATABASE_URL: !reset null
-    DATABASE_URL_TEMPLATE: postgresql://sbam:__SBAM_DB_PASSWORD__@postgres:5432/sbam
-    SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
-    LLM_PROVIDER: ${LLM_PROVIDER:-bifrost}
   volumes: [*wrapper-mount]
   secrets:
     - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
@@ -208,12 +209,47 @@ services:
       - { source: keycloak_admin_client_secret, target: keycloak_admin_client_secret, uid: "10001", gid: "10001", mode: 0400 }
       - { source: tusd_hook_secret, target: tusd_hook_secret, uid: "10001", gid: "10001", mode: 0400 }
 
-  worker-ingest: *worker-deploy
-  worker-knowledge: *worker-deploy
-  worker-llm: *worker-deploy
-  worker-build: *worker-deploy
-  worker-test: *worker-deploy
-  worker-certify: *worker-deploy
+  worker-ingest:
+    <<: *worker-deploy
+    build: !reset null
+    environment:
+      <<: *worker-deploy-env
+      DATABASE_URL: !reset null
+
+  worker-knowledge:
+    <<: *worker-deploy
+    build: !reset null
+    environment:
+      <<: *worker-deploy-env
+      DATABASE_URL: !reset null
+
+  worker-llm:
+    <<: *worker-deploy
+    build: !reset null
+    environment:
+      <<: *worker-deploy-env
+      DATABASE_URL: !reset null
+
+  worker-build:
+    <<: *worker-deploy
+    build: !reset null
+    environment:
+      <<: *worker-deploy-env
+      DATABASE_URL: !reset null
+
+  worker-test:
+    <<: *worker-deploy
+    build: !reset null
+    environment:
+      <<: *worker-deploy-env
+      DATABASE_URL: !reset null
+
+  worker-certify:
+    <<: *worker-deploy
+    build: !reset null
+    environment:
+      <<: *worker-deploy-env
+      DATABASE_URL: !reset null
 
   sbam-mock-api:
     image: ${SBAM_MOCK_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-mock-api@sha256:...)}
