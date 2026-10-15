@@ -29,6 +29,7 @@ dev = [
     "jsonschema>=4.25",
     "types-jsonschema>=4.26.0.20261006",
     "moto[s3]>=5.1,<6",
+    "types-pyyaml>=6.0.12.20260906",
 ]
 
 [tool.ruff]

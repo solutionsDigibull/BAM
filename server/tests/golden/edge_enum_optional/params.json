@@ -1,0 +1,77 @@
+{
+  "acceptance_check": "Fail closed when attempt > 3 or \"channel\" is not allowed; C:\\limits apply.",
+  "action_step": "Verify the \"OTP\" sent to mobile_number over channel; 'quotes' and C:\\paths are literal text.",
+  "action_tool": "verify_otp",
+  "fixed_check_tool": "check_limits",
+  "fresh_state": [],
+  "gate_outputs": [
+    "verified"
+  ],
+  "handoff_table": "otp_audit",
+  "inputs": [
+    {
+      "enum": [
+        "sms",
+        "email",
+        "wh'at"
+      ],
+      "name": "channel",
+      "required": false,
+      "type": "string"
+    },
+    {
+      "name": "mobile_number",
+      "required": true,
+      "type": "string"
+    },
+    {
+      "enum": [
+        1,
+        2,
+        3
+      ],
+      "name": "attempt",
+      "required": true,
+      "type": "integer"
+    },
+    {
+      "items": "string",
+      "name": "tags",
+      "required": false,
+      "type": "array"
+    },
+    {
+      "name": "strict",
+      "required": false,
+      "type": "boolean"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "verified",
+      "required": true,
+      "type": "boolean"
+    },
+    {
+      "name": "details",
+      "required": false,
+      "type": "object"
+    },
+    {
+      "name": "scores",
+      "required": false,
+      "type": "array"
+    },
+    {
+      "name": "ratio",
+      "required": false,
+      "type": "number"
+    }
+  ],
+  "parameters": [],
+  "required_fields": [
+    "iteration_pass",
+    "evidence"
+  ],
+  "skill_id": "MS09.2_Edge_Case_Skill"
+}

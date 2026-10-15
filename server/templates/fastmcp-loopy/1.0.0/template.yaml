@@ -1,0 +1,122 @@
+# Template manifest for fastmcp-loopy 1.0.0 (TD §12.3, E11.1). Owned by the platform team (O-06).
+# A released version is immutable: any byte change here or in a *.j2 file needs a new version
+# directory and a new entry in ../../registry.json (the loader verifies the tree hash).
+name: fastmcp-loopy
+version: 1.0.0
+description: >-
+  One ISATVON 1.4 Sub-Skill as a FastMCP server with a decoupled action tool and fixed check
+  tool, a read-only fresh-state reader and an append-only state handoff writer.
+
+supports_isatvon: ["1.4"]
+
+engine:
+  jinja2: ">=3.1.6"
+  python: "3.12"
+runtime:
+  fastmcp: ">=2.0"
+  pydantic: ">=2"
+
+# Modules the template itself imports. AST_IMPORTS allows these plus the registry-resolved
+# libraries of the manifest; sibling modules are imported relatively (`from . import ...`).
+base_imports: [__future__, json, typing, fastmcp, pydantic]
+
+# Slot markers in the rendered Python:   # >>> LLM_BODY:<slot>   ...   # <<< LLM_BODY:<slot>
+# An unfilled slot holds `raise NotImplementedError("LLM_BODY:<slot>")`, so the skeleton
+# parses, and fails loudly (import or call) at exactly the slot. state_queries is data: the
+# assembler writes a {name: "SELECT ... %s"} dict literal, never Python from the LLM.
+slot_marker:
+  open: "# >>> LLM_BODY:{slot}"
+  close: "# <<< LLM_BODY:{slot}"
+
+# Render order = dependency order. `context` lists every variable the .j2 file reads
+# (checked against the template source by a test). `slots` maps each slot, in file order, to
+# the CodeBodies field that fills it; {} = no LLM code in that file.
+files:
+  - output: models.py
+    template: models.py.j2
+    context: [skill_id, template_version, inputs, outputs, typing_imports]
+    slots: {}
+  - output: state.py
+    template: state.py.j2
+    context: [skill_id, template_version, key_field, parameters, fresh_state]
+    slots:
+      state_queries: state_queries
+  - output: state_handoff.py
+    template: state_handoff.py.j2
+    context: [skill_id, template_version, handoff_table, required_fields]
+    slots: {}
+  - output: action_tool.py
+    template: action_tool.py.j2
+    context:
+      [skill_id, template_version, action_tool, action_step, signature, key_field,
+       required_fields, typing_imports]
+    slots:
+      helpers: helpers
+      action: action_body
+  - output: check_tool.py
+    template: check_tool.py.j2
+    context:
+      [skill_id, template_version, fixed_check_tool, acceptance_check, signature, key_field,
+       gate_outputs, typing_imports]
+    slots:
+      helpers: helpers
+      check: check_body
+  - output: server.py
+    template: server.py.j2
+    context: [skill_id, template_version, action_tool, fixed_check_tool, signature, typing_imports]
+    slots: {}
+
+# Render parameters, mapped from the Skill Manifest (sbam_build_record.isatvon_detail and
+# contracts). Validated before anything renders. Identifiers must match ^[a-z_][a-z0-9_]*$ and
+# are further checked in code (keywords, builtins, names the generated modules already use).
+params_schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  additionalProperties: false
+  required:
+    - skill_id
+    - action_tool
+    - action_step
+    - fixed_check_tool
+    - acceptance_check
+    - inputs
+    - outputs
+    - parameters
+    - fresh_state
+    - gate_outputs
+    - handoff_table
+    - required_fields
+  properties:
+    skill_id: {type: string, minLength: 1, maxLength: 200}
+    action_tool: {$ref: "#/$defs/identifier"}
+    action_step: {type: string, minLength: 1, maxLength: 20000}
+    fixed_check_tool: {$ref: "#/$defs/identifier"}
+    acceptance_check: {type: string, minLength: 1, maxLength: 20000}
+    inputs: {type: array, minItems: 1, maxItems: 1000, items: {$ref: "#/$defs/field"}}
+    outputs: {type: array, maxItems: 1000, items: {$ref: "#/$defs/field"}}
+    parameters:
+      type: array
+      maxItems: 1000
+      items:
+        type: object
+        additionalProperties: false
+        required: [name, value]
+        properties:
+          name: {$ref: "#/$defs/identifier"}
+          value: {type: [string, number, boolean, "null"]}
+    fresh_state: {type: array, maxItems: 1000, items: {$ref: "#/$defs/identifier"}}
+    gate_outputs: {type: array, maxItems: 1000, items: {$ref: "#/$defs/identifier"}}
+    handoff_table: {$ref: "#/$defs/identifier"}
+    required_fields: {type: array, maxItems: 1000, items: {$ref: "#/$defs/identifier"}}
+  $defs:
+    identifier: {type: string, pattern: "^[a-z_][a-z0-9_]*$", maxLength: 63}
+    field:
+      type: object
+      additionalProperties: false
+      required: [name, type, required]
+      properties:
+        name: {$ref: "#/$defs/identifier"}
+        type: {enum: [string, integer, number, boolean, array, object]}
+        required: {type: boolean}
+        enum: {type: array, minItems: 1, maxItems: 1000, items: {type: [string, integer]}}
+        items: {enum: [string, integer, number, boolean]}
