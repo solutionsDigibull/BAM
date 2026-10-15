@@ -60,6 +60,10 @@ class FakeClamd:
         tb: TracebackType | None,
     ) -> None:
         self._running = False
+        try:
+            self._server.shutdown(socket.SHUT_RDWR)  # wakes the thread blocked in accept() on Linux
+        except OSError:
+            pass  # Windows refuses to shut down a listening socket; close() is enough there
         self._server.close()
 
     def _serve(self) -> None:

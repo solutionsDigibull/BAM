@@ -2,6 +2,7 @@
 
 import io
 import os
+import socket
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -53,9 +54,16 @@ def test_e4_3_empty_stream_is_scanned() -> None:
         assert not client(server).scan(io.BytesIO(b"")).infected
 
 
+def unused_port() -> int:
+    """A port nothing listens on. (A closed FakeClamd is not one: on Linux a socket stays open
+    while another thread is blocked in accept().)"""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
 def test_e4_3_unreachable_clamd_is_a_retryable_error() -> None:
-    with FakeClamd() as server:
-        port = server.port
+    port = unused_port()
     with pytest.raises(ClamdError, match="cannot reach clamd"):
         ClamdClient("127.0.0.1", port, timeout=1).scan(io.BytesIO(b"x"))
     with pytest.raises(ClamdError):
