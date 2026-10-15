@@ -174,4 +174,17 @@ describe("Users & Roles screen (E2.6)", { timeout: 20_000 }, () => {
     expect(await screen.findByText("Try again shortly")).toBeDefined();
     expect(screen.getByRole("button", { name: "Retry" })).toBeDefined();
   });
+
+  test("very long display names and emails are truncated with an ellipsis", async () => {
+    const long = {
+      ...FDE_A1,
+      display_name: "N".repeat(300),
+      email: `${"e".repeat(240)}@acme.example`,
+    };
+    fakeApi({ [LIST]: { body: { items: [ADMIN_A, long] } } });
+    renderWithRefine(<UsersScreen />);
+    const name = await screen.findByText(long.display_name);
+    const email = screen.getByText(long.email);
+    for (const el of [name, email]) expect(el.closest(".ant-typography-ellipsis")).not.toBeNull(); // clipped, full text on hover
+  });
 });
