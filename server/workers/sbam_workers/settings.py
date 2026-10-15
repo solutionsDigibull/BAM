@@ -27,4 +27,6 @@ class WorkerSettings(BaseSettings):
     clamav_host: str = Field(default="clamav", min_length=1)
     clamav_port: int = Field(default=3310, ge=1, le=65535)
     clamav_timeout_seconds: float = Field(default=60.0, gt=0)
-    clamav_max_signature_age_hours: float = Field(default=24.0, gt=0)
+    # ClamAV publishes one database a day (about 06:25 UTC) and freshclam checks every 2 h, so a
+    # 24 h limit would refuse scans for a few hours on most days (#62).
+    clamav_max_signature_age_hours: float = Field(default=48.0, gt=0)

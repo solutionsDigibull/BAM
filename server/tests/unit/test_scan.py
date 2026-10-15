@@ -67,7 +67,7 @@ class Harness:
             self.sessions,
             self.storage,
             ClamdClient(server.host, server.port, timeout=5),
-            max_signature_age=timedelta(hours=24),
+            max_signature_age=timedelta(hours=48),
         )
 
     def add_version(self, data: bytes = PDF, state: str = "UPLOADED", **fields: Any) -> StageRef:
@@ -229,7 +229,7 @@ def test_e4_3_clamd_down_raises_a_retryable_error_and_the_retry_succeeds(
     h = Harness(root, server)
     inp = h.add_version()
     dead = ScanDeps(
-        h.sessions, h.storage, ClamdClient("127.0.0.1", 1, timeout=1), timedelta(hours=24)
+        h.sessions, h.storage, ClamdClient("127.0.0.1", 1, timeout=1), timedelta(hours=48)
     )
     for _ in range(2):  # two failed attempts: clamd is unreachable
         with pytest.raises(ClamdError):
@@ -241,7 +241,7 @@ def test_e4_3_clamd_down_raises_a_retryable_error_and_the_retry_succeeds(
 
 
 def test_e4_3_t05_stale_signatures_refuse_the_scan_and_read_nothing(root: Path) -> None:
-    with FakeClamd(version=version_string(age=timedelta(hours=25))) as stale:
+    with FakeClamd(version=version_string(age=timedelta(hours=49))) as stale:
         h = Harness(root, stale)
         inp = h.add_version()
         with pytest.raises(SignatureStaleError):
@@ -258,7 +258,7 @@ def test_e4_3_mark_failed_sets_scan_failed_once_and_never_regresses(h: Harness) 
     with pytest.raises(ClamdError):
         scan_version(
             ScanDeps(
-                h.sessions, h.storage, ClamdClient("127.0.0.1", 1, timeout=1), timedelta(hours=24)
+                h.sessions, h.storage, ClamdClient("127.0.0.1", 1, timeout=1), timedelta(hours=48)
             ),
             inp,
         )

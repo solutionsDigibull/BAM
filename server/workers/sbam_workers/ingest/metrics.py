@@ -2,7 +2,7 @@
 
 Exported over OTLP only while OTEL_EXPORTER_OTLP_ENDPOINT is set (the `obs` profile); otherwise the
 instruments are no-ops. The age gauge asks clamd for its signature date every export interval, so it
-keeps moving when nobody uploads anything and the "older than 24 h" alert still fires; between
+keeps moving when nobody uploads anything and the "older than 48 h" alert still fires; between
 probes (or when clamd cannot be reached) it reports the age seen by the last scan.
 
 It lives in the ingest module so the worker bootstrap is not edited; `start` is called from the

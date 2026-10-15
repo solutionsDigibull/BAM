@@ -80,11 +80,11 @@ def test_e4_3_unreadable_signature_date_is_none(raw: str) -> None:
     assert parse_version(raw).signature_date is None
 
 
-def test_e4_3_t05_signatures_25_hours_old_are_refused() -> None:
-    with FakeClamd(version=version_string(age=timedelta(hours=25))) as server:
+def test_e4_3_t05_signatures_49_hours_old_are_refused() -> None:
+    with FakeClamd(version=version_string(age=timedelta(hours=49))) as server:
         version = client(server).version()
     with pytest.raises(SignatureStaleError):
-        require_fresh(version, datetime.now(UTC), timedelta(hours=24))
+        require_fresh(version, datetime.now(UTC), timedelta(hours=48))
 
 
 def test_e4_3_signatures_at_the_limit_pass_and_just_over_fails() -> None:
@@ -97,7 +97,7 @@ def test_e4_3_signatures_at_the_limit_pass_and_just_over_fails() -> None:
 
 def test_e4_3_unknown_signature_date_is_refused_not_trusted() -> None:
     with pytest.raises(SignatureStaleError):
-        require_fresh(parse_version("ClamAV 1.5.4"), NOW, timedelta(hours=24))
+        require_fresh(parse_version("ClamAV 1.5.4"), NOW, timedelta(hours=48))
 
 
 def version_row(scan_status: str | None) -> DocumentVersion:

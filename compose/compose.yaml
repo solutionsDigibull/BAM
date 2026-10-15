@@ -338,7 +338,7 @@ services:
       STORAGE_ROOT: /data/storage
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
-      CLAMAV_MAX_SIGNATURE_AGE_HOURS: ${CLAMAV_MAX_SIGNATURE_AGE_HOURS:-24}
+      CLAMAV_MAX_SIGNATURE_AGE_HOURS: ${CLAMAV_MAX_SIGNATURE_AGE_HOURS:-48}
     volumes: [storage:/data/storage] # only this worker reads uploaded files
     depends_on:
       <<: *worker-depends
