@@ -68,3 +68,4 @@ class RuntimeRegistryPackageRow(Base):
     name: Mapped[str] = mapped_column(String(200))  # PEP 503 normalised
     version: Mapped[str] = mapped_column(String(100))
     top_level_modules: Mapped[list[str]] = mapped_column(Json)
+    allowed: Mapped[bool] = mapped_column(Boolean)  # in requirements.in (E3.12)
