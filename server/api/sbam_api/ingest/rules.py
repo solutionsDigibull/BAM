@@ -49,3 +49,9 @@ def extension(name: str) -> str:
 
 def is_allowed(name: str) -> bool:
     return extension(name) in ALLOWED_EXTENSIONS
+
+
+def is_downloadable(state: str, scan_status: str | None) -> bool:
+    """Whether an FDE may be given the original file. A quarantined (infected, REJECTED) or
+    not-yet-clean file never is; the download endpoint answers 404 for it (E4.3-T07)."""
+    return scan_status == "CLEAN" and state not in {"REJECTED", "DELETED", "PURGED"}

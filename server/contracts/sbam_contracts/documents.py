@@ -11,10 +11,14 @@ Rules worth knowing
     FILE_TOO_LARGE, 409 FILE_LIMIT_REACHED or 415 UNSUPPORTED_TYPE) and nothing is stored.
   * The token is for one project and one user, and expires `expires_at` (at most 15 minutes after
     it was issued). Uploading with it to another project is refused.
+  * Scan (E4.3): every upload is scanned before anything reads it. `ScanStatus` is the verdict kept
+    on the document version; INFECTED versions are REJECTED with code MALWARE and quarantined.
 """
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated, Any, Final
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
@@ -77,10 +81,25 @@ class UploadToken(BaseModel):
     rejected: list[RejectedFile]
 
 
+class ScanStatus(StrEnum):
+    CLEAN = "CLEAN"
+    INFECTED = "INFECTED"
+    SCAN_FAILED = "SCAN_FAILED"  # the scanner could not be reached or was out of date
+
+
+class ScanOutcome(BaseModel):
+    """Result of the `scan_clamav` activity: the verdict and the signature set that gave it."""
+
+    document_version_id: UUID
+    verdict: ScanStatus
+    signature_version: str | None = None  # clamd VERSION, e.g. `ClamAV 1.5.4/27800/<date>`
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/documents/`."""
     models: dict[str, type[BaseModel]] = {
         "upload_request": UploadRequest,
         "upload_token": UploadToken,
+        "scan_outcome": ScanOutcome,
     }
     return {stem: contract_schema(model, f"documents/{stem}") for stem, model in models.items()}

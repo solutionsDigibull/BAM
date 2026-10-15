@@ -123,6 +123,23 @@ def test_e1_6_max_bytes_rejects_and_stores_nothing(store: StorageBackend) -> Non
     assert not store.exists(key)
 
 
+def test_e4_3_delete_removes_the_object_and_missing_is_fine(store: StorageBackend) -> None:
+    obj = store.put(b"quarantine me", SCOPE, Kind.QUARANTINE, "application/octet-stream")
+    assert obj.storage_key == f"{SCOPE.tenant_id}/{SCOPE.project_id}/quarantine/{obj.sha256}"
+    assert store.exists(obj.storage_key)
+    store.delete(obj.storage_key)
+    assert not store.exists(obj.storage_key)
+    store.delete(obj.storage_key)  # a second delete is not an error
+    again = store.put(b"quarantine me", SCOPE, Kind.QUARANTINE, "application/octet-stream")
+    assert again.storage_key == obj.storage_key and store.exists(again.storage_key)
+
+
+def test_e4_3_delete_rejects_bad_keys(store: StorageBackend) -> None:
+    for key in ("../../etc/passwd", "/abs/path", "x"):
+        with pytest.raises(InvalidStorageKey):
+            store.delete(key)
+
+
 def test_e1_6_missing_object_is_file_not_found(store: StorageBackend) -> None:
     with pytest.raises(FileNotFoundError):
         store.get(SCOPE.key(Kind.UPLOADS, "0" * 64))

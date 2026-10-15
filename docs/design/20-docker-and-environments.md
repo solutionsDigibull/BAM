@@ -201,7 +201,7 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 | keycloak realm | real: hardened realm + local seed job (#47 E2.1) | — |
 | bifrost | real: six `sbam-*` aliases with fallback, mock or OpenRouter (#46 E1.15; see `compose/bifrost/gen_config.py`) | — |
 | tusd | real: file store on `storage`, `pre-create` / `post-finish` file hooks (`compose/tusd/hooks`) calling the API, 15 MB cap, downloads and termination off (#61 E4.2) | — |
-| clamav | real clamd + freshclam; not yet called | #62 E4.3 (scan wiring) |
+| clamav | real: clamd + freshclam, scanned by `worker-ingest` (#62 E4.3); not published | — |
 | workers ×6 | real: Temporal bootstrap `--queues`, sample `PingWorkflow` on every queue (#40 E1.7) | — |
 | api-migrate | real: `alembic upgrade head` (#36 E1.5) | — |
 | sbam-mock-api | health-only HTTP server | #126 E13.5 |

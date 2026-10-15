@@ -64,6 +64,7 @@ class ErrorCode(StrEnum):
     PARSE_ERROR = "PARSE_ERROR"
     SCAN_UNAVAILABLE = "SCAN_UNAVAILABLE"
     OCR_UNAVAILABLE = "OCR_UNAVAILABLE"
+    MALWARE = "MALWARE"  # a document version rejected because the scan found malware
     # Knowledge
     KNOWLEDGE_BUILDING = "KNOWLEDGE_BUILDING"
     KNOWLEDGE_NOT_READY = "KNOWLEDGE_NOT_READY"

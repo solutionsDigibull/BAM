@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/scan_outcome:0.1.0",
+  "$defs": {
+    "ScanStatus": {
+      "enum": [
+        "CLEAN",
+        "INFECTED",
+        "SCAN_FAILED"
+      ],
+      "title": "ScanStatus",
+      "type": "string"
+    }
+  },
+  "description": "Result of the `scan_clamav` activity: the verdict and the signature set that gave it.",
+  "properties": {
+    "document_version_id": {
+      "format": "uuid",
+      "title": "Document Version Id",
+      "type": "string"
+    },
+    "verdict": {
+      "$ref": "#/$defs/ScanStatus"
+    },
+    "signature_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Signature Version"
+    }
+  },
+  "required": [
+    "document_version_id",
+    "verdict"
+  ],
+  "title": "ScanOutcome",
+  "type": "object"
+}

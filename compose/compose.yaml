@@ -21,7 +21,7 @@ x-worker: &worker
     TEMPORAL_NAMESPACE: sbam
     DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  depends_on:
+  depends_on: &worker-depends
     api-migrate: { condition: service_completed_successfully } # temporal_runs (run mirror)
     postgres: { condition: service_healthy }
     temporal: { condition: service_healthy }
@@ -223,7 +223,7 @@ services:
     restart: unless-stopped
 
   clamav:
-    # Real clamd + freshclam, not called yet (#62 wires scanning). Not published.
+    # Real clamd + freshclam; worker-ingest scans every upload through it (#62). Not published.
     image: clamav/clamav:1.5.4@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
     volumes: [clamav_db:/var/lib/clamav]
     networks: [sbam_edge, sbam_internal] # edge only for signature updates
@@ -331,7 +331,18 @@ services:
 
   worker-ingest:
     <<: *worker
-    environment: { <<: *worker-env, SBAM_QUEUES: sbam-ingest }
+    environment:
+      <<: *worker-env
+      SBAM_QUEUES: sbam-ingest
+      # Scan (#62): the stored upload is streamed to clamd, which is on the internal network only.
+      STORAGE_ROOT: /data/storage
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      CLAMAV_MAX_SIGNATURE_AGE_HOURS: ${CLAMAV_MAX_SIGNATURE_AGE_HOURS:-48}
+    volumes: [storage:/data/storage] # only this worker reads uploaded files
+    depends_on:
+      <<: *worker-depends
+      clamav: { condition: service_healthy }
   worker-knowledge:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-knowledge }

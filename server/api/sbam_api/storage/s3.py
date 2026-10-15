@@ -60,6 +60,13 @@ class S3Backend:
             raise StorageIntegrityError()
         return body
 
+    def delete(self, key: str) -> None:
+        parse_key(key)
+        try:
+            self.s3.delete_object(Bucket=self.bucket, Key=key)  # no error when the key is absent
+        except (BotoCoreError, ClientError):
+            raise StorageUnavailable() from None
+
     def exists(self, key: str) -> bool:
         parse_key(key)
         try:

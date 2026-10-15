@@ -161,7 +161,7 @@ def test_e4_2_t06_upload_resumes_after_a_dropped_connection(scope: Scope) -> Non
     assert offset == cut
     assert patch(location, offset, data[offset:]) == 204
     (version,) = scope.wait_for_versions(1)
-    assert version.state == "UPLOADED"
+    assert version.state in ("UPLOADED", "SCANNING", "PARSING")  # the scan may already have run
     assert version.sha256 == hashlib.sha256(data).hexdigest()  # single version, matching hash
     assert str(version.id) == location.rsplit("/", 1)[1]
 

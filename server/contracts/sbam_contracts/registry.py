@@ -10,7 +10,7 @@ from typing import Final
 from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
-from sbam_contracts.documents import UploadRequest, UploadToken
+from sbam_contracts.documents import ScanOutcome, UploadRequest, UploadToken
 from sbam_contracts.identity import (
     Me,
     Tenant,
@@ -78,4 +78,5 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("projects/project_members", ProjectMembers),
     ("documents/upload_request", UploadRequest),
     ("documents/upload_token", UploadToken),
+    ("documents/scan_outcome", ScanOutcome),
 )

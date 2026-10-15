@@ -46,6 +46,7 @@
         "PARSE_ERROR",
         "SCAN_UNAVAILABLE",
         "OCR_UNAVAILABLE",
+        "MALWARE",
         "KNOWLEDGE_BUILDING",
         "KNOWLEDGE_NOT_READY",
         "COGNEE_ACL_DISABLED",

@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
+from sbam_contracts.documents import ScanStatus
 from sbam_contracts.state_machines import MachineName
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
@@ -36,7 +37,10 @@ class DocumentVersion(Stateful, ProjectOwned, Base):
     """`state` changes only through the state-machine service."""
 
     __tablename__ = "document_versions"
-    __table_args__ = (state_check(MachineName.DOCUMENT_VERSION),)
+    __table_args__ = (
+        state_check(MachineName.DOCUMENT_VERSION),
+        status_check(ScanStatus, column="scan_status"),
+    )
     machine = MachineName.DOCUMENT_VERSION
 
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sbam.documents.id"), index=True)
@@ -46,6 +50,11 @@ class DocumentVersion(Stateful, ProjectOwned, Base):
     mime: Mapped[str] = mapped_column(String(255))
     # Set once the DocumentIngestion workflow is started; NULL = still to start (Temporal was down).
     ingestion_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The scan (E4.3): NULL until scanned. Nothing may read the file until it is CLEAN.
+    scan_status: Mapped[str | None] = mapped_column(String(20))
+    scan_signature_version: Mapped[str | None] = mapped_column(String(100))  # clamd VERSION
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reject_code: Mapped[str | None] = mapped_column(String(40))  # MALWARE when REJECTED by a scan
 
 
 class UploadReservation(ProjectOwned, Base):
