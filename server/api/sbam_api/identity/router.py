@@ -91,8 +91,21 @@ def tenant_user(row: User, response: Response | None = None) -> TenantUser:
 
 
 @router.get("/admin/users")
-def list_users(user: Admin, session: Db) -> Page[TenantUser]:
-    return Page[TenantUser](items=[tenant_user(u) for u in service.list_users(session, user)])
+def list_users(
+    user: Admin,
+    session: Db,
+    request: Request,
+    limit: str | None = None,
+    cursor: str | None = None,
+    role: str | None = None,
+    active: str | None = None,
+) -> Page[TenantUser]:
+    """`?limit=1..100 (25)&cursor=&role=sbam-admin|sbam-fde&active=true|false`."""
+    secret = request.app.state.settings.cursor_secret.get_secret_value().encode()
+    rows, next_cursor = service.list_users(
+        session, user, secret, limit=limit, cursor=cursor, role=role, active=active
+    )
+    return Page[TenantUser](items=[tenant_user(u) for u in rows], next_cursor=next_cursor)
 
 
 @router.post("/admin/users/invite", status_code=201)

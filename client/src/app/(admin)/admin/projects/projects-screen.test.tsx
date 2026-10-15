@@ -175,7 +175,7 @@ describe("Admin Projects screens (E3.9)", () => {
     const put = api.calls.find((c) => c.method === "PUT")!;
     expect(JSON.parse(String(put.init.body))).toEqual({ user_ids: ["u1"] });
     expect(api.calls.find((c) => c.path.startsWith("/admin/users"))!.path).toBe(
-      "/admin/users?role=sbam-fde&active=true",
+      "/admin/users?role=sbam-fde&active=true&limit=100",
     );
   });
 
