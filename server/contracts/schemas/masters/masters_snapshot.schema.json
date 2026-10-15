@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/masters_snapshot:0.1.0",
+  "$defs": {
+    "MasterType": {
+      "enum": [
+        "ORGANIZATION",
+        "RULES",
+        "AGENTS",
+        "SKILLS",
+        "TOOLING",
+        "FILETYPE"
+      ],
+      "title": "MasterType",
+      "type": "string"
+    },
+    "SnapshotEntry": {
+      "properties": {
+        "entry_id": {
+          "format": "uuid",
+          "title": "Entry Id",
+          "type": "string"
+        },
+        "master_type": {
+          "$ref": "#/$defs/MasterType"
+        },
+        "stable_id": {
+          "title": "Stable Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "entry_id",
+        "master_type",
+        "stable_id",
+        "version"
+      ],
+      "title": "SnapshotEntry",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "tenant_id": {
+      "format": "uuid",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/SnapshotEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "tenant_id",
+    "project_id",
+    "entries",
+    "sha256",
+    "created_at"
+  ],
+  "title": "MastersSnapshot",
+  "type": "object"
+}

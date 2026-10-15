@@ -12,6 +12,10 @@ Rules worth knowing
   * Status is a trailing `Status: <value>` fragment at the end of the Misc cell (MSC README). A
     fragment anywhere else is ordinary text. Missing means PROPOSED. Sample row #1 of each editable
     tab is ILLUSTRATIVE (O-24).
+  * Tooling (Manufacturing Masters v0.2, issue E3.2) is the 6th master. Its rows are labelled with
+    their stable id (`TOOL-MFG-01`) and it has its own Status column instead of a Misc fragment: a
+    Status that starts with a MasterStatus word sets it, anything else (e.g. "Category recorded;
+    configuration TBD") means PROPOSED.
   * Regenerate the committed JSON Schemas from `server/` with `python -m sbam_contracts.masters`.
 """
 
@@ -39,6 +43,7 @@ class MasterType(StrEnum):
     RULES = "RULES"
     AGENTS = "AGENTS"
     SKILLS = "SKILLS"
+    TOOLING = "TOOLING"  # Manufacturing Masters v0.2 (E3.2)
     FILETYPE = "FILETYPE"  # system-owned, read-only for Admin and FDE (O-23)
 
 
@@ -151,6 +156,28 @@ class SkillsPayload(_Master):
     rag_reference: RagReference | None = None
 
 
+class ToolingPayload(_Master):
+    """Tooling master: add-on tool categories and their bindings (Manufacturing Masters v0.2)."""
+
+    category: Text = ""
+    examples: Text = ""
+    links_path: Text = ""  # pointer only, never fetched
+    owner_access: Text = ""
+    # The workbook column "Status" (record and deployment status). Named record_status so the
+    # payload never carries SBAM's own `status` metadata; see `extract_tooling_status`.
+    record_status: Text = ""
+    source_version_checked_at: Text = ""
+    search_tag: Text = ""
+    tenant_account_scope: Text = ""
+    entity_node_type: Text = ""
+    security_access_level: Text = ""
+    refresh_frequency: Text = ""
+    parent_entity: Text = ""
+    source_evidence_ref: Text = ""
+    binding_review_state: Text = ""
+    search_aliases_category: Text = ""
+
+
 class FiletypePayload(_Master):
     """One of the 43 frozen filetypes. Changed only by super-admin through a new workbook (O-23)."""
 
@@ -165,7 +192,14 @@ class FiletypePayload(_Master):
     example: Text = Field(pattern=r"^https?://\S+$")
 
 
-MasterPayload = OrganizationPayload | RulesPayload | AgentsPayload | SkillsPayload | FiletypePayload
+MasterPayload = (
+    OrganizationPayload
+    | RulesPayload
+    | AgentsPayload
+    | SkillsPayload
+    | ToolingPayload
+    | FiletypePayload
+)
 
 
 class ReadmeTab(_Master):
@@ -180,13 +214,17 @@ class ReadmeTab(_Master):
 _RULE_ID = re.compile(r"^\s*(RULE-[A-Z0-9][A-Z0-9-]*)\s*:", re.IGNORECASE)
 _AGENT_ID = re.compile(r"^\s*(AG-[A-Z0-9][A-Z0-9-]*)(?![A-Z0-9-])", re.IGNORECASE)
 _SKILL_ID = re.compile(r"^\s*(SK-[A-Z0-9][A-Z0-9-]*)\s*:", re.IGNORECASE)
-_TEMPLATE_ID = re.compile(r"^(ORG|RULE|AG|SK)-")
+_TEMPLATE_ID = re.compile(r"^(ORG|RULE|AG|SK|TOOL)-")
+_TOOLING_STATUS = re.compile(r"^\s*([A-Za-z]+)\b")
 _STATUS_FRAGMENT_START = re.compile(r"(?:^|[;\n]|\.\s)\s*Status:", re.IGNORECASE)
 _STATUS_TRAILING = re.compile(r"(?:^|[\s;])Status:\s*(\S+?)\.?\s*$", re.IGNORECASE)
 _SAMPLE_ROW_NUMBER = 1
 _EDITABLE = frozenset(
     {MasterType.ORGANIZATION, MasterType.RULES, MasterType.AGENTS, MasterType.SKILLS}
 )
+# Admins create and version these in the portal; Filetype (and README) come only from the
+# super-admin workbook (O-23).
+ADMIN_EDITABLE: Final = _EDITABLE | {MasterType.TOOLING}
 
 
 class MasterIdentity(BaseModel):
@@ -218,6 +256,17 @@ def extract_status(misc: str) -> MasterStatus:
         raise ValueError(f"unknown status {value}") from None
 
 
+def extract_tooling_status(status: str) -> MasterStatus:
+    """Tooling's own Status column: a leading MasterStatus word, else PROPOSED. Never raises."""
+    match = _TOOLING_STATUS.match(status)
+    if match:
+        try:
+            return MasterStatus(match.group(1).upper())
+        except ValueError:
+            pass
+    return MasterStatus.PROPOSED
+
+
 def _row_number(row_label: str) -> int | None:
     match = re.search(r"#(\d+)\s*$", row_label)
     return int(match.group(1)) if match else None
@@ -228,7 +277,7 @@ def extract_stable_id(row_label: str, payload: MasterPayload) -> str:
 
     Matching ignores case and surrounding spaces, and the id is returned upper-cased
     (`rule-bom:` -> `RULE-BOM`). Rows without an id (the BAM 0.2 sample rows) fall back to their
-    trimmed row label, e.g. `Agent #1`. Filetype rows are identified by their label.
+    trimmed row label, e.g. `Agent #1`. Filetype and Tooling rows are identified by their label.
     """
     fallback = row_label.strip()
     if isinstance(payload, OrganizationPayload):
@@ -272,9 +321,24 @@ def identify(master_type: MasterType, row_label: str, payload: MasterPayload) ->
     kind = source_kind(master_type, row_label, stable_id)
     if kind == SourceKind.BAM_0_2_SAMPLE:
         status = MasterStatus.ILLUSTRATIVE
+    elif isinstance(payload, ToolingPayload):
+        status = extract_tooling_status(payload.record_status)
     else:
         status = extract_status(misc_text(payload))
     return MasterIdentity(stable_id=stable_id, status=status, source_kind=kind)
+
+
+def security_access_level(payload: MasterPayload) -> str:
+    """The Security / Access Level of an entry: Tooling's column or the RAG Reference key."""
+    if isinstance(payload, ToolingPayload):
+        return payload.security_access_level
+    rag = getattr(payload, "rag_reference", None)
+    return rag.security_access_level if isinstance(rag, RagReference) else ""
+
+
+def is_restricted(payload: MasterPayload) -> bool:
+    """Restricted entries never reach an authoritative snapshot (E3.2)."""
+    return "restricted" in security_access_level(payload).lower()
 
 
 # --- Cell text ------------------------------------------------------------------------------
@@ -312,6 +376,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "rules": contract_schema(RulesPayload, "masters/rules"),
         "agents": contract_schema(AgentsPayload, "masters/agents"),
         "skills": contract_schema(SkillsPayload, "masters/skills"),
+        "tooling": contract_schema(ToolingPayload, "masters/tooling"),
         "filetype": contract_schema(FiletypePayload, "masters/filetype"),
         "rag_reference": contract_schema(RagReference, "masters/rag_reference"),
     }

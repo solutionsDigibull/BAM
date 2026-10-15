@@ -30,6 +30,13 @@ from sbam_contracts.masters import (
     ReadmeTab,
     RulesPayload,
     SkillsPayload,
+    ToolingPayload,
+)
+from sbam_contracts.masters_api import (
+    MasterEntry,
+    MasterEntryCreate,
+    MastersSnapshot,
+    MasterVersionCreate,
 )
 from sbam_contracts.projects import (
     Project,
@@ -57,6 +64,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/rules", RulesPayload),
     ("masters/agents", AgentsPayload),
     ("masters/skills", SkillsPayload),
+    ("masters/tooling", ToolingPayload),
     ("masters/filetype", FiletypePayload),
     ("masters/rag_reference", RagReference),
     ("sow/sow_document", SowDocument),
@@ -79,4 +87,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/upload_request", UploadRequest),
     ("documents/upload_token", UploadToken),
     ("documents/scan_outcome", ScanOutcome),
+    ("masters/master_entry_create", MasterEntryCreate),
+    ("masters/master_version_create", MasterVersionCreate),
+    ("masters/master_entry", MasterEntry),
+    ("masters/masters_snapshot", MastersSnapshot),
 )

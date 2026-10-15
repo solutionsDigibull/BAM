@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:4860c644ff4ff980972ecb73f805ada44460f2adebcbf8709ae60625286b6b7d
+// source-sha256:191619139c504dbc9b2d19e9b249dc6b79b3160ddd689adbd6147df634d746b6
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -213,6 +213,21 @@ export type ProjectStatus = "ACTIVE" | "ARCHIVED";
  * via the `definition` "ScanStatus".
  */
 export type ScanStatus = "CLEAN" | "INFECTED" | "SCAN_FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterType".
+ */
+export type MasterType = "ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS" | "TOOLING" | "FILETYPE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterStatus".
+ */
+export type MasterStatus = "PROPOSED" | "ILLUSTRATIVE" | "APPROVED" | "RETIRED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SourceKind".
+ */
+export type SourceKind = "BAM_0_2_SAMPLE" | "TEMPLATE_ROW" | "ADMIN_ENTRY";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -231,6 +246,7 @@ export interface SbamContracts {
   RulesPayload?: RulesPayload;
   AgentsPayload?: AgentsPayload;
   SkillsPayload?: SkillsPayload;
+  ToolingPayload?: ToolingPayload;
   FiletypePayload?: FiletypePayload;
   RagReference?: RagReference;
   SowDocument?: SowDocument;
@@ -253,6 +269,10 @@ export interface SbamContracts {
   UploadRequest?: UploadRequest;
   UploadToken?: UploadToken;
   ScanOutcome?: ScanOutcome;
+  MasterEntryCreate?: MasterEntryCreate;
+  MasterVersionCreate?: MasterVersionCreate;
+  MasterEntry?: MasterEntry;
+  MastersSnapshot?: MastersSnapshot;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1112,6 +1132,29 @@ export interface SkillsPayload {
   rag_reference?: RagReference | null;
 }
 /**
+ * Tooling master: add-on tool categories and their bindings (Manufacturing Masters v0.2).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ToolingPayload".
+ */
+export interface ToolingPayload {
+  category?: string;
+  examples?: string;
+  links_path?: string;
+  owner_access?: string;
+  record_status?: string;
+  source_version_checked_at?: string;
+  search_tag?: string;
+  tenant_account_scope?: string;
+  entity_node_type?: string;
+  security_access_level?: string;
+  refresh_frequency?: string;
+  parent_entity?: string;
+  source_evidence_ref?: string;
+  binding_review_state?: string;
+  search_aliases_category?: string;
+}
+/**
  * One of the 43 frozen filetypes. Changed only by super-admin through a new workbook (O-23).
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -1854,4 +1897,71 @@ export interface ScanOutcome {
   document_version_id: string;
   verdict: ScanStatus;
   signature_version?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterEntryCreate".
+ */
+export interface MasterEntryCreate {
+  payload: {
+    [k: string]: unknown | undefined;
+  };
+  row_label?: string | null;
+  project_id?: string | null;
+}
+/**
+ * The full new payload. The entry's ETag goes in `If-Match`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterVersionCreate".
+ */
+export interface MasterVersionCreate {
+  payload: {
+    [k: string]: unknown | undefined;
+  };
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterEntry".
+ */
+export interface MasterEntry {
+  id: string;
+  tenant_id: string;
+  project_id: string | null;
+  master_type: MasterType;
+  stable_id: string;
+  row_label: string;
+  status: MasterStatus;
+  source_kind: SourceKind;
+  version: number;
+  payload: {
+    [k: string]: unknown | undefined;
+  };
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MastersSnapshot".
+ */
+export interface MastersSnapshot {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  entries: SnapshotEntry[];
+  /**
+   * Pattern: `^sha256:[0-9a-f]{64}$`
+   */
+  sha256: string;
+  created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SnapshotEntry".
+ */
+export interface SnapshotEntry {
+  entry_id: string;
+  master_type: MasterType;
+  stable_id: string;
+  version: number;
 }

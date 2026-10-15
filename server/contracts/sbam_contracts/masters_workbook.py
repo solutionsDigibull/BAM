@@ -25,6 +25,7 @@ from sbam_contracts.masters import (
     RagReference,
     RulesPayload,
     SkillsPayload,
+    ToolingPayload,
     cell_text,
     identify,
 )
@@ -37,11 +38,17 @@ NAME_HEADER_ROW: Final = 2
 TITLE_PREFIX: Final = "BuLLM - Admin Masters (BAM)"
 
 TAB_ORDER: Final = (README_TAB, "Organization", "Rules", "Agents", "Skills", "Filetype")
+# Manufacturing Masters v0.2 adds a Tooling tab between Skills and Filetype (E3.2). It is optional,
+# so a BAM 0.2 workbook without it stays valid.
+TOOLING_TAB: Final = "Tooling"
+TAB_ORDER_WITH_TOOLING: Final = (*TAB_ORDER[:5], TOOLING_TAB, *TAB_ORDER[5:])
+OPTIONAL_TABS: Final = frozenset({TOOLING_TAB})
 TABS: Final = {
     MasterType.ORGANIZATION: "Organization",
     MasterType.RULES: "Rules",
     MasterType.AGENTS: "Agents",
     MasterType.SKILLS: "Skills",
+    MasterType.TOOLING: TOOLING_TAB,
     MasterType.FILETYPE: "Filetype",
 }
 ROW_LABEL_PREFIX: Final = {
@@ -49,8 +56,11 @@ ROW_LABEL_PREFIX: Final = {
     MasterType.RULES: "Rule",
     MasterType.AGENTS: "Agent",
     MasterType.SKILLS: "Skill",
+    MasterType.TOOLING: "TOOL",
     MasterType.FILETYPE: "Filetype",
 }
+# Row labels are '<prefix> #n', except Tooling whose label is its stable id (TOOL-MFG-01).
+TOOLING_LABEL: Final = re.compile(r"TOOL-[A-Z0-9][A-Z0-9-]*\s*")
 # (column name in row 2, payload field). The order is the workbook order and is frozen.
 COLUMNS: Final[dict[MasterType, tuple[tuple[str, str], ...]]] = {
     MasterType.ORGANIZATION: (
@@ -108,6 +118,23 @@ COLUMNS: Final[dict[MasterType, tuple[tuple[str, str], ...]]] = {
         ("Misc", "misc"),
         ("RAG Reference", "rag_reference"),
     ),
+    MasterType.TOOLING: (
+        ("Category", "category"),
+        ("Examples", "examples"),
+        ("Links / Path", "links_path"),
+        ("Owner / access", "owner_access"),
+        ("Status", "record_status"),
+        ("Source version / checked_at", "source_version_checked_at"),
+        ("Search tag", "search_tag"),
+        ("Tenant / account scope", "tenant_account_scope"),
+        ("Entity / Node Type", "entity_node_type"),
+        ("Security / Access Level", "security_access_level"),
+        ("Refresh Frequency", "refresh_frequency"),
+        ("Parent Entity", "parent_entity"),
+        ("Source / evidence ref", "source_evidence_ref"),
+        ("Binding / review state", "binding_review_state"),
+        ("Search aliases / category", "search_aliases_category"),
+    ),
     MasterType.FILETYPE: (
         ("File Format", "file_format"),
         ("Tier", "tier"),
@@ -121,6 +148,7 @@ COLUMN_NUMBER_START: Final = {
     MasterType.RULES: 0,
     MasterType.AGENTS: 1,
     MasterType.SKILLS: 0,
+    MasterType.TOOLING: 1,
     MasterType.FILETYPE: 1,
 }
 PayloadModel = (
@@ -128,6 +156,7 @@ PayloadModel = (
     | type[RulesPayload]
     | type[AgentsPayload]
     | type[SkillsPayload]
+    | type[ToolingPayload]
     | type[FiletypePayload]
 )
 PAYLOAD_MODELS: Final[dict[MasterType, PayloadModel]] = {
@@ -135,6 +164,7 @@ PAYLOAD_MODELS: Final[dict[MasterType, PayloadModel]] = {
     MasterType.RULES: RulesPayload,
     MasterType.AGENTS: AgentsPayload,
     MasterType.SKILLS: SkillsPayload,
+    MasterType.TOOLING: ToolingPayload,
     MasterType.FILETYPE: FiletypePayload,
 }
 
@@ -244,7 +274,7 @@ def validate_readme(grid: Grid) -> list[FieldError]:
 
 def validate_structure(sheets: Mapping[str, Grid]) -> list[FieldError]:
     """The frozen structure: tabs, column names and order, Filetype labels. Never auto-maps."""
-    if tuple(sheets) != TAB_ORDER:
+    if tuple(sheets) not in (TAB_ORDER, TAB_ORDER_WITH_TOOLING):
         missing = [t for t in TAB_ORDER if t not in sheets]
         extra = [t for t in sheets if t not in TAB_ORDER]
         detail = (
@@ -254,7 +284,8 @@ def validate_structure(sheets: Mapping[str, Grid]) -> list[FieldError]:
         return [FieldError(path="workbook!tabs", message=message)]
     errors: list[FieldError] = []
     for master_type, tab in TABS.items():
-        errors += _validate_headers(master_type, sheets[tab])
+        if tab in sheets:
+            errors += _validate_headers(master_type, sheets[tab])
     errors += _validate_filetype_labels(sheets["Filetype"])
     errors += validate_readme(sheets[README_TAB])
     return errors
@@ -326,7 +357,11 @@ def _parse_row(
     if not label.strip():
         return None, [FieldError(path=label_path, message="row label is missing")]
     prefix = ROW_LABEL_PREFIX[master_type]
-    if not re.fullmatch(rf"{prefix} #\d+\s*", label):
+    if master_type == MasterType.TOOLING:
+        if not TOOLING_LABEL.fullmatch(label):
+            message = "row label must be a Tooling id like 'TOOL-MFG-01'"
+            return None, [FieldError(path=label_path, message=message)]
+    elif not re.fullmatch(rf"{prefix} #\d+\s*", label):
         message = f"row label must look like '{prefix} #n'"
         return None, [FieldError(path=label_path, message=message)]
     if not any(texts):
@@ -361,13 +396,15 @@ def _parse_row(
 
 
 def parse_workbook(sheets: Mapping[str, Grid]) -> WorkbookReport:
-    """Validate the structure, then each data row of the five masters. Stops on structure errors."""
+    """Validate the structure, then each data row of the masters. Stops on structure errors."""
     structure = validate_structure(sheets)
     if structure:
         return WorkbookReport(code=ErrorCode.STRUCTURE_MISMATCH, errors=structure)
     rows: list[MasterRow] = []
     errors: list[FieldError] = []
     for master_type, tab in TABS.items():
+        if tab not in sheets:
+            continue  # an optional tab (Tooling) that this workbook doesn't have
         seen: set[str] = set()
         grid = sheets[tab]
         for sheet_row in range(HEADER_ROWS + 1, len(grid) + 1):
