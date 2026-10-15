@@ -1,7 +1,7 @@
 """runtime registry: allowed flag per package
 
-Revision ID: 0009_registry_allowed
-Revises: 0008_rbac
+Revision ID: 0010_registry_allowed
+Revises: 0009_document_scan
 Create Date: 2026-10-15
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0009_registry_allowed"
-down_revision: str | Sequence[str] | None = "0008_rbac"
+revision: str = "0010_registry_allowed"
+down_revision: str | Sequence[str] | None = "0009_document_scan"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
