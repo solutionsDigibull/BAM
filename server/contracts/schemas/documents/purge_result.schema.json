@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/purge_result:0.1.0",
+  "description": "What one `PurgeDeleted` run did. `failed` documents are retried by the next run.",
+  "properties": {
+    "purged": {
+      "default": 0,
+      "title": "Purged",
+      "type": "integer"
+    },
+    "skipped": {
+      "default": 0,
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "failed": {
+      "default": 0,
+      "title": "Failed",
+      "type": "integer"
+    }
+  },
+  "title": "PurgeResult",
+  "type": "object"
+}

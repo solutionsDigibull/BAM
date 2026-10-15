@@ -63,6 +63,7 @@ Every 4xx/5xx response is a [`ProblemDetail`](../server/contracts/schemas/proble
 | **404** | Missing **or** another tenant's resource **or** a project you aren't assigned to | `NOT_FOUND` |
 | 409 | State conflict (already running, not approved, …) | `PIPELINE_RUNNING`, `SOW_NOT_APPROVED`, … |
 | 412 | `If-Match` doesn't match the current ETag | `PRECONDITION_FAILED` |
+| 410 | Permanently removed: a purged document cannot be restored | `GONE` |
 | 413 / 415 | File too large / unsupported type | `FILE_TOO_LARGE`, `UNSUPPORTED_TYPE` |
 | 422 | Body fails validation; Idempotency-Key reused with a different body | `VALIDATION_ERROR`, `IDEMPOTENCY_KEY_REUSED`, … |
 | **423** | The resource is frozen or approved, even with a correct `If-Match` | `RESOURCE_LOCKED`, `WORKFLOW_FROZEN`, `SOW_LOCKED` |

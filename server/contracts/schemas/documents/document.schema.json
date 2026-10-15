@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/document:0.1.0",
+  "$defs": {
+    "DocumentVersionState": {
+      "enum": [
+        "UPLOADED",
+        "SCANNING",
+        "REJECTED",
+        "SCAN_FAILED",
+        "PARSING",
+        "PARSED",
+        "PARSE_FAILED",
+        "DELETED",
+        "PURGED"
+      ],
+      "title": "DocumentVersionState",
+      "type": "string"
+    }
+  },
+  "description": "A document with the state of its stored file (`GET`, `POST .../restore`).",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "#/$defs/DocumentVersionState"
+    },
+    "size": {
+      "title": "Size",
+      "type": "integer"
+    },
+    "mime": {
+      "title": "Mime",
+      "type": "string"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "deleted_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deleted At"
+    },
+    "deleted_by": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deleted By"
+    },
+    "purge_after": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Purge After"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "state",
+    "size",
+    "mime",
+    "sha256",
+    "created_at"
+  ],
+  "title": "DocumentOut",
+  "type": "object"
+}

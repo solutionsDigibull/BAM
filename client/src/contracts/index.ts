@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:743883715a77563a092d0fbde933b779f06853714e477e1b465eb777f2da9338
+// source-sha256:03b663b4ffcaae76b45c8e883e71246da4eb24358027d045fb89b6acdeb4803f
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -28,6 +28,7 @@ export type ErrorCode =
   | "VERSION_CONFLICT"
   | "INVALID_TRANSITION"
   | "READ_ONLY"
+  | "GONE"
   | "TENANT_MISMATCH"
   | "TENANT_SUSPENDED"
   | "IDP_UNAVAILABLE"
@@ -280,6 +281,10 @@ export interface SbamContracts {
   MasterVersionCreate?: MasterVersionCreate;
   MasterEntry?: MasterEntry;
   MastersSnapshot?: MastersSnapshot;
+  DocumentOut?: DocumentOut;
+  PurgeTarget?: PurgeTarget;
+  PurgeRequest?: PurgeRequest;
+  PurgeResult?: PurgeResult;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -2016,4 +2021,54 @@ export interface SnapshotEntry {
   master_type: MasterType;
   stable_id: string;
   version: number;
+}
+/**
+ * A document with the state of its stored file (`GET`, `POST .../restore`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DocumentOut".
+ */
+export interface DocumentOut {
+  id: string;
+  title: string;
+  state: DocumentVersionState;
+  size: number;
+  mime: string;
+  sha256: string;
+  created_at: string;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  purge_after?: string | null;
+}
+/**
+ * One deleted document that is due for purging (IDs only, like every workflow input).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PurgeTarget".
+ */
+export interface PurgeTarget {
+  tenant_id: string;
+  project_id: string;
+  document_id: string;
+}
+/**
+ * Input of the per-document purge activity; `as_of` is the workflow clock (workflow.now()).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PurgeRequest".
+ */
+export interface PurgeRequest {
+  target: PurgeTarget;
+  as_of: string;
+}
+/**
+ * What one `PurgeDeleted` run did. `failed` documents are retried by the next run.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PurgeResult".
+ */
+export interface PurgeResult {
+  purged?: number;
+  skipped?: number;
+  failed?: number;
 }

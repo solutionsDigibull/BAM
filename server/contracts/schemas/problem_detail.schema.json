@@ -24,6 +24,7 @@
         "VERSION_CONFLICT",
         "INVALID_TRANSITION",
         "READ_ONLY",
+        "GONE",
         "TENANT_MISMATCH",
         "TENANT_SUSPENDED",
         "IDP_UNAVAILABLE",

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/purge_request:0.1.0",
+  "$defs": {
+    "PurgeTarget": {
+      "description": "One deleted document that is due for purging (IDs only, like every workflow input).",
+      "properties": {
+        "tenant_id": {
+          "format": "uuid",
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "project_id": {
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "document_id": {
+          "format": "uuid",
+          "title": "Document Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "project_id",
+        "document_id"
+      ],
+      "title": "PurgeTarget",
+      "type": "object"
+    }
+  },
+  "description": "Input of the per-document purge activity; `as_of` is the workflow clock (workflow.now()).",
+  "properties": {
+    "target": {
+      "$ref": "#/$defs/PurgeTarget"
+    },
+    "as_of": {
+      "format": "date-time",
+      "title": "As Of",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "as_of"
+  ],
+  "title": "PurgeRequest",
+  "type": "object"
+}

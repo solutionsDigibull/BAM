@@ -30,6 +30,9 @@ class Document(ProjectOwned, Base):
     __tablename__ = "documents"
 
     title: Mapped[str] = mapped_column(String(255))  # the uploaded file's name
+    # Soft delete (E4.9): `deleted_at` + `deleted_by` say when and by whom, `purge_after` is
+    # deleted_at + 90 days, when the daily PurgeDeleted job removes the stored bytes.
+    deleted_by: Mapped[str | None] = mapped_column(String(255))
     purge_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -71,6 +74,7 @@ class UploadReservation(ProjectOwned, Base):
     document_version_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)  # FINISHED / DUPLICATE
 
 
+Index("ix_documents_purge_after", Document.purge_after)
 Index("ix_document_versions_project_sha256", DocumentVersion.project_id, DocumentVersion.sha256)
 Index(
     "ix_upload_reservations_project_status", UploadReservation.project_id, UploadReservation.status
