@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:86825c219149285389002142e91415c2eaaae4ba9b4e5ceecb99d420d8d2c877
+// source-sha256:17ced3cb4ce25f87347d5cec9a628f5b1f568e6728f1cf8a3d729c113850e4cf
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -301,6 +301,7 @@ export interface SbamContracts {
   PurgeRequest?: PurgeRequest;
   PurgeResult?: PurgeResult;
   Notification?: Notification;
+  AuditEntry?: AuditEntry;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1576,9 +1577,6 @@ export interface UserProfile {
  * via the `definition` "UserInvite".
  */
 export interface UserInvite {
-  /**
-   * Pattern: `^[^@\s]+@[^@\s]+\.[^@\s]+$`
-   */
   email: string;
   roles: ("sbam-admin" | "sbam-fde")[];
 }
@@ -2102,4 +2100,23 @@ export interface Notification {
   link: string | null;
   created_at: string;
   read_at: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AuditEntry".
+ */
+export interface AuditEntry {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  actor_id: string;
+  before: {
+    [k: string]: unknown | undefined;
+  } | null;
+  after: {
+    [k: string]: unknown | undefined;
+  } | null;
+  correlation_id: string;
+  created_at: string;
 }

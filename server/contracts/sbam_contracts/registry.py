@@ -10,6 +10,7 @@ from typing import Final
 from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
+from sbam_contracts.audit import AuditEntry
 from sbam_contracts.documents import (
     DocumentOut,
     PurgeRequest,
@@ -109,4 +110,5 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/purge_request", PurgeRequest),
     ("documents/purge_result", PurgeResult),
     ("notifications/notification", Notification),
+    ("audit/audit_entry", AuditEntry),
 )

@@ -19,7 +19,16 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator, model_validator
+from email_validator import EmailNotValidError, validate_email
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from sbam_contracts._jsonschema import contract_schema
 
@@ -34,12 +43,22 @@ TenantName = Annotated[
 AssignableRole = Literal["sbam-admin", "sbam-fde"]
 ASSIGNABLE_ROLES: frozenset[str] = frozenset({"sbam-admin", "sbam-fde"})
 
-# ponytail: a plain shape check, not full RFC 5322; Keycloak and the invite email do the rest.
+
+def _email(value: str) -> str:
+    """RFC 5322 address syntax via `email-validator` (E2.8), without a DNS lookup. Quoted local
+    parts are refused; `.test` / `.example` are allowed for dev and test tenants. Lowercased."""
+    value = value.strip()
+    try:
+        address = validate_email(value, check_deliverability=False, test_environment=True)
+    except EmailNotValidError as exc:
+        raise ValueError(str(exc)) from None
+    if len(address.local_part) > 64:  # RFC 5321; email-validator only caps the whole address
+        raise ValueError("The part before the @-sign is too long (64 characters at most).")
+    return address.normalized.lower()
+
+
 Email = Annotated[
-    str,
-    StringConstraints(
-        strip_whitespace=True, to_lower=True, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-    ),
+    str, Field(max_length=254, json_schema_extra={"format": "email"}), AfterValidator(_email)
 ]
 
 
