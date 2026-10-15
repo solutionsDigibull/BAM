@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
 from sbam_contracts.documents import (
+    CleanupResult,
     DocumentOut,
     PurgeRequest,
     PurgeResult,
@@ -109,6 +110,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/purge_target", PurgeTarget),
     ("documents/purge_request", PurgeRequest),
     ("documents/purge_result", PurgeResult),
+    ("documents/cleanup_result", CleanupResult),
     ("notifications/notification", Notification),
     ("audit/audit_entry", AuditEntry),
 )

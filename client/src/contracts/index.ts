@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:17ced3cb4ce25f87347d5cec9a628f5b1f568e6728f1cf8a3d729c113850e4cf
+// source-sha256:d3a4df7f59fd244b63e0edebec11103cafc65ea48a9bfdfd7616e565d57c16ca
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -300,6 +300,7 @@ export interface SbamContracts {
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
   PurgeResult?: PurgeResult;
+  CleanupResult?: CleanupResult;
   Notification?: Notification;
   AuditEntry?: AuditEntry;
 }
@@ -2084,6 +2085,18 @@ export interface PurgeRequest {
 export interface PurgeResult {
   purged?: number;
   skipped?: number;
+  failed?: number;
+}
+/**
+ * What one `CleanupAbandonedUploads` run did (E4.12). `failed` files are retried next run.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CleanupResult".
+ */
+export interface CleanupResult {
+  files_removed?: number;
+  rows_deleted?: number;
+  orphans?: number;
   failed?: number;
 }
 /**

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/cleanup_result:0.1.0",
+  "description": "What one `CleanupAbandonedUploads` run did (E4.12). `failed` files are retried next run.",
+  "properties": {
+    "files_removed": {
+      "default": 0,
+      "title": "Files Removed",
+      "type": "integer"
+    },
+    "rows_deleted": {
+      "default": 0,
+      "title": "Rows Deleted",
+      "type": "integer"
+    },
+    "orphans": {
+      "default": 0,
+      "title": "Orphans",
+      "type": "integer"
+    },
+    "failed": {
+      "default": 0,
+      "title": "Failed",
+      "type": "integer"
+    }
+  },
+  "title": "CleanupResult",
+  "type": "object"
+}

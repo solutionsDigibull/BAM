@@ -35,8 +35,14 @@ ALLOWED_EXTENSIONS: Final = frozenset(
     }
 )
 
+STAGING: Final = "uploads"  # tusd's -upload-dir under STORAGE_ROOT (compose/compose.yaml)
+
 # A started upload keeps its slot this long, so a large file can resume after its token expired.
 UPLOAD_HOLD: Final = timedelta(hours=24)
+# An abandoned upload's row is kept this long after its hold ended, then deleted (E4.12).
+ABANDONED_ROW_RETENTION: Final = timedelta(days=7)
+# A staged file this much older than its hold, with no reservation, is reported as an orphan.
+ORPHAN_GRACE: Final = timedelta(days=1)
 
 
 def extension(name: str) -> str:

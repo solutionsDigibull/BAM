@@ -34,6 +34,9 @@ PURGE_RETENTION_DAYS: Final = 90  # a deleted document is restorable for this lo
 PURGE_DELETED: Final = "PurgeDeleted"  # workflow type of the daily purge (E4.9)
 PURGE_SCHEDULE_ID: Final = "purge-deleted"  # Temporal Schedule id (and the workflow id prefix)
 PURGE_CRON: Final = "0 2 * * *"  # 02:00 UTC every day
+CLEANUP_UPLOADS: Final = "CleanupAbandonedUploads"  # workflow type of the daily clean-up (E4.12)
+CLEANUP_SCHEDULE_ID: Final = "cleanup-abandoned-uploads"  # Temporal Schedule id
+CLEANUP_HOUR_UTC: Final = 3  # 03:00 UTC every day, an hour after the purge
 
 _NO_SEPARATORS_OR_CONTROL = r"^[^/\\\x00-\x1f\x7f-\x9f]+$"
 
@@ -143,6 +146,15 @@ class PurgeResult(BaseModel):
     failed: int = 0
 
 
+class CleanupResult(BaseModel):
+    """What one `CleanupAbandonedUploads` run did (E4.12). `failed` files are retried next run."""
+
+    files_removed: int = 0  # staged tusd files (and their .info) of uploads that never finished
+    rows_deleted: int = 0  # abandoned upload reservations past their retention
+    orphans: int = 0  # staged files no reservation owns: reported, never deleted
+    failed: int = 0  # files that could not be removed
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/documents/`."""
     models: dict[str, type[BaseModel]] = {
@@ -153,5 +165,6 @@ def schemas() -> dict[str, dict[str, Any]]:
         "purge_target": PurgeTarget,
         "purge_request": PurgeRequest,
         "purge_result": PurgeResult,
+        "cleanup_result": CleanupResult,
     }
     return {stem: contract_schema(model, f"documents/{stem}") for stem, model in models.items()}

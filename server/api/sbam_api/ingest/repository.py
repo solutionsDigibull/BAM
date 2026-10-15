@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from sbam_contracts.state_machines import DocumentVersionState as S
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from sbam_api.db.repository import TenantScopedRepository
@@ -161,3 +161,53 @@ def due_for_purge(
         .limit(limit)
     )
     return list(session.scalars(query))
+
+
+def abandoned_reservations(
+    session: Session,
+    *,
+    ended_by: datetime,
+    ended_after: datetime | None = None,
+    after: uuid.UUID | None = None,
+    newest_first: bool = False,
+    limit: int,
+) -> list[UploadReservation]:
+    """System job only (the CleanupAbandonedUploads schedule): reservations of every tenant that
+    never finished (`RESERVED` or `CREATED`) and whose hold ended at or before `ended_by` (and,
+    when given, after `ended_after`). By id from `after` on, oldest first or newest first. Never
+    reachable from a request."""
+    query = select(UploadReservation).where(
+        UploadReservation.status.in_((ReservationStatus.RESERVED, ReservationStatus.CREATED)),
+        UploadReservation.expires_at <= ended_by,
+    )
+    if ended_after is not None:
+        query = query.where(UploadReservation.expires_at > ended_after)
+    if after is not None:
+        query = query.where(
+            UploadReservation.id < after if newest_first else UploadReservation.id > after
+        )
+    order = UploadReservation.id.desc() if newest_first else UploadReservation.id
+    return list(session.scalars(query.order_by(order).limit(limit)))
+
+
+def known_reservation_ids(session: Session, ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+    """System job only: which of these ids are the id of an upload reservation (any tenant, any
+    status). Used to tell a staged file that belongs to someone from an orphan."""
+    if not ids:
+        return set()
+    return set(session.scalars(select(UploadReservation.id).where(UploadReservation.id.in_(ids))))
+
+
+def delete_reservations(session: Session, ids: Sequence[uuid.UUID]) -> int:
+    """System job only: delete abandoned reservations (never finished ones) by id; returns how
+    many went. The status filter is repeated here so a mistake in the caller cannot delete the row
+    that links a finished upload to its version."""
+    if not ids:
+        return 0
+    result = session.execute(
+        delete(UploadReservation).where(
+            UploadReservation.id.in_(ids),
+            UploadReservation.status.in_((ReservationStatus.RESERVED, ReservationStatus.CREATED)),
+        )
+    )
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]
