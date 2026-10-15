@@ -25,6 +25,25 @@ class DocumentVersionRepository(StatefulRepository):
         query = self._scoped().where(DocumentVersion.state.not_in(_INACTIVE))
         return self.session.scalar(select(func.count()).select_from(query.subquery())) or 0
 
+    def active_ids(self) -> list[uuid.UUID]:
+        """Ids of the versions that count towards the 20-file limit, oldest first (E4.1 start)."""
+        query = self._scoped().where(DocumentVersion.state.not_in(_INACTIVE))
+        return list(
+            self.session.scalars(
+                query.with_only_columns(DocumentVersion.id).order_by(DocumentVersion.id)
+            )
+        )
+
+    def count_by_state(self) -> dict[str, int]:
+        """Version count per state, deleted and purged excluded (E4.1 dashboard)."""
+        query = (
+            self._scoped()
+            .where(DocumentVersion.state.not_in((S.DELETED.value, S.PURGED.value)))
+            .with_only_columns(DocumentVersion.state, func.count())
+            .group_by(DocumentVersion.state)
+        )
+        return {state: n for state, n in self.session.execute(query)}
+
     def by_sha256(self, sha256: str) -> DocumentVersion | None:
         query = self._scoped().where(
             DocumentVersion.sha256 == sha256, DocumentVersion.state.not_in(_INACTIVE)

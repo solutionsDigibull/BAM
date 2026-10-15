@@ -1,23 +1,32 @@
-"""Pipeline endpoints (TD §8): POST P/pipeline/start (E10.1, minimal).
+"""Project workspace pipeline endpoints (TD §8.4, E4.1; start from E10.1):
 
-202 `{"run": Run}`; 409 PIPELINE_RUNNING when this project's pipeline is running; 503 when Temporal
-is down; 404 for a project the FDE isn't assigned to (#48). #69 extends this same route with the
-project-ACTIVE / pipeline_state / NO_DOCUMENTS checks once the projects table exists (#54).
+* `POST P/pipeline/start`: 202 `{"run": Run}`. 404 unassigned or other tenant; 409 PROJECT_ARCHIVED,
+  PIPELINE_RUNNING, NO_DOCUMENTS or INVALID_TRANSITION; 503 TEMPORAL_UNAVAILABLE (state unchanged).
+  The documents come from the database, not the request. A repeated `Idempotency-Key` (<= 128
+  characters) answers the same run.
+* `GET P/pipeline`: the dashboard's state, step timeline and document counts.
+* `GET P/workflows`: read-only. There is no route to create a Workflow: SBAM creates it when a SOW
+  is approved (#91), so a POST answers 405.
 """
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Request
-from sbam_contracts.pipeline import PipelineInput, PipelineStartRequest
+from fastapi import APIRouter, Depends, Header, Request
+from sbam_contracts.api import Page
+from sbam_contracts.projects import PipelineTimeline, WorkflowSummary
 from sbam_contracts.runs import RunAccepted
+from sbam_contracts.state_machines import ProjectPipelineState
 from sqlalchemy.orm import Session, sessionmaker
 
+from sbam_api.audit.repository import entity_history
 from sbam_api.core.auth import CurrentUser, fde, project_access
-from sbam_api.core.ids import uuid7
-from sbam_api.core.logging import correlation_id_var
+from sbam_api.core.conventions import not_found
 from sbam_api.core.settings import Settings
-from sbam_api.pipeline.service import start_pipeline
+from sbam_api.ingest.repository import DocumentVersionRepository
+from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY, start_project_pipeline
+from sbam_api.pipeline.timeline import build_counts, build_steps
+from sbam_api.projects.repository import ProjectRepository
 from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["pipeline"])
@@ -25,6 +34,7 @@ router = APIRouter(tags=["pipeline"])
 Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
+IdempotencyKey = Annotated[str | None, Header(min_length=1, max_length=MAX_IDEMPOTENCY_KEY)]
 
 
 @router.post("/projects/{project_id}/pipeline/start", status_code=202, response_model=RunAccepted)
@@ -33,20 +43,37 @@ async def start(
     request: Request,
     user: User,
     sessions: Sessions,
-    body: Annotated[PipelineStartRequest | None, Body()] = None,
+    idempotency_key: IdempotencyKey = None,
 ) -> RunAccepted:
     settings: Settings = request.app.state.settings
-    client = await temporal_client(request)
-    pipeline_input = PipelineInput(
-        tenant_id=user.context(project_id).tenant_id,
-        project_id=project_id,
-        run_id=uuid7(),
-        correlation_id=correlation_id_var.get() or str(uuid7()),
-        actor_id=str(user.user_id),
-        document_version_ids=body.document_version_ids if body else [],
-        search_attributes=settings.temporal_search_attributes,
-    )
-    run = await start_pipeline(
-        client, sessions, pipeline_input, with_search_attributes=settings.temporal_search_attributes
+    run = await start_project_pipeline(
+        sessions,
+        lambda: temporal_client(request),
+        user,
+        project_id,
+        idempotency_key=idempotency_key,
+        with_search_attributes=settings.temporal_search_attributes,
     )
     return RunAccepted(run=run)
+
+
+@router.get("/projects/{project_id}/pipeline")
+def pipeline(project_id: Project, user: User, sessions: Sessions) -> PipelineTimeline:
+    ctx = user.context(project_id)
+    with sessions() as session:
+        project = ProjectRepository(session, ctx).get(project_id)
+        if project is None:
+            raise not_found()
+        state = ProjectPipelineState(project.state)
+        history = entity_history(session, ctx.tenant_id, "project_pipeline", str(project_id))
+        counts = DocumentVersionRepository(session, ctx).count_by_state()
+    return PipelineTimeline(
+        state=state, steps=build_steps(state, history), counts=build_counts(counts)
+    )
+
+
+@router.get("/projects/{project_id}/workflows")
+def workflows(project_id: Project) -> Page[WorkflowSummary]:
+    # TODO(#91): list the project's Workflow rows once the table exists. None can exist before a
+    # SOW is approved, so an empty page is the truthful answer until then.
+    return Page[WorkflowSummary](items=[])

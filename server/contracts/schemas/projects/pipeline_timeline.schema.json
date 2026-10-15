@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:projects/pipeline_timeline:0.1.0",
+  "$defs": {
+    "PipelineCounts": {
+      "properties": {
+        "uploaded": {
+          "minimum": 0,
+          "title": "Uploaded",
+          "type": "integer"
+        },
+        "parsed": {
+          "minimum": 0,
+          "title": "Parsed",
+          "type": "integer"
+        },
+        "rejected": {
+          "minimum": 0,
+          "title": "Rejected",
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "title": "Failed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "uploaded",
+        "parsed",
+        "rejected",
+        "failed"
+      ],
+      "title": "PipelineCounts",
+      "type": "object"
+    },
+    "PipelineStep": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/ProjectPipelineState"
+        },
+        "status": {
+          "$ref": "#/$defs/PipelineStepStatus"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Started At"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ended At"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "started_at",
+        "ended_at"
+      ],
+      "title": "PipelineStep",
+      "type": "object"
+    },
+    "PipelineStepStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "done",
+        "failed",
+        "cancelled"
+      ],
+      "title": "PipelineStepStatus",
+      "type": "string"
+    },
+    "ProjectPipelineState": {
+      "enum": [
+        "IDLE",
+        "INGESTING",
+        "KNOWLEDGE_BUILDING",
+        "SOW_GENERATING",
+        "SOW_REVIEW",
+        "SOW_APPROVED",
+        "WORKFLOW_CREATED",
+        "INGESTION_FAILED",
+        "KNOWLEDGE_FAILED",
+        "SOW_GENERATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "ProjectPipelineState",
+      "type": "string"
+    }
+  },
+  "description": "`GET /projects/{id}/pipeline`: the dashboard's pipeline panel.",
+  "properties": {
+    "state": {
+      "$ref": "#/$defs/ProjectPipelineState"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/PipelineStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "counts": {
+      "$ref": "#/$defs/PipelineCounts"
+    }
+  },
+  "required": [
+    "state",
+    "steps",
+    "counts"
+  ],
+  "title": "PipelineTimeline",
+  "type": "object"
+}

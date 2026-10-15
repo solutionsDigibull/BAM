@@ -39,11 +39,13 @@ from sbam_contracts.masters_api import (
     MasterVersionCreate,
 )
 from sbam_contracts.projects import (
+    PipelineTimeline,
     Project,
     ProjectCreate,
     ProjectMembers,
     ProjectMembersPut,
     ProjectPatch,
+    WorkflowSummary,
 )
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
@@ -84,6 +86,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("projects/project_patch", ProjectPatch),
     ("projects/project_members_put", ProjectMembersPut),
     ("projects/project_members", ProjectMembers),
+    ("projects/pipeline_timeline", PipelineTimeline),
+    ("projects/workflow_summary", WorkflowSummary),
     ("documents/upload_request", UploadRequest),
     ("documents/upload_token", UploadToken),
     ("documents/scan_outcome", ScanOutcome),

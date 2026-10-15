@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:projects/workflow_summary:0.1.0",
+  "$defs": {
+    "WorkflowState": {
+      "enum": [
+        "CREATED",
+        "ISATVON_EXTRACTING",
+        "ISATVON_REVIEW",
+        "BUILDING",
+        "CERTIFYING",
+        "CERTIFIED",
+        "FROZEN",
+        "EXTRACTION_FAILED",
+        "NEEDS_FDE_REVIEW",
+        "WORKFLOW_VALIDATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "WorkflowState",
+      "type": "string"
+    }
+  },
+  "description": "One Workflow SBAM created for an approved SOW version (read-only).",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "sow_version_id": {
+      "format": "uuid",
+      "title": "Sow Version Id",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    },
+    "state": {
+      "$ref": "#/$defs/WorkflowState"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "sow_version_id",
+    "version",
+    "state",
+    "created_at"
+  ],
+  "title": "WorkflowSummary",
+  "type": "object"
+}
