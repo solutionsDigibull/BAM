@@ -187,6 +187,52 @@ routes:
       json: {user_ids: ["@user_fde_a_unassigned"]}
     expect: *tenant_admin_a_resource
 
+  # ---- admin masters engine (E3.2) ----------------------------------------------------------
+  # Tenant-scoped like the projects: each admin works in their own tenant, another tenant's entry
+  # or snapshot is a 404, the tenant-less super-admin has no tenant to administer (404).
+  list_entries_api_v1_admin_masters__master_type__get:
+    request:
+      method: GET
+      path: /api/v1/admin/masters/{master_type}
+      params: {master_type: RULES}
+    expect: *tenant_admin_list
+
+  create_entry_api_v1_admin_masters__master_type__post:
+    request:
+      method: POST
+      path: /api/v1/admin/masters/{master_type}
+      params: {master_type: RULES}
+      json: {payload: {domain_rule: "RULE-OFFER: applies to offers. Policy: approved FX only"}}
+    expect:
+      <<: *tenant_admin_list
+      admin_a: "201"
+      admin_b: "201"
+
+  get_entry_api_v1_admin_masters__master_type___entry_id__get:
+    request:
+      method: GET
+      path: /api/v1/admin/masters/{master_type}/{entry_id}
+      params: {master_type: RULES, entry_id: "@master_a"}
+    expect: *tenant_admin_a_resource
+
+  create_version_api_v1_admin_masters__master_type___entry_id__versions_post:
+    request:
+      method: POST
+      path: /api/v1/admin/masters/{master_type}/{entry_id}/versions
+      params: {master_type: RULES, entry_id: "@master_a"}
+      headers: {if-match: "@etag_master_a"}
+      json: {payload: {domain_rule: "RULE-BOM: applies to BOM. Policy: v2", misc: "Status: Proposed"}}
+    expect:
+      <<: *tenant_admin_a_resource
+      admin_a: "201"
+
+  get_snapshot_api_v1_admin_masters_snapshots__snapshot_id__get:
+    request:
+      method: GET
+      path: /api/v1/admin/masters/snapshots/{snapshot_id}
+      params: {snapshot_id: "@snapshot_a"}
+    expect: *tenant_admin_a_resource
+
   # ---- runtime registry -------------------------------------------------------------------
   admin_registry_api_v1_admin_registry_get:
     request: {method: GET, path: /api/v1/admin/registry}
