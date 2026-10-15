@@ -1,0 +1,303 @@
+[
+  {
+    "file_format": ".cpp",
+    "tier": 1,
+    "purpose": "Expose native application, embedded and manufacturing-software logic and dependencies that plain text chunking would miss.",
+    "rag_ingestion": "Prebundle a C/C++ parser such as tree-sitter/Clang tooling: extract namespaces, classes, functions, includes, symbols and call/include relationships; convert to structured metadata before Cognee graph ingestion and OKF provenance mapping.",
+    "example": "https://github.com/tree-sitter/tree-sitter-cpp/blob/master/examples/parser.cc"
+  },
+  {
+    "file_format": ".eml",
+    "tier": 1,
+    "purpose": "Turn operational email into searchable decisions, approvals, requests, handoffs and actor relationships while preserving message-level provenance.",
+    "rag_ingestion": "Cognee supports .eml through its document loader. Extract message headers, participants, timestamps, subject, body and attachments; model sender/recipient/thread relationships before graph ingestion. Map original message/resource and extracted claims into OKF sources for provenance.",
+    "example": "https://raw.githubusercontent.com/python/cpython/main/Lib/test/test_email/data/msg_01.txt"
+  },
+  {
+    "file_format": ".go",
+    "tier": 1,
+    "purpose": "Capture service, CLI, infrastructure and backend workflow logic written in Go, including package-level relationships.",
+    "rag_ingestion": "Prebundle Go parser/AST tooling: extract packages, structs, interfaces, functions, imports and call/dependency relationships; serialize to structured metadata, ingest into Cognee, and retain repository/file source references in OKF.",
+    "example": "https://github.com/golang/go/blob/master/src/go/ast/ast.go"
+  },
+  {
+    "file_format": ".js",
+    "tier": 1,
+    "purpose": "Capture application and automation logic, API clients, workflow code and module dependencies from JavaScript codebases.",
+    "rag_ingestion": "Prebundle a JavaScript/ESTree-compatible AST parser: extract functions, classes, imports/exports, calls and comments; serialize symbols/edges to structured JSON or Markdown, then ingest into Cognee and preserve repository/file provenance for OKF.",
+    "example": "https://github.com/estree/estree/blob/master/es5.md"
+  },
+  {
+    "file_format": ".json",
+    "tier": 1,
+    "purpose": "Configuration, API payloads, BOMs, manifests and machine-generated metadata where key/value structure should become graph context.",
+    "rag_ingestion": "Cognee TextLoader supports JSON. Parse JSON structurally first when keys/arrays encode domain entities; retain object paths and IDs, then ingest normalized text/records into Cognee. OKF can reference the source resource and record provenance/trust signals for generated concepts.",
+    "example": "https://raw.githubusercontent.com/typicode/demo/master/db.json"
+  },
+  {
+    "file_format": ".md",
+    "tier": 1,
+    "purpose": "Knowledge-base pages, engineering docs, runbooks, ADRs and other already-structured human/agent-readable context; ideal bridge into OKF.",
+    "rag_ingestion": "Ingest directly with Cognee TextLoader. Preserve headings, lists, links and code blocks as semantic structure; chunk/embed/graph in Cognee. Markdown is also the native body format for an OKF concept, with YAML frontmatter carrying type, resource, sources, generated/verified, status and freshness signals.",
+    "example": "https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/README.md"
+  },
+  {
+    "file_format": ".msg",
+    "tier": 1,
+    "purpose": "Extract enterprise context from Outlook messages: decisions, approvals, escalations, commitments and participant relationships.",
+    "rag_ingestion": "Use Cognee's document loader with the docs extra, or a prebundled MSG extractor where Outlook-specific properties/attachments need higher fidelity. Normalize sender/recipients/time/subject/body/attachments, then ingest into Cognee and preserve source identity in OKF.",
+    "example": "https://github.com/TeamMsgExtractor/msg-extractor"
+  },
+  {
+    "file_format": ".py",
+    "tier": 1,
+    "purpose": "Recover executable workflow logic, business rules, agent/tool implementations and dependencies from Python repositories instead of treating code as undifferentiated text.",
+    "rag_ingestion": "Prebundle a Python AST parser before Cognee: extract modules, classes, functions, signatures, imports, docstrings and call/dependency relationships into structured text/JSON; ingest those artifacts into Cognee and link source paths as provenance in OKF.",
+    "example": "https://github.com/python/cpython/blob/main/Lib/ast.py"
+  },
+  {
+    "file_format": ".sql",
+    "tier": 1,
+    "purpose": "Recover database structure, lineage and governed calculation logic; especially useful for enterprise analytics and workflow dependencies.",
+    "rag_ingestion": "Preparse SQL as DDL/query syntax: extract schemas, tables, columns, constraints, joins, referenced objects and statements. Send schema/lineage metadata to Cognee rather than only raw SQL text; represent sanctioned computations in OKF as Attested Computation when applicable.",
+    "example": "https://github.com/sqlite/sqlite/blob/master/test/schema.test"
+  },
+  {
+    "file_format": ".txt",
+    "tier": 1,
+    "purpose": "Runbooks, SOPs, requirements, notes and logs that are already textual; lowest-friction source for entity, relationship and procedural-context extraction.",
+    "rag_ingestion": "Use Cognee TextLoader to normalize UTF-8/plain text directly. Preserve filename, MIME type, extension and content hash; then chunk/embed/graph with Cognee. Emit selected enterprise concepts as OKF Markdown with YAML frontmatter and source provenance.",
+    "example": "https://raw.githubusercontent.com/GoogleCloudPlatform/open-knowledge-format/main/README.md"
+  },
+  {
+    "file_format": ".xml",
+    "tier": 1,
+    "purpose": "System configuration, integrations, structured BOM/engineering metadata and XML-based enterprise interchange formats.",
+    "rag_ingestion": "Cognee TextLoader supports XML, but preparse XML trees when hierarchy/attributes are meaningful. Convert elements, attributes, IDs and references into structured records before graph ingestion; retain original resource and source metadata in OKF.",
+    "example": "https://www.w3.org/TR/xml/#sec-well-formed"
+  },
+  {
+    "file_format": ".yaml",
+    "tier": 1,
+    "purpose": "Configuration, CI/CD, infrastructure, manifests and API/tool definitions where hierarchy and keys carry workflow meaning.",
+    "rag_ingestion": "Cognee TextLoader supports YAML. Parse mappings/lists/anchors structurally where configuration semantics matter, normalize to deterministic JSON/text for Cognee, and retain the original file as an OKF source/resource.",
+    "example": "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore.yaml"
+  },
+  {
+    "file_format": "FastMCP Spec",
+    "tier": 1,
+    "purpose": "Give FDE agents context about available MCP tools, their schemas, capabilities and where each tool fits in an enterprise workflow.",
+    "rag_ingestion": "Parse MCP/FastMCP server declarations and tool metadata into server, tool, input-schema, output and resource/prompt relationships; ingest the normalized manifest into Cognee and expose tool concepts/resources through OKF references.",
+    "example": "https://github.com/jlowin/fastmcp/blob/main/examples/echo.py"
+  },
+  {
+    "file_format": "ODB++",
+    "tier": 1,
+    "purpose": "High-fidelity PCB manufacturing context for FDEs: board structure, connectivity, components and fabrication/assembly data beyond natural-language documents.",
+    "rag_ingestion": "Prebundle an ODB++ archive/parser: unpack the job, extract layer stack, nets, components, drill/rout, materials and manufacturing attributes into normalized JSON. Ingest the structured engineering entities/relationships into Cognee and attach job/source provenance through OKF.",
+    "example": "https://odbplusplus.com/design/"
+  },
+  {
+    "file_format": "OpenAPI",
+    "tier": 1,
+    "purpose": "Give FDE agents machine-readable knowledge of enterprise APIs, contracts, payloads, authentication requirements and service relationships.",
+    "rag_ingestion": "Parse OpenAPI JSON/YAML deterministically before Cognee: extract paths, operations, parameters, request/response schemas, security schemes and component references as entities/edges. Ingest structured output into Cognee; publish API concepts in OKF with resource/source links and lifecycle metadata.",
+    "example": "https://github.com/OAI/OpenAPI-Specification/blob/main/examples/v3.0/petstore.yaml"
+  },
+  {
+    "file_format": "Swagger",
+    "tier": 1,
+    "purpose": "Understand legacy API contracts and map operations to services, data objects and integration workflows.",
+    "rag_ingestion": "Parse Swagger/OpenAPI 2.0 definitions into endpoints, HTTP methods, parameters, definitions, responses and security metadata; normalize to structured JSON/Markdown before Cognee and retain the specification URI as OKF provenance.",
+    "example": "https://petstore.swagger.io/v2/swagger.json"
+  },
+  {
+    "file_format": "Web URL / HTML",
+    "tier": 1,
+    "purpose": "Bring public/internal web documentation, wiki pages, product docs and web-based runbooks into the enterprise context graph while retaining source URLs.",
+    "rag_ingestion": "For a webpage URL, Cognee fetches HTML and extracts text with its URL crawler; direct binary-file URLs should be downloaded by the ingestion gateway first rather than passed as webpage URLs. Normalize page text/metadata, ingest into Cognee, and store the canonical resource URL in OKF frontmatter/sources.",
+    "example": "https://docs.cognee.ai/core-concepts/main-operations/legacy-operations/add"
+  },
+  {
+    "file_format": ".csv",
+    "tier": 2,
+    "purpose": "Flat master data, exports, mappings and transactional extracts such as Part Number→Supplier or Customer→Account relationships.",
+    "rag_ingestion": "Cognee auto-detects CSV and can ingest it via dlt; schema and foreign-key relationships can be built deterministically without LLM extraction. Infer/declare headers and types, preserve row/source identifiers, then graph domain entities; expose resulting concepts and sources in OKF.",
+    "example": "https://people.sc.fsu.edu/~jburkardt/data/csv/addresses.csv"
+  },
+  {
+    "file_format": ".docx",
+    "tier": 2,
+    "purpose": "Enterprise policies, SOPs, proposals, requirements and reports authored in Microsoft Word.",
+    "rag_ingestion": "Use Cognee UnstructuredLoader with cognee[docs]. Extract headings, paragraphs, tables, lists and document metadata to normalized text while preserving hierarchy; ingest into Cognee and retain the original document as OKF provenance.",
+    "example": "https://github.com/python-openxml/python-docx/tree/master/tests/test_files"
+  },
+  {
+    "file_format": ".parquet",
+    "tier": 2,
+    "purpose": "Large analytical datasets and event/transaction exports where columnar schema and selected records provide enterprise context efficiently.",
+    "rag_ingestion": "Use DuckDB/PyArrow to inspect schema and selectively read columnar rows; derive table/field metadata and domain relationships without converting the entire file to prose. Feed structured summaries/entities to Cognee; publish source URI/schema provenance through OKF.",
+    "example": "https://github.com/apache/parquet-testing/tree/master/data"
+  },
+  {
+    "file_format": ".pdf – Text-based",
+    "tier": 2,
+    "purpose": "Contracts, manuals, reports, specifications and procedures where text is embedded and page/layout context may matter.",
+    "rag_ingestion": "Use Cognee PyPdfLoader for standard extraction or AdvancedPdfLoader with cognee[docs] when layout/tables matter. Preserve page/source metadata, normalize extracted text, then chunk/embed/graph. Generate OKF concepts with the PDF URI in resource/sources and trust/freshness fields as needed.",
+    "example": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+  },
+  {
+    "file_format": ".tar.gz",
+    "tier": 2,
+    "purpose": "Portable bundles of repositories, logs, datasets or engineering artifacts that must be unpacked before semantic processing.",
+    "rag_ingestion": "Decompress at the ingestion gateway, record archive manifest/path/hash, then route every contained file through its format-specific parser. Ingest extracted content into Cognee with archive→member relationships; carry archive/member resources into OKF sources for provenance.",
+    "example": "https://github.com/libarchive/libarchive/tree/master/libarchive/test"
+  },
+  {
+    "file_format": ".xlsx",
+    "tier": 2,
+    "purpose": "Operational workbooks, BOMs, cost sheets, trackers and master data where row/column structure, formulas and sheet relationships are business context.",
+    "rag_ingestion": "Use Cognee's document loader for workbook extraction, but prebundle openpyxl/structured table extraction for enterprise fidelity: enumerate sheets, named ranges, headers, formulas and cell tables; route heavy calculations to deterministic code, ingest entities/relationships into Cognee, and preserve workbook/sheet provenance in OKF.",
+    "example": "https://github.com/SheetJS/test_files/tree/master/xlsx"
+  },
+  {
+    "file_format": ".zip",
+    "tier": 2,
+    "purpose": "Common enterprise delivery package for documents, datasets, code and engineering files containing mixed formats.",
+    "rag_ingestion": "Decompress at the ingestion gateway, preserve archive/member paths and hashes, then dispatch each member to the appropriate Cognee loader or prebundled parser. Model archive→member relationships and retain both levels as OKF provenance.",
+    "example": "https://github.com/libarchive/libarchive/tree/master/libarchive/test"
+  },
+  {
+    "file_format": "Google Docs",
+    "tier": 2,
+    "purpose": "Collaborative enterprise documentation, meeting notes, policies and evolving runbooks that need a stable graph representation with source traceability.",
+    "rag_ingestion": "Use Google Drive/Docs API to export document content to Markdown/text with headings, lists, tables, comments/metadata as permitted; feed the normalized export to Cognee. Store the canonical Drive resource URI and source metadata in OKF rather than treating the exported copy as the authoritative identity.",
+    "example": "https://developers.google.com/docs/api/samples"
+  },
+  {
+    "file_format": "Google Sheets",
+    "tier": 2,
+    "purpose": "Collaborative trackers, operational masters, planning sheets and lightweight databases where tabular relationships matter.",
+    "rag_ingestion": "Use Google Sheets API to read sheets, ranges, formulas and typed values; normalize each logical table with workbook/sheet/range identifiers before Cognee. Use deterministic processing for calculations and preserve the canonical spreadsheet URI/range as OKF provenance.",
+    "example": "https://developers.google.com/sheets/api/samples"
+  },
+  {
+    "file_format": ".dwg",
+    "tier": 3,
+    "purpose": "Native AutoCAD engineering drawings where geometry, layers, annotations and title-block metadata define manufacturing/project context.",
+    "rag_ingestion": "Use a CAD-specific parser/converter before Cognee. Extract layers, blocks, entities, title block, annotations and embedded BOM references into structured JSON/text; do not rely on generic image ingestion for engineering semantics. Graph parts/layers/documents and preserve drawing revision/source in OKF.",
+    "example": "https://github.com/LibreDWG/libredwg/tree/master/test/test-data"
+  },
+  {
+    "file_format": ".dxf",
+    "tier": 3,
+    "purpose": "Exchange-format CAD drawings where vector entities and layer semantics need deterministic extraction before semantic graphing.",
+    "rag_ingestion": "Parse DXF sections/entities/layers/blocks with a CAD library such as ezdxf/LibreDWG; extract title-block text, dimensions, annotations and entity relationships into JSON before Cognee. Preserve file/revision provenance in OKF.",
+    "example": "https://github.com/mozman/ezdxf/tree/master/examples"
+  },
+  {
+    "file_format": ".iges",
+    "tier": 3,
+    "purpose": "Legacy neutral 3D CAD exchange used to expose product geometry and part/assembly context to FDE workflows.",
+    "rag_ingestion": "Use a 3D CAD/STEP-IGES geometry parser such as Open CASCADE to extract product/assembly names, topology, bounding boxes and available attributes; serialize engineering metadata to JSON/text before Cognee and preserve model/source revision in OKF.",
+    "example": "https://github.com/Open-Cascade-SAS/OCCT/tree/master/samples"
+  },
+  {
+    "file_format": ".jpeg",
+    "tier": 3,
+    "purpose": "Photos, screenshots, scanned pages, labels, diagrams and visual evidence requiring semantic description or OCR.",
+    "rag_ingestion": "Cognee ImageLoader uses a vision-capable LLM to describe images. For enterprise ingestion, add OCR/layout extraction when text/tables are present; store extracted description/text plus image metadata in Cognee and keep the original image resource as OKF provenance.",
+    "example": "https://github.com/python-pillow/Pillow/tree/main/Tests/images"
+  },
+  {
+    "file_format": ".jpg",
+    "tier": 3,
+    "purpose": "Photos, screenshots, scanned records and diagrams that carry enterprise context unavailable as native text.",
+    "rag_ingestion": "Cognee ImageLoader uses a vision-capable LLM to describe images. Add OCR/layout extraction for text-heavy images, normalize captions/text/objects for graph ingestion, and retain image identity/source in OKF.",
+    "example": "https://github.com/python-pillow/Pillow/tree/main/Tests/images"
+  },
+  {
+    "file_format": ".mp3",
+    "tier": 3,
+    "purpose": "Calls, interviews, meetings and field recordings where spoken decisions, requirements and entities need to become searchable context.",
+    "rag_ingestion": "Cognee AudioLoader transcribes audio with a Whisper-compatible model. Add timestamps/speaker segmentation when available, normalize transcript segments and metadata, then ingest into Cognee; retain recording URI and generated/verified provenance in OKF.",
+    "example": "https://github.com/anars/blank-audio"
+  },
+  {
+    "file_format": ".mp4",
+    "tier": 3,
+    "purpose": "Training videos, inspections, demos and recorded workflows where both spoken and visual context matter.",
+    "rag_ingestion": "Preprocess video with audio transcription plus scene/keyframe segmentation; run OCR/vision on relevant frames, align transcript and visual events by timestamp, then ingest normalized segments into Cognee. Preserve original video/time ranges as OKF sources.",
+    "example": "https://sample-videos.com/"
+  },
+  {
+    "file_format": ".pdf – Scanned/Image",
+    "tier": 3,
+    "purpose": "Scanned contracts, invoices, drawings, legacy records and signed documents that cannot be reliably indexed through text extraction alone.",
+    "rag_ingestion": "Detect pages with no usable text layer; rasterize pages and run OCR/vision extraction before Cognee. Preserve page number, bounding/layout references and OCR confidence where available; normalize extracted text/tables and retain the original PDF/page as OKF source provenance.",
+    "example": "https://www.loc.gov/preservation/digital/formats/fdd/fdd000030.shtml"
+  },
+  {
+    "file_format": ".png",
+    "tier": 3,
+    "purpose": "Screenshots, diagrams, schematics, dashboards and scanned forms used as evidence or workflow context.",
+    "rag_ingestion": "Cognee ImageLoader can describe PNGs with a vision-capable LLM. Add OCR/layout/table extraction for screenshots, schematics and scanned forms; ingest extracted text/objects/relations and preserve image source metadata in OKF.",
+    "example": "https://github.com/python-pillow/Pillow/tree/main/Tests/images"
+  },
+  {
+    "file_format": ".step",
+    "tier": 3,
+    "purpose": "Neutral 3D CAD exchange for manufacturing/aerospace/automotive workflows requiring assembly and part context.",
+    "rag_ingestion": "Parse STEP with a 3D geometry kernel such as Open CASCADE; extract assembly tree, product/part names, geometry metadata, bounding boxes and available properties into structured JSON before Cognee. Preserve model/revision source in OKF.",
+    "example": "https://github.com/Open-Cascade-SAS/OCCT/tree/master/samples"
+  },
+  {
+    "file_format": ".stp",
+    "tier": 3,
+    "purpose": "Alternate STEP extension used for neutral 3D CAD exchange and assembly/part context.",
+    "rag_ingestion": "Treat as STEP content: parse with a 3D geometry kernel, extract assembly/product structure, part names, bounding boxes and attributes, serialize to JSON/text, then ingest into Cognee with model/revision provenance in OKF.",
+    "example": "https://github.com/Open-Cascade-SAS/OCCT/tree/master/samples"
+  },
+  {
+    "file_format": ".tiff",
+    "tier": 3,
+    "purpose": "High-resolution scans, archival documents, engineering images and document-imaging workflows.",
+    "rag_ingestion": "Use image/OCR preprocessing before Cognee. For multipage TIFF, preserve page/frame boundaries; extract text, tables and visual descriptions, then ingest normalized artifacts and retain page-level source provenance in OKF.",
+    "example": "https://github.com/python-pillow/Pillow/tree/main/Tests/images"
+  },
+  {
+    "file_format": ".wav",
+    "tier": 3,
+    "purpose": "Meetings, calls, voice notes and machine/field recordings where speech provides enterprise workflow context.",
+    "rag_ingestion": "Cognee AudioLoader transcribes WAV with a Whisper-compatible model. Preserve timestamps and audio metadata; optionally add diarization, then ingest transcript segments into Cognee and keep the recording URI as OKF source provenance.",
+    "example": "https://github.com/anars/blank-audio"
+  },
+  {
+    "file_format": "Gerber RS-274X",
+    "tier": 3,
+    "purpose": "Legacy PCB fabrication artwork requiring deterministic vector parsing before it can contribute manufacturing context.",
+    "rag_ingestion": "Use a Gerber parser before Cognee to decode apertures, flashes, draws, regions and coordinates; combine copper/mask/silkscreen layers plus drill data into a structured PCB manifest. Graph layers/nets/features and retain job/layer provenance in OKF.",
+    "example": "https://github.com/curtacircuitos/pcb-tools/tree/master/examples"
+  },
+  {
+    "file_format": "Gerber X2",
+    "tier": 3,
+    "purpose": "PCB fabrication data with richer standardized attributes than RS-274X, improving layer/component semantics for FDEs.",
+    "rag_ingestion": "Parse Gerber X2 commands plus file/aperture attributes; extract layer function, component/pad attributes and geometry into a structured PCB manifest before Cognee. Preserve layer/job provenance and revision signals in OKF.",
+    "example": "https://www.ucamco.com/en/gerber"
+  },
+  {
+    "file_format": "Gerber X3",
+    "tier": 3,
+    "purpose": "Newer Gerber-based PCB manufacturing context where component data should be available to engineering agents.",
+    "rag_ingestion": "Parse Gerber X3 including component information in addition to X2-style attributes and geometry; normalize layers, components, pads and manufacturing features into JSON before Cognee and preserve source/revision provenance in OKF.",
+    "example": "https://www.ucamco.com/en/gerber"
+  },
+  {
+    "file_format": "IPC-2581",
+    "tier": 3,
+    "purpose": "Comprehensive PCB design-to-manufacturing exchange that can supply richer assembly/fabrication context than rendered documents.",
+    "rag_ingestion": "Parse the IPC-2581 XML package deterministically: extract stackup, materials, components, nets, BOM, fabrication and assembly attributes; map IDs/references into graph relationships before Cognee. Preserve package/revision provenance in OKF.",
+    "example": "https://www.ipc2581.com/"
+  }
+]

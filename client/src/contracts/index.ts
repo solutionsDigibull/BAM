@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:61e342f1852aca2c7277b22495988b8233c7d88e1a5b27fe00357ce0f3194be5
+// source-sha256:138b53a4ea63bfcfc695bd6386b9966d099aa267629ecfccbf11f1477575cee2
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -81,6 +81,11 @@ export type ErrorCode =
   | "MOCK_UNMATCHED"
   | "WORKFLOW_FROZEN"
   | "NOT_FROZEN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DiffKind".
+ */
+export type DiffKind = "renamed" | "added" | "removed" | "reordered";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ExternalKind".
@@ -236,6 +241,11 @@ export type MasterStatus = "PROPOSED" | "ILLUSTRATIVE" | "APPROVED" | "RETIRED";
 export type SourceKind = "BAM_0_2_SAMPLE" | "TEMPLATE_ROW" | "ADMIN_ENTRY";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ImportMode".
+ */
+export type ImportMode = "validate-only" | "upsert";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "NotificationType".
  */
 export type NotificationType =
@@ -296,6 +306,7 @@ export interface SbamContracts {
   MasterVersionCreate?: MasterVersionCreate;
   MasterEntry?: MasterEntry;
   MastersSnapshot?: MastersSnapshot;
+  ImportReport?: ImportReport;
   DocumentOut?: DocumentOut;
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
@@ -329,6 +340,19 @@ export interface FieldError {
    */
   path: string;
   message: string;
+  diff?: StructureDiff | null;
+}
+/**
+ * How an uploaded layout differs from the frozen one (workbook import, E3.3).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StructureDiff".
+ */
+export interface StructureDiff {
+  tab: string;
+  expected: string | null;
+  actual: string | null;
+  kind: DiffKind;
 }
 /**
  * An Agent (TD: Macro Skill): a major module of the solution, made of ordered Sub-Skills.
@@ -2037,6 +2061,45 @@ export interface SnapshotEntry {
   master_type: MasterType;
   stable_id: string;
   version: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ImportReport".
+ */
+export interface ImportReport {
+  mode: ImportMode;
+  applied: boolean;
+  /**
+   * Pattern: `^sha256:[0-9a-f]{64}$`
+   */
+  sha256: string;
+  tabs: ImportTabReport[];
+  stable_ids: string[];
+  statuses: {
+    [k: string]: number | undefined;
+  };
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ImportTabReport".
+ */
+export interface ImportTabReport {
+  name: string;
+  created?: number;
+  updated?: number;
+  unchanged?: number;
+  missing?: number;
+  errors?: ImportRowError[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ImportRowError".
+ */
+export interface ImportRowError {
+  tab: string;
+  row?: number | null;
+  column?: string | null;
+  message: string;
 }
 /**
  * A document with the state of its stored file (`GET`, `POST .../restore`).
