@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sbam_contracts.identity import TenantStatus
+from sbam_contracts.identity import TenantStatus, UserStatus
 from sqlalchemy import JSON, DateTime, Index, Integer, String, Uuid, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
@@ -38,9 +38,12 @@ Index("uq_tenants_name_ci", func.lower(Tenant.name), unique=True)
 
 
 class User(TenantOwned, Base):
-    """One row per Keycloak subject, refreshed from the token. `id` is the subject's UUID."""
+    """One row per Keycloak subject, refreshed from the token. `id` is the subject's UUID.
+
+    An invited user's row exists before their first login (status INVITED)."""
 
     __tablename__ = "users"
+    __table_args__ = (status_check(UserStatus),)
 
     keycloak_sub: Mapped[str] = mapped_column(String(64), unique=True)
     email: Mapped[str | None] = mapped_column(String(254))
@@ -50,3 +53,4 @@ class User(TenantOwned, Base):
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_session_id: Mapped[str | None] = mapped_column(String(64))  # Keycloak `sid`
+    status: Mapped[str] = mapped_column(String(20), default=UserStatus.ACTIVE.value)

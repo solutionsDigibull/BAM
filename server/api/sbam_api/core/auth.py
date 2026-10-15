@@ -179,7 +179,7 @@ class MembershipLookup(Protocol):
 
 
 class NoMemberships:
-    """Until #50 lands: nobody is assigned anywhere, so FDE project routes answer 404."""
+    """No membership store (tests, no DB): nobody is assigned, so FDE project routes answer 404."""
 
     def assigned_projects(self, tenant_id: uuid.UUID, user_id: uuid.UUID) -> frozenset[uuid.UUID]:
         return frozenset()
@@ -267,6 +267,46 @@ class NoOrgs:
         return None
 
 
+class UserAdmin(Protocol):
+    """Keycloak users of a tenant (E2.4). Every method answers 503 IDP_UNAVAILABLE on failure."""
+
+    def invite(self, tenant_id: uuid.UUID, org_id: str | None, email: str, roles: list[str]) -> str:
+        """Create the user in the tenant's organization and send the invite; their id. 409
+        USER_EXISTS when the email is taken."""
+        ...
+
+    def set_roles(self, user_id: str, before: list[str], after: list[str]) -> None: ...
+
+    def set_enabled(self, user_id: str, enabled: bool) -> None: ...
+
+    def logout(self, user_id: str) -> None:
+        """Revoke all the user's sessions."""
+        ...
+
+    def delete(self, user_id: str) -> None:
+        """Compensating delete when the users row can't be committed."""
+        ...
+
+
+class NoUserAdmin:
+    """Keycloak admin credentials not configured: user changes answer 503."""
+
+    def invite(self, tenant_id: uuid.UUID, org_id: str | None, email: str, roles: list[str]) -> str:
+        raise idp_unavailable()
+
+    def set_roles(self, user_id: str, before: list[str], after: list[str]) -> None:
+        raise idp_unavailable()
+
+    def set_enabled(self, user_id: str, enabled: bool) -> None:
+        raise idp_unavailable()
+
+    def logout(self, user_id: str) -> None:
+        raise idp_unavailable()
+
+    def delete(self, user_id: str) -> None:
+        return None
+
+
 @dataclass
 class Auth:
     verifier: TokenVerifier
@@ -274,6 +314,7 @@ class Auth:
     audit: SecurityAudit = field(default_factory=LogSecurityAudit)
     directory: UserDirectory = field(default_factory=NoDirectory)
     orgs: OrgDirectory = field(default_factory=NoOrgs)
+    users: UserAdmin = field(default_factory=NoUserAdmin)
 
 
 # --- Dependencies ----------------------------------------------------------------------------
