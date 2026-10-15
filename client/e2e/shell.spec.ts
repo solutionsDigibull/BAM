@@ -22,6 +22,10 @@ test("e1_13_t02 FDE shell lists projects and has no Workflow create action", asy
   baseURL,
 }) => {
   await signInAs(page, "sbam-fde", baseURL!);
+  // My projects is a real screen now (E4.10): fake the API at the proxy, there is no sbam-api here.
+  await page.route("**/api/proxy/api/v1/projects", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ items: [] }) }),
+  );
   await page.goto("/");
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByText("No projects assigned — ask your Admin.")).toBeVisible();
