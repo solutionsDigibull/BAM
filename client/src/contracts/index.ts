@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:61e342f1852aca2c7277b22495988b8233c7d88e1a5b27fe00357ce0f3194be5
+// source-sha256:087d3727ca80b9754e12dda71afa69dfa241f184f2185f5a045a15c25cea4a80
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -295,6 +295,7 @@ export interface SbamContracts {
   MasterEntryCreate?: MasterEntryCreate;
   MasterVersionCreate?: MasterVersionCreate;
   MasterEntry?: MasterEntry;
+  FiletypeInfo?: FiletypeInfo;
   MastersSnapshot?: MastersSnapshot;
   DocumentOut?: DocumentOut;
   PurgeTarget?: PurgeTarget;
@@ -2012,6 +2013,25 @@ export interface MasterEntry {
   };
   created_at: string;
   updated_at: string;
+}
+/**
+ * GET /admin/filetypes (E3.7): a frozen Filetype row plus SBAM's loader configuration.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FiletypeInfo".
+ */
+export interface FiletypeInfo {
+  row_label: string;
+  file_format: string;
+  tier: number;
+  purpose: string;
+  rag_ingestion: string;
+  example: string;
+  mvp_enabled: boolean;
+  loader: string | null;
+  extensions: string[];
+  intent_class: string;
+  default_route: string;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

@@ -114,7 +114,7 @@ def test_e3_2_filetype_is_read_only_for_admins(h: MastersHarness) -> None:
         "rag_ingestion": "r",
         "example": "https://e.x",
     }
-    problem(h.post("FILETYPE", {"payload": payload}), 403, "FORBIDDEN")
+    problem(h.post("FILETYPE", {"payload": payload}), 403, "FILETYPE_FROZEN")  # E3.7
 
 
 def test_e3_2_labels_count_up_per_type(h: MastersHarness) -> None:

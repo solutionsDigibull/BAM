@@ -48,6 +48,22 @@ class MasterVersionCreate(_Request):
     payload: dict[str, Any]
 
 
+class FiletypeInfo(BaseModel):
+    """GET /admin/filetypes (E3.7): a frozen Filetype row plus SBAM's loader configuration."""
+
+    row_label: str
+    file_format: str
+    tier: int = Field(ge=1, le=3)
+    purpose: str
+    rag_ingestion: str
+    example: str
+    mvp_enabled: bool
+    loader: str | None
+    extensions: list[str]
+    intent_class: str
+    default_route: str
+
+
 class MasterEntry(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -85,6 +101,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "master_entry_create": MasterEntryCreate,
         "master_version_create": MasterVersionCreate,
         "master_entry": MasterEntry,
+        "filetype_info": FiletypeInfo,
         "masters_snapshot": MastersSnapshot,
     }
     return {stem: contract_schema(model, f"masters/{stem}") for stem, model in models.items()}
