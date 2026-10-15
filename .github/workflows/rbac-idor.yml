@@ -1,0 +1,39 @@
+# RBAC matrix + IDOR suite (E2.7): every route x every role, cross-tenant and cross-project access,
+# token lifecycle. Deny by default: a route without an entry in server/tests/security/rbac_matrix.yaml
+# fails here. No Docker: the suite runs the real app on SQLite with fake Keycloak and Temporal.
+# The job name `rbac-idor` is the required-check name in branch protection.
+name: rbac-idor
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rbac-idor-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  LLM_PROVIDER: mock
+
+jobs:
+  rbac-idor: # required-check name (E2.7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: server/uv.lock
+      - run: cd server && uv sync --locked
+      - run: cd server && uv run pytest tests/security --junitxml=../reports/rbac-idor.xml
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: rbac-idor-reports, path: reports/, if-no-files-found: ignore }
