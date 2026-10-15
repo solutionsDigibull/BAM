@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "SBAM Pydantic contracts, the single source of truth"
 requires-python = "==3.12.*"
 dependencies = [
+    "email-validator>=2.2",
     "pydantic>=2.11",
     "rfc8785>=0.1.4",
 ]
