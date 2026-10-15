@@ -80,7 +80,12 @@ jobs:
       # test_e16_3_deploy.py (#142) resolves compose.deploy.yaml's !reset/!override tags via
       # `docker compose config`; the runner image's bundled compose plugin predates that compose-spec
       # support, so pin a version that has it before those tests run.
-      - run: |
+      - name: Install a compose plugin that understands !reset/!override
+        run: |
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y --only-upgrade docker-compose-plugin
           docker compose version
