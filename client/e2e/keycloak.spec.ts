@@ -109,6 +109,10 @@ test("e2_5_t07 the session refreshes silently after the 300 s access token expir
   page,
   context,
 }) => {
+  test.skip(
+    !process.env.E2E_SLOW,
+    "idles 5 min; CI runs it nightly and on manual runs (E2E_SLOW=1)",
+  );
   test.setTimeout(9 * 60_000);
   await keycloakLogin(page, "fde", "fde-a1");
   await page.waitForURL("**/projects");

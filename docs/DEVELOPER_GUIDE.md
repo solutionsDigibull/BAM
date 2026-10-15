@@ -195,7 +195,7 @@ LLM-dependent tests run against the **mock LLM provider** in CI (issue E1.15). F
 | `secret-scan` | gitleaks over the PR's commits (full history on push/nightly) | yes |
 | `hadolint` | every `compose/docker/*.Dockerfile` | yes |
 | `image-scan` | builds `sbam-api`, `sbam-worker`, `sbam-web`, `sbam-mock-api`; Trivy fails on fixable CRITICAL; Syft SPDX SBOM; pushes `ghcr.io/<owner>/<image>:<sha>` + `:main` (or the tag) **only** on push to `main` or a `v*` tag | yes |
-| `compose-smoke` | `make up` + `make test-int` with a generated `compose/.env.ci` (gitignored, random passwords); retries `make up` once | yes |
+| `compose-smoke` | `make up` + `make test-int` + Keycloak login e2e with a generated `compose/.env.ci` (gitignored, random passwords); retries `make up` once. **Gated (E1.23)**: see below | yes (skipped counts as passing) |
 | `playwright-smoke` | `pnpm --dir client e2e` | no |
 
 Rules the pipeline keeps:
@@ -204,6 +204,7 @@ Rules the pipeline keeps:
 - PRs from forks get no secrets.
 - The buildx cache is scoped per branch, so a PR can't overwrite `dev`/`main` layers.
 - Integration tests skip when no stack is running, but fail under `CI=true`, so `compose-smoke` can't pass by skipping.
+- `compose-smoke` takes 13–28 min, so `smoke-gate` (`scripts/ci-smoke-gate.sh`) decides when it runs: on every 10th merge to `dev`, on any `dev` merge that touches the stack (`compose/`, migrations, Dockerfiles, `Makefile`, `pyproject.toml`/`uv.lock`/`pnpm-lock.yaml`, `.github/`), on `main` and tags, nightly, and on demand (**Actions → ci → Run workflow**). PRs skip it. The run summary says why it ran or skipped. Run `make test-int` locally before you merge a change the gate wouldn't catch. The 5-minute Keycloak refresh e2e (`e2_5_t07`) runs only nightly and on manual runs (`E2E_SLOW=1`).
 
 Turning on the required checks needs repository admin, so the repo owner runs this once per branch (`main`, then `dev`):
 
