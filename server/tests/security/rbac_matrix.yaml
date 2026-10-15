@@ -1,0 +1,278 @@
+# RBAC matrix (E2.7, TD section 9): what every role must get from every route.
+#
+# tests/security/test_rbac_matrix.py sends each request below as each role against a seeded
+# two-tenant world and compares status and problem `code`. It is deny by default: the meta-test
+# test_e2_7_t01 fails if a route of the generated OpenAPI has no entry here, or if an entry lacks
+# one of the seven role columns, or if an entry names a route that is gone.
+#
+# Adding an API? Add one entry per operationId (the key is the operationId as printed in the
+# failing meta-test). Write the expectation from the specification, not from what the code
+# returns today: this file is the specification the code is held to.
+#
+#   request.method / request.path   the OpenAPI method and path template (with /api/v1)
+#   request.params                  path parameters; "@name" is a seeded value (see
+#                                   World.value in rbac_world.py: @project_a, @run_b, @doc_a,
+#                                   @user_fde_a_assigned, @etag_project_a, ...)
+#   request.query                   query parameters. A route with an optional project_id filter
+#                                   (the masters export) lists the filtered form here, with
+#                                   `project_id: "@project_b"` so the cross-project case is the
+#                                   one under test, and gets its own entry for the unfiltered form
+#                                   only if it has a separate operationId.
+#   request.headers / request.json  extra headers and the JSON body of a valid request
+#   expect.<role>                   "<status>" or "<status> <CODE>"; CODE is the problem+json
+#                                   `code`, mandatory for every 4xx so a wrong reason fails.
+#
+# Roles (World.actors in rbac_world.py):
+#   anon              no Authorization header
+#   super_admin       platform operator, no tenant claim
+#   admin_a/admin_b   sbam-admin of tenant A / B
+#   fde_a_assigned    sbam-fde of tenant A, member of project A (not of A2)
+#   fde_a_unassigned  sbam-fde of tenant A, member of nothing
+#   fde_b             sbam-fde of tenant B, member of project B
+#
+# Conventions the expectations encode:
+#   - 401 UNAUTHENTICATED: no or bad credential. 403 WRONG_PORTAL: valid token, wrong role.
+#   - 404 NOT_FOUND: another tenant's resource, or a project the FDE is not assigned to. The same
+#     answer as a random id, so existence never leaks. A tenant-less super-admin has no tenant to
+#     administer, so tenant-scoped admin routes are 404 for it too.
+#   - List endpoints filter instead of 404 (see test_idor.py E2.7-T07).
+
+roles: [anon, super_admin, admin_a, admin_b, fde_a_assigned, fde_a_unassigned, fde_b]
+
+routes:
+  # ---- health: unauthenticated by design --------------------------------------------------
+  live_health_live_get:
+    request: {method: GET, path: /health/live}
+    expect: &open
+      anon: "200"
+      super_admin: "200"
+      admin_a: "200"
+      admin_b: "200"
+      fde_a_assigned: "200"
+      fde_a_unassigned: "200"
+      fde_b: "200"
+
+  ready_health_ready_get:
+    request: {method: GET, path: /health/ready}
+    expect: *open
+
+  # ---- identity ---------------------------------------------------------------------------
+  me_api_v1_me_get:
+    request: {method: GET, path: /api/v1/me}
+    expect:
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "200"
+      admin_a: "200"
+      admin_b: "200"
+      fde_a_assigned: "200"
+      fde_a_unassigned: "200"
+      fde_b: "200"
+
+  list_tenants_api_v1_admin_tenants_get:
+    request: {method: GET, path: /api/v1/admin/tenants}
+    expect: &super_admin_only
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "200"
+      admin_a: "403 WRONG_PORTAL"
+      admin_b: "403 WRONG_PORTAL"
+      fde_a_assigned: "403 WRONG_PORTAL"
+      fde_a_unassigned: "403 WRONG_PORTAL"
+      fde_b: "403 WRONG_PORTAL"
+
+  create_tenant_api_v1_admin_tenants_post:
+    request:
+      method: POST
+      path: /api/v1/admin/tenants
+      json: {name: Gamma Corp}
+    expect:
+      <<: *super_admin_only
+      super_admin: "201"
+
+  patch_tenant_api_v1_admin_tenants__tenant_id__patch:
+    request:
+      method: PATCH
+      path: /api/v1/admin/tenants/{tenant_id}
+      params: {tenant_id: "@tenant_a"}
+      headers: {if-match: "@etag_tenant_a"}
+      json: {status: SUSPENDED}
+    expect: *super_admin_only
+
+  list_users_api_v1_admin_users_get:
+    request: {method: GET, path: /api/v1/admin/users}
+    expect: &tenant_admin_list
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "404 NOT_FOUND"
+      admin_a: "200"
+      admin_b: "200"
+      fde_a_assigned: "403 WRONG_PORTAL"
+      fde_a_unassigned: "403 WRONG_PORTAL"
+      fde_b: "403 WRONG_PORTAL"
+
+  invite_user_api_v1_admin_users_invite_post:
+    request:
+      method: POST
+      path: /api/v1/admin/users/invite
+      json: {email: new.hire@gamma-corp.test, roles: [sbam-fde]}
+    expect:
+      <<: *tenant_admin_list
+      admin_a: "201"
+      admin_b: "201"
+
+  patch_user_api_v1_admin_users__user_id__patch:
+    request:
+      method: PATCH
+      path: /api/v1/admin/users/{user_id}
+      params: {user_id: "@user_fde_a_assigned"}
+      headers: {if-match: "@etag_user_fde_a_assigned"}
+      json: {active: false}
+    expect: &tenant_admin_a_resource
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "404 NOT_FOUND"
+      admin_a: "200"
+      admin_b: "404 NOT_FOUND"
+      fde_a_assigned: "403 WRONG_PORTAL"
+      fde_a_unassigned: "403 WRONG_PORTAL"
+      fde_b: "403 WRONG_PORTAL"
+
+  # ---- admin: projects and members --------------------------------------------------------
+  list_projects_api_v1_admin_projects_get:
+    request: {method: GET, path: /api/v1/admin/projects}
+    expect: *tenant_admin_list
+
+  create_project_api_v1_admin_projects_post:
+    request:
+      method: POST
+      path: /api/v1/admin/projects
+      json: {name: Gamma Gearbox}
+    expect:
+      <<: *tenant_admin_list
+      admin_a: "201"
+      admin_b: "201"
+
+  get_project_api_v1_admin_projects__project_id__get:
+    request:
+      method: GET
+      path: /api/v1/admin/projects/{project_id}
+      params: {project_id: "@project_a"}
+    expect: *tenant_admin_a_resource
+
+  patch_project_api_v1_admin_projects__project_id__patch:
+    request:
+      method: PATCH
+      path: /api/v1/admin/projects/{project_id}
+      params: {project_id: "@project_a"}
+      headers: {if-match: "@etag_project_a"}
+      json: {name: Alpha Quote Bot v2}
+    expect: *tenant_admin_a_resource
+
+  archive_project_api_v1_admin_projects__project_id__archive_post:
+    request:
+      method: POST
+      path: /api/v1/admin/projects/{project_id}/archive
+      params: {project_id: "@project_a"}
+    expect: *tenant_admin_a_resource
+
+  get_members_api_v1_admin_projects__project_id__members_get:
+    request:
+      method: GET
+      path: /api/v1/admin/projects/{project_id}/members
+      params: {project_id: "@project_a"}
+    expect: *tenant_admin_a_resource
+
+  put_members_api_v1_admin_projects__project_id__members_put:
+    request:
+      method: PUT
+      path: /api/v1/admin/projects/{project_id}/members
+      params: {project_id: "@project_a"}
+      json: {user_ids: ["@user_fde_a_unassigned"]}
+    expect: *tenant_admin_a_resource
+
+  # ---- runtime registry -------------------------------------------------------------------
+  admin_registry_api_v1_admin_registry_get:
+    request: {method: GET, path: /api/v1/admin/registry}
+    expect: *tenant_admin_list
+
+  fde_registry_api_v1_registry_get:
+    request: {method: GET, path: /api/v1/registry}
+    expect: &fde_list
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "403 WRONG_PORTAL"
+      admin_a: "403 WRONG_PORTAL"
+      admin_b: "403 WRONG_PORTAL"
+      fde_a_assigned: "200"
+      fde_a_unassigned: "200"
+      fde_b: "200"
+
+  # ---- FDE: projects and runs -------------------------------------------------------------
+  my_projects_api_v1_projects_get:
+    request: {method: GET, path: /api/v1/projects}
+    expect: *fde_list
+
+  create_upload_token_api_v1_projects__project_id__uploads_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/uploads
+      params: {project_id: "@project_a"}
+      json: {files: [{name: spec.pdf, size: 1024, mime: application/pdf}]}
+    expect: &fde_project_resource
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "403 WRONG_PORTAL"
+      admin_a: "403 WRONG_PORTAL"
+      admin_b: "403 WRONG_PORTAL"
+      fde_a_assigned: "201"
+      fde_a_unassigned: "404 NOT_FOUND"
+      fde_b: "404 NOT_FOUND"
+
+  start_api_v1_projects__project_id__pipeline_start_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/pipeline/start
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "202"
+
+  start_ping_api_v1_projects__project_id__runs_ping_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/runs/ping
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "202"
+
+  get_run_api_v1_projects__project_id__runs__run_id__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/runs/{run_id}
+      params: {project_id: "@project_a", run_id: "@run_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  # ---- internal and signed ----------------------------------------------------------------
+  # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
+  # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.
+  tusd_hook_api_v1_internal_tusd_hooks_post:
+    request:
+      method: POST
+      path: /api/v1/internal/tusd/hooks
+      json: {Type: pre-create, Event: {Upload: {}}}
+    expect:
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "401 UNAUTHENTICATED"
+      admin_a: "401 UNAUTHENTICATED"
+      admin_b: "401 UNAUTHENTICATED"
+      fde_a_assigned: "401 UNAUTHENTICATED"
+      fde_a_unassigned: "401 UNAUTHENTICATED"
+      fde_b: "401 UNAUTHENTICATED"
+
+  # The signed URL is the credential (it binds tenant and key), not the bearer token, so the
+  # answer must not depend on who is logged in. test_idor.py covers tampered signatures.
+  download_api_v1_files__key__get:
+    request:
+      method: GET
+      path: /api/v1/files/{key}
+      params: {key: "@file_key"}
+      query: {exp: "@file_exp", sig: "@file_sig"}
+    expect: *open
