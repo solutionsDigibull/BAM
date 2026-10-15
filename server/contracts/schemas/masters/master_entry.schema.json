@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/master_entry:0.1.0",
+  "$defs": {
+    "MasterStatus": {
+      "enum": [
+        "PROPOSED",
+        "ILLUSTRATIVE",
+        "APPROVED",
+        "RETIRED"
+      ],
+      "title": "MasterStatus",
+      "type": "string"
+    },
+    "MasterType": {
+      "enum": [
+        "ORGANIZATION",
+        "RULES",
+        "AGENTS",
+        "SKILLS",
+        "TOOLING",
+        "FILETYPE"
+      ],
+      "title": "MasterType",
+      "type": "string"
+    },
+    "SourceKind": {
+      "enum": [
+        "BAM_0_2_SAMPLE",
+        "TEMPLATE_ROW",
+        "ADMIN_ENTRY"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "tenant_id": {
+      "format": "uuid",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Project Id"
+    },
+    "master_type": {
+      "$ref": "#/$defs/MasterType"
+    },
+    "stable_id": {
+      "title": "Stable Id",
+      "type": "string"
+    },
+    "row_label": {
+      "title": "Row Label",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/MasterStatus"
+    },
+    "source_kind": {
+      "$ref": "#/$defs/SourceKind"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "tenant_id",
+    "project_id",
+    "master_type",
+    "stable_id",
+    "row_label",
+    "status",
+    "source_kind",
+    "version",
+    "payload",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "MasterEntry",
+  "type": "object"
+}

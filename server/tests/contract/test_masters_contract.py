@@ -22,6 +22,7 @@ from sbam_contracts.masters import (
     RulesPayload,
     SkillsPayload,
     SourceKind,
+    ToolingPayload,
     schemas,
 )
 from sbam_contracts.masters_workbook import (
@@ -84,6 +85,7 @@ def test_e0_4_t01_row_counts_per_master(sheets: Sheets) -> None:
         MasterType.RULES: 6,
         MasterType.AGENTS: 5,  # Agent #6 is a blank template row
         MasterType.SKILLS: 8,
+        MasterType.TOOLING: 0,  # the BAM 0.2 one-sheet workbook has no Tooling tab
         MasterType.FILETYPE: FILETYPE_COUNT,
     }
 
@@ -177,7 +179,7 @@ def test_e0_4_t01_no_sbam_metadata_in_payloads_or_columns() -> None:
 def test_e0_4_t01_column_tables_match_the_models_field_for_field() -> None:
     for master_type, model in PAYLOAD_MODELS.items():
         assert [field for _, field in COLUMNS[master_type]] == list(model.model_fields), master_type
-    assert [len(COLUMNS[t]) for t in MasterType] == [14, 11, 11, 11, 5]
+    assert [len(COLUMNS[t]) for t in MasterType] == [14, 11, 11, 11, 15, 5]
 
 
 def test_e0_4_t01_column_names_come_from_the_workbook_row_2(sheets: Sheets) -> None:
@@ -203,7 +205,7 @@ def test_e0_4_t01_committed_schema_matches_model(stem: str) -> None:
     ), "regenerate: cd server && uv run python -m sbam_contracts.masters"
 
 
-def test_e0_4_t01_schema_files_are_exactly_the_documented_seven() -> None:
+def test_e0_4_t01_schema_files_are_exactly_the_documented_ones() -> None:
     names = {p.name for p in SCHEMAS.glob("*.json")}
     assert names == {
         "readme.schema.json",
@@ -213,11 +215,17 @@ def test_e0_4_t01_schema_files_are_exactly_the_documented_seven() -> None:
         "skills.schema.json",
         "filetype.schema.json",
         "rag_reference.schema.json",
+        "tooling.schema.json",  # Manufacturing Masters v0.2 (E3.2)
+        # masters engine API (E3.2)
+        "master_entry_create.schema.json",
+        "master_version_create.schema.json",
+        "master_entry.schema.json",
+        "masters_snapshot.schema.json",
     }
 
 
 @pytest.mark.parametrize(
-    "stem", ["readme", "organization", "rules", "agents", "skills", "filetype"]
+    "stem", ["readme", "organization", "rules", "agents", "skills", "tooling", "filetype"]
 )
 def test_e0_4_t01_schemas_carry_the_structure_version_and_forbid_extras(stem: str) -> None:
     schema = json.loads((SCHEMAS / f"{stem}.schema.json").read_text(encoding="utf-8"))
@@ -228,7 +236,7 @@ def test_e0_4_t01_schemas_carry_the_structure_version_and_forbid_extras(stem: st
 def test_e0_4_t01_filetype_schema_is_marked_system_owned() -> None:
     filetype = json.loads((SCHEMAS / "filetype.schema.json").read_text(encoding="utf-8"))
     assert filetype["x-system-owned"] is True
-    for stem in ("organization", "rules", "agents", "skills"):
+    for stem in ("organization", "rules", "agents", "skills", "tooling"):
         schema = json.loads((SCHEMAS / f"{stem}.schema.json").read_text(encoding="utf-8"))
         assert "x-system-owned" not in schema
 
@@ -256,6 +264,7 @@ def test_e0_4_t01_models_are_the_ones_the_schemas_describe() -> None:
         RulesPayload,
         AgentsPayload,
         SkillsPayload,
+        ToolingPayload,
         FiletypePayload,
     } == set(PAYLOAD_MODELS.values())
 

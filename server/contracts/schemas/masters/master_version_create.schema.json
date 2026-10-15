@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/master_version_create:0.1.0",
+  "additionalProperties": false,
+  "description": "The full new payload. The entry's ETag goes in `If-Match`.",
+  "properties": {
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    }
+  },
+  "required": [
+    "payload"
+  ],
+  "title": "MasterVersionCreate",
+  "type": "object"
+}

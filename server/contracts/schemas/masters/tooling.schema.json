@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/tooling:0.1.0",
+  "additionalProperties": false,
+  "description": "Tooling master: add-on tool categories and their bindings (Manufacturing Masters v0.2).",
+  "properties": {
+    "category": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Category",
+      "type": "string"
+    },
+    "examples": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Examples",
+      "type": "string"
+    },
+    "links_path": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Links Path",
+      "type": "string"
+    },
+    "owner_access": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Owner Access",
+      "type": "string"
+    },
+    "record_status": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Record Status",
+      "type": "string"
+    },
+    "source_version_checked_at": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Source Version Checked At",
+      "type": "string"
+    },
+    "search_tag": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Search Tag",
+      "type": "string"
+    },
+    "tenant_account_scope": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Tenant Account Scope",
+      "type": "string"
+    },
+    "entity_node_type": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Entity Node Type",
+      "type": "string"
+    },
+    "security_access_level": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Security Access Level",
+      "type": "string"
+    },
+    "refresh_frequency": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Refresh Frequency",
+      "type": "string"
+    },
+    "parent_entity": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Parent Entity",
+      "type": "string"
+    },
+    "source_evidence_ref": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Source Evidence Ref",
+      "type": "string"
+    },
+    "binding_review_state": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Binding Review State",
+      "type": "string"
+    },
+    "search_aliases_category": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Search Aliases Category",
+      "type": "string"
+    }
+  },
+  "structure_version": "BAM 0.2",
+  "title": "ToolingPayload",
+  "type": "object"
+}
