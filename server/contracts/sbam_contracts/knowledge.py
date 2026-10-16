@@ -119,6 +119,8 @@ class KnowledgeCoverage(_Dto):
     documents: list[CoverageEntry] = Field(default_factory=list)
     masters_included: int = 0  # master entries in masters.jsonl (E3.6)
     entities: int = 0  # graph nodes after cognify
+    relations: int = 0  # in the OKF bundle (E5.3)
+    chunks: int = 0  # in the OKF bundle (E5.3)
     bundle: BundleCoverage | None = None  # the OKF bundle's view (E5.3), once it is built
 
 
@@ -145,6 +147,25 @@ MAX_NEIGHBOURS: Final = 100
 MAX_PASSAGE_CHARS: Final = 4000
 
 
+class KnowledgeCounts(_Dto):
+    documents: int = 0
+    entities: int = 0
+    relations: int = 0
+    chunks: int = 0
+
+
+class CoverageRow(_Dto):
+    """One document of a version, ready to show (E5.6): the bundle's view once it exists, else the
+    build's. `title` is the uploaded file's name; `reason` is a code, shown as text."""
+
+    document_version_id: UUID
+    title: str
+    status: str  # CoverageStatus once the bundle exists, else SourceStatus
+    chunks: int = 0
+    entities: int = 0
+    reason: str | None = None
+
+
 class KnowledgeVersionSummary(_Dto):
     id: UUID
     version: Annotated[int, Field(ge=1)]
@@ -152,6 +173,10 @@ class KnowledgeVersionSummary(_Dto):
     coverage: KnowledgeCoverage
     error_reason: str | None = None
     created_at: datetime
+    finished_at: datetime | None = None  # when it became READY or FAILED
+    okf_sha256: str | None = None
+    counts: KnowledgeCounts = Field(default_factory=KnowledgeCounts)
+    documents: list[CoverageRow] = Field(default_factory=list)
 
 
 class KnowledgeVersionList(_Dto):

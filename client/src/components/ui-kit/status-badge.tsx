@@ -51,6 +51,13 @@ const COLOR: Record<string, string> = {
   INGESTION_FAILED: "error",
   KNOWLEDGE_FAILED: "error",
   SOW_GENERATION_FAILED: "error",
+  // knowledge versions and their documents (E5.6)
+  READY: "success",
+  FAILED: "error",
+  OUTDATED: "default",
+  COVERED: "success",
+  CHUNKS_ONLY: "warning",
+  ADDED: "processing",
 };
 
 const label = (status: string) =>

@@ -188,7 +188,13 @@ async def build_bundle(deps: BuildDeps, inp: StageRef) -> uuid.UUID:
     )
     expected = {o.document_version_id for o in loaded.outcomes}
     problems = okf.validate(bundle, built.parts, loaded.docs, expected)
-    coverage = loaded.coverage.model_copy(update={"bundle": built.coverage})
+    coverage = loaded.coverage.model_copy(
+        update={
+            "bundle": built.coverage,
+            "relations": built.counts["relations"],
+            "chunks": built.counts["chunks"],
+        }
+    )
     if problems:
         await asyncio.to_thread(_finish, deps, inp, coverage, bundle=None, error=BUNDLE_INVALID)
         log.warning(

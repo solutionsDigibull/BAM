@@ -63,6 +63,54 @@
       "title": "CoverageEntry",
       "type": "object"
     },
+    "CoverageRow": {
+      "additionalProperties": false,
+      "description": "One document of a version, ready to show (E5.6): the bundle's view once it exists, else the\nbuild's. `title` is the uploaded file's name; `reason` is a code, shown as text.",
+      "properties": {
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "chunks": {
+          "default": 0,
+          "title": "Chunks",
+          "type": "integer"
+        },
+        "entities": {
+          "default": 0,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "document_version_id",
+        "title",
+        "status"
+      ],
+      "title": "CoverageRow",
+      "type": "object"
+    },
     "CoverageStatus": {
       "enum": [
         "COVERED",
@@ -115,6 +163,33 @@
       "title": "DocumentCoverage",
       "type": "object"
     },
+    "KnowledgeCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "default": 0,
+          "title": "Documents",
+          "type": "integer"
+        },
+        "entities": {
+          "default": 0,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "relations": {
+          "default": 0,
+          "title": "Relations",
+          "type": "integer"
+        },
+        "chunks": {
+          "default": 0,
+          "title": "Chunks",
+          "type": "integer"
+        }
+      },
+      "title": "KnowledgeCounts",
+      "type": "object"
+    },
     "KnowledgeCoverage": {
       "additionalProperties": false,
       "properties": {
@@ -133,6 +208,16 @@
         "entities": {
           "default": 0,
           "title": "Entities",
+          "type": "integer"
+        },
+        "relations": {
+          "default": 0,
+          "title": "Relations",
+          "type": "integer"
+        },
+        "chunks": {
+          "default": 0,
+          "title": "Chunks",
           "type": "integer"
         },
         "bundle": {
@@ -186,6 +271,41 @@
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "okf_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Okf Sha256"
+        },
+        "counts": {
+          "$ref": "#/$defs/KnowledgeCounts"
+        },
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/CoverageRow"
+          },
+          "title": "Documents",
+          "type": "array"
         }
       },
       "required": [

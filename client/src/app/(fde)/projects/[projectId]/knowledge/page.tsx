@@ -1,9 +1,13 @@
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { KnowledgeScreen } from "./knowledge-screen";
 
 export const metadata = { title: "Knowledge" };
 
-export default function KnowledgePage() {
-  return (
-    <PagePlaceholder title="Knowledge" empty="Knowledge is built after documents are processed." />
-  );
+// The layout above has already rejected a malformed id (notFound) before this page or any request runs.
+export default async function KnowledgePage({
+  params,
+}: {
+  params: Promise<{ projectId: string }>;
+}) {
+  const { projectId } = await params;
+  return <KnowledgeScreen projectId={projectId} />;
 }
