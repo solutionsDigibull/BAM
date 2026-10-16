@@ -5,13 +5,15 @@ belongs to. The dataset name is derived from it server-side, never from user inp
 results carry ids only, never document text (TD §13.1).
 """
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any, Final
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sbam_contracts.okf import BundleCoverage
+from sbam_contracts._jsonschema import contract_schema
+from sbam_contracts.okf import BundleCoverage, Location
 
 SHA256_HEX: Final = r"^[0-9a-f]{64}$"
 DATASET_PATTERN: Final = r"^sbam_[0-9a-f-]{36}_[0-9a-f-]{36}$"
@@ -134,3 +136,81 @@ class KnowledgeVersionOut(_Dto):
     coverage: KnowledgeCoverage = Field(default_factory=KnowledgeCoverage)
     error_reason: str | None = None
     run_id: UUID | None = None
+
+
+# --- read API (E5.4) -----------------------------------------------------------------------------
+
+MAX_GRAPH_LIMIT: Final = 500
+MAX_NEIGHBOURS: Final = 100
+MAX_PASSAGE_CHARS: Final = 4000
+
+
+class KnowledgeVersionSummary(_Dto):
+    id: UUID
+    version: Annotated[int, Field(ge=1)]
+    status: str  # KnowledgeVersionState
+    coverage: KnowledgeCoverage
+    error_reason: str | None = None
+    created_at: datetime
+
+
+class KnowledgeVersionList(_Dto):
+    """`GET P/knowledge`: this project's versions, newest first."""
+
+    versions: list[KnowledgeVersionSummary]
+
+
+class GraphApiNode(_Dto):
+    id: str
+    type: str
+    name: str
+    degree: Annotated[int, Field(ge=0)] = 0  # relations touching it in the whole version
+
+
+class GraphApiEdge(_Dto):
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+
+    id: str
+    type: str
+    from_: str = Field(alias="from")
+    to: str
+    external: bool = False  # `to` is not on this page
+
+
+class KnowledgeGraphPage(_Dto):
+    """`GET P/knowledge/{kv_id}/graph`: nodes sorted by id; each edge on its `from` node's page."""
+
+    knowledge_version_id: UUID
+    status: str  # READY or OUTDATED (an older version stays readable)
+    nodes: list[GraphApiNode]
+    edges: list[GraphApiEdge]
+    next_cursor: str | None = None
+    total_estimate: Annotated[int, Field(ge=0)]
+
+
+class SourcePassage(_Dto):
+    document_version_id: UUID
+    title: str
+    location: Location
+    text: Annotated[str, Field(max_length=MAX_PASSAGE_CHARS)]  # full text: the OKF bundle
+    truncated: bool = False
+
+
+class KnowledgeNodeDetail(_Dto):
+    """`GET P/knowledge/{kv_id}/nodes/{node_id}`."""
+
+    knowledge_version_id: UUID
+    status: str
+    node: GraphApiNode
+    neighbours: list[GraphApiNode]
+    has_more: bool = False  # more than MAX_NEIGHBOURS neighbours
+    source_passages: list[SourcePassage]
+
+
+def schemas() -> dict[str, dict[str, Any]]:
+    """File stem -> JSON Schema, for the committed files under `schemas/knowledge/`."""
+    return {
+        "version_list": contract_schema(KnowledgeVersionList, "knowledge/version_list"),
+        "graph_page": contract_schema(KnowledgeGraphPage, "knowledge/graph_page"),
+        "node_detail": contract_schema(KnowledgeNodeDetail, "knowledge/node_detail"),
+    }

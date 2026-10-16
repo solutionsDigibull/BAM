@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:207dbdd752bdf0ff688872805d5cdb6acbb55cb382265806d9bf82d9620e9736
+// source-sha256:0316f41d38f228ac9902ad2d9168199b08f58dc10d8f1330665ae50ea3327481
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -261,6 +261,13 @@ export type NotificationType =
  * via the `definition` "CoverageStatus".
  */
 export type CoverageStatus = "COVERED" | "CHUNKS_ONLY" | "FAILED";
+/**
+ * A document's fate in one knowledge build (E5.2); the OKF bundle (E5.3) refines ADDED.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SourceStatus".
+ */
+export type SourceStatus = "ADDED" | "FAILED";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -322,6 +329,9 @@ export interface SbamContracts {
   OkfRelation?: OkfRelation;
   OkfChunk?: OkfChunk;
   BundleCoverage?: BundleCoverage;
+  KnowledgeVersionList?: KnowledgeVersionList;
+  KnowledgeGraphPage?: KnowledgeGraphPage;
+  KnowledgeNodeDetail?: KnowledgeNodeDetail;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -2343,4 +2353,104 @@ export interface DocumentCoverage {
   chunks?: number;
   entities?: number;
   reason?: string | null;
+}
+/**
+ * `GET P/knowledge`: this project's versions, newest first.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeVersionList".
+ */
+export interface KnowledgeVersionList {
+  versions: KnowledgeVersionSummary[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeVersionSummary".
+ */
+export interface KnowledgeVersionSummary {
+  id: string;
+  version: number;
+  status: string;
+  coverage: KnowledgeCoverage;
+  error_reason?: string | null;
+  created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeCoverage".
+ */
+export interface KnowledgeCoverage {
+  documents?: CoverageEntry[];
+  masters_included?: number;
+  entities?: number;
+  bundle?: BundleCoverage | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CoverageEntry".
+ */
+export interface CoverageEntry {
+  document_version_id: string;
+  status: SourceStatus;
+  reason?: string | null;
+}
+/**
+ * `GET P/knowledge/{kv_id}/graph`: nodes sorted by id; each edge on its `from` node's page.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeGraphPage".
+ */
+export interface KnowledgeGraphPage {
+  knowledge_version_id: string;
+  status: string;
+  nodes: GraphApiNode[];
+  edges: GraphApiEdge[];
+  next_cursor?: string | null;
+  total_estimate: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GraphApiNode".
+ */
+export interface GraphApiNode {
+  id: string;
+  type: string;
+  name: string;
+  degree?: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GraphApiEdge".
+ */
+export interface GraphApiEdge {
+  id: string;
+  type: string;
+  from: string;
+  to: string;
+  external?: boolean;
+}
+/**
+ * `GET P/knowledge/{kv_id}/nodes/{node_id}`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeNodeDetail".
+ */
+export interface KnowledgeNodeDetail {
+  knowledge_version_id: string;
+  status: string;
+  node: GraphApiNode;
+  neighbours: GraphApiNode[];
+  has_more?: boolean;
+  source_passages: SourcePassage[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SourcePassage".
+ */
+export interface SourcePassage {
+  document_version_id: string;
+  title: string;
+  location: SbamContracts_Okf__Location;
+  text: string;
+  truncated?: boolean;
 }

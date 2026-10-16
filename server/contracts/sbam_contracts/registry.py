@@ -31,6 +31,11 @@ from sbam_contracts.identity import (
     UserPatch,
 )
 from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
+from sbam_contracts.knowledge import (
+    KnowledgeGraphPage,
+    KnowledgeNodeDetail,
+    KnowledgeVersionList,
+)
 from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
 from sbam_contracts.masters import (
     AgentsPayload,
@@ -129,4 +134,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("okf/relation", OkfRelation),
     ("okf/chunk", OkfChunk),
     ("okf/coverage", BundleCoverage),
+    ("knowledge/version_list", KnowledgeVersionList),
+    ("knowledge/graph_page", KnowledgeGraphPage),
+    ("knowledge/node_detail", KnowledgeNodeDetail),
 )
