@@ -418,11 +418,13 @@ def test_e6_1_a_prompt_written_for_another_alias_is_refused() -> None:
         run(client, scope(), alias="sbam-codegen")
 
 
-def test_e6_1_the_six_aliases_are_exactly_the_bifrost_aliases() -> None:
+def test_e6_1_the_six_wrapper_aliases_all_exist_in_bifrost() -> None:
     aliases = json.loads(
         (Path(__file__).resolve().parents[3] / "compose/bifrost/aliases.json").read_text()
     )
-    assert set(ALIASES) == set(aliases)
+    # Bifrost also serves sbam-knowledge and sbam-embed, which Cognee calls directly (E5.1); the
+    # wrapper's aliases are the six of TD §5.4 and every one of them must exist in Bifrost.
+    assert set(ALIASES) <= set(aliases)
     assert settings().llm_transport_attempts == 3
 
 
