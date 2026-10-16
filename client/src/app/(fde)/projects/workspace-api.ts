@@ -9,6 +9,10 @@ export const pipelinePath = (projectId: string) => `projects/${projectId}/pipeli
 export const startPath = (projectId: string) => `projects/${projectId}/pipeline/start`;
 export const workflowsPath = (projectId: string) => `projects/${projectId}/workflows`;
 export const uploadsPath = (projectId: string) => `projects/${projectId}/uploads`;
+export const retryPath = (projectId: string, documentId: string) =>
+  `projects/${projectId}/documents/${documentId}/retry`;
+export const restorePath = (projectId: string, documentId: string) =>
+  `projects/${projectId}/documents/${documentId}/restore`;
 
 export const EMPTY_PROJECTS = "No projects assigned — ask your Admin.";
 export const EMPTY_OVERVIEW = "Upload documents to start";

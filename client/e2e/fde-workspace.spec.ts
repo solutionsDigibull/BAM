@@ -79,13 +79,54 @@ const pdf = (name: string, size = 64) => ({
   buffer: Buffer.alloc(size, "a"),
 });
 
-async function documentsPage(page: Page, baseURL: string, docs: unknown[] = []) {
+const DOCS_URL = new RegExp(String.raw`/api/proxy/api/v1/projects/${PROJECT}/documents(\?.*)?$`);
+
+type Doc = {
+  id: string;
+  title: string;
+  state: string;
+  size: number;
+  mime: string;
+  sha256: string;
+  created_at: string;
+  deleted_at?: string;
+  purge_after?: string;
+};
+const doc = (over: Partial<Doc> = {}): Doc => ({
+  id: "d1",
+  title: "rfq.pdf",
+  state: "PARSED",
+  size: 64,
+  mime: "application/pdf",
+  sha256: "x",
+  created_at: "2026-10-15T10:00:00Z",
+  ...over,
+});
+
+/** The documents screen with a faked API: `items` is a function so a test can change what the list returns. */
+async function documentsPage(
+  page: Page,
+  baseURL: string,
+  docs: Doc[] | (() => Doc[]) = [],
+  pipeline = "IDLE",
+) {
   await signIn(page, baseURL);
   let items = docs;
-  await page.route(`${API}/projects/${PROJECT}/documents`, (r) => json(r, { items }));
+  await page.route(DOCS_URL, (r) =>
+    r.request().method() === "GET"
+      ? json(r, { items: typeof items === "function" ? items() : items })
+      : r.fallback(),
+  );
+  await page.route(`${API}/projects/${PROJECT}/pipeline`, (r) =>
+    json(r, {
+      state: pipeline,
+      steps: [],
+      counts: { uploaded: 0, parsed: 0, rejected: 0, failed: 0 },
+    }),
+  );
   await page.goto(`/projects/${PROJECT}/documents`);
   await expect(page.getByTestId("upload-dashboard")).toBeVisible();
-  return (next: unknown[]) => (items = next);
+  return (next: Doc[] | (() => Doc[])) => (items = next);
 }
 
 test("e4_10_t01 an accepted file uploads to tusd with the token and no Authorization header", async ({
@@ -106,19 +147,9 @@ test("e4_10_t01 an accepted file uploads to tusd with the token and no Authoriza
     });
   });
   await pick(page, [pdf("rfq.pdf")]);
-  setDocs([
-    {
-      id: "d1",
-      title: "rfq.pdf",
-      state: "UPLOADED",
-      size: 64,
-      mime: "application/pdf",
-      sha256: "x",
-      created_at: "2026-10-15T10:00:00Z",
-    },
-  ]);
+  setDocs([doc({ state: "UPLOADED" })]);
   await page.getByRole("button", { name: "Upload 1 file" }).click();
-  await expect(page.getByRole("cell", { name: "rfq.pdf" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "rfq.pdf", exact: true })).toBeVisible();
   expect(announced).toEqual([{ files: [{ name: "rfq.pdf", size: 64, mime: "application/pdf" }] }]);
   expect(tus.creations).toHaveLength(1);
   expect(metadata(tus.creations[0]!.metadata)).toMatchObject({
@@ -221,4 +252,81 @@ test("e4_10_t05 Start processing on the overview posts with an Idempotency-Key",
   await expect(page.getByText("Processing is running.")).toBeVisible();
   expect(key).toMatch(/^[0-9a-f-]{36}$/);
   await expect(page.getByRole("button", { name: /create|new workflow/i })).toHaveCount(0);
+});
+
+test("e4_11_t01 chips progress from UPLOADED to PARSED without a reload", async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(60_000);
+  // One state per ~3.5 s since the first request, so it moves between the 4 s polls, not per request.
+  const steps = ["UPLOADED", "SCANNING", "PARSING", "PARSED"];
+  let began = 0;
+  await documentsPage(
+    page,
+    baseURL!,
+    () => {
+      began ||= Date.now();
+      return [doc({ state: steps[Math.min(Math.floor((Date.now() - began) / 3500), 3)]! })];
+    },
+    "INGESTING",
+  );
+  await expect(page.getByText("Scan: Waiting")).toBeVisible();
+  await expect(page.getByText("Scan: Scanning")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Parse: Parsing")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Parse: Parsed")).toBeVisible({ timeout: 15_000 });
+});
+
+test("e4_11_t02 a failed document is retried, the chips run again and it ends PARSED", async ({
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(60_000);
+  let state = "PARSE_FAILED";
+  await documentsPage(page, baseURL!, () => {
+    const now = state;
+    if (state === "PARSING") state = "PARSED"; // the next poll
+    return [doc({ state: now })];
+  });
+  let key: string | undefined;
+  await page.route(`${API}/projects/${PROJECT}/documents/d1/retry`, (r) => {
+    key = r.request().headers()["idempotency-key"];
+    state = "PARSING";
+    return json(r, { run: {} }, 202);
+  });
+  await expect(page.getByText("Parse: Failed")).toBeVisible();
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByText("Parse: Parsing")).toBeVisible();
+  expect(key).toMatch(/^[0-9a-f-]{36}$/);
+  await expect(page.getByText("Parse: Parsed")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0);
+});
+
+test("e4_11_t04 delete, open the recycle bin, restore: the document is back in the list", async ({
+  page,
+  baseURL,
+}) => {
+  let removed = false;
+  await documentsPage(page, baseURL!, () => [
+    removed
+      ? doc({ deleted_at: "2026-10-16T10:00:00Z", purge_after: "2027-01-14T10:00:00Z" })
+      : doc(),
+  ]);
+  await page.route(`${API}/projects/${PROJECT}/documents/d1`, (r) => {
+    removed = true;
+    return r.fulfill({ status: 204 });
+  });
+  await page.route(`${API}/projects/${PROJECT}/documents/d1/restore`, (r) => {
+    removed = false;
+    return json(r, doc());
+  });
+  await page.getByRole("button", { name: "Delete rfq.pdf" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByRole("tab", { name: "Recycle bin (1)" })).toBeVisible();
+  await page.getByRole("tab", { name: "Recycle bin (1)" }).click();
+  await expect(page.getByText(/14 Jan 2027 \(\d+ days left\)/)).toBeVisible();
+  await page.getByRole("button", { name: "Restore rfq.pdf" }).click();
+  await expect(page.getByRole("tab", { name: "Documents (1)" })).toBeVisible();
+  await page.getByRole("tab", { name: "Documents (1)" }).click();
+  await expect(page.getByText("Parse: Parsed")).toBeVisible();
 });
