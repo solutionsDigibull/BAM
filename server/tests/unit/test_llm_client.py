@@ -164,6 +164,15 @@ def test_e6_1_a_refused_request_is_not_retried() -> None:
     assert len(bifrost.requests) == 1 and statuses(sessions, sc) == ["FAILED"]
 
 
+def test_e6_1_cost_is_read_from_the_object_bifrost_really_sends() -> None:
+    """Seen live: `usage.cost` is `{"total_cost": 3e-06}`, not a number."""
+    bifrost = FakeBifrost([completion(GOOD, cost={"total_cost": 3e-06})])
+    client, sessions = make_client(bifrost)
+    sc = scope()
+    run(client, sc)
+    assert float(rows(sessions, sc)[0].cost_usd) == pytest.approx(3e-06)
+
+
 def test_e6_1_failover_records_the_model_that_answered() -> None:
     bifrost = FakeBifrost([completion(GOOD, model="sbam-sow-fallback")])
     client, sessions = make_client(bifrost)

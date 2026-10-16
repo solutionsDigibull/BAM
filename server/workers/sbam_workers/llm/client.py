@@ -91,6 +91,13 @@ def require_strict_output(output_type: type[BaseModel]) -> None:
         raise TypeError(f"{output_type.__name__} must set extra='forbid' to be an LLM output type")
 
 
+def _cost(raw: Any) -> float:
+    """Bifrost sends `usage.cost` as `{"total_cost": 3e-06, ...}`; a bare number is accepted too."""
+    if isinstance(raw, dict):
+        raw = raw.get("total_cost")
+    return float(raw) if isinstance(raw, int | float) else 0.0
+
+
 def _escape(text: str) -> str:
     return text.replace("</data", "<\\/data")
 
@@ -298,7 +305,7 @@ class LlmClient:
                 model=str(data["model"]),
                 tokens_in=int(usage.get("prompt_tokens") or 0),
                 tokens_out=int(usage.get("completion_tokens") or 0),
-                cost_usd=float(usage.get("cost") or 0.0),
+                cost_usd=_cost(usage.get("cost")),
                 latency_ms=latency,
             )
         except (KeyError, IndexError, TypeError, ValueError) as exc:
