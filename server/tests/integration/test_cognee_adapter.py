@@ -6,7 +6,7 @@ the database check (T03) is covered by the unit tests.
 
 T02 (graph), T05, T06 and T07 need Cognee's two Bifrost aliases (`sbam-knowledge`, `sbam-embed`).
 Until Bifrost and the mock serve them they skip, saying so; T04 and the dataset-level part of T02
-need no LLM and always run.
+need no LLM and always run. The aliases arrive with #259 (E5.7).
 """
 
 import json
@@ -107,7 +107,7 @@ def cognee_aliases() -> None:
         with urllib.request.urlopen(req, timeout=30):  # noqa: S310 - fixed local URL
             return
     except (urllib.error.URLError, OSError) as exc:
-        pytest.skip(f"Bifrost does not serve Cognee's aliases yet ({type(exc).__name__})")
+        pytest.skip(f"Bifrost does not serve Cognee's aliases yet, #259 ({type(exc).__name__})")
 
 
 def test_e5_1_t04_access_control_off_worker_refuses_to_start(compose: Compose) -> None:
