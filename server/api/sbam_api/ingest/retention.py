@@ -1,4 +1,4 @@
-"""Soft delete, restore and purge of documents (E4.9).
+"""Soft delete, restore, retry and purge of documents (E4.9, E4.13).
 
 Lifecycle
   delete   FDE deletes a document: its version goes UPLOADED/PARSED/... -> DELETED through the
@@ -8,6 +8,10 @@ Lifecycle
   restore  Within the 90 days the FDE brings it back (version DELETED -> UPLOADED, so it is scanned
            and parsed again). It counts toward the 20-file limit again, so a full project answers
            409 FILE_LIMIT_REACHED. From `purge_after` on: 410 GONE.
+  retry    A document whose scan or parse failed (SCAN_FAILED / PARSE_FAILED) goes back to SCANNING
+           through the state machine and `DocumentIngestion` is started again for it (the router
+           does that; if Temporal cannot be reached `undo_retry` puts it back). Any other state is
+           409, so an infected (REJECTED) file can never be retried.
   purge    The daily `PurgeDeleted` Temporal schedule calls `purge_document` once per due document
            (version DELETED -> PURGED, system actor). The stored file, the derivatives and the
            knowledge references go away; the `documents` / `document_versions` rows stay as a
@@ -40,7 +44,7 @@ from sbam_contracts.state_machines import Actor, ProjectPipelineState
 from sbam_contracts.state_machines import DocumentVersionState as S
 from sqlalchemy.orm import Session
 
-from sbam_api.audit.repository import record
+from sbam_api.audit.repository import find_by_key, record
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.conventions import ApiError, locked, not_found
 from sbam_api.core.logging import correlation_id_var
@@ -307,6 +311,110 @@ def restore_document(
     session.commit()
     restored = version_repo.of_documents([document.id])
     return to_out(document, restored[document.id])
+
+
+# --- POST /projects/{id}/documents/{document_id}/retry ------------------------------------
+
+RETRYABLE = (S.SCAN_FAILED.value, S.PARSE_FAILED.value)
+
+
+@dataclass(frozen=True)
+class RetryResult:
+    version_ids: list[uuid.UUID]
+    replayed: bool  # the same Idempotency-Key was already served: nothing changed, start nothing
+
+
+def retry_document(
+    session: Session,
+    user: CurrentUser,
+    project_id: uuid.UUID,
+    document_id: uuid.UUID,
+    usage: DocumentUsage,
+    idempotency_key: str | None = None,
+) -> RetryResult:
+    """Put the failed versions of a document back to SCANNING, in one transaction with the audit.
+
+    The same `Idempotency-Key` again changes nothing (`replayed`); a version that is not failed is
+    409 CONFLICT and a document in use by a frozen version is 423.
+    """
+    ctx = user.context(project_id)
+    _active_project(session, user, project_id)
+    documents = DocumentRepository(session, ctx)
+    document = documents.get_for_update(document_id)
+    if document is None or document.deleted_at is not None:  # missing, other tenant/project, gone
+        raise not_found()
+    if usage.is_frozen(session, ctx, document.id):
+        raise locked()
+    version_repo = DocumentVersionRepository(session, ctx)
+    versions = version_repo.of_document(document.id)
+    if idempotency_key and any(
+        find_by_key(session, ctx.tenant_id, "document_version", str(v.id), idempotency_key)
+        for v in versions
+    ):
+        return RetryResult([v.id for v in versions], replayed=True)
+    failed = [v for v in versions if v.state in RETRYABLE]
+    if not failed:
+        raise ApiError(
+            409, ErrorCode.CONFLICT, "Not failed", "Only failed documents can be retried."
+        )
+    correlation = _correlation()
+    for version in failed:
+        apply_transition(
+            session,
+            ctx,
+            TransitionCommand(
+                model=DocumentVersion,
+                entity_id=version.id,
+                event="retry",
+                actor=Actor.FDE,
+                actor_id=str(user.user_id),
+                correlation_id=correlation,
+                idempotency_key=idempotency_key,
+            ),
+        )
+        version.ingestion_started_at = None  # the workflow is started again for it
+        version_repo.update(version, version.row_version)
+    _audit(
+        session,
+        ctx,
+        str(user.user_id),
+        "DOCUMENT_RETRIED",
+        document,
+        {"title": document.title, "from": sorted({v.state for v in failed})},
+        correlation,
+    )
+    session.commit()
+    return RetryResult([v.id for v in failed], replayed=False)
+
+
+def undo_retry(
+    session: Session, user: CurrentUser, project_id: uuid.UUID, version_ids: Sequence[uuid.UUID]
+) -> None:
+    """Temporal could not start the workflow: the versions go back to a failed, retryable state.
+
+    `scan_unavailable` (SCANNING -> SCAN_FAILED, system) is the existing way to say "the scan did
+    not happen"; a PARSE_FAILED document that comes back as SCAN_FAILED can be retried again.
+    """
+    ctx = user.context(project_id)
+    correlation = _correlation()
+    version_repo = DocumentVersionRepository(session, ctx)
+    for version_id in version_ids:
+        version = version_repo.get(version_id)
+        if version is None or version.state != S.SCANNING.value:
+            continue
+        apply_transition(
+            session,
+            ctx,
+            TransitionCommand(
+                model=DocumentVersion,
+                entity_id=version_id,
+                event="scan_unavailable",
+                actor=Actor.SYSTEM,
+                actor_id=SYSTEM_ACTOR_ID,
+                correlation_id=correlation,
+            ),
+        )
+    session.commit()
 
 
 # --- PurgeDeleted: one document ------------------------------------------------------------

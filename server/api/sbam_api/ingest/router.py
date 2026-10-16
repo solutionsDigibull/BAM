@@ -7,6 +7,12 @@ response, where a refused upload is `RejectUpload` with the problem+json body.
 Documents (E4.9): `GET /projects/{id}/documents` lists them (`?include_deleted=true` adds the ones
 in the 90-day bin), `DELETE .../documents/{id}` soft-deletes one and `POST .../restore` brings it
 back. The rules live in `sbam_api.ingest.retention`.
+
+Retry (E4.13): `POST .../documents/{id}/retry` puts a document whose scan or parse failed back to
+SCANNING and starts `DocumentIngestion` for it again: 202 `{"run": Run}`. 409 when it has not failed
+(an infected file included), 404 unassigned / other tenant / deleted, 423 when a frozen version uses
+it, 503 when Temporal is down (the document stays failed). A repeated `Idempotency-Key` answers the
+same run and starts nothing.
 """
 
 import asyncio
@@ -19,6 +25,7 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import ValidationError
 from sbam_contracts.api import ErrorCode, Page
 from sbam_contracts.documents import DocumentOut, UploadRequest, UploadToken
+from sbam_contracts.runs import Run, RunAccepted, SubjectType
 from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.core.auth import CurrentUser, fde, internal, project_access
@@ -28,10 +35,12 @@ from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.db.repository import TenantContext
 from sbam_api.ingest import retention, service, tusd
-from sbam_api.ingest.ingestion import start_waiting
+from sbam_api.ingest.ingestion import start_ingestion_run, start_waiting
 from sbam_api.ingest.rules import STAGING
 from sbam_api.storage.router import backend
+from sbam_api.temporal.client import OrchestratorUnavailable
 from sbam_api.temporal.deps import session_factory, temporal_client
+from sbam_api.temporal.repository import TemporalRunRepository, to_run
 
 router = APIRouter(tags=["ingest"])
 
@@ -124,6 +133,77 @@ def _restore(
 ) -> DocumentOut:
     with sessions() as session:
         return retention.restore_document(session, user, project_id, document_id)
+
+
+IdempotencyKey = Annotated[str | None, Header(min_length=1, max_length=128)]
+
+
+@router.post(
+    "/projects/{project_id}/documents/{document_id}/retry",
+    status_code=202,
+    response_model=RunAccepted,
+)
+async def retry_document(
+    project_id: Project,
+    document_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    idempotency_key: IdempotencyKey = None,
+) -> RunAccepted:
+    result = await asyncio.to_thread(
+        _retry, sessions, user, project_id, document_id, _usage(request), idempotency_key
+    )
+    ctx = user.context(project_id)
+    correlation = correlation_id_var.get() or str(uuid7())
+    settings: Settings = request.app.state.settings
+    run = None
+    try:
+        client = await temporal_client(request)
+        for version_id in result.version_ids:
+            if result.replayed:  # the same key was served before: its run, nothing new is started
+                run = await asyncio.to_thread(_known_run, sessions, ctx, version_id) or run
+                continue
+            run = await start_ingestion_run(
+                client, sessions, ctx, version_id, correlation,
+                with_search_attributes=settings.temporal_search_attributes,
+            )  # fmt: skip
+            if run is None:
+                break
+    except OrchestratorUnavailable:
+        run = None
+    if run is None:
+        if not result.replayed:  # nothing started: the document goes back to failed
+            await asyncio.to_thread(_undo, sessions, user, project_id, result.version_ids)
+        raise OrchestratorUnavailable()
+    return RunAccepted(run=run)
+
+
+def _retry(
+    sessions: sessionmaker[Session],
+    user: CurrentUser,
+    project_id: UUID,
+    document_id: UUID,
+    usage: retention.DocumentUsage,
+    key: str | None,
+) -> retention.RetryResult:
+    with sessions() as session:
+        return retention.retry_document(session, user, project_id, document_id, usage, key)
+
+
+def _undo(
+    sessions: sessionmaker[Session], user: CurrentUser, project_id: UUID, version_ids: list[UUID]
+) -> None:
+    with sessions() as session:
+        retention.undo_retry(session, user, project_id, version_ids)
+
+
+def _known_run(sessions: sessionmaker[Session], ctx: TenantContext, version_id: UUID) -> Run | None:
+    with sessions() as session:
+        row = TemporalRunRepository(session, ctx).latest_for_subject(
+            SubjectType.DOCUMENT_VERSION.value, version_id
+        )
+        return to_run(row) if row else None
 
 
 def hook_secret(

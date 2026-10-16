@@ -308,6 +308,15 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "409 CONFLICT"
 
+  retry_document_api_v1_projects__project_id__documents__document_id__retry_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/documents/{document_id}/retry
+      params: {project_id: "@project_a", document_id: "@doc_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 CONFLICT"  # the seeded document has not failed
+
   start_api_v1_projects__project_id__pipeline_start_post:
     request:
       method: POST
