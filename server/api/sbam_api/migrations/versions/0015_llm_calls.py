@@ -1,7 +1,7 @@
 """llm_calls: one row per LLM call attempt (E6.1)
 
-Revision ID: 0014_llm_calls
-Revises: 0013_registry_allowed
+Revision ID: 0015_llm_calls
+Revises: 0014_project_allow_restricted
 Create Date: 2026-10-15
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0014_llm_calls"
-down_revision: str | Sequence[str] | None = "0013_registry_allowed"
+revision: str = "0015_llm_calls"
+down_revision: str | Sequence[str] | None = "0014_project_allow_restricted"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

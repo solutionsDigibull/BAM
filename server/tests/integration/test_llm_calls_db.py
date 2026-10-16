@@ -1,4 +1,4 @@
-"""E6.1 against the Compose Postgres: migration 0014 up and down, the row constraints, tenant
+"""E6.1 against the Compose Postgres: migration 0015 up and down, the row constraints, tenant
 scoping and the replay lookup. A scratch database is created and dropped. Needs `make up`; not part
 of the unit run."""
 
@@ -36,7 +36,7 @@ def sessions() -> Iterator[sessionmaker[Session]]:
             mp.setenv("DATABASE_URL", url(database=DB))
             command.upgrade(config(), "head")
             yield make_sessionmaker(engine)
-            command.downgrade(config(), "0013_registry_allowed")  # 0014 undoes exactly itself
+            command.downgrade(config(), "0014_project_allow_restricted")  # 0015 undoes itself
             with engine.connect() as conn:
                 found = conn.execute(text("SELECT to_regclass('sbam.llm_calls')")).scalar()
             assert found is None
