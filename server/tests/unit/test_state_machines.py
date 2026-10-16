@@ -120,6 +120,20 @@ def test_e0_6_t05_rejected_document_cannot_be_parsed() -> None:
         )
 
 
+def test_e4_4_type_detection_rejects_a_parsing_document_only_as_the_system() -> None:
+    assert can_transition("document_version", "PARSING", "type_rejected", "SYSTEM") == "REJECTED"
+    assert (
+        code_of("document_version", "PARSING", "type_rejected", "FDE")
+        == InvalidTransitionCode.FORBIDDEN_ACTOR
+    )
+    # nothing else can be type-rejected: it needs a CLEAN scan first, and a parsed file is settled
+    for state in ("UPLOADED", "SCANNING", "PARSED", "SCAN_FAILED", "PARSE_FAILED", "REJECTED"):
+        assert (
+            code_of("document_version", state, "type_rejected", "SYSTEM")
+            == InvalidTransitionCode.NOT_ALLOWED
+        )
+
+
 def test_e0_6_t06_needs_review_cannot_jump_to_certified() -> None:
     assert code_of("sub_skill", "NEEDS_FDE_REVIEW", "tests_passed", "SYSTEM") == (
         InvalidTransitionCode.NOT_ALLOWED

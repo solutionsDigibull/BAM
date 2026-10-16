@@ -395,6 +395,12 @@
         "actor": "SYSTEM"
       },
       {
+        "from": "PARSING",
+        "event": "type_rejected",
+        "to": "REJECTED",
+        "actor": "SYSTEM"
+      },
+      {
         "from": "PARSE_FAILED",
         "event": "retry",
         "to": "SCANNING",

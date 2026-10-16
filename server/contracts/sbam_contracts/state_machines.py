@@ -267,6 +267,9 @@ DOCUMENT_VERSION: Final = Machine(
         (D.SCAN_FAILED, "retry", D.SCANNING, F),
         (D.PARSING, "parse_completed", D.PARSED, S),
         (D.PARSING, "parse_failed", D.PARSE_FAILED, S),
+        # Type detection runs after the scan, on a CLEAN version that is already PARSING (E4.4): a
+        # type that does not match the content, or is not supported, rejects it (code: reject_code).
+        (D.PARSING, "type_rejected", D.REJECTED, S),
         # Re-runs the whole DocumentIngestion: the scan finds the version in SCANNING and carries
         # on, then detect and parse follow (E4.13).
         (D.PARSE_FAILED, "retry", D.SCANNING, F),
