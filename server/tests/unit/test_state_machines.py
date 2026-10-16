@@ -1,4 +1,4 @@
-"""E0.6 unit tests: the six state machines (TD §14): transitions, actors, reachability, export."""
+"""E0.6 unit tests: the state machines (TD §14): transitions, actors, reachability, export."""
 
 import json
 import re
@@ -42,7 +42,7 @@ def test_e0_6_t01_every_row_is_allowed(m: Machine, row: Transition) -> None:
     assert can_transition(m.name, row.from_state, row.event, row.actor) == row.to_state
 
 
-def test_e0_6_six_machines_with_upper_snake_states() -> None:
+def test_e0_6_machines_with_upper_snake_states() -> None:
     assert [m.value for m in MACHINES] == [
         "project_pipeline",
         "workflow",
@@ -50,6 +50,7 @@ def test_e0_6_six_machines_with_upper_snake_states() -> None:
         "sow_version",
         "sub_skill",
         "agent",
+        "knowledge_version",  # E5.2
     ]
     for m in MACHINES.values():
         assert all(re.fullmatch(r"[A-Z][A-Z0-9_]*", s) for s in m.state_values()), m.name

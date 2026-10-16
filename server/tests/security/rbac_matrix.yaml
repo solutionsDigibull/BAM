@@ -326,6 +326,15 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "202"
 
+  rebuild_api_v1_projects__project_id__knowledge_rebuild_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/knowledge/rebuild
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "202"
+
   start_ping_api_v1_projects__project_id__runs_ping_post:
     request:
       method: POST

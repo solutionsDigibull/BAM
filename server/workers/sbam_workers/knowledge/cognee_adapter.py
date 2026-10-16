@@ -37,6 +37,7 @@ from sbam_contracts.knowledge import (
     KnowledgeItem,
     ProjectScope,
     SearchHit,
+    cognee_dataset,
 )
 
 log = logging.getLogger("sbam_workers.knowledge.cognee")
@@ -122,7 +123,7 @@ def dataset_name(scope: ProjectScope) -> str:
     """`sbam_<tenant>_<project>` from a validated scope (E5.1-T01)."""
     if not isinstance(scope, ProjectScope):
         raise ScopeError("a ProjectScope is required")
-    name = f"sbam_{scope.tenant_id}_{scope.project_id}"
+    name = cognee_dataset(scope.tenant_id, scope.project_id)
     if not DATASET_RE.fullmatch(name):
         raise ScopeError("invalid dataset name")
     return name
