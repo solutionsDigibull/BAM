@@ -11,7 +11,8 @@ a fake Cognee and a temp-dir storage; the activity only builds the real ones. Fo
   4. add each document on its own: one that Cognee refuses is FAILED, the others go on. Cognee
      or Bifrost down (`CogneeUnavailable`) fails the attempt, which Temporal retries;
   5. cognify (heartbeating from a separate task: it runs for minutes), then count the entities;
-  6. READY with the coverage, superseding the previous READY version.
+  6. save the coverage; the version stays BUILDING. `build_okf_bundle` (E5.3) makes it READY once
+     its bundle validates. A retry after this point returns at once (no second cognify).
 No document added, or no entity after cognify: FAILED, non-retryable `EmptyCorpus`. Cognee still
 down on the last attempt: FAILED. A FAILED build leaves the previous READY version usable.
 Payloads carry ids only; content is read from storage here. Logs carry ids and counts only.
@@ -99,6 +100,7 @@ class _Version:
     number: int
     state: str
     snapshot_id: uuid.UUID | None
+    graph_built: bool  # coverage has entities: steps 1-6 are done
 
 
 def _system_user(inp: RunInput) -> CurrentUser:
@@ -129,7 +131,10 @@ def _allocate(deps: BuildDeps, inp: RunInput) -> _Version:
             correlation_id=inp.correlation_id,
         )
         session.commit()
-        return _Version(version.id, version.version, version.state, version.master_snapshot_id)
+        built = KnowledgeCoverage.model_validate(version.coverage or {}).entities > 0
+        return _Version(
+            version.id, version.version, version.state, version.master_snapshot_id, built
+        )
 
 
 def _pin_masters(deps: BuildDeps, inp: RunInput, version: _Version) -> tuple[KnowledgeItem, int]:
@@ -229,6 +234,17 @@ def _finish(
         session.commit()
 
 
+def _save_coverage(
+    deps: BuildDeps, inp: RunInput, version_id: uuid.UUID, coverage: KnowledgeCoverage
+) -> None:
+    with deps.sessions() as session:
+        row = KnowledgeVersionRepository(session, _ctx(inp)).get(version_id)
+        if row is None:
+            raise RuntimeError("knowledge version vanished")
+        row.coverage = coverage.model_dump(mode="json")
+        session.commit()
+
+
 async def _heartbeating[R](deps: BuildDeps, work: Awaitable[R]) -> R:
     """Run `work` while a separate task heartbeats, so a minutes-long cognify stays alive."""
 
@@ -252,7 +268,7 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
         raise ApplicationError(
             "another knowledge build is running", type=BUILDING_ELSEWHERE
         ) from None
-    if version.state != KnowledgeVersionState.BUILDING.value:
+    if version.state != KnowledgeVersionState.BUILDING.value or version.graph_built:
         return version.id  # a retry after the version finished
     scope = ProjectScope(tenant_id=inp.tenant_id, project_id=inp.project_id)
     coverage = KnowledgeCoverage()
@@ -281,9 +297,9 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
         if attempt >= BUILD_KNOWLEDGE_ATTEMPTS:  # Temporal will not retry: record the failure
             await asyncio.to_thread(_finish, deps, inp, version.id, coverage, COGNEE_UNAVAILABLE)
         raise ApplicationError(str(exc), type=COGNEE_UNAVAILABLE) from None
-    await asyncio.to_thread(_finish, deps, inp, version.id, coverage, None)
+    await asyncio.to_thread(_save_coverage, deps, inp, version.id, coverage)
     log.info(
-        "knowledge version ready",
+        "knowledge graph built",
         extra={
             "tenant_id": str(inp.tenant_id),
             "project_id": str(inp.project_id),

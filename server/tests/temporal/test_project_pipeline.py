@@ -89,7 +89,16 @@ async def knowledge_stand_in(inp: RunInput) -> IdResult:
     return IdResult(id=stub_id(inp, "knowledge"))
 
 
-DEFAULT_OVERRIDES: "Overrides" = {"build_knowledge": knowledge_stand_in}
+@activity.defn(name="build_okf_bundle")
+async def okf_stand_in(inp: StageRef) -> IdResult:
+    """The real bundle (E5.3) reads Cognee's graph; its tests are tests/unit/test_okf_bundle.py."""
+    return IdResult(id=stub_id(inp, "okf"))
+
+
+DEFAULT_OVERRIDES: "Overrides" = {
+    "build_knowledge": knowledge_stand_in,
+    "build_okf_bundle": okf_stand_in,
+}
 
 
 def name_of(fn: Any) -> str:

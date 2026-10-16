@@ -51,6 +51,13 @@ from sbam_contracts.masters_api import (
     MasterVersionCreate,
 )
 from sbam_contracts.notifications import Notification
+from sbam_contracts.okf import (
+    BundleCoverage,
+    BundleManifest,
+    OkfChunk,
+    OkfEntity,
+    OkfRelation,
+)
 from sbam_contracts.projects import (
     PipelineTimeline,
     Project,
@@ -117,4 +124,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/cleanup_result", CleanupResult),
     ("notifications/notification", Notification),
     ("audit/audit_entry", AuditEntry),
+    ("okf/bundle", BundleManifest),
+    ("okf/entity", OkfEntity),
+    ("okf/relation", OkfRelation),
+    ("okf/chunk", OkfChunk),
+    ("okf/coverage", BundleCoverage),
 )
