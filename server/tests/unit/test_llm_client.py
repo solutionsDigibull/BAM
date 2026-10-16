@@ -224,7 +224,9 @@ def test_e6_1_t08_platform_fields_from_the_model_are_refused_and_never_returned(
     assert not hasattr(result.output, "status") and not hasattr(result.output, "is_locked")
     first, second = rows(sessions, sc)
     assert first.status == LlmCallStatus.SCHEMA_INVALID
-    assert "status" in (first.error or "") and "is_locked" in (first.error or "")
+    # the invented fields are model-chosen text, so the error names the type only (E1.21)
+    assert first.error == "<key>: extra_forbidden; <key>: extra_forbidden"
+    assert "is_locked" not in (first.error or "") and "status" not in (first.error or "")
     assert second.output == {"count": 3, "label": "ok"}  # what is persisted has no platform field
     assert "APPROVED" not in json.dumps(bifrost.requests[1]["messages"][-1])  # no echo of values
 
