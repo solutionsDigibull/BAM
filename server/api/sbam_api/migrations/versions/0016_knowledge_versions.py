@@ -1,7 +1,7 @@
 """knowledge_versions and knowledge_sources
 
-Revision ID: 0015_knowledge_versions
-Revises: 0014_project_allow_restricted
+Revision ID: 0016_knowledge_versions
+Revises: 0015_llm_calls
 Create Date: 2026-10-16
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0015_knowledge_versions"
-down_revision: str | Sequence[str] | None = "0014_project_allow_restricted"
+revision: str = "0016_knowledge_versions"
+down_revision: str | Sequence[str] | None = "0015_llm_calls"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
