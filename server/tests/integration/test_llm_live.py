@@ -2,7 +2,8 @@
 
 Costs a few cents per run, so it only runs with `LIVE_LLM=1`. Needs Bifrost started with
 `LLM_PROVIDER=bifrost` and `OPENROUTER_API_KEY` in compose/.env. Langfuse is checked when
-LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set in the shell (not in a file):
+LANGFUSE_HOST (or LANGFUSE_BASE_URL), LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set in the
+shell:
 
     LIVE_LLM=1 uv run pytest -m integration tests/integration/test_llm_live.py -s
 """
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.integration
 BIFROST = f"http://127.0.0.1:{port('BIFROST_PORT', 8081)}"
 REQUEST = {"rfq": "Please quote 12 cables, delivery in March."}
 LANGFUSE: dict[str, Any] = {
-    "langfuse_host": os.environ.get("LANGFUSE_HOST"),
+    "langfuse_host": os.environ.get("LANGFUSE_HOST") or os.environ.get("LANGFUSE_BASE_URL"),
     "langfuse_public_key": os.environ.get("LANGFUSE_PUBLIC_KEY"),
     "langfuse_secret_key": os.environ.get("LANGFUSE_SECRET_KEY"),
 }
