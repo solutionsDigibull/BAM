@@ -78,7 +78,8 @@ def test_e1_15_t02_only_alias_models_are_allowed_upstream() -> None:
     for mode in gen.MODES:
         config = gen.build_config(mode)
         (key,) = config["providers"]["openrouter"]["keys"]
-        assert "gpt-4o" not in key["models"] and "openai/gpt-4o" not in key["models"]
+        # a model no alias uses (the aliases map to openai/gpt-4o and openai/gpt-4o-mini since E6.1)
+        assert "mistralai/mistral-large" not in key["models"]
         targets = {t["model"] for r in config["governance"]["routing_rules"] for t in r["targets"]}
         fallbacks = {
             f.removeprefix("openrouter/")

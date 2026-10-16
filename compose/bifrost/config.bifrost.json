@@ -11,10 +11,10 @@
           "name": "sbam",
           "value": "env.OPENROUTER_API_KEY",
           "models": [
+            "openai/gpt-4o-mini",
+            "openai/gpt-4o",
             "google/gemini-3.8-flash",
             "anthropic/claude-haiku-5.5",
-            "anthropic/claude-sonnet-5.5",
-            "openai/gpt-6-sol",
             "openai/text-embedding-3-small"
           ],
           "weight": 1.0
@@ -34,12 +34,12 @@
         "targets": [
           {
             "provider": "openrouter",
-            "model": "google/gemini-3.8-flash",
+            "model": "openai/gpt-4o-mini",
             "weight": 1
           }
         ],
         "fallbacks": [
-          "openrouter/anthropic/claude-haiku-5.5"
+          "openrouter/openai/gpt-4o"
         ],
         "enabled": true,
         "priority": 1
@@ -51,12 +51,12 @@
         "targets": [
           {
             "provider": "openrouter",
-            "model": "anthropic/claude-sonnet-5.5",
+            "model": "openai/gpt-4o",
             "weight": 1
           }
         ],
         "fallbacks": [
-          "openrouter/openai/gpt-6-sol"
+          "openrouter/openai/gpt-4o-mini"
         ],
         "enabled": true,
         "priority": 2
@@ -68,12 +68,12 @@
         "targets": [
           {
             "provider": "openrouter",
-            "model": "anthropic/claude-sonnet-5.5",
+            "model": "openai/gpt-4o",
             "weight": 1
           }
         ],
         "fallbacks": [
-          "openrouter/openai/gpt-6-sol"
+          "openrouter/openai/gpt-4o-mini"
         ],
         "enabled": true,
         "priority": 3
@@ -85,12 +85,12 @@
         "targets": [
           {
             "provider": "openrouter",
-            "model": "anthropic/claude-sonnet-5.5",
+            "model": "openai/gpt-4o",
             "weight": 1
           }
         ],
         "fallbacks": [
-          "openrouter/openai/gpt-6-sol"
+          "openrouter/openai/gpt-4o-mini"
         ],
         "enabled": true,
         "priority": 4
@@ -102,12 +102,12 @@
         "targets": [
           {
             "provider": "openrouter",
-            "model": "google/gemini-3.8-flash",
+            "model": "openai/gpt-4o-mini",
             "weight": 1
           }
         ],
         "fallbacks": [
-          "openrouter/anthropic/claude-haiku-5.5"
+          "openrouter/openai/gpt-4o"
         ],
         "enabled": true,
         "priority": 5
@@ -119,12 +119,12 @@
         "targets": [
           {
             "provider": "openrouter",
-            "model": "anthropic/claude-sonnet-5.5",
+            "model": "openai/gpt-4o-mini",
             "weight": 1
           }
         ],
         "fallbacks": [
-          "openrouter/openai/gpt-6-sol"
+          "openrouter/openai/gpt-4o"
         ],
         "enabled": true,
         "priority": 6
