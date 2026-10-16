@@ -116,6 +116,9 @@ class DocumentOut(BaseModel):
     deleted_at: datetime | None = None  # set while the document is in the 90-day bin
     deleted_by: str | None = None
     purge_after: datetime | None = None  # deleted_at + 90 days
+    # Why the document is REJECTED: MALWARE (the scan), or TYPE_MISMATCH / UNSUPPORTED_TYPE /
+    # INVALID_ENCODING (type detection, E4.4). None for every other state.
+    reject_code: ErrorCode | None = None
 
 
 class PurgeTarget(BaseModel):
