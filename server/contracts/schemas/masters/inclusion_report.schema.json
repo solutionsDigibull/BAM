@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/inclusion_report:0.1.0",
+  "$defs": {
+    "ExcludedEntry": {
+      "properties": {
+        "stable_id": {
+          "title": "Stable Id",
+          "type": "string"
+        },
+        "master_type": {
+          "$ref": "#/$defs/MasterType"
+        },
+        "reason": {
+          "enum": [
+            "RESTRICTED",
+            "ILLUSTRATIVE",
+            "RETIRED"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stable_id",
+        "master_type",
+        "reason"
+      ],
+      "title": "ExcludedEntry",
+      "type": "object"
+    },
+    "MasterType": {
+      "enum": [
+        "ORGANIZATION",
+        "RULES",
+        "AGENTS",
+        "SKILLS",
+        "TOOLING",
+        "FILETYPE"
+      ],
+      "title": "MasterType",
+      "type": "string"
+    }
+  },
+  "description": "What went into masters.jsonl and what didn't; included + excluded = snapshot size.",
+  "properties": {
+    "snapshot_id": {
+      "format": "uuid",
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "dataset": {
+      "title": "Dataset",
+      "type": "string"
+    },
+    "storage_key": {
+      "title": "Storage Key",
+      "type": "string"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    },
+    "included": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Included",
+      "type": "array"
+    },
+    "excluded": {
+      "items": {
+        "$ref": "#/$defs/ExcludedEntry"
+      },
+      "title": "Excluded",
+      "type": "array"
+    },
+    "refresh_due": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Refresh Due",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "snapshot_id",
+    "dataset",
+    "storage_key",
+    "sha256",
+    "included",
+    "excluded",
+    "refresh_due",
+    "warnings"
+  ],
+  "title": "InclusionReport",
+  "type": "object"
+}

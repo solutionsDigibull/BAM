@@ -15,12 +15,18 @@
 """
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from pydantic import ValidationError
 from sbam_contracts.api import ErrorCode, FieldError
 from sbam_contracts.masters import ADMIN_EDITABLE, MasterIdentity, MasterType, identify
-from sbam_contracts.masters_api import MasterEntryCreate, MasterVersionCreate, SnapshotEntry
+from sbam_contracts.masters_api import (
+    InclusionReport,
+    MasterEntryCreate,
+    MasterVersionCreate,
+    SnapshotEntry,
+)
 from sbam_contracts.masters_workbook import PAYLOAD_MODELS, ROW_LABEL_PREFIX, TOOLING_LABEL
 from sbam_contracts.projects import ProjectStatus
 from sqlalchemy.exc import IntegrityError
@@ -31,11 +37,13 @@ from sbam_api.core.auth import CurrentUser
 from sbam_api.core.conventions import ApiError, etag, not_found
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import StaleRowVersion
+from sbam_api.masters.context import Version, build_master_context
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion, MasterSnapshot
 from sbam_api.masters.repository import MasterEntryRepository
 from sbam_api.masters.snapshot import Candidate, resolve, snapshot_hash
 from sbam_api.projects.models import Project
 from sbam_api.projects.repository import ProjectRepository
+from sbam_api.storage import Kind, StorageBackend, StorageScope
 
 
 def version_conflict() -> ApiError:
@@ -298,6 +306,70 @@ def context_outdated(session: Session, user: CurrentUser, snapshot_id: uuid.UUID
         raise not_found()
     now = _resolve(repo, snapshot.project_id)
     return snapshot_hash(snapshot.project_id, now) != snapshot.sha256
+
+
+# --- master context for Cognee (E3.6) -------------------------------------------------------
+
+
+def snapshot_mismatch() -> ApiError:
+    return ApiError(
+        409,
+        ErrorCode.SNAPSHOT_PROJECT_MISMATCH,
+        "This snapshot belongs to another project",
+        "Use a snapshot of the project whose knowledge is being built.",
+    )
+
+
+def export_master_context(
+    session: Session,
+    user: CurrentUser,
+    snapshot_id: uuid.UUID,
+    project_id: uuid.UUID,
+    storage: StorageBackend,
+    now: datetime,
+) -> InclusionReport:
+    """Write masters.jsonl for `project_id` from `snapshot_id` and report what went in (E3.6).
+
+    The snapshot must be the caller's tenant's (else 404) and this project's (else 409
+    SNAPSHOT_PROJECT_MISMATCH), and its sha256 must still recompute. Restricted entries go in only
+    when the project allows it. Nothing is fetched: Links / Path stays text.
+    """
+    repo = _repo(session, user)
+    snapshot = repo.snapshot(snapshot_id)
+    if snapshot is None:
+        raise not_found()
+    if snapshot.project_id != project_id:
+        raise snapshot_mismatch()
+    project: Project | None = ProjectRepository(session, user.context()).get(project_id)
+    if project is None:
+        raise not_found()
+    entries = [SnapshotEntry.model_validate(e) for e in snapshot.entries]
+    if snapshot_hash(project_id, entries) != snapshot.sha256:
+        raise ApiError(
+            409, ErrorCode.CONFLICT, "Snapshot failed its integrity check", "Take a new snapshot."
+        )
+    rows = repo.versions_at([(e.entry_id, e.version) for e in entries])
+    if len(rows) != len(entries):
+        raise ApiError(409, ErrorCode.CONFLICT, "A pinned master version is missing")
+    ctx = build_master_context(
+        entries,
+        {k: Version(payload=v.payload, created_at=v.created_at) for k, v in rows.items()},
+        allow_restricted=project.allow_restricted,
+        now=now,
+    )
+    stored = storage.put(
+        ctx.jsonl, StorageScope(snapshot.tenant_id, project_id), Kind.OKF, "application/x-ndjson"
+    )
+    return InclusionReport(
+        snapshot_id=snapshot.id,
+        dataset=str(project_id),
+        storage_key=stored.storage_key,
+        sha256=stored.sha256,
+        included=[n.node_id for n in ctx.nodes],
+        excluded=ctx.excluded,
+        refresh_due=ctx.refresh_due,
+        warnings=ctx.warnings,
+    )
 
 
 # --- audit ----------------------------------------------------------------------------------

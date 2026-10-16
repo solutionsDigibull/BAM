@@ -19,7 +19,7 @@ Rules worth knowing
 """
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -80,10 +80,57 @@ class MasterEntry(BaseModel):
 
 
 class SnapshotEntry(BaseModel):
+    """One pinned entry. The snapshot pins every live entry of the project; whoever uses it decides
+    inclusion from `status` and `restricted` (E3.6: ILLUSTRATIVE / RETIRED never, Restricted only
+    when the project allows it)."""
+
     entry_id: UUID
     master_type: MasterType
     stable_id: str
     version: int = Field(ge=1)
+    status: MasterStatus
+    restricted: bool = False
+
+
+ExclusionReason = Literal["RESTRICTED", "ILLUSTRATIVE", "RETIRED"]
+
+
+class MasterNode(BaseModel):
+    """One line of masters.jsonl (E3.6): a master entry as a Cognee graph node.
+
+    `node_id` = the RAG Reference ID Field, else the stable id; `node_type` = Entity / Node Type,
+    else the master type. `parent_id` is the Parent Entity's node (None for roots: Organization
+    rows, and entries whose parent is unknown). `Links / Path` stays inside `payload` as text."""
+
+    model_config = ConfigDict(frozen=True)
+
+    node_id: str
+    node_type: str
+    master_type: MasterType
+    stable_id: str
+    entry_id: UUID
+    version: int
+    parent_id: str | None
+    payload: dict[str, Any]
+
+
+class ExcludedEntry(BaseModel):
+    stable_id: str
+    master_type: MasterType
+    reason: ExclusionReason
+
+
+class InclusionReport(BaseModel):
+    """What went into masters.jsonl and what didn't; included + excluded = snapshot size."""
+
+    snapshot_id: UUID
+    dataset: str  # the Cognee dataset name: the project id
+    storage_key: str  # where masters.jsonl was written (content-addressed)
+    sha256: str  # of masters.jsonl
+    included: list[str]  # node ids
+    excluded: list[ExcludedEntry]
+    refresh_due: list[str]  # stable ids whose Refresh Frequency has elapsed
+    warnings: list[str]
 
 
 class MastersSnapshot(BaseModel):
@@ -103,6 +150,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "master_entry": MasterEntry,
         "filetype_info": FiletypeInfo,
         "masters_snapshot": MastersSnapshot,
+        "inclusion_report": InclusionReport,
     }
     return {stem: contract_schema(model, f"masters/{stem}") for stem, model in models.items()}
 

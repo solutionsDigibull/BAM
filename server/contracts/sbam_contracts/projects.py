@@ -66,12 +66,21 @@ class ProjectPatch(_Request):
     client_name: ClientName | None = None
     description: Description | None = None
     context_notes: ContextNotes | None = None
+    # E3.6: let Restricted master entries into this project's knowledge context (default false).
+    allow_restricted: bool | None = None
 
     @field_validator("name")
     @classmethod
     def _name_not_null(cls, value: str | None) -> str:
         if value is None:  # runs only when sent: omitting `name` keeps it
             raise ValueError("name cannot be null")
+        return value
+
+    @field_validator("allow_restricted")
+    @classmethod
+    def _flag_not_null(cls, value: bool | None) -> bool:
+        if value is None:
+            raise ValueError("allow_restricted cannot be null")
         return value
 
 
@@ -82,6 +91,7 @@ class Project(BaseModel):
     client_name: str | None
     description: str | None
     context_notes: str | None
+    allow_restricted: bool = False
     status: ProjectStatus
     pipeline_state: ProjectPipelineState
     row_version: int

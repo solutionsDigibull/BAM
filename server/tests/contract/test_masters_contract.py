@@ -222,6 +222,7 @@ def test_e0_4_t01_schema_files_are_exactly_the_documented_ones() -> None:
         "filetype_info.schema.json",  # E3.7
         "master_entry.schema.json",
         "masters_snapshot.schema.json",
+        "inclusion_report.schema.json",  # E3.6
     }
 
 

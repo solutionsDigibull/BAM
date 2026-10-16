@@ -44,6 +44,7 @@ from sbam_contracts.masters import (
 )
 from sbam_contracts.masters_api import (
     FiletypeInfo,
+    InclusionReport,
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
@@ -108,6 +109,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/master_entry", MasterEntry),
     ("masters/filetype_info", FiletypeInfo),
     ("masters/masters_snapshot", MastersSnapshot),
+    ("masters/inclusion_report", InclusionReport),
     ("documents/document", DocumentOut),
     ("documents/purge_target", PurgeTarget),
     ("documents/purge_request", PurgeRequest),

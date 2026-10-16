@@ -58,6 +58,18 @@
       ],
       "default": null,
       "title": "Context Notes"
+    },
+    "allow_restricted": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Allow Restricted"
     }
   },
   "title": "ProjectPatch",

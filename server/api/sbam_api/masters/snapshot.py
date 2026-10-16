@@ -3,8 +3,10 @@
 * Scope: the tenant's entries plus the project's own; a project entry overrides the tenant entry
   with the same type and stable id. Entries of other projects never reach here (the repository
   filters them).
-* Left out of an authoritative snapshot: ILLUSTRATIVE (sample rows), RETIRED, and anything whose
-  Security / Access Level is Restricted. Old snapshots keep whatever they pinned.
+* Every chosen entry is pinned with its status and whether it is Restricted (Security / Access
+  Level). Consumers decide inclusion (E3.6): ILLUSTRATIVE (sample rows) and RETIRED never reach an
+  authoritative context, Restricted only when the project allows it. So a report can account for
+  every pinned entry. Old snapshots keep whatever they pinned.
 * The hash is `sha256_of(snapshot_document(...))`: the same entries and versions always hash the
   same, whatever order the rows came in.
 """
@@ -18,6 +20,7 @@ from sbam_contracts.masters import MasterStatus, MasterType, is_restricted
 from sbam_contracts.masters_api import SnapshotEntry, snapshot_document
 from sbam_contracts.masters_workbook import PAYLOAD_MODELS
 
+# Never part of an authoritative context, whoever consumes the snapshot (O-24).
 EXCLUDED = frozenset({MasterStatus.ILLUSTRATIVE.value, MasterStatus.RETIRED.value})
 
 
@@ -54,9 +57,10 @@ def resolve(project_id: uuid.UUID, candidates: Iterable[Candidate]) -> list[Snap
             master_type=MasterType(c.master_type),
             stable_id=c.stable_id,
             version=c.version,
+            status=MasterStatus(c.status),
+            restricted=_restricted(c),
         )
         for c in chosen.values()
-        if c.status not in EXCLUDED and not _restricted(c)
     ]
     return sorted(pinned, key=lambda e: (e.master_type.value, e.stable_id))
 
