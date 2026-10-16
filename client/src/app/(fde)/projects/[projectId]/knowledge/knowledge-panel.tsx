@@ -20,7 +20,7 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   ApiErrorState,
@@ -81,7 +81,9 @@ export function KnowledgePanel({
   const sending = useRef(false); // one rebuild request, even on a double click
 
   const current = latest(list.result.data?.versions);
-  onVersion?.(current);
+  useEffect(() => {
+    onVersion?.(current);
+  }, [current?.id, current?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const retry = useCustomMutation<RunAccepted, ApiError>();
   const [retrying, setRetrying] = useState<string | null>(null);
