@@ -222,6 +222,17 @@ services:
     environment:
       <<: *worker-deploy-env
       DATABASE_URL: !reset null
+      # Cognee (#78): the per-project user key and the Bifrost key come from Docker secrets.
+      COGNEE_USER_SECRET: !reset null
+      LLM_API_KEY: !reset null
+      EMBEDDING_API_KEY: !reset null
+      COGNEE_USER_SECRET_FILE: /run/secrets/cognee_user_secret
+      LLM_API_KEY_FILE: /run/secrets/bifrost_virtual_key
+      EMBEDDING_API_KEY_FILE: /run/secrets/bifrost_virtual_key
+    secrets:
+      - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: cognee_user_secret, target: cognee_user_secret, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: bifrost_virtual_key, target: bifrost_virtual_key, uid: "10001", gid: "10001", mode: 0400 }
 
   worker-llm:
     <<: *worker-deploy
@@ -329,3 +340,5 @@ secrets:
   storage_signing_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/storage_signing_key" }
   auth_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/auth_secret" }
   openrouter_api_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/openrouter_api_key" }
+  cognee_user_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/cognee_user_secret" }
+  bifrost_virtual_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/bifrost_virtual_key" }

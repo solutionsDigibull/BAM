@@ -5,6 +5,8 @@
 * Workflows and activities come from the registry (`@workflow_for` / `@activity_for`); feature
   modules register themselves, so this file is not edited to add one.
 * Touches the heartbeat file every few seconds; the image healthcheck reads it.
+* Preflight checks of the served queues (`@preflight_for`) run before Temporal is reached; a failure
+  exits with code 3 and `health FAILED <code>`, so nothing is polled (E5.1-T04).
 * `--reconcile-every SECONDS` (default `$SBAM_RECONCILE_EVERY`, 0 = off) runs the mirror reconciler.
 """
 
@@ -137,6 +139,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"sbam-worker: missing or invalid settings: {', '.join(names)}", file=sys.stderr)
         return 2
     configure_logging(settings.log_level)
+    registry.load_all()
+    try:
+        registry.run_preflight(queues)
+    except registry.PreflightError as exc:  # never polls; no heartbeat, so the healthcheck fails
+        print(f"sbam-worker: health FAILED {exc}", file=sys.stderr)
+        return 3
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(serve(settings, queues, args.reconcile_every))
     return 0

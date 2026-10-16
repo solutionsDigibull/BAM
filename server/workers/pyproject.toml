@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "SBAM Temporal workers"
 requires-python = "==3.12.*"
 dependencies = [
+    "cognee==1.6.2",
     "jinja2>=3.1.6,<4",
     "jsonschema>=4.25",
     "pyyaml>=6",
