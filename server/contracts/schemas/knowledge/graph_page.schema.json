@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:knowledge/graph_page:0.1.0",
+  "$defs": {
+    "GraphApiEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "title": "To",
+          "type": "string"
+        },
+        "external": {
+          "default": false,
+          "title": "External",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "from",
+        "to"
+      ],
+      "title": "GraphApiEdge",
+      "type": "object"
+    },
+    "GraphApiNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "degree": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Degree",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "name"
+      ],
+      "title": "GraphApiNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET P/knowledge/{kv_id}/graph`: nodes sorted by id; each edge on its `from` node's page.",
+  "properties": {
+    "knowledge_version_id": {
+      "format": "uuid",
+      "title": "Knowledge Version Id",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/GraphApiNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/GraphApiEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "next_cursor": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Next Cursor"
+    },
+    "total_estimate": {
+      "minimum": 0,
+      "title": "Total Estimate",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "knowledge_version_id",
+    "status",
+    "nodes",
+    "edges",
+    "total_estimate"
+  ],
+  "title": "KnowledgeGraphPage",
+  "type": "object"
+}

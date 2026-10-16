@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:knowledge/node_detail:0.1.0",
+  "$defs": {
+    "GraphApiNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "degree": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Degree",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "name"
+      ],
+      "title": "GraphApiNode",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "description": "Where a chunk is in its source (E4.5's doc.json provenance). `scope` is `document` when only\nthe whole document is known (no doc.json, or an entity found in no block).",
+      "properties": {
+        "scope": {
+          "default": "block",
+          "enum": [
+            "block",
+            "document"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "sheet": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet"
+        },
+        "cell": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cell"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        }
+      },
+      "title": "Location",
+      "type": "object"
+    },
+    "SourcePassage": {
+      "additionalProperties": false,
+      "properties": {
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "text": {
+          "maxLength": 4000,
+          "title": "Text",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "document_version_id",
+        "title",
+        "location",
+        "text"
+      ],
+      "title": "SourcePassage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET P/knowledge/{kv_id}/nodes/{node_id}`.",
+  "properties": {
+    "knowledge_version_id": {
+      "format": "uuid",
+      "title": "Knowledge Version Id",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "node": {
+      "$ref": "#/$defs/GraphApiNode"
+    },
+    "neighbours": {
+      "items": {
+        "$ref": "#/$defs/GraphApiNode"
+      },
+      "title": "Neighbours",
+      "type": "array"
+    },
+    "has_more": {
+      "default": false,
+      "title": "Has More",
+      "type": "boolean"
+    },
+    "source_passages": {
+      "items": {
+        "$ref": "#/$defs/SourcePassage"
+      },
+      "title": "Source Passages",
+      "type": "array"
+    }
+  },
+  "required": [
+    "knowledge_version_id",
+    "status",
+    "node",
+    "neighbours",
+    "source_passages"
+  ],
+  "title": "KnowledgeNodeDetail",
+  "type": "object"
+}

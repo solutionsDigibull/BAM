@@ -326,6 +326,42 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "202"
 
+  versions_api_v1_projects__project_id__knowledge_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  graph_page_api_v1_projects__project_id__knowledge__kv_id__graph_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge/{kv_id}/graph
+      params: {project_id: "@project_a", kv_id: "@kv_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  node_api_v1_projects__project_id__knowledge__kv_id__nodes__node_id__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge/{kv_id}/nodes/{node_id}
+      params: {project_id: "@project_a", kv_id: "@kv_a", node_id: n1}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  okf_bundle_api_v1_projects__project_id__knowledge__kv_id__okf_bundle_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge/{kv_id}/okf-bundle
+      params: {project_id: "@project_a", kv_id: "@kv_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "302"
+
   rebuild_api_v1_projects__project_id__knowledge_rebuild_post:
     request:
       method: POST

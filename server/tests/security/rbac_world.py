@@ -15,6 +15,7 @@ authorization, never from absence:
 `rbac_matrix.yaml` says what every role must get from every route; `World.request` sends it.
 """
 
+import hashlib
 import time
 import uuid
 from collections.abc import Callable
@@ -35,6 +36,7 @@ from runs_db import FakeClient
 from sbam_api.audit.models import AuditLog, NotificationOutbox
 from sbam_api.audit.security import AuditLogSecurityAudit
 from sbam_api.core.auth import Auth, Jwks, TokenVerifier
+from sbam_api.core.ids import uuid7
 from sbam_api.core.settings import Settings, load_settings
 from sbam_api.db.base import Base
 from sbam_api.db.repository import TenantContext
@@ -42,6 +44,7 @@ from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.identity.models import Tenant, User
 from sbam_api.identity.service import SqlUserDirectory
 from sbam_api.ingest.models import Document, DocumentVersion
+from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.main import create_app
 from sbam_api.masters.models import MasterEntry, MasterSnapshot
 from sbam_api.projects.models import Project
@@ -52,8 +55,11 @@ from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.temporal.models import TemporalRun
 from sbam_contracts.api import API_BASE
 from sbam_contracts.build import BuildStage, SubSkillBuildStatus
+from sbam_contracts.knowledge import CoverageEntry, GraphEdge, GraphNode, SourceStatus
+from sbam_contracts.okf import PartRef
 from sbam_contracts.runs import RunState, SubjectType, build_workflow_id
 from sbam_contracts.state_machines import DocumentVersionState, SubSkillState
+from sbam_workers.knowledge import okf
 from sqlalchemy import func, pool, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -327,6 +333,7 @@ class World:
             signed_url(SIGNING_KEY, self.file_key, TenantContext(self.tenant_a), 600)
         ).query
         self.file_query = dict(part.split("=", 1) for part in query.split("&"))
+        self.kv_a = self._seed_knowledge()
 
     def _create_project(self, role: str, name: str) -> uuid.UUID:
         res = self.call("POST", "/admin/projects", role, json={"name": name})
@@ -370,6 +377,57 @@ class World:
         url, kwargs = spec.build(self, overrides)
         return self.call(spec.method, url, role, **kwargs)
 
+    def _seed_knowledge(self) -> uuid.UUID:
+        """A READY knowledge version of project A with a one-entity OKF bundle (E5.4 reads)."""
+        storage = LocalDiskBackend(self.tmp)
+        where = StorageScope(self.tenant_a, self.project_a)
+        dvid = uuid.uuid4()
+        text = "Alpha supplier Mouser."
+        doc = okf.Doc(dvid, text, hashlib.sha256(text.encode()).hexdigest())
+        nodes = [
+            GraphNode(id="d", type="TextDocument", name=f"{dvid}_{'0' * 64}"),
+            GraphNode(id="c", type="DocumentChunk"),
+            GraphNode(id="n1", type="Entity", name="Mouser"),
+        ]
+        edges = [
+            GraphEdge(source="c", target="d", label="is_part_of"),
+            GraphEdge(source="c", target="n1", label="contains"),
+        ]
+        outcome = CoverageEntry(document_version_id=dvid, status=SourceStatus.ADDED)
+        built = okf.build_parts([doc], [outcome], nodes, edges, b"")
+        refs = {}
+        for name, data in built.parts.items():
+            stored = storage.put(data, where, Kind.OKF, "application/json")
+            refs[name] = PartRef(storage_key=stored.storage_key, sha256=stored.sha256)
+        kv = uuid7()
+        bundle = okf.manifest(
+            version_id=kv,
+            project_id=self.project_a,
+            number=1,
+            docs=[doc],
+            parts=refs,
+            snapshot_id=None,
+            masters_sha256=okf.sha256(b""),
+        )
+        stored = storage.put(bundle, where, Kind.OKF, "application/json")
+        with self.sessions() as s:
+            s.add(
+                KnowledgeVersion(
+                    id=kv,
+                    tenant_id=self.tenant_a,
+                    project_id=self.project_a,
+                    version=1,
+                    run_id=uuid7(),
+                    cognee_dataset="d",
+                    coverage={},
+                    state="READY",
+                    okf_bundle_key=stored.storage_key,
+                    okf_sha256=stored.sha256,
+                )
+            )
+            s.commit()
+        return kv
+
     # -- placeholders (`@name` in the matrix) ----------------------------------------------
     def value(self, name: str) -> str:
         """What `@name` stands for in the matrix."""
@@ -388,6 +446,7 @@ class World:
             "master_a": self.master_a,
             "master_b": self.master_b,
             "snapshot_a": self.snapshot_a,
+            "kv_a": self.kv_a,
         }
         if name in fixed:
             return str(fixed[name])
