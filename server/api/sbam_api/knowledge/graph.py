@@ -27,8 +27,10 @@ from sbam_contracts.api import ErrorCode
 from sbam_contracts.knowledge import (
     MAX_NEIGHBOURS,
     MAX_PASSAGE_CHARS,
+    CoverageRow,
     GraphApiEdge,
     GraphApiNode,
+    KnowledgeCounts,
     KnowledgeCoverage,
     KnowledgeGraphPage,
     KnowledgeNodeDetail,
@@ -74,20 +76,80 @@ def invalid_cursor() -> ApiError:
 # --- versions ------------------------------------------------------------------------------------
 
 
+FINISHED = frozenset({KnowledgeVersionState.READY.value, KnowledgeVersionState.FAILED.value})
+
+
 def list_versions(session: Session, ctx: TenantContext) -> KnowledgeVersionList:
-    rows = KnowledgeVersionRepository(session, ctx).list()
-    return KnowledgeVersionList(
-        versions=[
-            KnowledgeVersionSummary(
-                id=r.id,
-                version=r.version,
-                status=r.state,
-                coverage=KnowledgeCoverage.model_validate(r.coverage or {}),
-                error_reason=r.error_reason,
-                created_at=r.created_at,
+    rows = sorted(KnowledgeVersionRepository(session, ctx).list(), key=lambda r: -r.version)
+    coverages = {r.id: _coverage(r) for r in rows}
+    ids: set[uuid.UUID] = set()
+    for coverage in coverages.values():
+        ids |= {entry.document_version_id for entry in coverage.documents}
+        if coverage.bundle is not None:
+            ids |= {d.document_version_id for d in coverage.bundle.documents}
+    documents = _documents_of(session, ctx, ids)
+    return KnowledgeVersionList(versions=[_summary(r, coverages[r.id], documents) for r in rows])
+
+
+def _coverage(row: KnowledgeVersion) -> KnowledgeCoverage:
+    """Stored coverage, or an empty one when it is malformed (the panel says so, never crashes)."""
+    try:
+        return KnowledgeCoverage.model_validate(row.coverage or {})
+    except ValueError:
+        return KnowledgeCoverage()
+
+
+def _summary(
+    row: KnowledgeVersion, coverage: KnowledgeCoverage, documents_of: dict[uuid.UUID, Document]
+) -> KnowledgeVersionSummary:
+    def title(version_id: uuid.UUID) -> str:
+        found = documents_of.get(version_id)
+        return found.title if found else ""
+
+    def document_id(version_id: uuid.UUID) -> uuid.UUID | None:
+        found = documents_of.get(version_id)
+        return found.id if found else None
+
+    if coverage.bundle is not None:
+        documents = [
+            CoverageRow(
+                document_version_id=d.document_version_id,
+                title=title(d.document_version_id),
+                document_id=document_id(d.document_version_id),
+                status=d.status.value,
+                chunks=d.chunks,
+                entities=d.entities,
+                reason=d.reason,
             )
-            for r in sorted(rows, key=lambda r: -r.version)
+            for d in coverage.bundle.documents
         ]
+    else:
+        documents = [
+            CoverageRow(
+                document_version_id=e.document_version_id,
+                title=title(e.document_version_id),
+                document_id=document_id(e.document_version_id),
+                status=e.status.value,
+                reason=e.reason,
+            )
+            for e in coverage.documents
+        ]
+    return KnowledgeVersionSummary(
+        id=row.id,
+        version=row.version,
+        status=row.state,
+        coverage=coverage,
+        error_reason=row.error_reason,
+        created_at=row.created_at,
+        finished_at=row.updated_at if row.state in FINISHED else None,
+        okf_sha256=row.okf_sha256,
+        counts=KnowledgeCounts(
+            documents=len(documents),
+            entities=coverage.entities,
+            relations=coverage.relations,
+            chunks=coverage.chunks,
+        ),
+        documents=documents,
     )
 
 
@@ -299,18 +361,25 @@ def node_detail(
     )
 
 
-def _titles(
+def _documents_of(
     session: Session, ctx: TenantContext, version_ids: set[uuid.UUID]
-) -> dict[uuid.UUID, str]:
+) -> dict[uuid.UUID, Document]:
+    """Document version id -> its document (title, id), this tenant's only."""
     versions = DocumentVersionRepository(session, ctx)
     documents = DocumentRepository(session, ctx)
-    out: dict[uuid.UUID, str] = {}
+    out: dict[uuid.UUID, Document] = {}
     for version_id in version_ids:
         version = versions.get(version_id)
         document: Document | None = documents.get(version.document_id) if version else None
         if document is not None:
-            out[version_id] = document.title
+            out[version_id] = document
     return out
+
+
+def _titles(
+    session: Session, ctx: TenantContext, version_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    return {k: d.title for k, d in _documents_of(session, ctx, version_ids).items()}
 
 
 # --- OKF download --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:0316f41d38f228ac9902ad2d9168199b08f58dc10d8f1330665ae50ea3327481
+// source-sha256:135f03b5bc3d584539bb316921f48babe11646812fd782510f011e4367ade2be
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -2374,6 +2374,10 @@ export interface KnowledgeVersionSummary {
   coverage: KnowledgeCoverage;
   error_reason?: string | null;
   created_at: string;
+  finished_at?: string | null;
+  okf_sha256?: string | null;
+  counts?: KnowledgeCounts;
+  documents?: CoverageRow[];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -2383,6 +2387,8 @@ export interface KnowledgeCoverage {
   documents?: CoverageEntry[];
   masters_included?: number;
   entities?: number;
+  relations?: number;
+  chunks?: number;
   bundle?: BundleCoverage | null;
 }
 /**
@@ -2392,6 +2398,32 @@ export interface KnowledgeCoverage {
 export interface CoverageEntry {
   document_version_id: string;
   status: SourceStatus;
+  reason?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeCounts".
+ */
+export interface KnowledgeCounts {
+  documents?: number;
+  entities?: number;
+  relations?: number;
+  chunks?: number;
+}
+/**
+ * One document of a version, ready to show (E5.6): the bundle's view once it exists, else the
+ * build's. `title` is the uploaded file's name; `reason` is a code, shown as text.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CoverageRow".
+ */
+export interface CoverageRow {
+  document_version_id: string;
+  document_id?: string | null;
+  title: string;
+  status: string;
+  chunks?: number;
+  entities?: number;
   reason?: string | null;
 }
 /**

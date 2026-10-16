@@ -332,3 +332,51 @@ def test_e5_4_no_write_routes_on_nodes_or_edges(h: Harness) -> None:
     for method in ("POST", "PATCH", "PUT", "DELETE"):
         res = h.call(method, f"/projects/{h.project}/knowledge/{kv}/nodes/e00000", h.fde())
         assert res.status_code == 405
+
+
+def test_e5_6_versions_carry_titles_counts_and_hash(h: Harness) -> None:
+    dvid, doc = h.document("Supplier Mouser.", title="rfq-12.pdf")
+    nodes, edges = graph_of(dvid, [("m", "Mouser", "Supplier")])
+    kv = h.ready([doc], nodes, edges)
+    with h.sessions() as s:
+        row = s.get(KnowledgeVersion, kv)
+        assert row is not None
+        bundle = okf.build_parts(
+            [doc],
+            [CoverageEntry(document_version_id=dvid, status=SourceStatus.ADDED)],
+            nodes,
+            edges,
+            b"",
+        ).coverage
+        row.coverage = {
+            "entities": 1,
+            "relations": 0,
+            "chunks": 1,
+            "bundle": bundle.model_dump(mode="json"),
+        }
+        s.commit()
+    [v] = h.get("").json()["versions"]
+    assert v["okf_sha256"] and v["finished_at"] and v["documents"][0]["document_id"]
+    assert v["counts"] == {"documents": 1, "entities": 1, "relations": 0, "chunks": 1}
+    assert v["documents"] == [
+        {
+            "document_version_id": str(dvid),
+            "document_id": v["documents"][0]["document_id"],
+            "title": "rfq-12.pdf",
+            "status": "COVERED",
+            "chunks": 1,
+            "entities": 1,
+            "reason": None,
+        }
+    ]
+
+
+def test_e5_6_malformed_coverage_is_empty_not_an_error(h: Harness) -> None:
+    kv = h.add_version(1, "FAILED")
+    with h.sessions() as s:
+        row = s.get(KnowledgeVersion, kv)
+        assert row is not None
+        row.coverage = {"documents": "not a list"}
+        s.commit()
+    [v] = h.get("").json()["versions"]
+    assert v["documents"] == [] and v["counts"]["documents"] == 0
