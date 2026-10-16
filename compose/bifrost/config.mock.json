@@ -22,7 +22,11 @@
             "sbam-testgen-primary",
             "sbam-testgen-fallback",
             "sbam-corrector-primary",
-            "sbam-corrector-fallback"
+            "sbam-corrector-fallback",
+            "sbam-knowledge-primary",
+            "sbam-knowledge-fallback",
+            "sbam-embed-primary",
+            "sbam-embed-fallback"
           ],
           "weight": 1.0
         }
@@ -137,6 +141,40 @@
         ],
         "enabled": true,
         "priority": 6
+      },
+      {
+        "id": "alias-sbam-knowledge",
+        "name": "sbam-knowledge",
+        "cel_expression": "model == \"sbam-knowledge\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-knowledge-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-knowledge-fallback"
+        ],
+        "enabled": true,
+        "priority": 7
+      },
+      {
+        "id": "alias-sbam-embed",
+        "name": "sbam-embed",
+        "cel_expression": "model == \"sbam-embed\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-embed-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-embed-fallback"
+        ],
+        "enabled": true,
+        "priority": 8
       }
     ]
   },

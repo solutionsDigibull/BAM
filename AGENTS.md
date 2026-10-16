@@ -127,6 +127,7 @@ These targets are **created by the M0 issues with exactly these names**: #32 E1.
   for changes, and replay tests must pass.
 - LLM calls go only through the Bifrost client with an alias (`sbam-ocr`, `sbam-sow`, `sbam-isatvon`,
   `sbam-codegen`, `sbam-testgen`, `sbam-corrector`). No direct SDK calls. CI uses the mock provider.
+  Cognee (in worker-knowledge) has its own two, `sbam-knowledge` and `sbam-embed`, set in Compose.
 - Project files go only through `StorageBackend`. No direct file I/O.
 - State changes go through the state-machine service and write the audit log.
 - API: base `/api/v1`. Errors are problem+json. Writes use `ETag`/`If-Match`. Long operations return 202

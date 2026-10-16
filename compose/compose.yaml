@@ -366,6 +366,10 @@ services:
       EMBEDDING_API_KEY: ${COGNEE_BIFROST_KEY:-sbam-local}
       EMBEDDING_DIMENSIONS: ${COGNEE_EMBEDDING_DIMENSIONS:-1536}
       COGNEE_USER_SECRET: ${COGNEE_USER_SECRET:-change-me-cognee-user-secret-0000000000}
+      # No internet: never try HuggingFace for a tokenizer and send no telemetry; tiktoken's encoding and the
+      # graph store's JSON extension are baked into the image (#259).
+      HF_HUB_OFFLINE: "1"
+      TELEMETRY_DISABLED: "1"
     volumes:
       - cognee_data:/data/cognee
       - storage:/data/storage:ro

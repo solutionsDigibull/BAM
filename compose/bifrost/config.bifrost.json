@@ -14,7 +14,8 @@
             "google/gemini-3.8-flash",
             "anthropic/claude-haiku-5.5",
             "anthropic/claude-sonnet-5.5",
-            "openai/gpt-6-sol"
+            "openai/gpt-6-sol",
+            "openai/text-embedding-3-small"
           ],
           "weight": 1.0
         }
@@ -127,6 +128,40 @@
         ],
         "enabled": true,
         "priority": 6
+      },
+      {
+        "id": "alias-sbam-knowledge",
+        "name": "sbam-knowledge",
+        "cel_expression": "model == \"sbam-knowledge\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "google/gemini-3.8-flash",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/anthropic/claude-haiku-5.5"
+        ],
+        "enabled": true,
+        "priority": 7
+      },
+      {
+        "id": "alias-sbam-embed",
+        "name": "sbam-embed",
+        "cel_expression": "model == \"sbam-embed\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "openai/text-embedding-3-small",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/text-embedding-3-small"
+        ],
+        "enabled": true,
+        "priority": 8
       }
     ]
   },

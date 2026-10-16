@@ -28,5 +28,17 @@
     "use": "Correction (CorrectionPatch)",
     "primary": "anthropic/claude-sonnet-5.5",
     "fallback": "openai/gpt-6-sol"
+  },
+  "sbam-knowledge": {
+    "use": "Cognee graph extraction and summaries in worker-knowledge (KnowledgeGraph JSON)",
+    "primary": "google/gemini-3.8-flash",
+    "fallback": "anthropic/claude-haiku-5.5",
+    "mock": "generated"
+  },
+  "sbam-embed": {
+    "use": "Cognee embeddings (1536 dimensions); the fallback is the same model, because another model would change the vector size",
+    "primary": "openai/text-embedding-3-small",
+    "fallback": "openai/text-embedding-3-small",
+    "kind": "embedding"
   }
 }
