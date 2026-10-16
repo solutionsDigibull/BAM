@@ -20,7 +20,7 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import {
   ApiErrorState,
@@ -50,6 +50,7 @@ import {
   okfFileName,
   rebuildErrorMessage,
   rebuildPath,
+  retryDocumentPath,
 } from "./knowledge-api";
 
 const newKey = () => globalThis.crypto.randomUUID();
@@ -81,6 +82,29 @@ export function KnowledgePanel({
 
   const current = latest(list.result.data?.versions);
   onVersion?.(current);
+
+  const retry = useCustomMutation<RunAccepted, ApiError>();
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const onRetry = (documentId: string) => {
+    if (retrying) return; // one retry request at a time
+    setRetrying(documentId);
+    retry.mutate(
+      {
+        url: retryDocumentPath(projectId, documentId),
+        method: "post",
+        values: {},
+        config: { headers: { "idempotency-key": newKey() } },
+      },
+      {
+        onSuccess: () => void message.success("Document retry started."),
+        onError: (error) =>
+          void message.error(
+            (error as ApiError | null)?.problem?.detail ?? "Could not retry the document.",
+          ),
+        onSettled: () => setRetrying(null),
+      },
+    );
+  };
 
   const onRebuild = () => {
     if (sending.current) return;
@@ -227,9 +251,20 @@ export function KnowledgePanel({
                 key: "action",
                 render: (_: unknown, row: CoverageRow) =>
                   row.status === "FAILED" ? (
-                    <Button size="small" disabled={building} onClick={onRebuild}>
-                      Rebuild
-                    </Button>
+                    <Flex gap={8}>
+                      {row.document_id ? (
+                        <Button
+                          size="small"
+                          loading={retrying === row.document_id}
+                          onClick={() => onRetry(row.document_id!)}
+                        >
+                          Retry document
+                        </Button>
+                      ) : null}
+                      <Button size="small" disabled={building} onClick={onRebuild}>
+                        Rebuild
+                      </Button>
+                    </Flex>
                   ) : null,
               },
             ]}

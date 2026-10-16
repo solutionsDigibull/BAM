@@ -7,6 +7,8 @@ import { problemCode } from "../../workspace-api";
 
 export const knowledgePath = (projectId: string) => `projects/${projectId}/knowledge`;
 export const rebuildPath = (projectId: string) => `projects/${projectId}/knowledge/rebuild`;
+export const retryDocumentPath = (projectId: string, documentId: string) =>
+  `projects/${projectId}/documents/${documentId}/retry`;
 export const graphPath = (projectId: string, kvId: string) =>
   `projects/${projectId}/knowledge/${kvId}/graph`;
 export const nodePath = (projectId: string, kvId: string, nodeId: string) =>

@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
@@ -103,6 +103,25 @@ describe("Knowledge status and coverage (E5.6)", () => {
     expect(button.closest("a")).toBeNull();
   });
 
+  test("e5_6_t03 'Retry document' posts the document's retry with an Idempotency-Key", async () => {
+    const DOC = "0190f3a2-7b1c-7d4e-8f00-00000000d0c9";
+    const failed = row({
+      status: "FAILED",
+      reason: "PARSE_ERROR",
+      document_id: DOC,
+      title: "x.pdf",
+    });
+    const { calls } = fakeApi({
+      [LIST]: list(version({ documents: [failed] })),
+      [`POST /projects/${ID}/documents/${DOC}/retry`]: { status: 202, body: { run: {} } },
+    });
+    render();
+    fireEvent.click(await screen.findByRole("button", { name: "Retry document" }));
+    expect(await screen.findByText("Document retry started.")).toBeDefined();
+    const post = calls.find((c) => c.path.endsWith("/retry"))!;
+    expect(new Headers(post.init.headers).get("idempotency-key")).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
   test("e5_6_t03 failed documents come first with their reason and a Rebuild action", async () => {
     const failed = row({
       document_version_id: "0190f3a2-7b1c-7d4e-8f00-00000000d0c2",
@@ -120,7 +139,7 @@ describe("Knowledge status and coverage (E5.6)", () => {
     const rows = await screen.findAllByRole("row");
     expect(rows[1]?.textContent).toContain("scan.pdf");
     expect(rows[1]?.textContent).toContain("NOT_PARSED");
-    fireEvent.click(rows[1]!.querySelector("button")!);
+    fireEvent.click(within(rows[1]!).getByRole("button", { name: "Rebuild" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
     expect(await screen.findByText("Rebuild started.")).toBeDefined();
   });

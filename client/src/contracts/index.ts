@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:f46f791f4a4369cb9fa72fe7d0e95d7a10f3cd7661c8c1425b35b7dd6a98c0c5
+// source-sha256:135f03b5bc3d584539bb316921f48babe11646812fd782510f011e4367ade2be
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -2419,6 +2419,7 @@ export interface KnowledgeCounts {
  */
 export interface CoverageRow {
   document_version_id: string;
+  document_id?: string | null;
   title: string;
   status: string;
   chunks?: number;

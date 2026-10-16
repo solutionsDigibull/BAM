@@ -72,6 +72,19 @@
           "title": "Document Version Id",
           "type": "string"
         },
+        "document_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Id"
+        },
         "title": {
           "title": "Title",
           "type": "string"

@@ -356,11 +356,12 @@ def test_e5_6_versions_carry_titles_counts_and_hash(h: Harness) -> None:
         }
         s.commit()
     [v] = h.get("").json()["versions"]
-    assert v["okf_sha256"] and v["finished_at"]
+    assert v["okf_sha256"] and v["finished_at"] and v["documents"][0]["document_id"]
     assert v["counts"] == {"documents": 1, "entities": 1, "relations": 0, "chunks": 1}
     assert v["documents"] == [
         {
             "document_version_id": str(dvid),
+            "document_id": v["documents"][0]["document_id"],
             "title": "rfq-12.pdf",
             "status": "COVERED",
             "chunks": 1,

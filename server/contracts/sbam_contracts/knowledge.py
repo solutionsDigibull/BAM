@@ -159,6 +159,7 @@ class CoverageRow(_Dto):
     build's. `title` is the uploaded file's name; `reason` is a code, shown as text."""
 
     document_version_id: UUID
+    document_id: UUID | None = None  # for POST P/documents/{document_id}/retry
     title: str
     status: str  # CoverageStatus once the bundle exists, else SourceStatus
     chunks: int = 0

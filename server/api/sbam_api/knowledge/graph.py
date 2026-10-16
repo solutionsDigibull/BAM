@@ -87,8 +87,8 @@ def list_versions(session: Session, ctx: TenantContext) -> KnowledgeVersionList:
         ids |= {entry.document_version_id for entry in coverage.documents}
         if coverage.bundle is not None:
             ids |= {d.document_version_id for d in coverage.bundle.documents}
-    titles = _titles(session, ctx, ids)
-    return KnowledgeVersionList(versions=[_summary(r, coverages[r.id], titles) for r in rows])
+    documents = _documents_of(session, ctx, ids)
+    return KnowledgeVersionList(versions=[_summary(r, coverages[r.id], documents) for r in rows])
 
 
 def _coverage(row: KnowledgeVersion) -> KnowledgeCoverage:
@@ -100,13 +100,22 @@ def _coverage(row: KnowledgeVersion) -> KnowledgeCoverage:
 
 
 def _summary(
-    row: KnowledgeVersion, coverage: KnowledgeCoverage, titles: dict[uuid.UUID, str]
+    row: KnowledgeVersion, coverage: KnowledgeCoverage, documents_of: dict[uuid.UUID, Document]
 ) -> KnowledgeVersionSummary:
+    def title(version_id: uuid.UUID) -> str:
+        found = documents_of.get(version_id)
+        return found.title if found else ""
+
+    def document_id(version_id: uuid.UUID) -> uuid.UUID | None:
+        found = documents_of.get(version_id)
+        return found.id if found else None
+
     if coverage.bundle is not None:
         documents = [
             CoverageRow(
                 document_version_id=d.document_version_id,
-                title=titles.get(d.document_version_id, ""),
+                title=title(d.document_version_id),
+                document_id=document_id(d.document_version_id),
                 status=d.status.value,
                 chunks=d.chunks,
                 entities=d.entities,
@@ -118,7 +127,8 @@ def _summary(
         documents = [
             CoverageRow(
                 document_version_id=e.document_version_id,
-                title=titles.get(e.document_version_id, ""),
+                title=title(e.document_version_id),
+                document_id=document_id(e.document_version_id),
                 status=e.status.value,
                 reason=e.reason,
             )
@@ -351,18 +361,25 @@ def node_detail(
     )
 
 
-def _titles(
+def _documents_of(
     session: Session, ctx: TenantContext, version_ids: set[uuid.UUID]
-) -> dict[uuid.UUID, str]:
+) -> dict[uuid.UUID, Document]:
+    """Document version id -> its document (title, id), this tenant's only."""
     versions = DocumentVersionRepository(session, ctx)
     documents = DocumentRepository(session, ctx)
-    out: dict[uuid.UUID, str] = {}
+    out: dict[uuid.UUID, Document] = {}
     for version_id in version_ids:
         version = versions.get(version_id)
         document: Document | None = documents.get(version.document_id) if version else None
         if document is not None:
-            out[version_id] = document.title
+            out[version_id] = document
     return out
+
+
+def _titles(
+    session: Session, ctx: TenantContext, version_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    return {k: d.title for k, d in _documents_of(session, ctx, version_ids).items()}
 
 
 # --- OKF download --------------------------------------------------------------------------------
