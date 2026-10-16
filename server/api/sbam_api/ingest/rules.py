@@ -1,39 +1,15 @@
 """Upload limits and the extension allowlist (TD §5.2).
 
-ponytail: `ALLOWED_EXTENSIONS` is the TD §5.2 MVP set, written out. #60 (E3.7) derives it from the
-Filetype configuration (`mvp_enabled` loaders); replace this constant with that then.
+`ALLOWED_EXTENSIONS` comes from the Filetype configuration (E3.7): the extensions of the types with
+an MVP loader (`sbam_api.filetypes.config`).
 """
 
 from datetime import timedelta
 from typing import Final
 
-ALLOWED_EXTENSIONS: Final = frozenset(
-    {
-        "md",
-        "txt",
-        "eml",
-        "msg",
-        "json",
-        "xml",
-        "yaml",
-        "yml",
-        "py",
-        "sql",
-        "js",
-        "go",
-        "cpp",
-        "csv",
-        "xlsx",
-        "docx",
-        "pdf",
-        "zip",
-        "tar.gz",
-        "png",
-        "jpg",
-        "jpeg",
-        "tiff",
-    }
-)
+from sbam_api.filetypes.config import allowlist
+
+ALLOWED_EXTENSIONS: Final = allowlist()
 
 STAGING: Final = "uploads"  # tusd's -upload-dir under STORAGE_ROOT (compose/compose.yaml)
 

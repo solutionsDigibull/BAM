@@ -237,6 +237,14 @@ routes:
       params: {snapshot_id: "@snapshot_a"}
     expect: *tenant_admin_a_resource
 
+  # ---- filetype table (E3.7) --------------------------------------------------------------
+  # The 43 frozen Filetype rows + loader config: platform data, readable by every portal role.
+  list_filetypes_api_v1_admin_filetypes_get:
+    request: {method: GET, path: /api/v1/admin/filetypes}
+    expect:
+      <<: *open
+      anon: "401 UNAUTHENTICATED"
+
   # ---- runtime registry -------------------------------------------------------------------
   admin_registry_api_v1_admin_registry_get:
     request: {method: GET, path: /api/v1/admin/registry}

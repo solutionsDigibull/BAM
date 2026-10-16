@@ -43,6 +43,7 @@ from sbam_contracts.masters import (
     ToolingPayload,
 )
 from sbam_contracts.masters_api import (
+    FiletypeInfo,
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
@@ -105,6 +106,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/master_entry_create", MasterEntryCreate),
     ("masters/master_version_create", MasterVersionCreate),
     ("masters/master_entry", MasterEntry),
+    ("masters/filetype_info", FiletypeInfo),
     ("masters/masters_snapshot", MastersSnapshot),
     ("documents/document", DocumentOut),
     ("documents/purge_target", PurgeTarget),

@@ -49,9 +49,10 @@ def _invalid(errors: list[FieldError]) -> ApiError:
 
 
 def _not_editable(master_type: MasterType) -> ApiError:
+    """FILETYPE is frozen (O-23, E3.7-T03): FILETYPE_FROZEN. Anything else: FORBIDDEN."""
     return ApiError(
         403,
-        ErrorCode.FORBIDDEN,
+        ErrorCode.FILETYPE_FROZEN if master_type == MasterType.FILETYPE else ErrorCode.FORBIDDEN,
         "This master is read-only here",
         f"{master_type.value} changes only through the super-admin workbook import.",
     )
