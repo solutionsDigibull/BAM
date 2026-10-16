@@ -395,6 +395,12 @@
         "actor": "SYSTEM"
       },
       {
+        "from": "PARSE_FAILED",
+        "event": "retry",
+        "to": "SCANNING",
+        "actor": "FDE"
+      },
+      {
         "from": "UPLOADED",
         "event": "delete",
         "to": "DELETED",
