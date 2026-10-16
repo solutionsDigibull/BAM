@@ -3,6 +3,8 @@ or without a parsed `doc.md`, masters tables and the knowledge tables. No Docker
 
 import asyncio
 import hashlib
+import json
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -22,10 +24,13 @@ from sbam_api.projects.models import Project
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.temporal.models import TemporalRun
+from sbam_contracts.knowledge import GraphEdge, GraphNode
+from sbam_contracts.pipeline import StageRef
 from sbam_contracts.runs import RunInput
 from sbam_workers.knowledge.build import BuildDeps, build_version
+from sbam_workers.knowledge.bundle import build_bundle
 from sbam_workers.knowledge.cognee_adapter import CogneeAdapter, Principal
-from sbam_workers.knowledge.derivatives import DOC_MD, Derivative
+from sbam_workers.knowledge.derivatives import DOC_JSON, DOC_MD, Derivative
 from sbam_workers.knowledge.scope import SqlScopeGuard
 from sqlalchemy import pool, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -93,6 +98,7 @@ def add_document(
     tenant: uuid.UUID = TENANT,
     state: str = "PARSED",
     scan: str = "CLEAN",
+    blocks: list[dict[str, Any]] | None = None,
 ) -> uuid.UUID:
     """A document version; with `text`, its parsed `doc.md` is stored and linked (E4.5's key)."""
     with sessions() as session:
@@ -116,6 +122,11 @@ def add_document(
                 text.encode(), StorageScope(tenant, project), Kind.DERIVED, "text/markdown"
             )
             DERIVED[version.id] = {DOC_MD: Derivative(stored.storage_key, stored.sha256)}
+            if blocks is not None:
+                body = json.dumps({"blocks": blocks, "tables": []}).encode()
+                where = StorageScope(tenant, project)
+                doc_json = storage.put(body, where, Kind.DERIVED, "application/json")
+                DERIVED[version.id][DOC_JSON] = Derivative(doc_json.storage_key, doc_json.sha256)
         session.add(version)
         session.commit()
         return version.id
@@ -152,8 +163,31 @@ class Cognee(FakeCognee):
         await super().add(who, dataset, name, data)
 
     async def graph(self, who: Principal, dataset: str) -> Any:
-        nodes, edges = await super().graph(who, dataset)
-        return (nodes, edges) if self.entities else ([], [])
+        """Cognee's shape (E5.1/#26): TextDocument (named after the item) <- DocumentChunk
+        (`is_part_of`), chunk -> Entity (`contains`), Entity -> EntityType (`is_a`), and an
+        `related_to` edge between consecutive entities. `entities=False`: an empty graph."""
+        self._call("graph")
+        if not self.entities:
+            return [], []
+        nodes: dict[str, GraphNode] = {}
+        edges: list[GraphEdge] = []
+        concept = GraphNode(id="type-concept", type="EntityType", name="Concept")
+        for name, data in sorted(self._ds(who, dataset).items()):
+            doc = GraphNode(id=f"doc-{name}", type="TextDocument", name=name)
+            chunk = GraphNode(id=f"chunk-{name}", type="DocumentChunk", name=name)
+            nodes[doc.id], nodes[chunk.id], nodes[concept.id] = doc, chunk, concept
+            edges.append(GraphEdge(source=chunk.id, target=doc.id, label="is_part_of"))
+            words = re.findall(r"\b[A-Z][A-Za-z0-9-]+\b", data.decode("utf-8", "replace"))
+            previous = None
+            for word in dict.fromkeys(words):
+                entity = GraphNode(id=f"ent-{word.lower()}", type="Entity", name=word)
+                nodes[entity.id] = entity
+                edges.append(GraphEdge(source=chunk.id, target=entity.id, label="contains"))
+                edges.append(GraphEdge(source=entity.id, target=concept.id, label="is_a"))
+                if previous is not None:
+                    edges.append(GraphEdge(source=previous, target=entity.id, label="related_to"))
+                previous = entity.id
+        return list(nodes.values()), edges
 
 
 class World:
@@ -189,3 +223,11 @@ class World:
 
     def build(self, inp: RunInput, attempt: int = 1) -> uuid.UUID:
         return asyncio.run(build_version(self.deps, inp, attempt=attempt))
+
+    def bundle(self, inp: RunInput, version: uuid.UUID) -> uuid.UUID:
+        ref = StageRef(**inp.model_dump(), ref_id=version)
+        return asyncio.run(build_bundle(self.deps, ref))
+
+    def build_all(self, inp: RunInput) -> uuid.UUID:
+        """The pipeline's knowledge + okf stages: graph, then bundle (READY)."""
+        return self.bundle(inp, self.build(inp))

@@ -12,6 +12,7 @@
 """
 
 import asyncio
+import logging
 import uuid
 from collections.abc import Awaitable, Callable
 
@@ -46,10 +47,12 @@ from sbam_api.projects.repository import ProjectRepository
 from sbam_api.projects.service import project_archived
 from sbam_api.state_machine import TransitionCommand, apply_transition
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID, apply_create
+from sbam_api.storage.base import StorageBackend, StorageIntegrityError
 from sbam_api.temporal.client import OrchestratorUnavailable
 from sbam_api.temporal.repository import TemporalRunRepository, to_run
 from sbam_api.temporal.service import PipelineRunning, StartSpec, start_run
 
+log = logging.getLogger("sbam_api.knowledge")
 REBUILD_STARTED = "KNOWLEDGE_REBUILD_STARTED"
 KEY_PREFIX = "knowledge-rebuild:"
 # The pipeline's own knowledge stage is (about to be) running: a rebuild would race it.
@@ -317,3 +320,29 @@ async def start_rebuild(
         except BaseException:
             await asyncio.to_thread(session.rollback)
             raise
+
+
+# --- OKF bundle reads (E5.3) ----------------------------------------------------------------------
+
+
+class BundleTampered(ApiError):  # noqa: N818
+    def __init__(self) -> None:
+        super().__init__(
+            409,
+            ErrorCode.HASH_MISMATCH,
+            "Knowledge bundle failed its integrity check",
+            "A stored part of this knowledge bundle does not match its hash; it is not served.",
+        )
+
+
+def read_okf_part(storage: StorageBackend, storage_key: str) -> bytes:
+    """A stored bundle part, hash re-verified (content-addressed key). A mismatch is refused with
+    409 HASH_MISMATCH and logged at ERROR with `alert=okf_tampered` for the operator alert."""
+    try:
+        return storage.get(storage_key, verify=True)
+    except StorageIntegrityError:
+        log.error(
+            "OKF bundle part failed its hash check",
+            extra={"storage_key": storage_key, "alert": "okf_tampered"},
+        )
+        raise BundleTampered() from None

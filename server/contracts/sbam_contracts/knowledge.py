@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from sbam_contracts.okf import BundleCoverage
+
 SHA256_HEX: Final = r"^[0-9a-f]{64}$"
 DATASET_PATTERN: Final = r"^sbam_[0-9a-f-]{36}_[0-9a-f-]{36}$"
 MAX_TOP_K: Final = 50
@@ -115,6 +117,7 @@ class KnowledgeCoverage(_Dto):
     documents: list[CoverageEntry] = Field(default_factory=list)
     masters_included: int = 0  # master entries in masters.jsonl (E3.6)
     entities: int = 0  # graph nodes after cognify
+    bundle: BundleCoverage | None = None  # the OKF bundle's view (E5.3), once it is built
 
 
 class KnowledgeVersionOut(_Dto):

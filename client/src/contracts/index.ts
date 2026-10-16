@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:9a0fe82c54f25bff2e46eeeddb8c27a8efdebf18387a85847e1ebba09ba7915e
+// source-sha256:207dbdd752bdf0ff688872805d5cdb6acbb55cb382265806d9bf82d9620e9736
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -256,6 +256,11 @@ export type NotificationType =
   | "GENERATION_FAILED"
   | "STAGE_COMPLETED"
   | "REMINDER";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CoverageStatus".
+ */
+export type CoverageStatus = "COVERED" | "CHUNKS_ONLY" | "FAILED";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -312,6 +317,11 @@ export interface SbamContracts {
   CleanupResult?: CleanupResult;
   Notification?: Notification;
   AuditEntry?: AuditEntry;
+  BundleManifest?: BundleManifest;
+  OkfEntity?: OkfEntity;
+  OkfRelation?: OkfRelation;
+  OkfChunk?: OkfChunk;
+  BundleCoverage?: BundleCoverage;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1254,13 +1264,13 @@ export interface Overview {
 export interface Citation {
   okf_ref_id: string;
   document_version_id: string;
-  location: Location;
+  location: SbamContracts_Sow__Location;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "Location".
+ * via the `definition` "sbam_contracts__sow__Location".
  */
-export interface Location {
+export interface SbamContracts_Sow__Location {
   page?: number | null;
   line?: number | null;
   sheet?: string | null;
@@ -2195,4 +2205,142 @@ export interface AuditEntry {
   } | null;
   correlation_id: string;
   created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BundleManifest".
+ */
+export interface BundleManifest {
+  id: string;
+  project_id: string;
+  workflow_id?: string | null;
+  knowledge_version: number;
+  okf_version?: "1.0";
+  sources: BundleSource[];
+  master_snapshot_ref?: MasterSnapshotRef | null;
+  parts: {
+    [k: string]: PartRef | undefined;
+  };
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BundleSource".
+ */
+export interface BundleSource {
+  document_version_id: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+  type?: "md";
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterSnapshotRef".
+ */
+export interface MasterSnapshotRef {
+  snapshot_id: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PartRef".
+ */
+export interface PartRef {
+  storage_key: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "OkfEntity".
+ */
+export interface OkfEntity {
+  id: string;
+  type: string;
+  name: string;
+  attributes?: {
+    [k: string]: string | undefined;
+  };
+  /**
+   * @minItems 1
+   */
+  source_refs: [SourceRef, ...SourceRef[]];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SourceRef".
+ */
+export interface SourceRef {
+  document_version_id: string;
+  chunk_id: string;
+  location: SbamContracts_Okf__Location;
+}
+/**
+ * Where a chunk is in its source (E4.5's doc.json provenance). `scope` is `document` when only
+ * the whole document is known (no doc.json, or an entity found in no block).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "sbam_contracts__okf__Location".
+ */
+export interface SbamContracts_Okf__Location {
+  scope?: "block" | "document";
+  page?: number | null;
+  sheet?: string | null;
+  cell?: string | null;
+  line?: number | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "OkfRelation".
+ */
+export interface OkfRelation {
+  id: string;
+  type: string;
+  from: string;
+  to: string;
+  attributes?: {
+    [k: string]: string | undefined;
+  };
+  /**
+   * @minItems 1
+   */
+  source_refs: [SourceRef, ...SourceRef[]];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "OkfChunk".
+ */
+export interface OkfChunk {
+  id: string;
+  document_version_id: string;
+  location: SbamContracts_Okf__Location;
+  text: string;
+  ocr?: string | null;
+  unreadable?: boolean;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BundleCoverage".
+ */
+export interface BundleCoverage {
+  documents: DocumentCoverage[];
+  dropped_entities?: number;
+  warnings?: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DocumentCoverage".
+ */
+export interface DocumentCoverage {
+  document_version_id: string;
+  status: CoverageStatus;
+  chunks?: number;
+  entities?: number;
+  reason?: string | null;
 }

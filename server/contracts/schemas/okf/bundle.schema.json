@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:okf/bundle:0.1.0",
+  "$defs": {
+    "BundleSource": {
+      "additionalProperties": false,
+      "properties": {
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "type": {
+          "const": "md",
+          "default": "md",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_version_id",
+        "sha256"
+      ],
+      "title": "BundleSource",
+      "type": "object"
+    },
+    "MasterSnapshotRef": {
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "format": "uuid",
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "sha256"
+      ],
+      "title": "MasterSnapshotRef",
+      "type": "object"
+    },
+    "PartRef": {
+      "additionalProperties": false,
+      "properties": {
+        "storage_key": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Storage Key",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "storage_key",
+        "sha256"
+      ],
+      "title": "PartRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "workflow_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workflow Id"
+    },
+    "knowledge_version": {
+      "minimum": 1,
+      "title": "Knowledge Version",
+      "type": "integer"
+    },
+    "okf_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Okf Version",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/BundleSource"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "master_snapshot_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MasterSnapshotRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "parts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/PartRef"
+      },
+      "title": "Parts",
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "knowledge_version",
+    "sources",
+    "parts"
+  ],
+  "title": "BundleManifest",
+  "type": "object"
+}
