@@ -176,7 +176,7 @@ FAILURE_EXITS = {
     },
     "document_version": {
         "SCAN_FAILED": {"SCANNING", "DELETED"},
-        "PARSE_FAILED": {"DELETED"},
+        "PARSE_FAILED": {"SCANNING", "DELETED"},
         "REJECTED": {"DELETED"},
     },
     "sow_version": {"GENERATION_FAILED": {"GENERATED"}},
