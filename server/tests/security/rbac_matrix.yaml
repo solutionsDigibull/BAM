@@ -360,7 +360,7 @@ routes:
       params: {project_id: "@project_a", kv_id: "@kv_a"}
     expect:
       <<: *fde_project_resource
-      fde_a_assigned: "302"
+      fde_a_assigned: "200"  # the 302 to the signed URL, followed by the test client to the zip
 
   rebuild_api_v1_projects__project_id__knowledge_rebuild_post:
     request:
