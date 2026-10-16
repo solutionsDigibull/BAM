@@ -1,0 +1,1 @@
+description: Live smoke test of the wrapper against real models (E6.1, tests/integration/test_llm_live.py). Any alias.
