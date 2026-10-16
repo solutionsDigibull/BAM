@@ -18,12 +18,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_CACHE_DIR=/root/.cache/uv \
     PATH=/opt/venv/bin:$PATH \
     SBAM_ROLE=${ROLE}
 COPY --from=uv /uv /usr/local/bin/uv
 RUN groupadd --gid 10001 sbam \
  && useradd --uid 10001 --gid sbam --no-create-home --shell /usr/sbin/nologin sbam \
- && mkdir -p /data/storage /tmp/sbam \
+ && mkdir -p /data/storage /data/cognee /tmp/sbam \
  && chown -R sbam:sbam /data /tmp/sbam
 COPY --chmod=0755 compose/docker/server/healthcheck.py /usr/local/bin/sbam-healthcheck
 COPY --chmod=0755 compose/docker/server/migrate.sh /usr/local/bin/sbam-migrate
@@ -35,6 +36,17 @@ COPY server/workers/pyproject.toml workers/
 COPY server/contracts/pyproject.toml contracts/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-workspace --package "${PACKAGE}"
+# Cognee (worker-knowledge) downloads two things on first use: tiktoken's encoding and the JSON extension of
+# its graph store (Ladybug, into ~/.lbdb). Workers have no internet route, so the worker image fetches both
+# here, at build time, and gives the sbam user a home for them and for ~/.cognee (#259).
+ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken \
+    HOME=/home/sbam
+RUN mkdir -p /home/sbam \
+ && if [ "$ROLE" = worker ]; then \
+      python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')" \
+   && python -c "import ladybug, os, tempfile; db = ladybug.Database(os.path.join(tempfile.mkdtemp(), 'db')); c = ladybug.Connection(db); c.execute('INSTALL JSON;'); c.execute('LOAD EXTENSION JSON;')"; \
+    fi \
+ && chown -R sbam:sbam /home/sbam
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 CMD ["sbam-healthcheck"]
 
 # --- dev: dev tools installed; compose.override.yaml mounts server/ over /app/server ----------------

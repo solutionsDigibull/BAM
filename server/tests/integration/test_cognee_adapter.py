@@ -80,6 +80,12 @@ asyncio.run(main())
 """
 
 
+MOCK_STATE = (
+    "import urllib.request as u; r = u.Request('http://127.0.0.1:8091/__mock/state', "
+    "method='{method}'); print(u.urlopen(r, timeout=10).read().decode())"
+)
+
+
 def drive(compose: Compose, *args: str, timeout: int = 600) -> dict[str, Any]:
     run = compose("exec", "-T", "worker-knowledge", "python", "-c", DRIVER, *args, timeout=timeout)
     if run.returncode != 0 and "RESULT " not in run.stdout:
@@ -143,11 +149,14 @@ def test_e5_1_t02_canary_of_project_a_is_never_visible_to_project_b(compose: Com
 
 @pytest.mark.usefixtures("cognee_aliases")
 def test_e5_1_t05_cognee_calls_reach_bifrost(compose: Compose) -> None:
+    """Bifrost logs no model names, so the mock behind it (LLM_PROVIDER=mock) is the witness: every
+    call it records came through a Bifrost alias rule (`<alias>-primary` / `-fallback`)."""
     a = ids()
-    since = compose("exec", "-T", "bifrost", "date", "-u", "+%Y-%m-%dT%H:%M:%SZ").stdout.strip()
+    compose("exec", "-T", "sbam-llm-mock", "python", "-c", MOCK_STATE.format(method="DELETE"))
     assert "error" not in drive(compose, "build", *a, "Routing probe for the gateway.")
-    logs = compose("logs", "--since", since or "5m", "bifrost").stdout
-    assert "sbam-knowledge" in logs or "sbam-embed" in logs
+    state = compose("exec", "-T", "sbam-llm-mock", "python", "-c", MOCK_STATE.format(method="GET"))
+    aliases = {c["alias"] for c in json.loads(state.stdout)["calls"]}
+    assert {"sbam-knowledge", "sbam-embed"} <= aliases
     assert "openrouter.ai" not in compose("exec", "-T", "worker-knowledge", "printenv").stdout
     drive(compose, "delete", *a)
 

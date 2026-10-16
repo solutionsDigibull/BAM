@@ -22,6 +22,7 @@ REPO = Path(__file__).resolve().parents[3]
 BIFROST_DIR = REPO / "compose/bifrost"
 FIXTURES = REPO / "server/tests/llm-mock"
 ALIASES = ["sbam-ocr", "sbam-sow", "sbam-isatvon", "sbam-codegen", "sbam-testgen", "sbam-corrector"]
+COGNEE_ALIASES = ["sbam-knowledge", "sbam-embed"]  # E5.7: generated answers, no recorded fixtures
 
 
 def load(name: str, path: Path) -> ModuleType:
@@ -54,15 +55,16 @@ def chat(
 
 def test_e1_15_t01_six_aliases_each_with_primary_and_fallback() -> None:
     aliases = gen.load_aliases()
-    assert list(aliases) == ALIASES
+    assert list(aliases) == ALIASES + COGNEE_ALIASES
     for mode in gen.MODES:
         rules = gen.build_config(mode)["governance"]["routing_rules"]
-        assert [r["name"] for r in rules] == ALIASES
+        assert [r["name"] for r in rules] == ALIASES + COGNEE_ALIASES
         assert len({r["priority"] for r in rules}) == len(rules)  # Bifrost: one rule per priority
         for rule in rules:
             alias = rule["name"]
             primary, fallback = gen.model_ids(alias, aliases[alias], mode)
-            assert primary != fallback
+            # One embedding model on both sides: another model would change the vector size.
+            assert primary != fallback or (mode == "bifrost" and alias == "sbam-embed")
             assert rule["cel_expression"] == f'model == "{alias}"'
             assert [t["model"] for t in rule["targets"]] == [primary]
             assert rule["fallbacks"] == [f"openrouter/{fallback}"]

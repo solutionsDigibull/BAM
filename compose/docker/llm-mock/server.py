@@ -17,11 +17,25 @@ Scenarios, set with `PUT /__mock/scenario {"alias": "sbam-sow" | "*", "scenario"
     timeout         sleep LLM_MOCK_TIMEOUT_S (default 65, longer than Bifrost's 30 s), then 504
     5xx             503 from the primary model only, so Bifrost falls back to the fallback model
     5xx_all         503 from both models
+
+Cognee's aliases (E5.7, #259) are marked in `aliases.json` and need no recorded fixtures:
+    "mock": "generated"   (`sbam-knowledge`) an unseen input is answered with JSON built from the JSON
+                          schema the caller sends (`response_format`, or the ```json block LiteLLM puts in
+                          the system prompt). A knowledge-graph schema (`nodes` + `edges`) gets the input's
+                          entity-like words as nodes, linked in order. No schema: a short plain answer.
+    "kind": "embedding"   (`sbam-embed`) served on `/v1/embeddings` only: one unit vector per input,
+                          hashed from its words, so the same text always gives the same vector and texts
+                          that share words are close. Size: `dimensions` in the request, else
+                          LLM_MOCK_EMBEDDING_DIMENSIONS (default 1536).
+The scenarios apply to both.
 """
 
 import hashlib
+import itertools
 import json
+import math
 import os
+import re
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,6 +49,12 @@ PORT = 8091
 HOST = "0.0.0.0"  # noqa: S104 - container port, internal network only
 INVALID_BODY = '{"mock":"schema_invalid"'  # truncated JSON, never schema-valid
 CREATED = 1_700_000_000  # fixed so replies are byte-identical
+EMBEDDING_DIMENSIONS = int(os.environ.get("LLM_MOCK_EMBEDDING_DIMENSIONS", "1536"))
+MAX_ENTITIES = 8
+SCHEMA_BLOCK = re.compile(r"```json\s*\n(.*?)\n\s*```", re.DOTALL)
+ENTITY = re.compile(r"\b[A-Z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*\b")
+WORD = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+PLAIN_ANSWER = "test"  # Cognee's LLM connection test asks for exactly this
 
 
 def check_env(env: str, provider: str) -> None:
@@ -100,10 +120,16 @@ def error(status: int, code: str, message: str) -> tuple[int, dict[str, Any]]:
 
 class Mock:
     def __init__(
-        self, fixtures: dict[tuple[str, str, str], dict[str, Any]], aliases: set[str]
+        self,
+        fixtures: dict[tuple[str, str, str], dict[str, Any]],
+        aliases: set[str],
+        generated: frozenset[str] = frozenset(),
+        embedding: frozenset[str] = frozenset(),
     ):
         self.fixtures = fixtures
         self.aliases = aliases
+        self.generated = generated  # unseen inputs are answered from the request's schema
+        self.embedding = embedding  # served on /v1/embeddings only
         self.scenarios: dict[str, str] = {}
         self.calls: list[dict[str, str]] = []
         self.timeout_s = float(os.environ.get("LLM_MOCK_TIMEOUT_S", "65"))
@@ -130,6 +156,10 @@ class Mock:
                 404, "MOCK_UNKNOWN_MODEL", f"model {model!r} is not an sbam alias model"
             )
         alias, role = found
+        if alias in self.embedding:
+            return error(
+                400, "MOCK_BAD_REQUEST", f"{alias} is an embedding alias: /v1/embeddings"
+            )
         messages = body.get("messages")
         if not isinstance(messages, list) or not messages:
             return error(400, "MOCK_BAD_REQUEST", "messages must be a non-empty list")
@@ -165,7 +195,7 @@ class Mock:
             time.sleep(self.timeout_s)
             return error(504, "MOCK_TIMEOUT", f"mock timeout for {model}")
         fixture = self.fixtures.get((alias, prompt_id, digest))
-        if fixture is None:
+        if fixture is None and alias not in self.generated:
             return error(
                 422,
                 "MOCK_FIXTURE_MISSING",
@@ -174,7 +204,10 @@ class Mock:
         invalid = scenario == "schema_invalid" and (
             invalid_times is None or reasks < invalid_times
         )
-        content = fixture_content(fixture, invalid)
+        if fixture is None:
+            content = INVALID_BODY if invalid else generated_answer(body)
+        else:
+            content = fixture_content(fixture, invalid)
         completion = {
             "id": f"chatcmpl-mock-{digest[:16]}",
             "object": "chat.completion",
@@ -194,6 +227,186 @@ class Mock:
             },
         }
         return 200, completion
+
+    def embeddings(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        model = str(body.get("model", ""))
+        found = alias_of(model, self.aliases)
+        if found is None or found[0] not in self.embedding:
+            return error(
+                404, "MOCK_UNKNOWN_MODEL", f"model {model!r} is not an embedding alias"
+            )
+        alias, role = found
+        texts = body.get("input")
+        if isinstance(texts, str):
+            texts = [texts]
+        if not isinstance(texts, list) or not all(isinstance(t, str) for t in texts):
+            return error(400, "MOCK_BAD_REQUEST", "input must be a string or strings")
+        size = body.get("dimensions")
+        size = EMBEDDING_DIMENSIONS if size is None else size
+        if not isinstance(size, int) or isinstance(size, bool) or not 1 <= size <= 8192:
+            return error(400, "MOCK_BAD_REQUEST", "dimensions must be 1..8192")
+        with self._lock:
+            scenario = str(
+                self.scenarios.get(alias) or self.scenarios.get("*") or "ok"
+            )
+            self.calls.append(
+                {"alias": alias, "role": role, "model": model, "prompt_id": "embed"}
+            )
+        if scenario == "5xx_all" or (scenario == "5xx" and role == "primary"):
+            return error(503, "MOCK_UPSTREAM_DOWN", f"mock {scenario} for {model}")
+        if scenario == "timeout":
+            time.sleep(self.timeout_s)
+            return error(504, "MOCK_TIMEOUT", f"mock timeout for {model}")
+        data = [
+            {"object": "embedding", "index": i, "embedding": embed(text, size)}
+            for i, text in enumerate(texts)
+        ]
+        tokens = sum(len(t) for t in texts) // 4
+        return 200, {
+            "object": "list",
+            "data": data,
+            "model": model,
+            "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
+        }
+
+
+def embed(text: str, size: int) -> list[float]:
+    """Feature hashing of the words: deterministic, and shared words mean close vectors."""
+    vector = [0.0] * size
+    for word in WORD.findall(text.lower()) or [""]:
+        digest = hashlib.sha256(word.encode()).digest()
+        index = int.from_bytes(digest[:4], "big") % size
+        vector[index] += 1.0 if digest[4] % 2 else -1.0
+    norm = math.sqrt(sum(v * v for v in vector)) or 1.0
+    return [round(v / norm, 6) for v in vector]
+
+
+def generated_answer(body: dict[str, Any]) -> str:
+    """A schema-valid answer for an unseen input (Cognee's `sbam-knowledge`)."""
+    messages = [m for m in body.get("messages") or [] if isinstance(m, dict)]
+    schema = request_schema(body, messages)
+    if schema is None:
+        return PLAIN_ANSWER
+    text = " ".join(
+        str(m.get("content", "")) for m in messages if m.get("role") == "user"
+    )
+    return dump(instance(schema, schema, entities(text)))
+
+
+def request_schema(body: dict[str, Any], messages: list[Any]) -> dict[str, Any] | None:
+    fmt = body.get("response_format") or {}
+    if isinstance(fmt, dict) and isinstance(fmt.get("json_schema"), dict):
+        schema = fmt["json_schema"].get("schema")
+        if isinstance(schema, dict):
+            return schema
+    for message in messages:
+        for block in SCHEMA_BLOCK.findall(str(message.get("content", ""))):
+            try:
+                parsed = json.loads(block)
+            except ValueError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+    return None
+
+
+def entities(text: str) -> list[str]:
+    """Up to MAX_ENTITIES distinct capitalised words or codes (`Mouser`, `ZEBRA-7731`)."""
+    found = list(dict.fromkeys(ENTITY.findall(text)))
+    return found[:MAX_ENTITIES] or ["Document"]
+
+
+def instance(schema: Any, root: dict[str, Any], names: list[str], depth: int = 0) -> Any:
+    """A minimal value valid for `schema`; a `nodes` + `edges` object becomes a graph."""
+    if not isinstance(schema, dict) or depth > 8:
+        return None
+    if "$ref" in schema:
+        return instance(resolve(schema, root), root, names, depth + 1)
+    for key in ("anyOf", "oneOf", "allOf"):
+        options = [o for o in schema.get(key) or [] if o.get("type") != "null"]
+        if options:
+            return instance(options[0], root, names, depth + 1)
+    if "const" in schema:
+        return schema["const"]
+    if schema.get("enum"):
+        return schema["enum"][0]
+    kind = schema.get("type")
+    if isinstance(kind, list):
+        kind = next((k for k in kind if k != "null"), "null")
+    props = schema.get("properties") or {}
+    if kind == "object" or props:
+        if {"nodes", "edges"} <= set(props):
+            return graph(props, root, names, depth)
+        return {
+            name: instance(props[name], root, names, depth + 1)
+            for name in schema.get("required", list(props))
+            if name in props
+        }
+    if kind == "array":
+        items = [instance(schema.get("items", {}), root, names, depth + 1)]
+        return items * max(1, int(schema.get("minItems", 1)))
+    if kind == "integer":
+        return int(schema.get("minimum", 0))
+    if kind == "number":
+        return float(schema.get("minimum", 0))
+    if kind == "boolean":
+        return False
+    if kind == "null":
+        return None
+    return "mock " + names[0]
+
+
+def graph(
+    props: dict[str, Any], root: dict[str, Any], names: list[str], depth: int
+) -> dict[str, Any]:
+    """Cognee's KnowledgeGraph: one node per entity, edges linking them in order."""
+    node_schema = resolve(resolve(props["nodes"], root).get("items", {}), root)
+    edge_schema = resolve(resolve(props["edges"], root).get("items", {}), root)
+    nodes = [_fill(node_schema, root, names, depth, name, None) for name in names]
+    pairs = itertools.pairwise(names)
+    edges = [_fill(edge_schema, root, names, depth, a, b) for a, b in pairs]
+    return {"nodes": nodes, "edges": edges}
+
+
+def resolve(schema: Any, root: dict[str, Any]) -> dict[str, Any]:
+    """Follow a local `$ref` (`#/$defs/Node`); anything else is returned as is."""
+    ref = schema.get("$ref", "") if isinstance(schema, dict) else ""
+    if not ref.startswith("#/"):
+        return schema if isinstance(schema, dict) else {}
+    target: Any = root
+    for part in ref[2:].split("/"):
+        target = target.get(part, {}) if isinstance(target, dict) else {}
+    return target if isinstance(target, dict) else {}
+
+
+def _fill(
+    schema: dict[str, Any],
+    root: dict[str, Any],
+    names: list[str],
+    depth: int,
+    name: str,
+    target: str | None,
+) -> dict[str, Any]:
+    """A node (`target` None) or an edge from `name` to `target`, field by field."""
+    props = schema.get("properties") or {}
+    out: dict[str, Any] = {}
+    for field in schema.get("required", list(props)):
+        lower = field.lower()
+        if target is not None and "source" in lower:
+            out[field] = name
+        elif target is not None and "target" in lower:
+            out[field] = target
+        elif target is not None and ("relation" in lower or "name" in lower):
+            out[field] = "related_to"
+        elif lower in ("id", "name"):
+            out[field] = name
+        elif lower == "type":
+            out[field] = "Entity"
+        elif lower == "description":
+            out[field] = f"{name}, mentioned in the document"
+        else:
+            out[field] = instance(props.get(field, {}), root, names, depth + 1)
+    return out
 
 
 def fixture_content(fixture: dict[str, Any], force_invalid: bool) -> str:
@@ -276,7 +489,8 @@ def make_handler(mock: Mock) -> type[BaseHTTPRequestHandler]:
             self._send(200, {"status": "ok", "scenarios": mock.scenarios})
 
         def do_POST(self) -> None:
-            if self.path != "/v1/chat/completions":
+            routes = {"/v1/chat/completions": mock.chat, "/v1/embeddings": mock.embeddings}
+            if self.path not in routes:
                 self._send(*error(404, "NOT_FOUND", "not found"))
                 return
             try:
@@ -284,7 +498,7 @@ def make_handler(mock: Mock) -> type[BaseHTTPRequestHandler]:
             except ValueError as exc:
                 self._send(*error(400, "MOCK_BAD_REQUEST", str(exc)))
                 return
-            self._send(*mock.chat(body))
+            self._send(*routes[self.path](body))
 
         def log_message(self, fmt: str, *args: object) -> None:
             line = {"level": "INFO", "logger": "sbam_llm_mock", "msg": fmt % args}
@@ -294,8 +508,13 @@ def make_handler(mock: Mock) -> type[BaseHTTPRequestHandler]:
 
 
 def build(fixtures_dir: Path, aliases_file: Path) -> Mock:
-    aliases = set(json.loads(aliases_file.read_text()))
-    return Mock(load_fixtures(fixtures_dir), aliases)
+    specs: dict[str, dict[str, str]] = json.loads(aliases_file.read_text())
+    return Mock(
+        load_fixtures(fixtures_dir),
+        set(specs),
+        generated=frozenset(a for a, s in specs.items() if s.get("mock") == "generated"),
+        embedding=frozenset(a for a, s in specs.items() if s.get("kind") == "embedding"),
+    )
 
 
 def main() -> None:

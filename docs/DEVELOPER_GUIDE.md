@@ -126,7 +126,7 @@ A PR is mergeable only when all of the following hold (from PLAN §26.4):
 - Pydantic v2 models in `server/contracts` are the single source of truth. Never duplicate a contract model elsewhere.
 - After changing a contract run `make contracts` and commit the regenerated `server/contracts/schemas/**` and `client/src/contracts/index.ts` together with the model. `make contracts-check` (part of `make check`, and the CI job **contract-drift**) fails, naming each file, when they differ. A new root model is one line in `server/contracts/sbam_contracts/registry.py`.
 - No direct file I/O for project data. Use `StorageBackend`.
-- No direct LLM SDK calls. Use the Bifrost client with an **alias** (`sbam-ocr`, `sbam-sow`, `sbam-isatvon`, `sbam-codegen`, `sbam-testgen`, `sbam-corrector`).
+- No direct LLM SDK calls. Use the Bifrost client with an **alias** (`sbam-ocr`, `sbam-sow`, `sbam-isatvon`, `sbam-codegen`, `sbam-testgen`, `sbam-corrector`). Cognee, inside worker-knowledge, uses its own two (`sbam-knowledge`, `sbam-embed`), set in Compose.
 - Long-running work runs in Temporal activities only. API handlers never block on parsing, LLM, codegen or sandbox calls.
 - Temporal workflow code must be deterministic: no I/O, no `datetime.now()`, no randomness. Use `workflow.patched` for changes, and replay tests must pass.
 - Secrets come from environment/Docker secrets only. Never commit `.env`.
