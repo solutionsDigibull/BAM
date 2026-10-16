@@ -67,7 +67,7 @@ def test_e1_15_t01_each_alias_answers_through_bifrost_with_its_model_recorded(al
     assert body["choices"][0]["message"]["content"]
 
 
-@pytest.mark.parametrize("model", ["gpt-4o", "openrouter/openai/gpt-4o", "sbam-nope"])
+@pytest.mark.parametrize("model", ["gpt-4o", "openrouter/mistralai/mistral-large", "sbam-nope"])
 def test_e1_15_t02_models_that_are_not_aliases_are_rejected(model: str) -> None:
     status, headers, body = call({"model": model, "messages": SMOKE})
     assert status == 400
