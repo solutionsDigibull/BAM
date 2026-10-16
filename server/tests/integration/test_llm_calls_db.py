@@ -1,6 +1,6 @@
-"""E6.1 against the Compose Postgres: migration 0014 up and down, the row constraints, tenant scoping
-and the replay lookup. A scratch database is created and dropped. Needs `make up`; not part of the
-unit run."""
+"""E6.1 against the Compose Postgres: migration 0014 up and down, the row constraints, tenant
+scoping and the replay lookup. A scratch database is created and dropped. Needs `make up`; not part
+of the unit run."""
 
 import uuid
 from collections.abc import Iterator
