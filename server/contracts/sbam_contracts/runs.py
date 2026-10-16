@@ -28,7 +28,8 @@ CORRELATION_ID_PATTERN: Final = r"^[A-Za-z0-9-]{1,64}$"  # same rule as the API 
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _QUEUE = r"sbam-(?:ingest|knowledge|llm|build|test|certify)"
 WORKFLOW_ID_PATTERN: Final = (
-    rf"^(?:pipeline-{_UUID}|ingest-{_UUID}|build-{_UUID}-[1-9][0-9]*|ping-{_QUEUE}-{_UUID})$"
+    rf"^(?:pipeline-{_UUID}|ingest-{_UUID}|build-{_UUID}-[1-9][0-9]*|ping-{_QUEUE}-{_UUID}"
+    rf"|knowledge-{_UUID})$"  # knowledge-: KnowledgeRebuild (E5.2)
 )
 WORKFLOW_ID: Final = re.compile(WORKFLOW_ID_PATTERN)
 

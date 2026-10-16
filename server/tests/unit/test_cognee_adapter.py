@@ -2,7 +2,6 @@
 
 import asyncio
 import hashlib
-import itertools
 import logging
 import uuid
 from collections.abc import Coroutine
@@ -10,23 +9,21 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from cognee_fake import DatasetNotFoundError, EmbeddingException, FakeCognee
 from pydantic import ValidationError
+from sbam_api.core.ids import uuid7
 from sbam_api.storage.base import Kind, StorageScope
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_contracts.knowledge import (
-    GraphEdge,
-    GraphNode,
     ItemSource,
     KnowledgeItem,
     ProjectScope,
-    SearchHit,
 )
 from sbam_workers.knowledge.cognee_adapter import (
     CogneeAdapter,
     CogneeUnavailable,
     DatasetNotFound,
     ItemRejected,
-    Principal,
     ScopeError,
     classify,
     dataset_name,
@@ -51,67 +48,6 @@ class FakeGuard:
 
     def eligible_versions(self, scope: ProjectScope, ids: set[uuid.UUID]) -> set[uuid.UUID]:
         return ids & self.eligible
-
-
-class EmbeddingException(Exception):  # noqa: N818 - same name as Cognee's
-    status_code = 422
-
-
-class DatasetNotFoundError(Exception):
-    pass
-
-
-class FakeCognee:
-    """Datasets keyed by (user email, dataset name), like Cognee with access control on."""
-
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-        self.data: dict[tuple[str, str], dict[str, bytes]] = {}
-        self.fail: Exception | None = None
-
-    def _call(self, name: str) -> None:
-        self.calls.append(name)
-        if self.fail is not None:
-            raise self.fail
-
-    def _ds(self, who: Principal, dataset: str) -> dict[str, bytes]:
-        if (who.email, dataset) not in self.data:
-            raise DatasetNotFoundError(dataset)
-        return self.data[(who.email, dataset)]
-
-    async def ensure_dataset(self, who: Principal, dataset: str) -> None:
-        self._call("ensure_dataset")
-        self.data.setdefault((who.email, dataset), {})
-
-    async def item_names(self, who: Principal, dataset: str) -> set[str]:
-        self._call("item_names")
-        return set(self._ds(who, dataset))
-
-    async def add(self, who: Principal, dataset: str, name: str, data: bytes) -> None:
-        self._call("add")
-        self._ds(who, dataset)[name] = data
-
-    async def cognify(self, who: Principal, dataset: str) -> None:
-        self._call("cognify")
-        self._ds(who, dataset)
-
-    async def search(self, who: Principal, dataset: str, query: str, top_k: int) -> list[SearchHit]:
-        self._call("search")
-        items = self._ds(who, dataset).items()
-        hits = [(k, v.decode()) for k, v in items]
-        return [SearchHit(id=k, text=t, source_id=k) for k, t in hits if query in t]
-
-    async def graph(self, who: Principal, dataset: str) -> tuple[list[GraphNode], list[GraphEdge]]:
-        self._call("graph")
-        names = sorted(self._ds(who, dataset))
-        nodes = [GraphNode(id=n) for n in names]
-        edges = [GraphEdge(source=a, target=b, label="next") for a, b in itertools.pairwise(names)]
-        return nodes, edges
-
-    async def delete_dataset(self, who: Principal, dataset: str) -> None:
-        self._call("delete_dataset")
-        self._ds(who, dataset)
-        del self.data[(who.email, dataset)]
 
 
 @pytest.fixture
@@ -148,12 +84,19 @@ def stored(storage: LocalDiskBackend, sc: ProjectScope, text: str) -> KnowledgeI
 # --- T01 dataset naming -----------------------------------------------------------------------
 
 
+def test_e5_1_sbam_uuid7_ids_are_accepted() -> None:
+    tenant, project = uuid7(), uuid7()  # SBAM's ids (sbam_api.core.ids)
+    assert dataset_name(ProjectScope(tenant_id=tenant, project_id=project)) == (
+        f"sbam_{tenant}_{project}"
+    )
+
+
 def test_e5_1_t01_dataset_name_is_derived_and_validated() -> None:
     assert dataset_name(scope()) == f"sbam_{T1}_{P1}"
     assert dataset_name(scope()) == dataset_name(scope())
 
 
-@pytest.mark.parametrize("bad", ["../x", "", "not-a-uuid", str(uuid.uuid1())])
+@pytest.mark.parametrize("bad", ["../x", "", "not-a-uuid", "sbam_x"])
 def test_e5_1_t01_invalid_project_id_is_rejected(bad: str) -> None:
     with pytest.raises(ValidationError):  # a ValueError: the scope never exists
         ProjectScope(tenant_id=T1, project_id=bad)  # type: ignore[arg-type]

@@ -68,7 +68,8 @@ with workflow.unsafe.imports_passed_through():
     )
     from sbam_workers.ingest.stubs import ingest_documents
     from sbam_workers.isatvon.stubs import create_workflow, extract_macro_skills, extract_sub_skills
-    from sbam_workers.knowledge.stubs import build_knowledge, build_okf_bundle
+    from sbam_workers.knowledge.build import build_knowledge
+    from sbam_workers.knowledge.stubs import build_okf_bundle
     from sbam_workers.mirror import update_run_mirror
     from sbam_workers.pipeline.sub_skill_build import SubSkillBuild
     from sbam_workers.pipeline_state import apply_pipeline_transition, notify
@@ -99,6 +100,12 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "validate_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "certify_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "freeze_and_version": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
+}
+# TD §13.3 for long stages: heartbeat timeout and retry backoff (initial interval, coefficient).
+# Behind `workflow.patched(TUNED_PATCH)`, so runs recorded before it replay unchanged.
+TUNED_PATCH = "e5-2-knowledge-heartbeat"
+TUNED: dict[str, tuple[timedelta, timedelta, float]] = {
+    "build_knowledge": (timedelta(minutes=2), timedelta(seconds=30), 2.0),
 }
 WAITING_FOR = {
     PipelineStage.WAIT_SOW_APPROVAL: "sow_approved",
@@ -427,13 +434,21 @@ class ProjectPipeline:
         transition + a notification and stop the pipeline."""
         name: str = getattr(activity, "__temporal_activity_definition").name
         queue, timeout, attempts = PLAN[name]
+        retry = RetryPolicy(maximum_attempts=attempts)
+        heartbeat: timedelta | None = None
+        if name in TUNED and workflow.patched(TUNED_PATCH):
+            heartbeat, initial, coefficient = TUNED[name]
+            retry = RetryPolicy(
+                initial_interval=initial, backoff_coefficient=coefficient, maximum_attempts=attempts
+            )
         try:
             return await workflow.execute_activity(
                 name,
                 arg,
                 task_queue=queue.value,
                 start_to_close_timeout=timeout,
-                retry_policy=RetryPolicy(maximum_attempts=attempts),
+                heartbeat_timeout=heartbeat,
+                retry_policy=retry,
                 result_type=result_type,
             )
         except ActivityError as exc:

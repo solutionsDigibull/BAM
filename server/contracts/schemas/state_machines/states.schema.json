@@ -37,6 +37,16 @@
       "title": "DocumentVersionState",
       "type": "string"
     },
+    "KnowledgeVersionState": {
+      "enum": [
+        "BUILDING",
+        "READY",
+        "FAILED",
+        "OUTDATED"
+      ],
+      "title": "KnowledgeVersionState",
+      "type": "string"
+    },
     "MachineName": {
       "enum": [
         "project_pipeline",
@@ -44,7 +54,8 @@
         "document_version",
         "sow_version",
         "sub_skill",
-        "agent"
+        "agent",
+        "knowledge_version"
       ],
       "title": "MachineName",
       "type": "string"
@@ -141,6 +152,9 @@
     },
     "agent": {
       "$ref": "#/$defs/AgentState"
+    },
+    "knowledge_version": {
+      "$ref": "#/$defs/KnowledgeVersionState"
     }
   },
   "required": [
@@ -151,7 +165,8 @@
     "document_version",
     "sow_version",
     "sub_skill",
-    "agent"
+    "agent",
+    "knowledge_version"
   ],
   "title": "StateMachineStates",
   "type": "object"

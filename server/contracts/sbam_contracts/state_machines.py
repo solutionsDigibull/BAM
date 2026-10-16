@@ -1,10 +1,10 @@
-"""State machines as code: six lifecycles, their transitions and who triggers them (TD §14, E0.6).
+"""State machines as code: seven lifecycles, their transitions and who triggers them (TD §14, E0.6).
 
-Machines: project pipeline, Workflow, document version, SOW version, Sub-Skill and Agent (TD: Macro
-Skill). Each transition is a row `(from_state, event, to_state, actor)`; a row with
-`from_state=None` creates the entity in its first state. The tables are the single definition used
-by the state-machine service, the Temporal activities, the DB CHECK constraints and, read-only
-through `schemas/state_machines.json`, the UI.
+Machines: project pipeline, Workflow, document version, SOW version, Sub-Skill, Agent (TD: Macro
+Skill) and knowledge version (E5.2). Each transition is a row `(from_state, event, to_state,
+actor)`; a row with `from_state=None` creates the entity in its first state. The tables are the
+single definition used by the state-machine service, the Temporal activities, the DB CHECK
+constraints and, read-only through `schemas/state_machines.json`, the UI.
 
 Rules worth knowing
   * SBAM creates the Workflow. The only way to create one is the SYSTEM event `sow_approved`; the
@@ -41,6 +41,7 @@ class MachineName(StrEnum):
     SOW_VERSION = "sow_version"
     SUB_SKILL = "sub_skill"
     AGENT = "agent"
+    KNOWLEDGE_VERSION = "knowledge_version"
 
 
 class ProjectPipelineState(StrEnum):
@@ -89,6 +90,13 @@ class SowVersionState(StrEnum):
     APPROVED = "APPROVED"
     SUPERSEDED = "SUPERSEDED"
     GENERATION_FAILED = "GENERATION_FAILED"
+
+
+class KnowledgeVersionState(StrEnum):
+    BUILDING = "BUILDING"
+    READY = "READY"
+    FAILED = "FAILED"
+    OUTDATED = "OUTDATED"
 
 
 class SubSkillState(StrEnum):
@@ -369,8 +377,32 @@ AGENT: Final = Machine(
     locked=frozenset({G.CERTIFIED, G.FROZEN}),
 )
 
+KV = KnowledgeVersionState
+KNOWLEDGE_VERSION: Final = Machine(
+    MachineName.KNOWLEDGE_VERSION,
+    KnowledgeVersionState,
+    _rows(
+        (None, "build_started", KV.BUILDING, S),  # pipeline knowledge stage
+        (None, "rebuild", KV.BUILDING, F),  # FDE: POST P/knowledge/rebuild
+        (KV.BUILDING, "build_ready", KV.READY, S),
+        (KV.BUILDING, "build_failed", KV.FAILED, S),
+        (KV.READY, "superseded", KV.OUTDATED, S),  # a newer version became READY
+    ),
+    terminal=frozenset({KV.FAILED, KV.OUTDATED}),
+    locked=frozenset({KV.READY, KV.OUTDATED}),
+)
+
 MACHINES: Final[Mapping[MachineName, Machine]] = {
-    m.name: m for m in (PROJECT_PIPELINE, WORKFLOW, DOCUMENT_VERSION, SOW_VERSION, SUB_SKILL, AGENT)
+    m.name: m
+    for m in (
+        PROJECT_PIPELINE,
+        WORKFLOW,
+        DOCUMENT_VERSION,
+        SOW_VERSION,
+        SUB_SKILL,
+        AGENT,
+        KNOWLEDGE_VERSION,
+    )
 }
 
 # SubSkillState -> skill_metadata.status / governance.lifecycle.state (TD §14.4)
@@ -509,6 +541,7 @@ class StateMachineStates(BaseModel):
     sow_version: SowVersionState
     sub_skill: SubSkillState
     agent: AgentState
+    knowledge_version: KnowledgeVersionState
 
 
 def schemas() -> dict[str, dict[str, Any]]:

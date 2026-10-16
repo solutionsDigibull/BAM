@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:8fa892f239e91ccef4fddbbee06751dd2e2fe8f7fc275be7f54247c35f571b92
+// source-sha256:9a0fe82c54f25bff2e46eeeddb8c27a8efdebf18387a85847e1ebba09ba7915e
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -125,7 +125,8 @@ export type Actor = "FDE" | "ADMIN" | "SYSTEM";
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MachineName".
  */
-export type MachineName = "project_pipeline" | "workflow" | "document_version" | "sow_version" | "sub_skill" | "agent";
+export type MachineName =
+  "project_pipeline" | "workflow" | "document_version" | "sow_version" | "sub_skill" | "agent" | "knowledge_version";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ProjectPipelineState".
@@ -195,6 +196,11 @@ export type SubSkillState =
  * via the `definition` "AgentState".
  */
 export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeVersionState".
+ */
+export type KnowledgeVersionState = "BUILDING" | "READY" | "FAILED" | "OUTDATED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "TenantStatus".
@@ -1443,7 +1449,7 @@ export interface AssumptionsOpenPoints {
 export interface Run {
   id: string;
   /**
-   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
    */
   temporal_workflow_id: string;
   temporal_run_id: string;
@@ -1521,6 +1527,7 @@ export interface StateMachineStates {
   sow_version: SowVersionState;
   sub_skill: SubSkillState;
   agent: AgentState;
+  knowledge_version: KnowledgeVersionState;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
