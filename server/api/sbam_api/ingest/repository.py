@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
+from sbam_contracts.documents import ScanStatus
 from sbam_contracts.state_machines import DocumentVersionState as S
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -100,6 +101,15 @@ class DocumentVersionRepository(StatefulRepository):
             DocumentVersion.ingestion_started_at.is_(None),
         )
         return list(self.session.scalars(query.order_by(DocumentVersion.id)))
+
+    def parsed_clean_ids(self, ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+        """The ids among `ids` that are PARSED with a CLEAN scan: what may reach Cognee (E5.1)."""
+        query = self._scoped().where(
+            DocumentVersion.id.in_(list(ids)),
+            DocumentVersion.state == S.PARSED.value,
+            DocumentVersion.scan_status == ScanStatus.CLEAN.value,
+        )
+        return set(self.session.scalars(query.with_only_columns(DocumentVersion.id)))
 
 
 class ReservationRepository(TenantScopedRepository[UploadReservation]):
