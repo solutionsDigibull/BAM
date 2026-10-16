@@ -1,16 +1,21 @@
 "use client";
 
-// Documents screen (E4.10, TD §9.3): upload files and see what the project holds. The list here is the
-// minimum (name, size, state); the stage chips, retry and recycle bin are E4.11 (#77) and build on it.
-import { useList } from "@refinedev/core";
-import { Card, Flex, Table, Typography } from "antd";
+// Documents screen (E4.10, E4.11, TD §9.3): upload files, watch them go through scan and parse, retry
+// the ones that failed, and delete or restore them (recycle bin, 90 days). One request lists the
+// documents with the deleted ones (`include_deleted`); the two tabs split it. It is asked again every
+// few seconds while the pipeline is ingesting or any document is still in flight, and then it stops.
+import { useCustom } from "@refinedev/core";
+import { Card, Flex, Tabs } from "antd";
 import dynamic from "next/dynamic";
 
-import { ApiErrorState, EmptyState, LoadingState, StatusBadge } from "@/components/ui-kit";
-import type { DocumentOut } from "@/contracts";
+import { ApiErrorState, EmptyState, LoadingState } from "@/components/ui-kit";
+import type { DocumentOut, PipelineTimeline } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
-import { EMPTY_DOCUMENTS, documentsResource } from "../../workspace-api";
+import { EMPTY_DOCUMENTS, documentsResource, pipelinePath } from "../../workspace-api";
+import { POLL_MS, countActive, inBin, inList, shouldPoll } from "./document-state";
+import { DocumentsTable } from "./documents-table";
+import { RecycleBin } from "./recycle-bin";
 
 // Uppy needs the browser: load it on the client only.
 const UploadPanel = dynamic(() => import("./upload-panel"), {
@@ -18,56 +23,62 @@ const UploadPanel = dynamic(() => import("./upload-panel"), {
   loading: () => <LoadingState />,
 });
 
-const INACTIVE = ["REJECTED", "DELETED", "PURGED"];
-
-/** Documents that count toward the project's 20-file limit. */
-export const countActive = (docs: DocumentOut[]): number =>
-  docs.filter((d) => !d.deleted_at && !INACTIVE.includes(d.state)).length;
-
-const size = (bytes: number): string =>
-  bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-    : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+export { countActive };
 
 export function DocumentsScreen({ projectId }: { projectId: string }) {
-  const docs = useList<DocumentOut, ApiError>({
-    resource: documentsResource(projectId),
-    pagination: { mode: "off" },
+  const timeline = useCustom<PipelineTimeline, ApiError>({
+    url: pipelinePath(projectId),
+    method: "get",
+    queryOptions: {
+      refetchInterval: (q) => (q.state.data?.data.state === "INGESTING" ? POLL_MS : false),
+    },
   });
-  const items = (docs.result.data ?? []).filter((d) => !d.deleted_at);
+  const docs = useCustom<{ items: DocumentOut[] }, ApiError>({
+    url: documentsResource(projectId),
+    method: "get",
+    config: { query: { include_deleted: "true" } },
+    queryOptions: {
+      refetchInterval: (q) =>
+        shouldPoll(q.state.data?.data.items ?? [], timeline.result.data?.state) ? POLL_MS : false,
+    },
+  });
+  const all = docs.result.data?.items ?? [];
+  const listed = inList(all);
+  const binned = inBin(all);
+  const refresh = () => {
+    void docs.query.refetch();
+    void timeline.query.refetch();
+  };
 
   return (
     <Flex vertical gap={16}>
       <Card title="Upload documents">
-        <UploadPanel
-          projectId={projectId}
-          active={countActive(docs.result.data ?? [])}
-          onUploaded={() => void docs.query.refetch()}
-        />
+        <UploadPanel projectId={projectId} active={countActive(all)} onUploaded={refresh} />
       </Card>
-      <Card title="Documents">
+      <Card>
         {docs.query.isLoading ? (
           <LoadingState />
         ) : docs.query.error ? (
           <ApiErrorState error={docs.query.error} onRetry={() => void docs.query.refetch()} />
-        ) : items.length === 0 ? (
-          <EmptyState message={EMPTY_DOCUMENTS} />
         ) : (
-          <Table<DocumentOut>
-            rowKey="id"
-            dataSource={items}
-            pagination={false}
-            columns={[
+          <Tabs
+            items={[
               {
-                title: "Name",
-                dataIndex: "title",
-                render: (t: string) => <Typography.Text>{t}</Typography.Text>,
+                key: "documents",
+                label: `Documents (${listed.length})`,
+                children:
+                  listed.length === 0 ? (
+                    <EmptyState message={EMPTY_DOCUMENTS} />
+                  ) : (
+                    <DocumentsTable projectId={projectId} documents={listed} onChanged={refresh} />
+                  ),
               },
-              { title: "Size", dataIndex: "size", render: size },
               {
-                title: "State",
-                dataIndex: "state",
-                render: (s: DocumentOut["state"]) => <StatusBadge status={s} />,
+                key: "bin",
+                label: `Recycle bin (${binned.length})`,
+                children: (
+                  <RecycleBin projectId={projectId} documents={binned} onChanged={refresh} />
+                ),
               },
             ]}
           />
