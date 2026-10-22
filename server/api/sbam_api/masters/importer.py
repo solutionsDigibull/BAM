@@ -87,23 +87,24 @@ def import_workbook(
 
     errors = [_row_error(e) for e in parsed.errors]
     write = mode == ImportMode.UPSERT and not errors
-    tabs = _apply(session, user, parsed.rows, project_id, write)
-    by_name = {t.name: t for t in tabs}
-    for error in errors:
-        if error.tab not in by_name:
-            by_name[error.tab] = ImportTabReport(name=error.tab)
-            tabs.append(by_name[error.tab])
-        by_name[error.tab].errors.append(error)
-    report = ImportReport(
-        mode=mode,
-        applied=write,
-        sha256=sha256,
-        tabs=tabs,
-        stable_ids=[r.identity.stable_id for r in parsed.rows],
-        statuses=dict(Counter(r.identity.status for r in parsed.rows)),
-    )
-    _audit_import(session, user, report, project_id, filename)
+    # _apply flushes version bumps, so a concurrent edit can surface there, not only at commit.
     try:
+        tabs = _apply(session, user, parsed.rows, project_id, write)
+        by_name = {t.name: t for t in tabs}
+        for error in errors:
+            if error.tab not in by_name:
+                by_name[error.tab] = ImportTabReport(name=error.tab)
+                tabs.append(by_name[error.tab])
+            by_name[error.tab].errors.append(error)
+        report = ImportReport(
+            mode=mode,
+            applied=write,
+            sha256=sha256,
+            tabs=tabs,
+            stable_ids=[r.identity.stable_id for r in parsed.rows],
+            statuses=dict(Counter(r.identity.status for r in parsed.rows)),
+        )
+        _audit_import(session, user, report, project_id, filename)
         session.commit()
     except (IntegrityError, StaleRowVersion):  # another import or edit won the race
         session.rollback()

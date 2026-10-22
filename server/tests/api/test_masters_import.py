@@ -19,6 +19,7 @@ from clamd_fake import FakeClamd
 from fixtures import eicar_bytes, fixture_path
 from openpyxl.workbook.workbook import Workbook
 from sbam_api.audit.models import AuditLog
+from sbam_api.db.repository import StaleRowVersion
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion
 from sqlalchemy import func, select
 from test_auth import problem
@@ -327,3 +328,16 @@ def test_e3_3_another_tenants_project_is_404(h: ImportHarness) -> None:
 
 def test_e3_3_mode_must_be_known(h: ImportHarness) -> None:
     problem(h.upload(workbook(), mode="replace"), 422, "VALIDATION_ERROR")
+
+
+def test_e3_3_concurrent_edit_during_apply_is_409(h: ImportHarness) -> None:
+    assert h.upload(workbook()).status_code == 200
+
+    def edit(book: Workbook) -> None:
+        cell = book["Rules"].cell(5, column(book, "Rules", "Components (BOM)"))
+        cell.value = f"{cell.value or ''} (revised)"
+
+    # another edit bumps the row between our read and _apply's flush
+    with mock.patch("sbam_api.masters.importer._new_version", side_effect=StaleRowVersion()):
+        res = h.upload(workbook(edit))
+    problem(res, 409, "VERSION_CONFLICT")
