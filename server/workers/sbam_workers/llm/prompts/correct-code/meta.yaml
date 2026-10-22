@@ -1,0 +1,2 @@
+alias: sbam-corrector
+description: Correct a failed Sub-Skill build attempt from its findings (E11.4, TD §12.4).

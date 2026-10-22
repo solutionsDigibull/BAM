@@ -396,7 +396,13 @@ def copy_prompts(tmp_path: Path) -> Path:
 
 def test_e6_1_shipped_prompts_match_their_manifest() -> None:
     registry = PromptRegistry()
-    assert registry.ids() == ["codegen-bodies", "live-smoke", "smoke", "sow-generate"]
+    assert registry.ids() == [
+        "codegen-bodies",
+        "correct-code",
+        "live-smoke",
+        "smoke",
+        "sow-generate",
+    ]
     assert json.loads((PROMPTS_DIR / "manifest.json").read_text()) == build_manifest()
 
 
