@@ -17,7 +17,15 @@ const FORWARD_REQUEST = [
   "idempotency-key",
   "x-correlation-id",
 ];
-const FORWARD_RESPONSE = ["content-type", "etag", "location", "retry-after", "x-correlation-id"];
+const FORWARD_RESPONSE = [
+  "cache-control", // no-store on downloads of tenant data (masters export)
+  "content-disposition", // the file name of a download
+  "content-type",
+  "etag",
+  "location",
+  "retry-after",
+  "x-correlation-id",
+];
 
 const problem = (status: number, title: string, detail?: string) =>
   Response.json(

@@ -56,6 +56,23 @@ describe("API proxy (E1.14)", () => {
     expect(await res.text()).not.toContain("session-token");
   });
 
+  it("passes a download's file name and no-store through (masters export, E3.4)", async () => {
+    upstream.mockResolvedValue(
+      new Response("xlsx", {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": 'attachment; filename="BAM_masters_Tenant-A_20261022.xlsx"',
+          "cache-control": "no-store",
+          "set-cookie": "upstream=1",
+        },
+      }),
+    );
+    const res = await call(GET, "api/v1/admin/masters/export");
+    expect(res.headers.get("content-disposition")).toContain("BAM_masters_Tenant-A_20261022.xlsx");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("set-cookie")).toBeNull(); // still an allowlist
+  });
+
   it.each([
     ["http:", "169.254.169.254"],
     ["api", "v1", "..", "..", "admin"],
