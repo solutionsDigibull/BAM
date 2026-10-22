@@ -57,6 +57,8 @@ FDE = str(uuid.uuid4())
 FINDING = uuid.uuid4()
 SUB_SKILL = SQLITE_MODELS[MachineName.SUB_SKILL]
 HISTORY = Path(__file__).parent / "histories" / "sub_skill_build.json"
+CANCELLED_HISTORY = HISTORY.with_name("sub_skill_build_cancelled.json")
+TESTING_BLOCKED_HISTORY = HISTORY.with_name("sub_skill_build_testing_blocked.json")
 STAGES = [  # TD §13.2, in order
     "build_manifest",
     "check_libraries",
@@ -648,8 +650,46 @@ def test_record_sub_skill_build_history() -> None:  # pragma: no cover - mainten
         return data
 
     data = run(scenario, ast_gate=traced("ast_gate", [], behave))
-    HISTORY.parent.mkdir(exist_ok=True)
-    HISTORY.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
+    save_history(HISTORY, data)
+
+
+@pytest.mark.skipif(not os.environ.get("RECORD_HISTORY"), reason="RECORD_HISTORY=1 to re-record")
+def test_record_cancelled_build_history() -> None:  # pragma: no cover - maintenance helper
+    """E10.6: corrections exhausted, NEEDS_FDE_REVIEW, then the FDE cancels."""
+
+    async def scenario(build: Build) -> dict[str, Any]:
+        await build.until_waiting()
+        await build.end()
+        data: dict[str, Any] = json.loads((await build.handle.fetch_history()).to_json())
+        return data
+
+    save_history(CANCELLED_HISTORY, run(scenario, ast_gate=traced("ast_gate", [], gate_failed)))
+
+
+@pytest.mark.skipif(not os.environ.get("RECORD_HISTORY"), reason="RECORD_HISTORY=1 to re-record")
+def test_record_testing_blocked_history() -> None:  # pragma: no cover - maintenance helper
+    """E10.6: the sandbox is down (TESTING_BLOCKED), the FDE retries, the build certifies."""
+    down = {"on": True}
+
+    def behave(inp: Any) -> None:
+        if down["on"]:
+            raise ApplicationError("sandbox unreachable", type="SandboxUnavailable")
+
+    async def scenario(build: Build) -> dict[str, Any]:
+        await build.until_waiting()
+        down["on"] = False
+        await build.retry()
+        await build.finish()
+        data: dict[str, Any] = json.loads((await build.handle.fetch_history()).to_json())
+        return data
+
+    sandbox = traced("run_sandbox_tests", [], behave)
+    save_history(TESTING_BLOCKED_HISTORY, run(scenario, run_sandbox_tests=sandbox))
+
+
+def save_history(path: Path, data: dict[str, Any]) -> None:  # pragma: no cover - maintenance
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
 
 
 # --- T05 / T09 through the API service on a real Temporal server ---------------------------------

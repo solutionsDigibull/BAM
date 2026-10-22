@@ -47,7 +47,7 @@ Human waits have no timeout; a reminder notification is sent after 3 days *(prop
 
 - Activities upsert by natural keys (`sub_skill_id + build_no + attempt + gate`). Storage writes are content-addressed. LLM results are cached by `(temporal_workflow_id, activity_id, attempt)`.
 - Freeze is ordered: files → read-only → DB transaction (certification + version + `is_frozen` + lifecycle `APPROVED`) → read-back hash verification. A failure leaves the version not frozen, and a re-run completes it.
-- Replay tests of recorded histories run in CI. Workflow-code changes use `workflow.patched`.
+- Replay tests of recorded histories run in CI (`replay.yml`, required check `temporal-replay`): every `server/tests/temporal/histories/*.json` replays against the PR's workflow code, and the histories cover correction exhaustion, cancel and `TESTING_BLOCKED`. Workflow-code changes use `workflow.patched`. `make record-histories` re-records them; keep the old file as `<name>_before_<change>.json` while older runs can still be live.
 
 ---
 [← §12](12-code-generation.md)   [Design index](README.md)   [§14 →](14-state-machines.md)
