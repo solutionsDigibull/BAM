@@ -1,9 +1,13 @@
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { WorkbenchScreen } from "./workbench-screen";
 
 export const metadata = { title: "ISATVON Workbench" };
 
-export default function IsatvonWorkbenchPage() {
-  return (
-    <PagePlaceholder title="ISATVON Workbench" empty="The breakdown appears after extraction." />
-  );
+// The workflow layout has already rejected a malformed id (notFound) before this page or any request runs.
+export default async function IsatvonWorkbenchPage({
+  params,
+}: {
+  params: Promise<{ projectId: string; workflowId: string }>;
+}) {
+  const { projectId, workflowId } = await params;
+  return <WorkbenchScreen projectId={projectId} workflowId={workflowId} />;
 }
