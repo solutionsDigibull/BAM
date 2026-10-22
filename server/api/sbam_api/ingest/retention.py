@@ -135,6 +135,7 @@ def to_out(document: Document, version: DocumentVersion) -> DocumentOut:
         deleted_at=document.deleted_at,
         deleted_by=document.deleted_by,
         purge_after=document.purge_after,
+        reject_code=ErrorCode(version.reject_code) if version.reject_code else None,
     )
 
 
