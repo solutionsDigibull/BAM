@@ -4,7 +4,12 @@
 //
 // The API gives one `state` per document (`DocumentVersionState`), not one per stage, so the chips are
 // derived from it. OCR has no state of its own yet (E4.8, #74): its chip reads "n/a".
-import type { DocumentOut, DocumentVersionState, ProjectPipelineState } from "@/contracts";
+import type {
+  DocumentOut,
+  DocumentVersionState,
+  ErrorCode,
+  ProjectPipelineState,
+} from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
 export const POLL_MS = 4000;
@@ -17,16 +22,21 @@ export type Chip = { stage: Stage; status: ChipStatus; text: string };
 const chip = (stage: Stage, status: ChipStatus, text: string): Chip => ({ stage, status, text });
 const OCR = chip("ocr", "na", "n/a");
 
-export function stageChips(state: DocumentVersionState): Chip[] {
+/** Why a REJECTED document was rejected: `MALWARE` is the scan, the rest is type detection (E4.4). */
+type RejectCode = ErrorCode | null | undefined;
+const isMalware = (code: RejectCode): boolean => !code || code === "MALWARE";
+
+export function stageChips(state: DocumentVersionState, rejectCode?: RejectCode): Chip[] {
   switch (state) {
     case "UPLOADED":
       return [chip("scan", "pending", "Waiting"), chip("parse", "pending", "Waiting"), OCR];
     case "SCANNING":
       return [chip("scan", "running", "Scanning"), chip("parse", "pending", "Waiting"), OCR];
     case "REJECTED":
-      // ponytail: only the malware scan rejects today. When #70 rejects on type or content, the API
-      // needs a reason field, and this chip should say "Rejected" for those.
-      return [chip("scan", "failed", "Quarantined"), chip("parse", "skipped", "Skipped"), OCR];
+      // The scan found malware (quarantined), or the type check refused the file after a clean scan.
+      return isMalware(rejectCode)
+        ? [chip("scan", "failed", "Quarantined"), chip("parse", "skipped", "Skipped"), OCR]
+        : [chip("scan", "ok", "Clean"), chip("parse", "failed", "Rejected"), OCR];
     case "SCAN_FAILED":
       return [chip("scan", "failed", "Failed"), chip("parse", "pending", "Waiting"), OCR];
     case "PARSING":
@@ -40,6 +50,15 @@ export function stageChips(state: DocumentVersionState): Chip[] {
   }
 }
 
+const REJECT_REASONS: Partial<Record<ErrorCode, string>> = {
+  TYPE_MISMATCH:
+    "Rejected: the file type does not match its extension. Upload a correct copy; this one cannot be retried.",
+  UNSUPPORTED_TYPE:
+    "Rejected: this file type is not supported. Upload it in a supported format; this one cannot be retried.",
+  INVALID_ENCODING:
+    "Rejected: the text is not valid UTF-8. Save it as UTF-8 and upload it again; this one cannot be retried.",
+};
+
 const REASONS: Partial<Record<DocumentVersionState, string>> = {
   REJECTED:
     "The malware scan flagged this file. It is quarantined: it cannot be downloaded or retried.",
@@ -48,7 +67,14 @@ const REASONS: Partial<Record<DocumentVersionState, string>> = {
 };
 
 /** One line saying why a document failed, or null. */
-export const stateReason = (state: DocumentVersionState): string | null => REASONS[state] ?? null;
+export function stateReason(state: DocumentVersionState, rejectCode?: RejectCode): string | null {
+  if (state === "REJECTED" && rejectCode && !isMalware(rejectCode))
+    return (
+      REJECT_REASONS[rejectCode] ??
+      "Rejected: the file was not accepted. Upload a corrected copy; this one cannot be retried."
+    );
+  return REASONS[state] ?? null;
+}
 
 const TERMINAL: readonly DocumentVersionState[] = [
   "PARSED",

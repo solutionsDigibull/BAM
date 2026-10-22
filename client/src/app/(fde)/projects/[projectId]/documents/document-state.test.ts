@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { DocumentOut, DocumentVersionState } from "@/contracts";
+import type { DocumentOut, DocumentVersionState, ErrorCode } from "@/contracts";
 
 import {
   canRetry,
@@ -60,6 +60,28 @@ describe("stage chips (E4.11)", () => {
       "parse:skipped:Skipped",
     ]);
     expect(stateReason("REJECTED")).toMatch(/quarantined/);
+  });
+
+  test("e4_4 a file the type check rejected was scanned clean and says why", () => {
+    const chips = (code: ErrorCode) =>
+      stageChips("REJECTED", code).map((c) => `${c.stage}:${c.status}:${c.text}`);
+    for (const code of ["TYPE_MISMATCH", "UNSUPPORTED_TYPE", "INVALID_ENCODING"] as const)
+      expect(chips(code).slice(0, 2)).toEqual(["scan:ok:Clean", "parse:failed:Rejected"]);
+    expect(stateReason("REJECTED", "TYPE_MISMATCH")).toMatch(/does not match its extension/);
+    expect(stateReason("REJECTED", "UNSUPPORTED_TYPE")).toMatch(/not supported/);
+    expect(stateReason("REJECTED", "INVALID_ENCODING")).toMatch(/UTF-8/);
+    expect(stateReason("REJECTED", "TYPE_MISMATCH")).not.toMatch(/malware|quarantined/);
+  });
+
+  test("e4_4 a rejection with no code, or MALWARE, stays Quarantined", () => {
+    for (const code of [undefined, null, "MALWARE"] as const) {
+      expect(stageChips("REJECTED", code)[0]!.text).toBe("Quarantined");
+      expect(stateReason("REJECTED", code)).toMatch(/quarantined/);
+    }
+  });
+
+  test("e4_4 an unknown rejection code gets a generic reason, not the malware one", () => {
+    expect(stateReason("REJECTED", "PARSE_ERROR")).toMatch(/not accepted/);
   });
 
   test("a failed file says why and what to do", () => {

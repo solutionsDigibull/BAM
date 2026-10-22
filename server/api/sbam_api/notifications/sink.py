@@ -16,6 +16,8 @@ from sbam_contracts.notifications import NotificationType as T
 from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.audit.outbox import OutboxItem
+from sbam_api.db.repository import TenantContext
+from sbam_api.ingest.repository import DocumentVersionRepository
 from sbam_api.notifications import service
 
 log = logging.getLogger("sbam_api.notifications")
@@ -57,6 +59,16 @@ for _type in T:  # a producer may also notify with a NotificationType value dire
     KINDS.setdefault(_type.value, Kind(_type))
 
 
+# Why a document was rejected, in the words of the notification (the Documents screen has its own).
+REJECT_REASONS: dict[str, str] = {
+    "MALWARE": "The malware scan flagged it, so it was quarantined.",
+    "TYPE_MISMATCH": "The file type does not match its extension.",
+    "UNSUPPORTED_TYPE": "This file type is not supported.",
+    "INVALID_ENCODING": "The text is not valid UTF-8.",
+}
+REJECTIONS = frozenset({"document_version.malware_detected", "document_version.type_rejected"})
+
+
 def _uuid(value: Any) -> uuid.UUID | None:
     try:
         return uuid.UUID(str(value))
@@ -88,6 +100,8 @@ class InAppSink:
             "waiting_for": item.payload.get("waiting_for", ""),
         }
         with self.sessions() as session:
+            if item.type in REJECTIONS and entity_id is not None and not params["error"]:
+                params["error"] = self._reject_reason(session, item, entity_id)
             service.notify_project(
                 session,
                 item.tenant_id,
@@ -98,3 +112,9 @@ class InAppSink:
                 source=service.Source("outbox", str(item.id)),
             )
             session.commit()
+
+    @staticmethod
+    def _reject_reason(session: Session, item: OutboxItem, version_id: uuid.UUID) -> str:
+        """The reason on the rejected version (`reject_code`); empty if it has none."""
+        version = DocumentVersionRepository(session, TenantContext(item.tenant_id)).get(version_id)
+        return REJECT_REASONS.get(version.reject_code or "", "") if version is not None else ""

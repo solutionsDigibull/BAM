@@ -215,3 +215,93 @@ def test_e10_4_notifications_are_in_app_only_no_email_sms_or_webhook_sender() ->
     source = "\n".join(p.read_text() for p in root.glob("*.py")).lower()
     for banned in ("smtplib", "sendgrid", "twilio", "httpx", "requests", "aiosmtplib", "webhook"):
         assert banned not in source, banned
+
+
+# --- E4.4: a rejected document's notification says why --------------------------------------------
+
+
+def rejected_version(
+    sessions: sessionmaker[Session],
+    project: uuid.UUID,
+    code: str | None,
+    tenant: uuid.UUID = TENANT,
+) -> uuid.UUID:
+    from sbam_api.ingest.models import Document, DocumentVersion
+
+    engine = sessions.kw["bind"]
+    for table in (Document, DocumentVersion):
+        table.__table__.create(engine, checkfirst=True)  # type: ignore[attr-defined]
+    with sessions() as session:
+        doc = Document(tenant_id=tenant, project_id=project, title="x.pdf")
+        session.add(doc)
+        session.flush()
+        version = DocumentVersion(
+            tenant_id=tenant,
+            project_id=project,
+            document_id=doc.id,
+            storage_key="k",
+            sha256="0" * 64,
+            size=1,
+            mime="application/pdf",
+            state="REJECTED",
+            reject_code=code,
+        )
+        session.add(version)
+        session.commit()
+        return version.id
+
+
+@pytest.mark.parametrize(
+    ("event", "code", "reason"),
+    [
+        ("document_version.type_rejected", "TYPE_MISMATCH", "does not match its extension"),
+        ("document_version.type_rejected", "UNSUPPORTED_TYPE", "not supported"),
+        ("document_version.type_rejected", "INVALID_ENCODING", "not valid UTF-8"),
+        ("document_version.malware_detected", "MALWARE", "quarantined"),
+    ],
+)
+def test_e4_4_the_rejection_notification_carries_the_reason(
+    event: str, code: str, reason: str
+) -> None:
+    sessions, fde, project, _ = world()
+    version = rejected_version(sessions, project, code)
+    payload = {"project_id": str(project), "entity_id": str(version)}
+    InAppSink(sessions).send(OutboxItem(uuid.uuid4(), TENANT, event, payload))
+    [row] = rows(sessions, fde)
+    assert row.type == "DOCUMENT_REJECTED" and reason in row.body
+    assert row.body.startswith("A document in Acme onboarding was rejected")
+
+
+def test_e4_4_a_rejection_without_a_known_reason_keeps_the_plain_text() -> None:
+    sessions, fde, project, _ = world()
+    sink = InAppSink(sessions)
+    for code in (None, "SOMETHING_NEW"):
+        version = rejected_version(sessions, project, code)
+        payload = {"project_id": str(project), "entity_id": str(version)}
+        sink.send(OutboxItem(uuid.uuid4(), TENANT, "document_version.type_rejected", payload))
+    bodies = {r.body for r in rows(sessions, fde)}
+    assert bodies == {
+        "A document in Acme onboarding was rejected and was not added to the knowledge base."
+    }
+
+
+def test_e4_4_another_tenants_version_gives_no_reason() -> None:
+    sessions, fde, project, _ = world()
+    version = rejected_version(sessions, project, "TYPE_MISMATCH", tenant=OTHER_TENANT)
+    payload = {"project_id": str(project), "entity_id": str(version)}
+    InAppSink(sessions).send(
+        OutboxItem(uuid.uuid4(), TENANT, "document_version.type_rejected", payload)
+    )
+    [row] = rows(sessions, fde)
+    assert "extension" not in row.body  # the lookup is tenant-scoped: it found nothing
+
+
+def test_e4_4_a_parse_failure_is_not_looked_up_for_a_reason() -> None:
+    sessions, fde, project, _ = world()
+    version = rejected_version(sessions, project, "TYPE_MISMATCH")
+    payload = {"project_id": str(project), "entity_id": str(version)}
+    InAppSink(sessions).send(
+        OutboxItem(uuid.uuid4(), TENANT, "document_version.parse_failed", payload)
+    )
+    [row] = rows(sessions, fde)
+    assert "extension" not in row.body

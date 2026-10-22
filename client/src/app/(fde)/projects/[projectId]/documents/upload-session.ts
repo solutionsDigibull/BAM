@@ -10,8 +10,10 @@
 import Uppy, { type UppyFile } from "@uppy/core";
 import Tus from "@uppy/tus";
 
-import type { UploadRequest, UploadToken } from "@/contracts";
+import type { DocumentOut, UploadRequest, UploadToken } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
+
+import { binnedCopy, sha256Hex } from "./file-hash";
 
 export const MAX_FILE_BYTES = 15 * 1024 * 1024;
 export const MAX_ACTIVE_FILES = 20;
@@ -68,7 +70,14 @@ export const REASONS: Record<string, string> = {
 export type Meta = { token?: string; project_id?: string };
 export type SbamUppy = Uppy<Meta, Record<string, never>>;
 type File = UppyFile<Meta, Record<string, never>>;
-export type Rejection = { name: string; reason: string };
+/** `restore` is set when the file is a deleted document of this project: the panel offers to restore it. */
+export type Rejection = {
+  name: string;
+  reason: string;
+  restore?: { id: string; title: string };
+};
+
+export const IN_BIN = "Already in this project's recycle bin";
 
 export const reasonFor = (code: string | undefined, fallback = "Upload failed"): string =>
   (code && REASONS[code]) || fallback;
@@ -137,10 +146,46 @@ export function applyToken(
   return refused;
 }
 
+/**
+ * Take out the files whose bytes are a deleted document of this project, and report each one with the
+ * document to restore. A file that cannot be read or hashed stays: the server decides about it.
+ */
+async function withoutBinned(
+  uppy: SbamUppy,
+  files: File[],
+  opts: UploaderOptions,
+): Promise<File[]> {
+  const documents = opts.getDocuments();
+  if (!documents.some((d) => d.deleted_at)) return files;
+  const kept: File[] = [];
+  for (const file of files) {
+    let copy: DocumentOut | null = null;
+    try {
+      const sha256 = file.data instanceof Blob ? await sha256Hex(file.data) : null;
+      copy = sha256 ? binnedCopy(sha256, documents) : null;
+    } catch {
+      copy = null;
+    }
+    if (copy === null) {
+      kept.push(file);
+      continue;
+    }
+    opts.onRejected({
+      name: file.name ?? "",
+      reason: IN_BIN,
+      restore: { id: copy.id, title: copy.title },
+    });
+    uppy.removeFile(file.id);
+  }
+  return kept;
+}
+
 export type UploaderOptions = {
   projectId: string;
   /** Documents of this project that already count toward the 20-file limit. */
   getActive: () => number;
+  /** Every document of the project, deleted ones included: a file in the recycle bin is not re-uploaded. */
+  getDocuments: () => DocumentOut[];
   /** `POST /projects/{id}/uploads`. Throws the data provider's ApiError. */
   announce: (body: UploadRequest) => Promise<UploadToken>;
   onRejected: (rejection: Rejection) => void;
@@ -192,7 +237,12 @@ export function createUploader(opts: UploaderOptions): SbamUppy {
   // first try asks again. A refused request (4xx) removes the files with its reason; a request that could
   // not be made (5xx, offline) throws, which stops the upload and keeps the files for another try.
   uppy.addPreProcessor(async (fileIds) => {
-    const files = fileIds.map((id) => uppy.getFile(id));
+    const files = await withoutBinned(
+      uppy,
+      fileIds.map((id) => uppy.getFile(id)),
+      opts,
+    );
+    if (files.length === 0) return;
     let answer: UploadToken;
     try {
       answer = await opts.announce(announceBody(files));

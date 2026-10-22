@@ -62,7 +62,7 @@ TEMPLATES: dict[NotificationType, tuple[str, str]] = {
     ),
     NotificationType.DOCUMENT_REJECTED: (
         "Document rejected",
-        "A document in {project} was rejected and was not added to the knowledge base.",
+        "A document in {project} was rejected and was not added to the knowledge base. {error}",
     ),
     NotificationType.GENERATION_FAILED: (
         "Generation failed",

@@ -114,7 +114,7 @@ export function DocumentsTable({ projectId, documents, onChanged }: Props) {
           title: "Name",
           dataIndex: "title",
           render: (title: string, doc) => {
-            const reason = stateReason(doc.state);
+            const reason = stateReason(doc.state, doc.reject_code);
             return (
               <Flex vertical>
                 <Typography.Text>{title}</Typography.Text>
@@ -133,7 +133,7 @@ export function DocumentsTable({ projectId, documents, onChanged }: Props) {
           dataIndex: "state",
           render: (_: unknown, doc) => (
             <Flex gap={4} wrap>
-              {stageChips(doc.state).map((chip) => (
+              {stageChips(doc.state, doc.reject_code).map((chip) => (
                 <Tooltip
                   key={chip.stage}
                   title={

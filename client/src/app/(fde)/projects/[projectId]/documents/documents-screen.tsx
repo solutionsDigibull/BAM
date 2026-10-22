@@ -53,7 +53,12 @@ export function DocumentsScreen({ projectId }: { projectId: string }) {
   return (
     <Flex vertical gap={16}>
       <Card title="Upload documents">
-        <UploadPanel projectId={projectId} active={countActive(all)} onUploaded={refresh} />
+        <UploadPanel
+          projectId={projectId}
+          active={countActive(all)}
+          documents={all}
+          onUploaded={refresh}
+        />
       </Card>
       <Card>
         {docs.query.isLoading ? (
