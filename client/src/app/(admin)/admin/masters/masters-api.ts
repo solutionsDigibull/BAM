@@ -1,5 +1,11 @@
-import type { ImportMode, ImportReport, MasterStatus, MasterType } from "@/contracts";
-import { API_BASE, toApiError } from "@/providers/data-provider";
+import type {
+  ImportMode,
+  ImportReport,
+  MasterDocumentOut,
+  MasterStatus,
+  MasterType,
+} from "@/contracts";
+import { API_BASE, toApiError, type ApiError } from "@/providers/data-provider";
 
 export const LAYOUT_URL = "admin/master-types";
 export const FILETYPES_URL = "admin/filetypes";
@@ -120,4 +126,44 @@ export async function importWorkbook(file: File, mode: ImportMode): Promise<Impo
   });
   if (!res.ok) throw await toApiError(res);
   return (await res.json()) as ImportReport;
+}
+
+// --- master documents (E3.11) ----------------------------------------------------------------
+
+export const DOCUMENTS = "admin/master-documents";
+export const ROUTED_TYPES = ["ORGANIZATION", "RULES", "AGENTS", "SKILLS"] as const;
+export const DOCUMENT_POLL_MS = 5_000;
+export const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024; // TD §7.3.2; the server answers 413 above it
+// ponytail: parsing is #291; until it lands a CLEAN row stays PENDING. Rows older than this count as
+// settled ("waiting for a loader") so an open tab stops polling. Drop the window once #291 parses.
+export const PENDING_WINDOW_MS = 10 * 60_000;
+
+/** True while a row can still change on its own: scan unfinished, parsing, or freshly queued. */
+export const isActive = (d: MasterDocumentOut, now = Date.now()) =>
+  d.scan_status == null ||
+  d.parse_status === "PARSING" ||
+  (d.parse_status === "PENDING" &&
+    d.scan_status === "CLEAN" &&
+    now - Date.parse(d.created_at) < PENDING_WINDOW_MS);
+
+/** What to tell the Admin about a refused file, per status the upload can answer. */
+export function uploadMessage(error: ApiError): string {
+  if (error.statusCode === 413) return "Larger than 15 MB";
+  if (error.statusCode === 415) return "File type not supported yet";
+  if (error.problem?.code === "MALWARE") return "Quarantined: the file contains malware";
+  return error.problem?.detail ?? error.problem?.title ?? error.message ?? "Upload failed";
+}
+
+/** POST /admin/master-documents (multipart; the server scans, routes and stores it). */
+export async function uploadDocument(file: File): Promise<MasterDocumentOut> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/${DOCUMENTS}`, {
+    method: "POST",
+    body: form,
+    headers: { accept: "application/json" },
+    credentials: "same-origin",
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as MasterDocumentOut;
 }
