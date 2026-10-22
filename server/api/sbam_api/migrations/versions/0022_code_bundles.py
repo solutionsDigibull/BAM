@@ -1,7 +1,7 @@
 """code_bundles
 
-Revision ID: 0020_code_bundles
-Revises: 0019_sow_versions
+Revision ID: 0022_code_bundles
+Revises: 0021_master_documents
 Create Date: 2026-10-22
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -9,6 +9,11 @@ only your module's tables; downgrade() undoes exactly this revision and nothing 
 
 E11.3: the `artifacts` index (TD §7.8), the bundle hash and Black provenance on `code_attempts`, and
 the ASSEMBLED / ASSEMBLY_FAILED statuses.
+
+Renumbered on dev (#298) twice: first because #295 (0020_code_bundles) and #290
+(0020_sow_versions_immutable) both branched from 0019_sow_versions; then again because #296
+(0021_master_documents) landed on 0020_sow_versions_immutable before this fix merged. Re-chained
+after 0021_master_documents. No `alembic merge` used.
 """
 
 from collections.abc import Sequence
@@ -16,8 +21,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0020_code_bundles"
-down_revision: str | Sequence[str] | None = "0019_sow_versions"
+revision: str = "0022_code_bundles"
+down_revision: str | Sequence[str] | None = "0021_master_documents"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
