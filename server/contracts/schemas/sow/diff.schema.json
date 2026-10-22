@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/diff:0.1.0",
+  "$defs": {
+    "SectionChange": {
+      "enum": [
+        "ADDED",
+        "REMOVED",
+        "MODIFIED",
+        "UNCHANGED"
+      ],
+      "title": "SectionChange",
+      "type": "string"
+    },
+    "SowDiffItem": {
+      "additionalProperties": false,
+      "description": "A changed module / feature (by id) or, in other sections, a changed field (by name).",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "change": {
+          "$ref": "#/$defs/SectionChange"
+        }
+      },
+      "required": [
+        "id",
+        "change"
+      ],
+      "title": "SowDiffItem",
+      "type": "object"
+    },
+    "SowSectionDiff": {
+      "additionalProperties": false,
+      "properties": {
+        "section_id": {
+          "enum": [
+            "overview",
+            "users_authority",
+            "scope",
+            "modules",
+            "features",
+            "data_integrations",
+            "rules_constraints",
+            "deliverables_acceptance",
+            "assumptions_open_points"
+          ],
+          "title": "Section Id",
+          "type": "string"
+        },
+        "change": {
+          "$ref": "#/$defs/SectionChange"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/SowDiffItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "section_id",
+        "change"
+      ],
+      "title": "SowSectionDiff",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    },
+    "other": {
+      "title": "Other",
+      "type": "integer"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/SowSectionDiff"
+      },
+      "title": "Sections",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "other",
+    "sections"
+  ],
+  "title": "SowDiff",
+  "type": "object"
+}

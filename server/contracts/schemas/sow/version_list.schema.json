@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/version_list:0.1.0",
+  "$defs": {
+    "SowVersionSource": {
+      "enum": [
+        "GENERATED",
+        "EDITED"
+      ],
+      "title": "SowVersionSource",
+      "type": "string"
+    },
+    "SowVersionStatus": {
+      "enum": [
+        "GENERATED",
+        "IN_REVIEW",
+        "APPROVED",
+        "SUPERSEDED",
+        "GENERATION_FAILED"
+      ],
+      "title": "SowVersionStatus",
+      "type": "string"
+    },
+    "SowVersionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/SowVersionStatus"
+        },
+        "source": {
+          "$ref": "#/$defs/SowVersionSource"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "parent_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Version"
+        },
+        "knowledge_version_id": {
+          "format": "uuid",
+          "title": "Knowledge Version Id",
+          "type": "string"
+        },
+        "error_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Reason"
+        },
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "status",
+        "source",
+        "knowledge_version_id",
+        "created_at"
+      ],
+      "title": "SowVersionSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/SowVersionSummary"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "SowVersionList",
+  "type": "object"
+}

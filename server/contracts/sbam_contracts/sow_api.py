@@ -1,0 +1,187 @@
+"""SOW API contracts (TD §8.7, issue E6.3): versions, save, diff, regenerate, and the TipTap shape.
+
+The editor's document (`content_tiptap`) is TipTap JSON in an SBAM-defined shape (ADR 0019), which
+the server converts to and from `SowDocument`:
+
+    doc
+      sowSection {section_id}           x 9, in `SECTIONS` order, template-locked
+        heading {level: 2}              the section's title from `SECTION_TITLES`, unchanged
+        sowField {field}                one per field of the section (not `citations`)
+        sowItem {id, module_id?}        modules and features only: one per module / feature
+          heading {level: 3}            the item's `name`
+          sowField {field}              its other fields
+          sowCitations                  its citations
+        sowCitations                    the section's citations (not on modules / features)
+          citation {okf_ref_id, document_version_id, location}
+
+A `sowField` holds its value as: paragraphs (text and number fields; paragraphs join with a line
+break), a `bulletList` of `listItem > paragraph` (lists of text), nested `sowField`s (an object,
+e.g. `bound`, `tools`) or `sowRecord` nodes of nested `sowField`s (a list of objects, `roles`).
+Text marks (bold, italic, ...) are kept in `content_tiptap` only; `structured` holds plain text.
+Ids, module ids and citations are node attributes, so typing in the editor cannot change them.
+"""
+
+from datetime import datetime
+from enum import StrEnum
+from typing import Annotated, Any, Final, Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from sbam_contracts._jsonschema import contract_schema
+from sbam_contracts.sow import SECTIONS
+
+MAX_TIPTAP_BYTES: Final = 2 * 1024 * 1024  # compact JSON of content_tiptap; more is 413
+MAX_HINT_CHARS: Final = 2000
+SOW_REGENERATE: Final = "SowRegenerate"  # workflow type of POST P/sow/regenerate from SOW_REVIEW
+
+SECTION_TITLES: Final[dict[str, str]] = {
+    "overview": "Overview",
+    "users_authority": "Users and authority",
+    "scope": "Scope",
+    "modules": "Modules",
+    "features": "Features",
+    "data_integrations": "Data and integrations",
+    "rules_constraints": "Rules and constraints",
+    "deliverables_acceptance": "Deliverables and acceptance",
+    "assumptions_open_points": "Assumptions and open points",
+}
+if tuple(SECTION_TITLES) != SECTIONS:  # pragma: no cover - a guard for whoever edits SECTIONS
+    raise RuntimeError("SECTION_TITLES must follow SECTIONS")
+
+
+def sow_workflow_id(project_id: UUID) -> str:
+    """One regeneration at a time per project (Temporal's FAIL conflict policy)."""
+    return f"sow-{project_id}"
+
+
+class _Dto(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class TipTapMark(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    type: Annotated[str, Field(min_length=1, max_length=64)]
+    attrs: dict[str, Any] | None = None
+
+
+class TipTapNode(BaseModel):
+    """Any TipTap node. The SOW shape (module docstring) is checked by the server on save."""
+
+    model_config = ConfigDict(extra="allow")
+
+    type: Annotated[str, Field(min_length=1, max_length=64)]
+    attrs: dict[str, Any] | None = None
+    content: list["TipTapNode"] | None = None
+    text: str | None = None
+    marks: list[TipTapMark] | None = None
+
+
+class SowVersionStatus(StrEnum):
+    GENERATED = "GENERATED"
+    IN_REVIEW = "IN_REVIEW"
+    APPROVED = "APPROVED"
+    SUPERSEDED = "SUPERSEDED"
+    GENERATION_FAILED = "GENERATION_FAILED"
+
+
+class SowVersionSource(StrEnum):
+    GENERATED = "GENERATED"
+    EDITED = "EDITED"
+
+
+class SowVersionSummary(_Dto):
+    id: UUID
+    version: Annotated[int, Field(ge=1)]
+    status: SowVersionStatus
+    source: SowVersionSource
+    sha256: str | None = None  # None for a version whose generation failed
+    parent_version: int | None = None
+    knowledge_version_id: UUID
+    error_reason: str | None = None
+    author: str | None = None  # the FDE who saved it; None for SBAM's generations
+    created_at: datetime
+
+
+class SowVersionList(_Dto):
+    items: list[SowVersionSummary]  # newest first
+
+
+class SowCitationRef(_Dto):
+    """A citation with where it sits in the document (`features.0`, `scope`, ...)."""
+
+    path: str
+    okf_ref_id: str
+    document_version_id: UUID
+    location: dict[str, Any]
+
+
+class SowVersionDetail(SowVersionSummary):
+    content_tiptap: TipTapNode | None = None
+    structured: dict[str, Any] | None = None  # SowDocument
+    citations: list[SowCitationRef] = Field(default_factory=list)
+
+
+class SowOverview(_Dto):
+    sow_id: UUID
+    current: SowVersionSummary | None = None
+    approved: SowVersionSummary | None = None
+    etag: str  # the If-Match a save must send
+
+
+class SowSaveRequest(_Dto):
+    content_tiptap: TipTapNode
+    base_version: Annotated[int, Field(ge=1)]
+
+
+class SowRegenerateRequest(_Dto):
+    hint: Annotated[str | None, Field(max_length=MAX_HINT_CHARS)] = None
+
+
+class SectionChange(StrEnum):
+    ADDED = "ADDED"
+    REMOVED = "REMOVED"
+    MODIFIED = "MODIFIED"
+    UNCHANGED = "UNCHANGED"
+
+
+class SowDiffItem(_Dto):
+    """A changed module / feature (by id) or, in other sections, a changed field (by name)."""
+
+    id: str
+    change: SectionChange
+
+
+class SowSectionDiff(_Dto):
+    section_id: Literal[
+        "overview",
+        "users_authority",
+        "scope",
+        "modules",
+        "features",
+        "data_integrations",
+        "rules_constraints",
+        "deliverables_acceptance",
+        "assumptions_open_points",
+    ]
+    change: SectionChange
+    items: list[SowDiffItem] = Field(default_factory=list)
+
+
+class SowDiff(_Dto):
+    version: int
+    other: int
+    sections: list[SowSectionDiff]  # all nine, in `SECTIONS` order
+
+
+def schemas() -> dict[str, dict[str, Any]]:
+    """File stem -> JSON Schema, for the committed files under `schemas/sow/`."""
+    return {
+        "overview": contract_schema(SowOverview, "sow/overview"),
+        "version_list": contract_schema(SowVersionList, "sow/version_list"),
+        "version_detail": contract_schema(SowVersionDetail, "sow/version_detail"),
+        "save_request": contract_schema(SowSaveRequest, "sow/save_request"),
+        "diff": contract_schema(SowDiff, "sow/diff"),
+        "regenerate_request": contract_schema(SowRegenerateRequest, "sow/regenerate_request"),
+    }

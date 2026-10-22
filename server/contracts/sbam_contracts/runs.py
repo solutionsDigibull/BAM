@@ -29,7 +29,7 @@ _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _QUEUE = r"sbam-(?:ingest|knowledge|llm|build|test|certify)"
 WORKFLOW_ID_PATTERN: Final = (
     rf"^(?:pipeline-{_UUID}|ingest-{_UUID}|build-{_UUID}-[1-9][0-9]*|ping-{_QUEUE}-{_UUID}"
-    rf"|knowledge-{_UUID})$"  # knowledge-: KnowledgeRebuild (E5.2)
+    rf"|knowledge-{_UUID}|sow-{_UUID})$"  # knowledge-: KnowledgeRebuild (E5.2), sow-: SowRegenerate
 )
 WORKFLOW_ID: Final = re.compile(WORKFLOW_ID_PATTERN)
 

@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/save_request:0.1.0",
+  "$defs": {
+    "TipTapMark": {
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "attrs": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attrs"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "TipTapMark",
+      "type": "object"
+    },
+    "TipTapNode": {
+      "additionalProperties": true,
+      "description": "Any TipTap node. The SOW shape (module docstring) is checked by the server on save.",
+      "properties": {
+        "type": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "attrs": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attrs"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/TipTapNode"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "marks": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/TipTapMark"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Marks"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "TipTapNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "content_tiptap": {
+      "$ref": "#/$defs/TipTapNode"
+    },
+    "base_version": {
+      "minimum": 1,
+      "title": "Base Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "content_tiptap",
+    "base_version"
+  ],
+  "title": "SowSaveRequest",
+  "type": "object"
+}

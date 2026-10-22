@@ -78,6 +78,7 @@ class ErrorCode(StrEnum):
     SOW_NOT_APPROVED = "SOW_NOT_APPROVED"
     SOW_NOT_LATEST = "SOW_NOT_LATEST"
     SOW_VERSION_CONFLICT = "SOW_VERSION_CONFLICT"
+    SOW_GENERATING = "SOW_GENERATING"  # a SOW generation is already running
     NO_APPROVED_SOW = "NO_APPROVED_SOW"
     NOT_IN_REVIEW = "NOT_IN_REVIEW"
     # Pipeline and orchestration
