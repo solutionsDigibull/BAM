@@ -82,6 +82,7 @@
         "SOW_NOT_LATEST",
         "SOW_VERSION_CONFLICT",
         "SOW_GENERATING",
+        "EXPORT_TIMEOUT",
         "NO_APPROVED_SOW",
         "NOT_IN_REVIEW",
         "PIPELINE_RUNNING",

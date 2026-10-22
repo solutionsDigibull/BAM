@@ -29,11 +29,14 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from sbam_contracts._jsonschema import contract_schema
+from sbam_contracts.runs import RunInput
 from sbam_contracts.sow import SECTIONS
 
 MAX_TIPTAP_BYTES: Final = 2 * 1024 * 1024  # compact JSON of content_tiptap; more is 413
 MAX_HINT_CHARS: Final = 2000
 SOW_REGENERATE: Final = "SowRegenerate"  # workflow type of POST P/sow/regenerate from SOW_REVIEW
+SOW_EXPORT: Final = "SowExport"  # workflow type of GET P/sow/versions/{v}/export (E6.4)
+EXPORT_TEMPLATE: Final = "1.0.0"  # bump when the layout changes: cached exports are keyed by it
 
 SECTION_TITLES: Final[dict[str, str]] = {
     "overview": "Overview",
@@ -48,6 +51,11 @@ SECTION_TITLES: Final[dict[str, str]] = {
 }
 if tuple(SECTION_TITLES) != SECTIONS:  # pragma: no cover - a guard for whoever edits SECTIONS
     raise RuntimeError("SECTION_TITLES must follow SECTIONS")
+
+
+def sow_export_workflow_id(sow_version_id: UUID, fmt: "ExportFormat") -> str:
+    """One render per version and format at a time: a second request joins the running one."""
+    return f"sow-export-{sow_version_id}-{fmt.value}"
 
 
 def sow_workflow_id(project_id: UUID) -> str:
@@ -173,6 +181,25 @@ class SowDiff(_Dto):
     version: int
     other: int
     sections: list[SowSectionDiff]  # all nine, in `SECTIONS` order
+
+
+class ExportFormat(StrEnum):
+    PDF = "pdf"
+    DOCX = "docx"
+    MD = "md"
+
+
+class SowExportInput(RunInput):
+    """`export_sow`'s input: ids only; the worker reads the version itself."""
+
+    sow_version_id: Annotated[UUID, Field(strict=False)]
+    format: ExportFormat
+
+
+class SowExportResult(_Dto):
+    storage_key: str
+    sha256: str  # of the exported file
+    size: int
 
 
 def schemas() -> dict[str, dict[str, Any]]:
