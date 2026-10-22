@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/schema_response:0.1.0",
+  "$defs": {
+    "Editor": {
+      "description": "The only cell editors the client implements (allow-list).",
+      "enum": [
+        "text",
+        "largeText",
+        "number",
+        "boolean",
+        "json",
+        "expression",
+        "stringList",
+        "select",
+        "readonly"
+      ],
+      "title": "Editor",
+      "type": "string"
+    },
+    "Grid": {
+      "additionalProperties": false,
+      "properties": {
+        "column_groups": {
+          "items": {
+            "$ref": "#/$defs/GridGroup"
+          },
+          "title": "Column Groups",
+          "type": "array"
+        }
+      },
+      "required": [
+        "column_groups"
+      ],
+      "title": "Grid",
+      "type": "object"
+    },
+    "GridColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "field_path": {
+          "title": "Field Path",
+          "type": "string"
+        },
+        "header": {
+          "title": "Header",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "editor": {
+          "$ref": "#/$defs/Editor"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "editable": {
+          "title": "Editable",
+          "type": "boolean"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "boolean"
+        },
+        "enum": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enum"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "width": {
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "field_path",
+        "header",
+        "type",
+        "editor",
+        "required",
+        "editable",
+        "platform",
+        "width"
+      ],
+      "title": "GridColumn",
+      "type": "object"
+    },
+    "GridGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "header": {
+          "title": "Header",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/GridColumn"
+          },
+          "title": "Children",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "header",
+        "description",
+        "children"
+      ],
+      "title": "GridGroup",
+      "type": "object"
+    }
+  },
+  "description": "GET /schemas/isatvon/{version}.",
+  "properties": {
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "json_schema": {
+      "additionalProperties": true,
+      "title": "Json Schema",
+      "type": "object"
+    },
+    "grid": {
+      "$ref": "#/$defs/Grid"
+    }
+  },
+  "required": [
+    "version",
+    "json_schema",
+    "grid"
+  ],
+  "title": "IsatvonSchemaResponse",
+  "type": "object"
+}

@@ -34,6 +34,13 @@ from sbam_contracts.identity import (
     UserPatch,
 )
 from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
+from sbam_contracts.isatvon_grid import IsatvonSchemaResponse
+from sbam_contracts.isatvon_workbench import (
+    SubSkillPatch,
+    ValidationReport,
+    WorkbenchSubSkill,
+    WorkbenchTree,
+)
 from sbam_contracts.knowledge import (
     KnowledgeGraphPage,
     KnowledgeNodeDetail,
@@ -99,6 +106,11 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/agent", Agent),
     ("isatvon/sub_skill", SubSkill),
     ("isatvon/rule_violation", RuleViolation),
+    ("isatvon/schema_response", IsatvonSchemaResponse),
+    ("isatvon/workbench_tree", WorkbenchTree),
+    ("isatvon/workbench_sub_skill", WorkbenchSubSkill),
+    ("isatvon/sub_skill_patch", SubSkillPatch),
+    ("isatvon/validation_report", ValidationReport),
     ("manifest/isa14_manifest", Isa14Manifest),
     ("manifest/skill_manifest", SkillManifest),
     ("manifest/workflow_manifest", WorkflowManifest),

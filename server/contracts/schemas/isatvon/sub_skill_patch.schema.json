@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/sub_skill_patch:0.1.0",
+  "additionalProperties": false,
+  "description": "`PATCH W/sub-skills/{sub_id}`: a partial ISATVON 1.4 Sub-Skill. Keys are dotted grid\n`field_path`s (e.g. `isatvon_definition.v_variables.max_iterations`); the server merges them\ninto the row, revalidates and answers the whole row. `skill_metadata.skill_id` is never\naccepted.",
+  "properties": {
+    "changes": {
+      "additionalProperties": true,
+      "minProperties": 1,
+      "title": "Changes",
+      "type": "object"
+    }
+  },
+  "required": [
+    "changes"
+  ],
+  "title": "SubSkillPatch",
+  "type": "object"
+}

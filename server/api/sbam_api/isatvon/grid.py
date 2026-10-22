@@ -11,13 +11,18 @@ import hashlib
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass
-from enum import StrEnum
 from functools import cache
 from typing import Any, Final
 
-from pydantic import BaseModel, ConfigDict
 from sbam_contracts.canonical import canonical_json
 from sbam_contracts.isatvon14 import FRAMEWORK_VERSION, MAX_ITERATIONS_RANGE, SHORT_CHARS, schemas
+
+# The response shapes live in the contracts; re-exported (`X as X`) for callers of this module.
+from sbam_contracts.isatvon_grid import Editor as Editor
+from sbam_contracts.isatvon_grid import Grid as Grid
+from sbam_contracts.isatvon_grid import GridColumn as GridColumn
+from sbam_contracts.isatvon_grid import GridGroup as GridGroup
+from sbam_contracts.isatvon_grid import IsatvonSchemaResponse as IsatvonSchemaResponse
 from sbam_contracts.state_machines import SubSkillState
 
 IDEF: Final = "isatvon_definition."
@@ -29,20 +34,6 @@ _ACRONYMS: Final = {
     "Ml": "ML",
     "Srim": "SRIM",
 }
-
-
-class Editor(StrEnum):
-    """The only cell editors the client implements (allow-list)."""
-
-    TEXT = "text"
-    LARGE_TEXT = "largeText"
-    NUMBER = "number"
-    BOOLEAN = "boolean"
-    JSON = "json"
-    EXPRESSION = "expression"
-    STRING_LIST = "stringList"
-    SELECT = "select"
-    READONLY = "readonly"
 
 
 _WIDTHS: Final = {
@@ -97,45 +88,6 @@ PLATFORM_FIELDS: Final = (
     ("content_sha256", "string", None),
     ("validation_errors", "array", None),
 )
-
-
-class GridColumn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    field_path: str
-    header: str
-    type: str
-    editor: Editor
-    required: bool
-    editable: bool
-    platform: bool
-    enum: list[str] | None = None
-    min: int | float | None = None
-    max: int | float | None = None
-    width: int
-
-
-class GridGroup(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    header: str
-    description: str
-    children: list[GridColumn]
-
-
-class Grid(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    column_groups: list[GridGroup]
-
-
-class IsatvonSchemaResponse(BaseModel):
-    """GET /schemas/isatvon/{version}."""
-
-    version: str
-    json_schema: dict[str, Any]
-    grid: Grid
 
 
 @dataclass(frozen=True)

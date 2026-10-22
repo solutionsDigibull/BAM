@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/validation_report:0.1.0",
+  "$defs": {
+    "RuleViolation": {
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Rule",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "path",
+        "message"
+      ],
+      "title": "RuleViolation",
+      "type": "object"
+    },
+    "SubSkillState": {
+      "enum": [
+        "DRAFT",
+        "VALID",
+        "INVALID",
+        "BUILDING",
+        "CORRECTING",
+        "TESTING",
+        "TESTING_BLOCKED",
+        "NEEDS_FDE_REVIEW",
+        "DEPENDENCY_FAILED",
+        "BUILD_ERROR",
+        "CERTIFIED",
+        "FROZEN",
+        "INVALIDATED",
+        "SUPERSEDED"
+      ],
+      "title": "SubSkillState",
+      "type": "string"
+    },
+    "SubSkillValidation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SubSkillState"
+        },
+        "validation_errors": {
+          "items": {
+            "$ref": "#/$defs/RuleViolation"
+          },
+          "title": "Validation Errors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "state"
+      ],
+      "title": "SubSkillValidation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`POST W/isatvon/validate`: every Sub-Skill of the Workflow, revalidated.",
+  "properties": {
+    "sub_skills": {
+      "items": {
+        "$ref": "#/$defs/SubSkillValidation"
+      },
+      "title": "Sub Skills",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sub_skills"
+  ],
+  "title": "ValidationReport",
+  "type": "object"
+}

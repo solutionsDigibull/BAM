@@ -1,0 +1,943 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/workbench_tree:0.1.0",
+  "$defs": {
+    "AAutomation": {
+      "additionalProperties": false,
+      "properties": {
+        "orchestration_layer": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Orchestration Layer",
+          "type": "string"
+        },
+        "trigger_mode": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Trigger Mode",
+          "type": "string"
+        },
+        "action_step": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Action Step",
+          "type": "string"
+        },
+        "acceptance_check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Acceptance Check",
+          "type": "string"
+        },
+        "srim_metadata": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Srim Metadata",
+          "type": "string"
+        }
+      },
+      "required": [
+        "orchestration_layer",
+        "trigger_mode",
+        "action_step",
+        "acceptance_check",
+        "srim_metadata"
+      ],
+      "title": "AAutomation",
+      "type": "object"
+    },
+    "Context": {
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Background",
+          "type": "string"
+        },
+        "topic": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Topic",
+          "type": "string"
+        },
+        "history": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "History"
+        }
+      },
+      "required": [
+        "background",
+        "topic"
+      ],
+      "title": "Context",
+      "type": "object"
+    },
+    "ExternalData": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ExternalKind"
+        },
+        "ref": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "ref"
+      ],
+      "title": "ExternalData",
+      "type": "object"
+    },
+    "ExternalKind": {
+      "enum": [
+        "FILE",
+        "API",
+        "URL"
+      ],
+      "title": "ExternalKind",
+      "type": "string"
+    },
+    "IInstructions": {
+      "additionalProperties": false,
+      "properties": {
+        "statement": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "trigger": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        },
+        "action": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "check": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Check",
+          "type": "string"
+        },
+        "bound": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Bound",
+          "type": "string"
+        },
+        "user_role": {
+          "$ref": "#/$defs/UserRole"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "context": {
+          "$ref": "#/$defs/Context"
+        }
+      },
+      "required": [
+        "statement",
+        "trigger",
+        "action",
+        "check",
+        "bound",
+        "user_role",
+        "task",
+        "context"
+      ],
+      "title": "IInstructions",
+      "type": "object"
+    },
+    "IsatvonDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "i_instructions": {
+          "$ref": "#/$defs/IInstructions"
+        },
+        "s_source": {
+          "$ref": "#/$defs/SSource"
+        },
+        "a_automation": {
+          "$ref": "#/$defs/AAutomation"
+        },
+        "t_tech_stack": {
+          "$ref": "#/$defs/TTechStack"
+        },
+        "v_variables": {
+          "$ref": "#/$defs/VVariables"
+        },
+        "o_outcome": {
+          "$ref": "#/$defs/OOutcome"
+        },
+        "n_notification": {
+          "$ref": "#/$defs/NNotification"
+        }
+      },
+      "required": [
+        "i_instructions",
+        "s_source",
+        "a_automation",
+        "t_tech_stack",
+        "v_variables",
+        "o_outcome",
+        "n_notification"
+      ],
+      "title": "IsatvonDefinition",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Library": {
+      "additionalProperties": false,
+      "properties": {
+        "package": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Package",
+          "type": "string"
+        },
+        "version_constraint": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Constraint"
+        }
+      },
+      "required": [
+        "package"
+      ],
+      "title": "Library",
+      "type": "object"
+    },
+    "NNotification": {
+      "additionalProperties": false,
+      "properties": {
+        "ui_updates": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Ui Updates",
+          "type": "array"
+        },
+        "database_updates": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Database Updates",
+          "type": "array"
+        },
+        "alerts": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Alerts",
+          "type": "array"
+        },
+        "next": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next"
+        }
+      },
+      "required": [
+        "ui_updates",
+        "database_updates",
+        "alerts",
+        "next"
+      ],
+      "title": "NNotification",
+      "type": "object"
+    },
+    "OOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "json_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "minProperties": 1,
+          "title": "Json Schema",
+          "type": "object"
+        },
+        "state_handoff_file": {
+          "$ref": "#/$defs/StateHandoffFile"
+        },
+        "success_criteria": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Success Criteria",
+          "type": "string"
+        }
+      },
+      "required": [
+        "json_schema",
+        "state_handoff_file",
+        "success_criteria"
+      ],
+      "title": "OOutcome",
+      "type": "object"
+    },
+    "Parameter": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "default": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "constraints": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Constraints"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "Parameter",
+      "type": "object"
+    },
+    "RuleViolation": {
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Rule",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "path",
+        "message"
+      ],
+      "title": "RuleViolation",
+      "type": "object"
+    },
+    "SSource": {
+      "additionalProperties": false,
+      "properties": {
+        "required_inputs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Required Inputs",
+          "type": "array"
+        },
+        "fresh_state_parameters": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Fresh State Parameters",
+          "type": "array"
+        },
+        "external_data": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ExternalData"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "External Data"
+        },
+        "ml_data": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ml Data"
+        }
+      },
+      "required": [
+        "required_inputs",
+        "fresh_state_parameters"
+      ],
+      "title": "SSource",
+      "type": "object"
+    },
+    "SkillMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "macro_category": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Macro Category",
+          "type": "string"
+        },
+        "skill_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "skill_name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Name",
+          "type": "string"
+        },
+        "skill_ref": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skill Ref"
+        },
+        "rule_refs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Rule Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "macro_category",
+        "skill_id",
+        "skill_name"
+      ],
+      "title": "SkillMetadata",
+      "type": "object"
+    },
+    "StateHandoffFile": {
+      "additionalProperties": false,
+      "properties": {
+        "table": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Table",
+          "type": "string"
+        },
+        "mode": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Mode",
+          "type": "string"
+        },
+        "required_fields": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Required Fields",
+          "type": "array"
+        },
+        "description": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "table",
+        "mode",
+        "required_fields",
+        "description"
+      ],
+      "title": "StateHandoffFile",
+      "type": "object"
+    },
+    "SubSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_metadata": {
+          "$ref": "#/$defs/SkillMetadata"
+        },
+        "isatvon_definition": {
+          "$ref": "#/$defs/IsatvonDefinition"
+        }
+      },
+      "required": [
+        "skill_metadata",
+        "isatvon_definition"
+      ],
+      "title": "SubSkill",
+      "type": "object"
+    },
+    "SubSkillState": {
+      "enum": [
+        "DRAFT",
+        "VALID",
+        "INVALID",
+        "BUILDING",
+        "CORRECTING",
+        "TESTING",
+        "TESTING_BLOCKED",
+        "NEEDS_FDE_REVIEW",
+        "DEPENDENCY_FAILED",
+        "BUILD_ERROR",
+        "CERTIFIED",
+        "FROZEN",
+        "INVALIDATED",
+        "SUPERSEDED"
+      ],
+      "title": "SubSkillState",
+      "type": "string"
+    },
+    "TTechStack": {
+      "additionalProperties": false,
+      "properties": {
+        "execution_layer": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Execution Layer",
+          "type": "string"
+        },
+        "action_tool": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Action Tool",
+          "type": "string"
+        },
+        "fixed_check_tool": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Fixed Check Tool",
+          "type": "string"
+        },
+        "secondary_tools": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secondary Tools"
+        },
+        "gateway_routing": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gateway Routing"
+        },
+        "libraries": {
+          "items": {
+            "$ref": "#/$defs/Library"
+          },
+          "minItems": 1,
+          "title": "Libraries",
+          "type": "array"
+        }
+      },
+      "required": [
+        "execution_layer",
+        "action_tool",
+        "fixed_check_tool",
+        "libraries"
+      ],
+      "title": "TTechStack",
+      "type": "object"
+    },
+    "Task": {
+      "additionalProperties": false,
+      "properties": {
+        "goal": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Goal",
+          "type": "string"
+        },
+        "method": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Method",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "goal",
+        "method",
+        "steps"
+      ],
+      "title": "Task",
+      "type": "object"
+    },
+    "UserRole": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Level",
+          "type": "string"
+        },
+        "persona": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Persona",
+          "type": "string"
+        },
+        "authority": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Authority",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "persona",
+        "authority"
+      ],
+      "title": "UserRole",
+      "type": "object"
+    },
+    "VVariables": {
+      "additionalProperties": false,
+      "properties": {
+        "max_iterations": {
+          "title": "Max Iterations",
+          "type": "integer"
+        },
+        "success_gate": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Success Gate",
+          "type": "string"
+        },
+        "no_op_condition": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "No Op Condition",
+          "type": "string"
+        },
+        "escalation_condition": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Escalation Condition",
+          "type": "string"
+        },
+        "budget_limit": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Budget Limit",
+          "type": "string"
+        },
+        "tables": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tables",
+          "type": "array"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Parameter"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        },
+        "secrets": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secrets"
+        }
+      },
+      "required": [
+        "max_iterations",
+        "success_gate",
+        "no_op_condition",
+        "escalation_condition",
+        "budget_limit",
+        "tables"
+      ],
+      "title": "VVariables",
+      "type": "object"
+    },
+    "WorkbenchMacro": {
+      "additionalProperties": false,
+      "description": "A Macro Skill (contract `Agent`) with its Sub-Skills in order.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "macro_category": {
+          "title": "Macro Category",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "order": {
+          "minimum": 0,
+          "title": "Order",
+          "type": "integer"
+        },
+        "sub_skills": {
+          "items": {
+            "$ref": "#/$defs/WorkbenchSubSkill"
+          },
+          "title": "Sub Skills",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "macro_category",
+        "name",
+        "description",
+        "order",
+        "sub_skills"
+      ],
+      "title": "WorkbenchMacro",
+      "type": "object"
+    },
+    "WorkbenchSubSkill": {
+      "additionalProperties": false,
+      "description": "One Sub-Skill row: ISATVON 1.4 content plus the platform fields the grid shows read-only.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "macro_id": {
+          "format": "uuid",
+          "title": "Macro Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SubSkillState"
+        },
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "validation_errors": {
+          "items": {
+            "$ref": "#/$defs/RuleViolation"
+          },
+          "title": "Validation Errors",
+          "type": "array"
+        },
+        "sub_skill": {
+          "$ref": "#/$defs/SubSkill"
+        }
+      },
+      "required": [
+        "id",
+        "macro_id",
+        "state",
+        "content_sha256",
+        "sub_skill"
+      ],
+      "title": "WorkbenchSubSkill",
+      "type": "object"
+    },
+    "WorkflowState": {
+      "enum": [
+        "CREATED",
+        "ISATVON_EXTRACTING",
+        "ISATVON_REVIEW",
+        "BUILDING",
+        "CERTIFYING",
+        "CERTIFIED",
+        "FROZEN",
+        "EXTRACTION_FAILED",
+        "NEEDS_FDE_REVIEW",
+        "WORKFLOW_VALIDATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "WorkflowState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET W/macro-skills`. `workflow_state` and `sow_approved` decide whether the grid is editable\nand whether Generate can be offered; the server enforces both again (409/423).",
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "workflow_state": {
+      "$ref": "#/$defs/WorkflowState"
+    },
+    "sow_approved": {
+      "title": "Sow Approved",
+      "type": "boolean"
+    },
+    "macros": {
+      "items": {
+        "$ref": "#/$defs/WorkbenchMacro"
+      },
+      "title": "Macros",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "workflow_state",
+    "sow_approved",
+    "macros"
+  ],
+  "title": "WorkbenchTree",
+  "type": "object"
+}
