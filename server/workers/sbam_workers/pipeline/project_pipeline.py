@@ -5,6 +5,9 @@
     → [wait rebuild_subskills while a Sub-Skill needs review] → certify_macros → validate_workflow →
     certify_workflow → freeze → done
 
+E10.3 (behind `workflow.patched(SCHEDULER_PATCH)`): the build limit and the Sub-Skill dependency
+graph come from `plan_builds`, read once per generate; upstream Sub-Skills build first.
+
 Rules this file keeps (.claude/rules/temporal.md):
   * Deterministic: no clock, randomness, env or I/O here. Everything with side effects is an
     activity: stage stubs (owned by their feature issues), `apply_pipeline_transition` (state
@@ -33,6 +36,9 @@ with workflow.unsafe.imports_passed_through():
         MAX_PARALLEL_BUILDS,
         ORDER,
         PROJECT_PIPELINE,
+        BuildPlan,
+        BuildPlanInput,
+        BuildProgress,
         Cancel,
         CreateWorkflowInput,
         CreateWorkflowResult,
@@ -59,6 +65,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.runs import MirrorUpdate, RunInput, RunState, TaskQueue, build_workflow_id
     from sbam_contracts.state_machines import Actor, MachineName
 
+    from sbam_workers.build.plan import plan_builds
     from sbam_workers.build.stubs import build_schema_sql
     from sbam_workers.certify.stubs import (
         certify_macros,
@@ -71,6 +78,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_workers.knowledge.build import build_knowledge
     from sbam_workers.knowledge.bundle import build_okf_bundle
     from sbam_workers.mirror import update_run_mirror
+    from sbam_workers.pipeline.build_scheduler import BuildScheduler
     from sbam_workers.pipeline.sub_skill_build import SubSkillBuild
     from sbam_workers.pipeline_state import apply_pipeline_transition, notify
     from sbam_workers.registry import workflow_for
@@ -96,6 +104,7 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "extract_macro_skills": LLM,
     "extract_sub_skills": LLM,
     "build_schema_sql": (TaskQueue.BUILD, timedelta(minutes=5), 2),
+    "plan_builds": (TaskQueue.BUILD, timedelta(minutes=1), 3),
     "certify_macros": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "validate_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "certify_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
@@ -107,6 +116,8 @@ TUNED_PATCH = "e5-2-knowledge-heartbeat"
 TUNED: dict[str, tuple[timedelta, timedelta, float]] = {
     "build_knowledge": (timedelta(minutes=2), timedelta(seconds=30), 2.0),
 }
+# E10.3: configurable limit, upstream-first scheduling. Older runs keep the plain semaphore.
+SCHEDULER_PATCH = "e10-3-build-scheduler"
 WAITING_FOR = {
     PipelineStage.WAIT_SOW_APPROVAL: "sow_approved",
     PipelineStage.WAIT_GENERATE: "generate",
@@ -144,6 +155,9 @@ class ProjectPipeline:
         self.sub_skill_ids: list[UUID] = []
         self.needs_review: list[UUID] = []
         self.done: set[UUID] = set()
+        self.blocked: set[UUID] = set()  # needs review only because an upstream isn't certified
+        self.build_plan: BuildPlan | None = None
+        self.scheduler: BuildScheduler | None = None
         self.builds_started: dict[str, int] = {}
         self.children: dict[str, ChildWorkflowHandle[Any, Any]] = {}
         self.reminders_sent: list[PipelineStage] = []
@@ -200,6 +214,28 @@ class ProjectPipeline:
             failed_stage=self.failed_stage,
             last_error=self.last_error,
             reminders_sent=list(self.reminders_sent),
+        )
+
+    @workflow.query(name="build_schedule")
+    def build_schedule(self) -> BuildProgress:
+        plan = self.build_plan or BuildPlan()
+        now = self.scheduler
+        if now is None:
+            return BuildProgress(
+                max_parallel=plan.max_parallel,
+                blocked=sorted(self.blocked, key=str),
+                certified=len(self.done),
+                needs_review=len(self.needs_review),
+            )
+        in_round = set(now.running) | set(now.needs_review())
+        earlier = [s for s in self.needs_review if s not in in_round]  # not rebuilt this round
+        return BuildProgress(
+            running=list(now.running),
+            queued=list(now.queued),
+            blocked=list(now.blocked),
+            max_parallel=now.limit,
+            certified=len(self.done),
+            needs_review=len(now.failed) + len(now.blocked) + len(earlier),
         )
 
     # --- run -------------------------------------------------------------------------------------
@@ -311,6 +347,13 @@ class ProjectPipeline:
         await self._enter(PipelineStage.BUILD_SUB_SKILLS)
         wanted = set(_need(self.generate).sub_skill_ids)  # empty = every Sub-Skill
         targets = [s for s in self.sub_skill_ids if not wanted or s in wanted]
+        if workflow.patched(SCHEDULER_PATCH):
+            plan_input = BuildPlanInput(
+                **self._base(),
+                workflow_id=_need(self.workflow_id),
+                sub_skill_ids=self.sub_skill_ids,
+            )
+            self.build_plan = await self._attempt(plan_builds, plan_input, BuildPlan, None)
         self.needs_review = await self._build(targets)
 
     async def _stage_wait_rebuild(self) -> None:
@@ -321,7 +364,9 @@ class ProjectPipeline:
             rebuild = self.rebuilds.pop(0)
             await self._workflow("retry", Actor.FDE, rebuild.actor_id, nth=round_no)
             await self._enter(PipelineStage.BUILD_SUB_SKILLS)
-            again = [s for s in self.needs_review if s in set(rebuild.sub_skill_ids)]
+            again = self._with_unblocked(
+                [s for s in self.needs_review if s in set(rebuild.sub_skill_ids)]
+            )
             still = await self._build(again)
             self.needs_review = [s for s in self.needs_review if s not in again] + still
             round_no += 1
@@ -355,38 +400,13 @@ class ProjectPipeline:
     async def _build(self, sub_skill_ids: list[UUID]) -> list[UUID]:
         """Run SubSkillBuild children, at most MAX_PARALLEL_BUILDS at a time; returns the ones
         that need FDE review."""
+        if self.build_plan is not None:
+            return await self._schedule(sub_skill_ids, self.build_plan)
         slots = asyncio.Semaphore(MAX_PARALLEL_BUILDS)
-        workflow_id = _need(self.workflow_id)
 
         async def one(sub_skill_id: UUID) -> SubSkillBuildResult | None:
             async with slots:
-                if self.cancel_request is not None:
-                    return None
-                key = str(sub_skill_id)
-                build_no = self.builds_started.get(key, 0) + 1
-                self.builds_started[key] = build_no
-                child = await workflow.start_child_workflow(
-                    SubSkillBuild.run,
-                    SubSkillBuildInput(
-                        **self._base(),
-                        workflow_id=workflow_id,
-                        sub_skill_id=sub_skill_id,
-                        build_no=build_no,
-                    ),
-                    id=build_workflow_id(sub_skill_id, build_no),
-                    task_queue=TaskQueue.BUILD.value,
-                    # Request the cancel and move on: a running activity only hears it on its next
-                    # (throttled) heartbeat, so waiting for it would stall the pipeline's cancel.
-                    cancellation_type=ChildWorkflowCancellationType.TRY_CANCEL,
-                )
-                self.children[key] = child
-                if self.cancel_request is not None:  # cancel arrived while this child started
-                    child.cancel()
-                try:
-                    result: SubSkillBuildResult = await child
-                    return result
-                finally:
-                    self.children.pop(key, None)
+                return await self._build_one(sub_skill_id)
 
         results = await asyncio.gather(*(one(s) for s in sub_skill_ids), return_exceptions=True)
         self._checkpoint()  # a cancel during the builds stops here
@@ -397,6 +417,81 @@ class ProjectPipeline:
             else:
                 review.append(sub_skill_id)
         return review
+
+    async def _schedule(self, sub_skill_ids: list[UUID], plan: BuildPlan) -> list[UUID]:
+        """E10.3: at most `plan.max_parallel` children at once (counted here, in workflow state),
+        each started once its upstreams are certified; returns the ones that need FDE review."""
+        scheduler = BuildScheduler(sub_skill_ids, plan.depends_on, plan.max_parallel, self.done)
+        self.scheduler = scheduler
+        running: dict[UUID, asyncio.Task[SubSkillBuildResult | None]] = {}
+        while True:
+            if self.cancel_request is None:
+                for sub_skill_id in scheduler.start_ready():
+                    running[sub_skill_id] = asyncio.create_task(self._build_one(sub_skill_id))
+            if not running:
+                break
+            await workflow.wait_condition(lambda: any(t.done() for t in running.values()))
+            for sub_skill_id in sorted((s for s, t in running.items() if t.done()), key=str):
+                task = running.pop(sub_skill_id)
+                result = None if task.cancelled() or task.exception() else task.result()
+                certified = result is not None and result.certified
+                scheduler.finished(sub_skill_id, certified)
+                if certified:
+                    self.done.add(sub_skill_id)
+        self.scheduler = None
+        self._checkpoint()  # a cancel during the builds stops here
+        self.blocked = (self.blocked - set(sub_skill_ids)) | set(scheduler.blocked)
+        return scheduler.needs_review()
+
+    def _with_unblocked(self, chosen: list[UUID]) -> list[UUID]:
+        """Add blocked Sub-Skills whose upstreams are all certified or rebuilt in this round, so an
+        FDE who rebuilds an upstream doesn't have to name each dependent too."""
+        if self.build_plan is None:
+            return chosen
+        depends_on = self.build_plan.depends_on
+        picked = set(chosen)
+        grew = True
+        while grew:
+            grew = False
+            for s in self.needs_review:
+                ups = depends_on.get(s, [])
+                if (
+                    s in self.blocked
+                    and s not in picked
+                    and all(u in self.done or u in picked for u in ups)
+                ):
+                    picked.add(s)
+                    grew = True
+        return [s for s in self.needs_review if s in picked]
+
+    async def _build_one(self, sub_skill_id: UUID) -> SubSkillBuildResult | None:
+        if self.cancel_request is not None:
+            return None
+        key = str(sub_skill_id)
+        build_no = self.builds_started.get(key, 0) + 1
+        self.builds_started[key] = build_no
+        child = await workflow.start_child_workflow(
+            SubSkillBuild.run,
+            SubSkillBuildInput(
+                **self._base(),
+                workflow_id=_need(self.workflow_id),
+                sub_skill_id=sub_skill_id,
+                build_no=build_no,
+            ),
+            id=build_workflow_id(sub_skill_id, build_no),
+            task_queue=TaskQueue.BUILD.value,
+            # Request the cancel and move on: a running activity only hears it on its next
+            # (throttled) heartbeat, so waiting for it would stall the pipeline's cancel.
+            cancellation_type=ChildWorkflowCancellationType.TRY_CANCEL,
+        )
+        self.children[key] = child
+        if self.cancel_request is not None:  # cancel arrived while this child started
+            child.cancel()
+        try:
+            result: SubSkillBuildResult = await child
+            return result
+        finally:
+            self.children.pop(key, None)
 
     # --- helpers ---------------------------------------------------------------------------------
 
@@ -531,6 +626,9 @@ class ProjectPipeline:
             reminders_sent=self.reminders_sent,
             sow_approved=self.sow_approved,
             builds_started=self.builds_started,
+            certified=sorted(self.done, key=str),
+            blocked=sorted(self.blocked, key=str),
+            build_plan=self.build_plan,
         )
         workflow.continue_as_new(self.inp.model_copy(update={"resume": resume}))
 
@@ -542,6 +640,9 @@ class ProjectPipeline:
         self.reminders_sent = list(resume.reminders_sent)
         self.sow_approved = self.sow_approved or resume.sow_approved
         self.builds_started = dict(resume.builds_started)
+        self.done = set(resume.certified)
+        self.blocked = set(resume.blocked)
+        self.build_plan = resume.build_plan
 
     # --- state, notifications, mirror ------------------------------------------------------------
 
