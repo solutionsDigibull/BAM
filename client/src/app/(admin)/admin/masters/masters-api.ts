@@ -1,4 +1,4 @@
-import type { MasterStatus, MasterType } from "@/contracts";
+import type { ImportMode, ImportReport, MasterStatus, MasterType } from "@/contracts";
 import { API_BASE, toApiError } from "@/providers/data-provider";
 
 export const LAYOUT_URL = "admin/master-types";
@@ -96,4 +96,28 @@ export function ragError(text: string): string | null {
   if (extra.length) return `Unknown key${extra.length > 1 ? "s" : ""}: ${extra.join(", ")}`;
   if (Object.values(value).some((v) => typeof v !== "string")) return "Every value must be text";
   return null;
+}
+
+export const MAX_WORKBOOK_BYTES = 15 * 1024 * 1024; // the server answers 413 above this too
+
+/** Why a picked file can't be imported, or null (the server checks it all again). */
+export function workbookProblem(file: { name: string; size: number }): string | null {
+  if (!file.name.toLowerCase().endsWith(".xlsx")) return "Only .xlsx workbooks can be imported.";
+  if (file.size > MAX_WORKBOOK_BYTES) return "The workbook is larger than 15 MB.";
+  return null;
+}
+
+/** POST /admin/masters/import as multipart (Refine's custom() only sends JSON). */
+export async function importWorkbook(file: File, mode: ImportMode): Promise<ImportReport> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("mode", mode);
+  const res = await fetch(`${API_BASE}/admin/masters/import`, {
+    method: "POST",
+    body: form,
+    headers: { accept: "application/json" },
+    credentials: "same-origin",
+  });
+  if (!res.ok) throw await toApiError(res);
+  return (await res.json()) as ImportReport;
 }
