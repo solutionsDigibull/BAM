@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/parsed_document:0.1.0",
+  "$defs": {
+    "Block": {
+      "additionalProperties": false,
+      "description": "One piece of the document with where it came from.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/BlockType"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "maximum": 6,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "sheet": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet"
+        },
+        "cell": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Z]{1,3}[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cell"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "title": "Block",
+      "type": "object"
+    },
+    "BlockType": {
+      "enum": [
+        "heading",
+        "paragraph",
+        "list_item",
+        "row",
+        "cell",
+        "table"
+      ],
+      "title": "BlockType",
+      "type": "string"
+    },
+    "Table": {
+      "additionalProperties": false,
+      "properties": {
+        "header": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Header",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "sheet": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sheet"
+        },
+        "range": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Range"
+        },
+        "start_line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Line"
+        }
+      },
+      "title": "Table",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`doc.json`: what a loader read from a document version.",
+  "properties": {
+    "schema_version": {
+      "default": 1,
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "document_version_id": {
+      "format": "uuid",
+      "title": "Document Version Id",
+      "type": "string"
+    },
+    "loader": {
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Loader",
+      "type": "string"
+    },
+    "blocks": {
+      "items": {
+        "$ref": "#/$defs/Block"
+      },
+      "title": "Blocks",
+      "type": "array"
+    },
+    "tables": {
+      "items": {
+        "$ref": "#/$defs/Table"
+      },
+      "title": "Tables",
+      "type": "array"
+    }
+  },
+  "required": [
+    "document_version_id",
+    "loader"
+  ],
+  "title": "ParsedDocument",
+  "type": "object"
+}

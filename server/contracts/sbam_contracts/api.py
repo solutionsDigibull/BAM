@@ -64,6 +64,11 @@ class ErrorCode(StrEnum):
     HASH_MISMATCH = "HASH_MISMATCH"
     NO_DOCUMENTS = "NO_DOCUMENTS"
     PARSE_ERROR = "PARSE_ERROR"
+    # Why a document version is PARSE_FAILED (E4.5): the loader's own verdict.
+    CORRUPT = "CORRUPT"  # the file cannot be read as its type
+    ENCRYPTED = "ENCRYPTED"  # password-protected: no password is ever asked for
+    EMPTY = "EMPTY"  # readable, but holds no content
+    TIMEOUT = "TIMEOUT"  # the parse ran past its limit
     SCAN_UNAVAILABLE = "SCAN_UNAVAILABLE"
     OCR_UNAVAILABLE = "OCR_UNAVAILABLE"
     MALWARE = "MALWARE"  # a document version rejected because the scan found malware
