@@ -44,6 +44,7 @@ KINDS: dict[str, Kind] = {
     "workflow.freeze": Kind(T.WORKFLOW_FROZEN),
     "sub_skill.attempts_exhausted": Kind(T.SUBSKILL_NEEDS_REVIEW),
     "document_version.malware_detected": Kind(T.DOCUMENT_REJECTED),
+    "document_version.type_rejected": Kind(T.DOCUMENT_REJECTED),  # E4.4; the reason is on screen
     "document_version.parse_failed": Kind(T.DOCUMENT_REJECTED),
     "pipeline.failed": Kind(T.GENERATION_FAILED),
     "knowledge.rebuilt": Kind(T.STAGE_COMPLETED, "Knowledge rebuild"),  # E5.2, KnowledgeRebuild

@@ -5,7 +5,9 @@ One execution per uploaded file, id `ingest-<document_version_id>` on sbam-inges
 1. Scan (E4.3): `scan_clamav`, 3 attempts with 5 s x2 backoff. If every attempt fails the version
    is marked SCAN_FAILED (the FDE can retry) and this execution ends normally, so the pipeline goes
    on with the other documents. An infected file ends it the same way, as REJECTED.
-2. Detect, parse and OCR follow (E4.4 to E4.8). Each must call `require_clean` first.
+2. Detect (E4.4): `detect_type` checks the content against the extension and the enabled Filetype
+   rows. A mismatch, an unsupported type or a bad encoding ends the execution as REJECTED.
+3. Parse and OCR follow (E4.5 to E4.8). Each must call `require_clean` first.
 
 Each step keeps this workflow's name and its input and output types.
 """
@@ -21,9 +23,15 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.pipeline import IdsResult, StageRef
     from sbam_contracts.runs import TaskQueue
 
+    from sbam_workers.ingest import type_detection
     from sbam_workers.ingest.scan import PERMANENT, mark_scan_failed, scan_clamav
     from sbam_workers.registry import workflow_for
 
+DETECT_RETRY = RetryPolicy(
+    maximum_attempts=3,
+    initial_interval=timedelta(seconds=2),
+    non_retryable_error_types=[type_detection.NOT_FOUND, type_detection.NOT_DETECTABLE],
+)
 SCAN_ATTEMPTS = 3
 SCAN_TIMEOUT = timedelta(minutes=2)
 SCAN_RETRY = RetryPolicy(
@@ -59,4 +67,12 @@ class DocumentIngestion:
             )
         if outcome.verdict is not ScanStatus.CLEAN:
             return IdsResult(ids=[])  # infected or unscanned: nothing goes on to parsing
-        return IdsResult(ids=[inp.ref_id])  # CLEAN: detect and parse follow (#70, #71, ...)
+        if workflow.patched("e4-4-detect-type"):  # runs started before E4.4 skip it on replay
+            return await workflow.execute_activity(
+                type_detection.detect_type,
+                inp,
+                task_queue=TaskQueue.INGEST.value,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=DETECT_RETRY,
+            )
+        return IdsResult(ids=[inp.ref_id])  # CLEAN: parse follows (#71, ...)
