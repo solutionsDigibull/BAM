@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/master_types:0.1.0",
+  "$defs": {
+    "MasterColumn": {
+      "additionalProperties": false,
+      "description": "One frozen workbook column: row-2 header, payload field and row-3 description (tooltip).",
+      "properties": {
+        "header": {
+          "title": "Header",
+          "type": "string"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "header",
+        "field",
+        "description"
+      ],
+      "title": "MasterColumn",
+      "type": "object"
+    },
+    "MasterType": {
+      "enum": [
+        "ORGANIZATION",
+        "RULES",
+        "AGENTS",
+        "SKILLS",
+        "TOOLING",
+        "FILETYPE"
+      ],
+      "title": "MasterType",
+      "type": "string"
+    },
+    "MasterTypeInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "master_type": {
+          "$ref": "#/$defs/MasterType"
+        },
+        "tab": {
+          "title": "Tab",
+          "type": "string"
+        },
+        "editable": {
+          "title": "Editable",
+          "type": "boolean"
+        },
+        "row_label_prefix": {
+          "title": "Row Label Prefix",
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/MasterColumn"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "payload_schema": {
+          "additionalProperties": true,
+          "title": "Payload Schema",
+          "type": "object"
+        }
+      },
+      "required": [
+        "master_type",
+        "tab",
+        "editable",
+        "row_label_prefix",
+        "columns",
+        "payload_schema"
+      ],
+      "title": "MasterTypeInfo",
+      "type": "object"
+    },
+    "ReadmeTab": {
+      "additionalProperties": false,
+      "description": "The README tab: help text. Only its structure is checked, its content is not interpreted.",
+      "properties": {
+        "title": {
+          "maxLength": 32767,
+          "pattern": "^BuLLM - Admin Masters \\(BAM\\)",
+          "title": "Title",
+          "type": "string"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "maxLength": 32767,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxItems": 4,
+            "type": "array"
+          },
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "rows"
+      ],
+      "structure_version": "BAM 0.2",
+      "title": "ReadmeTab",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET /admin/master-types` (TD §8.3): the frozen BAM 0.2 layout the masters screen is built\nfrom, read from the workbook template, plus the README tab.",
+  "properties": {
+    "types": {
+      "items": {
+        "$ref": "#/$defs/MasterTypeInfo"
+      },
+      "title": "Types",
+      "type": "array"
+    },
+    "readme": {
+      "$ref": "#/$defs/ReadmeTab"
+    }
+  },
+  "required": [
+    "types",
+    "readme"
+  ],
+  "title": "MasterTypes",
+  "type": "object"
+}

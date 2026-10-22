@@ -9,6 +9,9 @@ in the column order the importer reads, so import -> export -> import changes no
   * the Filetype tab is the platform's frozen one, whatever the tenant stored;
   * the Tooling tab is kept only when there are Tooling entries; the template never has it.
 Restricted entries are exported too: only the tenant's admins can call this.
+
+The same file answers `GET /admin/master-types` (TD §8.3): the column headers and row-3
+descriptions the masters screen shows, so the workbook stays the one source of the layout.
 """
 
 import io
@@ -16,14 +19,31 @@ import json
 import re
 import uuid
 from datetime import UTC, datetime
+from functools import cache
 from importlib.resources import files
 from typing import Any, Final
 
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 from sbam_contracts.api import ErrorCode, FieldError
-from sbam_contracts.masters import MAX_CELL_CHARS, MasterType
-from sbam_contracts.masters_workbook import COLUMNS, HEADER_ROWS, TABS, TOOLING_TAB
+from sbam_contracts.masters import (
+    ADMIN_EDITABLE,
+    MAX_CELL_CHARS,
+    README_MAX_COLUMNS,
+    MasterType,
+    ReadmeTab,
+    cell_text,
+)
+from sbam_contracts.masters_api import MasterColumn, MasterTypeInfo, MasterTypes
+from sbam_contracts.masters_workbook import (
+    COLUMNS,
+    HEADER_ROWS,
+    PAYLOAD_MODELS,
+    README_TAB,
+    ROW_LABEL_PREFIX,
+    TABS,
+    TOOLING_TAB,
+)
 from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
@@ -86,6 +106,38 @@ def export(session: Session, user: CurrentUser, project_id: uuid.UUID | None) ->
     data = _save(book)
     session.commit()
     return name, data
+
+
+@cache
+def master_types() -> MasterTypes:
+    """Every master's frozen columns with their row-3 description, and the README tab."""
+    book = _layout()
+    types = []
+    for master_type, tab in TABS.items():
+        row3 = next(book[tab].iter_rows(min_row=HEADER_ROWS, max_row=HEADER_ROWS, values_only=True))
+        descriptions = [cell_text(v).strip() for v in row3[1:]]  # column A is the row label
+        columns = [
+            MasterColumn(header=header, field=field, description=descriptions[i])
+            for i, (header, field) in enumerate(COLUMNS[master_type])
+        ]
+        types.append(
+            MasterTypeInfo(
+                master_type=master_type,
+                tab=tab,
+                editable=master_type in ADMIN_EDITABLE,
+                row_label_prefix=ROW_LABEL_PREFIX[master_type],
+                columns=columns,
+                payload_schema=PAYLOAD_MODELS[master_type].model_json_schema(by_alias=True),
+            )
+        )
+    rows = [
+        [None if v is None else cell_text(v) for v in row[:README_MAX_COLUMNS]]
+        for row in book[README_TAB].iter_rows(values_only=True)
+    ]
+    while rows and not any(rows[-1]):
+        rows.pop()
+    readme = ReadmeTab(title=rows[0][0] or "", rows=rows[1:])
+    return MasterTypes(types=types, readme=readme)
 
 
 def _layout() -> openpyxl.Workbook:

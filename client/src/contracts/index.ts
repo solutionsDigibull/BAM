@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:108a2989fd36b74fa43e3459f8c485b4bf48201199c7a9e4b24cb52b17244104
+// source-sha256:3c15ebd62b70d01fbfae22540195dd1dd152ecb3116fe1bfd55a39e5b1760ea5
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -328,6 +328,7 @@ export interface SbamContracts {
   MastersSnapshot?: MastersSnapshot;
   InclusionReport?: InclusionReport;
   ImportReport?: ImportReport;
+  MasterTypes?: MasterTypes;
   DocumentOut?: DocumentOut;
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
@@ -2182,6 +2183,42 @@ export interface ImportRowError {
   row?: number | null;
   column?: string | null;
   message: string;
+}
+/**
+ * `GET /admin/master-types` (TD §8.3): the frozen BAM 0.2 layout the masters screen is built
+ * from, read from the workbook template, plus the README tab.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterTypes".
+ */
+export interface MasterTypes {
+  types: MasterTypeInfo[];
+  readme: ReadmeTab;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterTypeInfo".
+ */
+export interface MasterTypeInfo {
+  master_type: MasterType;
+  tab: string;
+  editable: boolean;
+  row_label_prefix: string;
+  columns: MasterColumn[];
+  payload_schema: {
+    [k: string]: unknown | undefined;
+  };
+}
+/**
+ * One frozen workbook column: row-2 header, payload field and row-3 description (tooltip).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterColumn".
+ */
+export interface MasterColumn {
+  header: string;
+  field: string;
+  description: string;
 }
 /**
  * A document with the state of its stored file (`GET`, `POST .../restore`).
