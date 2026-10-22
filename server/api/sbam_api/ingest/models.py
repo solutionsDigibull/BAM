@@ -57,7 +57,12 @@ class DocumentVersion(Stateful, ProjectOwned, Base):
     scan_status: Mapped[str | None] = mapped_column(String(20))
     scan_signature_version: Mapped[str | None] = mapped_column(String(100))  # clamd VERSION
     scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reject_code: Mapped[str | None] = mapped_column(String(40))  # MALWARE when REJECTED by a scan
+    # Why it is REJECTED: MALWARE (the scan), TYPE_MISMATCH, UNSUPPORTED_TYPE, INVALID_ENCODING.
+    reject_code: Mapped[str | None] = mapped_column(String(40))
+    # Type detection (E4.4), after a CLEAN scan: the type the content really is (an extension such
+    # as "pdf" or "tar.gz") and the Filetype master row it maps to (e.g. "Filetype #21").
+    detected_type: Mapped[str | None] = mapped_column(String(40))
+    filetype_row_label: Mapped[str | None] = mapped_column(String(40))
 
 
 class UploadReservation(ProjectOwned, Base):
