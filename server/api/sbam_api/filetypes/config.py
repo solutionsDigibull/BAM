@@ -121,3 +121,15 @@ def allowlist(filetypes: tuple[Filetype, ...] | None = None) -> frozenset[str]:
         if f.config.mvp_enabled
         for ext in f.config.extensions
     )
+
+
+def enabled_rows(filetypes: tuple[Filetype, ...] | None = None) -> dict[str, Filetype]:
+    """Extension -> the MVP-enabled Filetype row for it (the first row when two share one: a
+    `.pdf` is the text-based row until the loader finds no text layer and routes it to OCR)."""
+    rows: dict[str, Filetype] = {}
+    for filetype in filetypes if filetypes is not None else load():
+        if not filetype.config.mvp_enabled or filetype.config.loader is None:
+            continue
+        for ext in filetype.config.extensions:
+            rows.setdefault(ext.lower(), filetype)
+    return rows

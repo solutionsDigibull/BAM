@@ -10,14 +10,13 @@ from pathlib import Path
 
 import pytest
 from fixtures import fixture_path
-from sbam_api.filetypes.config import allowlist
+from sbam_api.filetypes.config import allowlist, enabled_rows
 from sbam_contracts.api import ErrorCode
 from sbam_workers.ingest.detect import (
     HEAD_BYTES,
     Detected,
     Rejected,
     detect,
-    enabled_rows,
     is_executable,
     is_text,
 )

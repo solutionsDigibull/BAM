@@ -28,7 +28,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
-from sbam_api.filetypes.config import Filetype, load
+from sbam_api.filetypes.config import Filetype, enabled_rows
 from sbam_api.ingest.rules import extension
 from sbam_contracts.api import ErrorCode
 
@@ -80,18 +80,6 @@ class Rejected:
 
 
 ZipNames = Callable[[], set[str]]
-
-
-def enabled_rows(filetypes: tuple[Filetype, ...] | None = None) -> dict[str, Filetype]:
-    """Extension -> the MVP-enabled Filetype row for it (the first row when two share one: a
-    `.pdf` is the text-based row until the loader finds no text layer and routes it to OCR)."""
-    rows: dict[str, Filetype] = {}
-    for filetype in filetypes if filetypes is not None else load():
-        if not filetype.config.mvp_enabled or filetype.config.loader is None:
-            continue
-        for ext in filetype.config.extensions:
-            rows.setdefault(ext.lower(), filetype)
-    return rows
 
 
 def is_executable(head: bytes) -> bool:
