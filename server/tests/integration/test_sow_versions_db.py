@@ -5,6 +5,7 @@ A scratch database migrated to head; dropped at the end.
 
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -16,6 +17,7 @@ from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.projects.models import Project
 from sbam_api.sow.service import Generation, record_generation
 from sbam_api.sow.sql import IMMUTABLE_SQLSTATE
+from sbam_contracts.sow import SowDocument
 from sqlalchemy import pool, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
@@ -26,7 +28,8 @@ pytestmark = pytest.mark.integration
 
 DB = f"sbam_e63_{uuid.uuid4().hex[:10]}"
 TENANT = uuid.uuid4()
-DOC = {"anything": "the trigger does not read the content"}
+FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "sow" / "ms01_1_sow.json"
+DOC = SowDocument.model_validate_json(FIXTURE.read_text(encoding="utf-8")).model_dump(mode="json")
 
 
 @pytest.fixture(scope="module")
