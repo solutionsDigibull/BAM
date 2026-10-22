@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import func
 
 from sbam_api.db.repository import TenantScopedRepository
-from sbam_api.sow.models import Sow, SowVersion
+from sbam_api.sow.models import Sow, SowExport, SowVersion
 from sbam_api.state_machine.repository import StatefulRepository
 
 
@@ -49,3 +49,19 @@ class SowVersionRepository(StatefulRepository):
             .with_only_columns(func.max(SowVersion.version))
         )
         return int(self.session.scalar(query) or 0) + 1
+
+
+class SowExportRepository(TenantScopedRepository[SowExport]):
+    model = SowExport
+
+    def find(
+        self, sow_version_id: uuid.UUID, status: str, fmt: str, template_version: str
+    ) -> SowExport | None:
+        query = self._scoped().where(
+            SowExport.sow_version_id == sow_version_id,
+            SowExport.status == status,
+            SowExport.format == fmt,
+            SowExport.template_version == template_version,
+        )
+        found: SowExport | None = self.session.scalars(query).one_or_none()
+        return found

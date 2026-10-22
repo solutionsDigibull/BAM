@@ -76,6 +76,11 @@ module = ["boto3", "botocore.*", "moto"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+# No py.typed: Pandoc and WeasyPrint for the SOW export (#88), python-docx to read it back in tests.
+module = ["pypandoc", "weasyprint", "docx", "docx.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 # Cognee ships no py.typed; only knowledge/cognee_backend.py imports it (#78).
 module = ["cognee", "cognee.*"]
 ignore_missing_imports = true
