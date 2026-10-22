@@ -324,6 +324,27 @@ def test_e4_9_t07_restore_after_purge_is_410_gone(h: Harness) -> None:
     assert tombstone and tombstone[0]["state"] == "PURGED"  # ...unless asked for
 
 
+# --- E4.4: why a document was rejected ----------------------------------------------------------
+
+
+def test_e4_4_the_list_says_why_a_document_was_rejected(h: Harness) -> None:
+    infected, mismatched = h.uploaded("a.pdf"), h.uploaded("b.pdf", OTHER_PDF)
+    with h.sessions() as s:
+        for document_id, code in ((infected, "MALWARE"), (mismatched, "TYPE_MISMATCH")):
+            version = s.scalars(
+                select(DocumentVersion).where(DocumentVersion.document_id == document_id)
+            ).one()
+            version.state, version.reject_code = "REJECTED", code
+        s.commit()
+    codes = {d["id"]: d["reject_code"] for d in h.listing()}
+    assert codes == {str(infected): "MALWARE", str(mismatched): "TYPE_MISMATCH"}
+
+
+def test_e4_4_a_document_that_is_not_rejected_has_no_reject_code(h: Harness) -> None:
+    h.uploaded()
+    assert [d["reject_code"] for d in h.listing()] == [None]
+
+
 # --- T08 security -------------------------------------------------------------------------------
 
 

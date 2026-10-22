@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:135f03b5bc3d584539bb316921f48babe11646812fd782510f011e4367ade2be
+// source-sha256:cb187e4e21152263b663d09ac489cb63ceb76c1b30294eeb4fa14c6e8cd86881
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -2137,6 +2137,7 @@ export interface DocumentOut {
   deleted_at?: string | null;
   deleted_by?: string | null;
   purge_after?: string | null;
+  reject_code?: ErrorCode | null;
 }
 /**
  * One deleted document that is due for purging (IDs only, like every workflow input).
