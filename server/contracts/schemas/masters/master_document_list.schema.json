@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/master_document_list:0.1.0",
+  "$defs": {
+    "MasterDocumentOut": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project Id"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "filetype_row_label": {
+          "title": "Filetype Row Label",
+          "type": "string"
+        },
+        "intent_class": {
+          "title": "Intent Class",
+          "type": "string"
+        },
+        "master_type": {
+          "enum": [
+            "ORGANIZATION",
+            "RULES",
+            "AGENTS",
+            "SKILLS"
+          ],
+          "title": "Master Type",
+          "type": "string"
+        },
+        "master_entry_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Master Entry Id"
+        },
+        "route_source": {
+          "$ref": "#/$defs/RouteSource"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "title": "Size",
+          "type": "integer"
+        },
+        "scan_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScanStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parse_status": {
+          "$ref": "#/$defs/ParseStatus"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "filetype_row_label",
+        "intent_class",
+        "master_type",
+        "route_source",
+        "sha256",
+        "size",
+        "parse_status",
+        "created_at"
+      ],
+      "title": "MasterDocumentOut",
+      "type": "object"
+    },
+    "ParseStatus": {
+      "enum": [
+        "PENDING",
+        "PARSING",
+        "PARSED",
+        "FAILED"
+      ],
+      "title": "ParseStatus",
+      "type": "string"
+    },
+    "RouteSource": {
+      "enum": [
+        "DEFAULT_BY_FILETYPE",
+        "ADMIN_OVERRIDE",
+        "CLASSIFIER"
+      ],
+      "title": "RouteSource",
+      "type": "string"
+    },
+    "ScanStatus": {
+      "enum": [
+        "CLEAN",
+        "INFECTED",
+        "SCAN_FAILED"
+      ],
+      "title": "ScanStatus",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/MasterDocumentOut"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "MasterDocumentList",
+  "type": "object"
+}

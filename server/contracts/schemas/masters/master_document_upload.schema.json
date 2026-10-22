@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/master_document_upload:0.1.0",
+  "additionalProperties": false,
+  "description": "The optional fields of the multipart POST, next to the `file` part.",
+  "properties": {
+    "project_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Id"
+    },
+    "master_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "ORGANIZATION",
+            "RULES",
+            "AGENTS",
+            "SKILLS"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Master Type"
+    }
+  },
+  "title": "MasterDocumentUpload",
+  "type": "object"
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/master_document_patch:0.1.0",
+  "additionalProperties": false,
+  "description": "Confirm or override the route. `master_entry_id` must be an entry of `master_type`.",
+  "properties": {
+    "master_type": {
+      "enum": [
+        "ORGANIZATION",
+        "RULES",
+        "AGENTS",
+        "SKILLS"
+      ],
+      "title": "Master Type",
+      "type": "string"
+    },
+    "master_entry_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Master Entry Id"
+    }
+  },
+  "required": [
+    "master_type"
+  ],
+  "title": "MasterDocumentPatch",
+  "type": "object"
+}
