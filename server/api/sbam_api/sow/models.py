@@ -74,3 +74,23 @@ class SowVersion(Stateful, ProjectOwned, Base):
 
 
 register_entity(MachineName.SOW_VERSION, SowVersion)
+
+
+class SowExport(ProjectOwned, Base):
+    """A rendered export (E6.4), cached by what the file shows: the version (its content is
+    immutable, `sow_sha256`), its status on the cover, the format and the template version. The same
+    file is never rendered twice; an approval or supersession renders a new cover."""
+
+    __tablename__ = "sow_exports"
+    __table_args__ = (UniqueConstraint("sow_version_id", "status", "format", "template_version"),)
+
+    sow_version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA}.sow_versions.id"), index=True
+    )
+    sow_sha256: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32))  # the version's state when rendered
+    format: Mapped[str] = mapped_column(String(8))  # ExportFormat
+    template_version: Mapped[str] = mapped_column(String(20))
+    storage_key: Mapped[str] = mapped_column(String(255))
+    sha256: Mapped[str] = mapped_column(String(64))  # of the file
+    size: Mapped[int] = mapped_column(Integer)

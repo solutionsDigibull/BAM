@@ -34,6 +34,8 @@ dev = [
     "types-jsonschema>=4.26.0.20261006",
     "moto[s3]>=5.1,<6",
     "types-pyyaml>=6.0.12.20260906",
+    "pypdf>=6",
+    "python-docx>=1.2",
 ]
 
 [tool.ruff]
@@ -71,6 +73,11 @@ files = ["api", "workers", "contracts", "tests"]
 [[tool.mypy.overrides]]
 # No type stubs shipped; the S3 stub (#37) wraps them behind StorageBackend.
 module = ["boto3", "botocore.*", "moto"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# No py.typed: Pandoc and WeasyPrint for the SOW export (#88), python-docx to read it back in tests.
+module = ["pypandoc", "weasyprint", "docx", "docx.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

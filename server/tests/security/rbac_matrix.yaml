@@ -468,6 +468,16 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"
 
+  export_sow_version_api_v1_projects__project_id__sow_versions__version__export_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow/versions/{version}/export
+      params: {project_id: "@project_a", version: 1}
+      query: {format: md}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"  # the 302 to the signed URL of the cached export, followed to the file
+
   regenerate_sow_api_v1_projects__project_id__sow_regenerate_post:
     request:
       method: POST

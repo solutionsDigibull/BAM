@@ -51,7 +51,7 @@ from sbam_api.masters.models import MasterDocument, MasterEntry, MasterSnapshot
 from sbam_api.projects.models import Project
 from sbam_api.projects.repository import SqlMemberships
 from sbam_api.registry.sync import sync as sync_registry
-from sbam_api.sow.models import Sow
+from sbam_api.sow.models import Sow, SowVersion
 from sbam_api.sow.service import Generation, record_generation
 from sbam_api.storage import Kind, StorageScope, signed_url
 from sbam_api.storage.local import LocalDiskBackend
@@ -61,8 +61,10 @@ from sbam_contracts.build import BuildStage, SubSkillBuildStatus
 from sbam_contracts.knowledge import CoverageEntry, GraphEdge, GraphNode, SourceStatus
 from sbam_contracts.okf import PartRef
 from sbam_contracts.runs import RunState, SubjectType, build_workflow_id
+from sbam_contracts.sow_api import ExportFormat, SowExportInput
 from sbam_contracts.state_machines import DocumentVersionState, SubSkillState
 from sbam_workers.knowledge import okf
+from sbam_workers.sow.export.activity import ExportDeps, export_version
 from sqlalchemy import func, pool, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -340,6 +342,7 @@ class World:
         self.file_query = dict(part.split("=", 1) for part in query.split("&"))
         self.kv_a = self._seed_knowledge()
         self.sow_a, self.sow_a_tiptap = self._seed_sow()
+        self._seed_export()
 
     def _create_project(self, role: str, name: str) -> uuid.UUID:
         res = self.call("POST", "/admin/projects", role, json={"name": name})
@@ -482,6 +485,22 @@ class World:
             version = record_generation(s, ctx, gen, correlation_id="rbac-world-sow")
             s.commit()
             return version.sow_id, dict(version.content_tiptap or {})
+
+    def _seed_export(self) -> None:
+        """Project A's v1 already rendered as Markdown (E6.4): the export route hits the cache."""
+        with self.sessions() as s:
+            version_id = s.scalars(
+                select(SowVersion.id).where(SowVersion.sow_id == self.sow_a)
+            ).one()
+        inp = SowExportInput(
+            tenant_id=self.tenant_a,
+            project_id=self.project_a,
+            run_id=uuid7(),
+            correlation_id="rbac-world-export",
+            sow_version_id=version_id,
+            format=ExportFormat.MD,
+        )
+        export_version(ExportDeps(self.sessions, LocalDiskBackend(self.tmp)), inp)
 
     # -- placeholders (`@name` in the matrix) ----------------------------------------------
     def value(self, name: str) -> str:
