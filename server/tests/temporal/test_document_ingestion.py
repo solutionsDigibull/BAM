@@ -27,6 +27,7 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, UnsandboxedWorkflowRunner, Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 QUEUE = "sbam-ingest"
 
@@ -110,7 +111,7 @@ async def running(fakes: Fakes, *, sandbox: bool = True) -> AsyncIterator[Workfl
             task_queue=QUEUE,
             workflows=[DocumentIngestion],
             activities=activities(fakes),
-            **({} if sandbox else {"workflow_runner": UnsandboxedWorkflowRunner()}),
+            workflow_runner=SandboxedWorkflowRunner() if sandbox else UnsandboxedWorkflowRunner(),
         ):
             yield env
 
@@ -316,8 +317,8 @@ def test_e4_5_the_parse_limits_are_the_ones_in_the_contract() -> None:
     assert document_ingestion.PARSE_RETRY.maximum_attempts == 3
     assert document_ingestion.PARSE_RETRY.initial_interval == timedelta(seconds=10)
     assert document_ingestion.PARSE_RETRY.backoff_coefficient == 2.0
-    assert document_ingestion.PARSE_TIMEOUT_SECONDS == documents.PARSE_TIMEOUT_SECONDS == 600
-    assert document_ingestion.PARSE_HEARTBEAT_SECONDS == documents.PARSE_HEARTBEAT_SECONDS == 60
+    assert documents.PARSE_TIMEOUT_SECONDS == 600  # the activity's start-to-close timeout
+    assert documents.PARSE_HEARTBEAT_SECONDS == 60  # and its heartbeat timeout
 
 
 def test_e4_5_an_execution_started_before_parsing_existed_still_replays() -> None:

@@ -316,7 +316,7 @@ def test_e4_5_an_infrastructure_error_is_raised_for_a_retry_and_changes_nothing(
     h = Harness(root)
     ref = h.add("rfq.md", docs("sample.md"))
     flaky = Harness.__new__(Harness)
-    flaky.sessions, flaky.storage = h.sessions, FlakyStorage(h.storage)  # type: ignore[assignment]
+    flaky.sessions, flaky.storage = h.sessions, FlakyStorage(h.storage)
     flaky.deps = ParseDeps(h.sessions, flaky.storage)
     with pytest.raises(OSError):
         parse_version(flaky.deps, ref)
