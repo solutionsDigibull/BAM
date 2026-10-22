@@ -37,6 +37,7 @@ from sbam_contracts.documents import (
     MAX_ACTIVE_FILES,
     PURGE_RETENTION_DAYS,
     DocumentOut,
+    ParseReport,
     PurgeOutcome,
     PurgeTarget,
 )
@@ -136,6 +137,10 @@ def to_out(document: Document, version: DocumentVersion) -> DocumentOut:
         deleted_by=document.deleted_by,
         purge_after=document.purge_after,
         reject_code=ErrorCode(version.reject_code) if version.reject_code else None,
+        parse_code=ErrorCode(version.parse_code) if version.parse_code else None,
+        parse_report=(
+            ParseReport.model_validate(version.parse_report) if version.parse_report else None
+        ),
     )
 
 
@@ -374,6 +379,8 @@ def retry_document(
             ),
         )
         version.ingestion_started_at = None  # the workflow is started again for it
+        version.parse_code = None  # the next attempt writes its own verdict and report
+        version.parse_report = None
         version_repo.update(version, version.row_version)
     _audit(
         session,
