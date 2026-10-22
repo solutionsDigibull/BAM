@@ -478,6 +478,24 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"  # the 302 to the signed URL of the cached export, followed to the file
 
+  sow_citation_api_v1_projects__project_id__sow_versions__version__citations__okf_ref_id__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow/versions/{version}/citations/{okf_ref_id}
+      params: {project_id: "@project_a", version: 1, okf_ref_id: "@sow_a_chunk"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  sow_citation_source_api_v1_projects__project_id__sow_versions__version__citations__okf_ref_id__source_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow/versions/{version}/citations/{okf_ref_id}/source
+      params: {project_id: "@project_a", version: 1, okf_ref_id: "@sow_a_chunk"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   regenerate_sow_api_v1_projects__project_id__sow_regenerate_post:
     request:
       method: POST

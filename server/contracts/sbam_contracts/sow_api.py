@@ -131,6 +131,22 @@ class SowVersionDetail(SowVersionSummary):
     citations: list[SowCitationRef] = Field(default_factory=list)
 
 
+MAX_CITATION_PASSAGE: Final = 4000
+
+
+class SowCitationDetail(_Dto):
+    """What a citation points at (E6.5 citation panel), read from the version's OKF bundle."""
+
+    okf_ref_id: str
+    kind: Literal["chunk", "entity"]
+    document_version_id: UUID
+    title: str | None = None  # None: the document was deleted ("source deleted")
+    location: dict[str, Any]
+    passage: str  # at most MAX_CITATION_PASSAGE characters; `truncated` says if it was cut
+    truncated: bool = False
+    source_available: bool  # GET .../source serves the document's text
+
+
 class SowOverview(_Dto):
     sow_id: UUID
     current: SowVersionSummary | None = None
@@ -211,4 +227,5 @@ def schemas() -> dict[str, dict[str, Any]]:
         "save_request": contract_schema(SowSaveRequest, "sow/save_request"),
         "diff": contract_schema(SowDiff, "sow/diff"),
         "regenerate_request": contract_schema(SowRegenerateRequest, "sow/regenerate_request"),
+        "citation_detail": contract_schema(SowCitationDetail, "sow/citation_detail"),
     }

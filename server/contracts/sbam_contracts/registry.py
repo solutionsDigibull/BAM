@@ -93,6 +93,7 @@ from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sow import SowDocument
 from sbam_contracts.sow_api import (
+    SowCitationDetail,
     SowDiff,
     SowOverview,
     SowRegenerateRequest,
@@ -133,6 +134,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sow/save_request", SowSaveRequest),
     ("sow/diff", SowDiff),
     ("sow/regenerate_request", SowRegenerateRequest),
+    ("sow/citation_detail", SowCitationDetail),
     ("runs/run", Run),
     ("runs/run_accepted", RunAccepted),
     ("runtime_registry/runtime_registry", RuntimeRegistry),
