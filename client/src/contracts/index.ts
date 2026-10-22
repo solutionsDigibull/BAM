@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:3c15ebd62b70d01fbfae22540195dd1dd152ecb3116fe1bfd55a39e5b1760ea5
+// source-sha256:dcbcdd32ba633d132c7a51697b4331c31056cb1e7ba8650962c2949d42ee6876
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -253,6 +253,16 @@ export type SourceKind = "BAM_0_2_SAMPLE" | "TEMPLATE_ROW" | "ADMIN_ENTRY";
 export type ImportMode = "validate-only" | "upsert";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RouteSource".
+ */
+export type RouteSource = "DEFAULT_BY_FILETYPE" | "ADMIN_OVERRIDE" | "CLASSIFIER";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ParseStatus".
+ */
+export type ParseStatus = "PENDING" | "PARSING" | "PARSED" | "FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "NotificationType".
  */
 export type NotificationType =
@@ -329,6 +339,10 @@ export interface SbamContracts {
   InclusionReport?: InclusionReport;
   ImportReport?: ImportReport;
   MasterTypes?: MasterTypes;
+  MasterDocumentUpload?: MasterDocumentUpload;
+  MasterDocumentPatch?: MasterDocumentPatch;
+  MasterDocumentOut?: MasterDocumentOut;
+  MasterDocumentList?: MasterDocumentList;
   DocumentOut?: DocumentOut;
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
@@ -2219,6 +2233,52 @@ export interface MasterColumn {
   header: string;
   field: string;
   description: string;
+}
+/**
+ * The optional fields of the multipart POST, next to the `file` part.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterDocumentUpload".
+ */
+export interface MasterDocumentUpload {
+  project_id?: string | null;
+  master_type?: ("ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS") | null;
+}
+/**
+ * Confirm or override the route. `master_entry_id` must be an entry of `master_type`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterDocumentPatch".
+ */
+export interface MasterDocumentPatch {
+  master_type: "ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS";
+  master_entry_id?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterDocumentOut".
+ */
+export interface MasterDocumentOut {
+  id: string;
+  project_id?: string | null;
+  title: string;
+  filetype_row_label: string;
+  intent_class: string;
+  master_type: "ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS";
+  master_entry_id?: string | null;
+  route_source: RouteSource;
+  sha256: string;
+  size: number;
+  scan_status?: ScanStatus | null;
+  parse_status: ParseStatus;
+  created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterDocumentList".
+ */
+export interface MasterDocumentList {
+  items: MasterDocumentOut[];
 }
 /**
  * A document with the state of its stored file (`GET`, `POST .../restore`).
