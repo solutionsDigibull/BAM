@@ -82,7 +82,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_workers.pipeline.sub_skill_build import SubSkillBuild
     from sbam_workers.pipeline_state import apply_pipeline_transition, notify
     from sbam_workers.registry import workflow_for
-    from sbam_workers.sow.stubs import generate_sow
+    from sbam_workers.sow.generate import generate_sow
 
 SYSTEM = "SYSTEM"
 REMINDER_AFTER = timedelta(days=3)  # TD §13.3 (proposed): remind once, never time out
