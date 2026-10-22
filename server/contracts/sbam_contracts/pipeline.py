@@ -18,6 +18,7 @@ from sbam_contracts.state_machines import Actor, MachineName
 PROJECT_PIPELINE: Final = "ProjectPipeline"  # workflow type name
 SUB_SKILL_BUILD: Final = "SubSkillBuild"
 MAX_PARALLEL_BUILDS: Final = 4  # TD §13.2
+MAX_PARALLEL_LIMIT: Final = 16  # E10.3: build.max_parallel is 1..16
 SHA256_HEX: Final = r"^[0-9a-f]{64}$"
 ActorId = Annotated[str, Field(min_length=1, max_length=255)]
 
@@ -71,6 +72,14 @@ class SowApproved(_Dto):
     actor_id: ActorId
 
 
+class BuildPlan(_Dto):
+    """E10.3: read once per generate (`plan_builds`), so a config change mid-run never alters the
+    schedule. `depends_on[s]` = Sub-Skills whose outputs feed `s`; they must be CERTIFIED first."""
+
+    max_parallel: Annotated[int, Field(ge=1, le=MAX_PARALLEL_LIMIT)] = MAX_PARALLEL_BUILDS
+    depends_on: dict[UUID, list[UUID]] = Field(default_factory=dict)
+
+
 class ResumeState(_Dto):
     """What a continue-as-new carries over (TD §13.2: long human waits)."""
 
@@ -82,6 +91,11 @@ class ResumeState(_Dto):
     reminders_sent: list[PipelineStage] = Field(default_factory=list)
     sow_approved: SowApproved | None = None
     builds_started: dict[str, int] = Field(default_factory=dict)  # sub_skill_id -> last build_no
+    certified: list[UUID] = Field(default_factory=list)
+    blocked: list[UUID] = Field(
+        default_factory=list
+    )  # in needs_review: an upstream never certified
+    build_plan: BuildPlan | None = None
 
 
 class PipelineInput(RunInput):
@@ -125,6 +139,17 @@ class PipelineStatus(_Dto):
     reminders_sent: list[PipelineStage] = Field(default_factory=list)
 
 
+class BuildProgress(_Dto):
+    """`build_schedule` query (E10.3): the current build round plus whole-run counts."""
+
+    running: list[UUID] = Field(default_factory=list)
+    queued: list[UUID] = Field(default_factory=list)  # in start order
+    blocked: list[UUID] = Field(default_factory=list)
+    max_parallel: int = MAX_PARALLEL_BUILDS
+    certified: int = 0
+    needs_review: int = 0
+
+
 # --- stage activity DTOs (stubs now; real activities keep these) ---------------------------------
 
 
@@ -155,6 +180,12 @@ class CreateWorkflowInput(RunInput):
 
 class CreateWorkflowResult(_Dto):
     workflow_id: UUID
+
+
+class BuildPlanInput(WorkflowRef):
+    """E10.3 `plan_builds`: every Sub-Skill of the Workflow (edges to other ids are rejected)."""
+
+    sub_skill_ids: list[UUID]
 
 
 class SubSkillBuildInput(WorkflowRef):

@@ -61,6 +61,7 @@ FDE = str(uuid.uuid4())
 SHA = "ab" * 32
 HISTORY = Path(__file__).parent / "histories" / "project_pipeline.json"
 BEFORE_E5_2 = HISTORY.with_name("project_pipeline_before_e5_2.json")  # no heartbeat patch
+BEFORE_E10_3 = HISTORY.with_name("project_pipeline_before_e10_3.json")  # no build scheduler patch
 FULL_ORDER = [
     "ingest",
     "knowledge",
@@ -567,10 +568,15 @@ def test_e10_1_signal_helper_refuses_when_not_waiting() -> None:
 # --- replay --------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("recorded", [HISTORY, BEFORE_E5_2], ids=["current", "before_e5_2"])
+@pytest.mark.parametrize(
+    "recorded",
+    [HISTORY, BEFORE_E5_2, BEFORE_E10_3],
+    ids=["current", "before_e5_2", "before_e10_3"],
+)
 def test_e10_1_replays_from_recorded_history(recorded: Path) -> None:
     """Determinism guard (TD §13.4): a change that breaks running pipelines fails here. E5.2-T09:
-    `before_e5_2` was recorded before the knowledge stage's heartbeat patch, `current` after it."""
+    `before_e5_2` was recorded before the knowledge stage's heartbeat patch, `current` after it.
+    E10.3-T06: `before_e10_3` was recorded before the build scheduler patch."""
     workflow_id = pipeline_workflow_id(uuid.UUID(int=0))
     history = WorkflowHistory.from_json(workflow_id, json.loads(recorded.read_text("utf-8")))
     replayer = Replayer(workflows=[ProjectPipeline], data_converter=pydantic_data_converter)
