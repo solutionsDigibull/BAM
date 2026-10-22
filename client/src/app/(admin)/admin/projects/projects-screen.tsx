@@ -15,14 +15,24 @@ import {
   Table,
   Tabs,
   Tag,
-  theme,
   Tooltip,
   Typography,
 } from "antd";
 import dayjs from "dayjs";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 
-import { ApiErrorState, EmptyState, LoadingState, StatusBadge } from "@/components/ui-kit";
+import {
+  ApiErrorState,
+  CountBadge,
+  EmptyState,
+  GRID_STYLE,
+  GRID_THEME,
+  head,
+  LoadingState,
+  Meta,
+  MUTED,
+  StatusBadge,
+} from "@/components/ui-kit";
 import type { Project, ProjectStatus } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
@@ -32,37 +42,6 @@ import { EMPTY_MESSAGE, RESOURCE } from "./project-api";
 import { ProjectFormDrawer } from "./project-form-drawer";
 
 type Editor = { mode: "create" } | { mode: "edit"; id: string };
-
-const MUTED = "#64748b";
-const head = (label: string) => (
-  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.3, color: MUTED }}>
-    {label.toUpperCase()}
-  </span>
-);
-
-function CountBadge({ n, active }: { n: number; active: boolean }) {
-  const { token } = theme.useToken(); // follow the app theme, like the tab underline
-  return (
-    <span
-      style={{
-        marginLeft: 6,
-        padding: "0 7px",
-        borderRadius: 10,
-        fontSize: 11,
-        lineHeight: "18px",
-        display: "inline-block",
-        background: active ? token.colorPrimaryBg : "#f1f5f9",
-        color: active ? token.colorPrimary : MUTED,
-      }}
-    >
-      {n}
-    </span>
-  );
-}
-
-function Meta({ children }: { children: ReactNode }) {
-  return <Typography.Text style={{ fontSize: 12, color: MUTED }}>{children}</Typography.Text>;
-}
 
 export function ProjectsScreen() {
   const { message } = App.useApp();
@@ -122,26 +101,14 @@ export function ProjectsScreen() {
           {rows.length} of {inTab} rows
         </Meta>
       </Flex>
-      <ConfigProvider
-        theme={{
-          components: {
-            Table: {
-              headerBg: "#f8fafc",
-              headerSplitColor: "transparent",
-              borderColor: "#e5e7eb",
-              rowHoverBg: "#f5f9ff",
-              cellPaddingBlock: 14,
-            },
-          },
-        }}
-      >
+      <ConfigProvider theme={GRID_THEME}>
         <Table<Project>
           rowKey="id"
           bordered={false}
           dataSource={rows}
           pagination={rows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
           scroll={{ x: 820 }}
-          style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}
+          style={GRID_STYLE}
           locale={{
             emptyText: (
               <EmptyState

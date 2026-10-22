@@ -1,9 +1,8 @@
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { MastersScreen } from "./masters-screen";
 
 export const metadata = { title: "Masters" };
 
+// Admin-only: (admin)/layout.tsx renders Forbidden for non-admins before this page (or its requests) runs.
 export default function MastersPage() {
-  return (
-    <PagePlaceholder title="Masters" empty="No masters loaded yet. Import the BAM 0.2 workbook." />
-  );
+  return <MastersScreen />;
 }
