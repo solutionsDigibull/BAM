@@ -1,0 +1,51 @@
+{
+  "acceptance_check": "Pass when reserved quantity <= available_qty and quantity <= max_reserve.",
+  "action_step": "Reserve quantity units of sku against the available stock, never more than max_reserve per call.",
+  "action_tool": "reserve_stock",
+  "fixed_check_tool": "check_reservation",
+  "fresh_state": [
+    "available_qty",
+    "reserved_qty"
+  ],
+  "gate_outputs": [
+    "within_stock",
+    "within_limit"
+  ],
+  "handoff_table": "stock_reservation_handoff",
+  "inputs": [
+    {
+      "name": "sku",
+      "required": true,
+      "type": "string"
+    },
+    {
+      "name": "quantity",
+      "required": true,
+      "type": "integer"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "reserved",
+      "required": true,
+      "type": "boolean"
+    },
+    {
+      "name": "remaining",
+      "required": false,
+      "type": "integer"
+    }
+  ],
+  "parameters": [
+    {
+      "name": "max_reserve",
+      "value": 50
+    }
+  ],
+  "required_fields": [
+    "iteration_pass",
+    "sku",
+    "quantity"
+  ],
+  "skill_id": "MS02.3_Stock_Reserver"
+}
