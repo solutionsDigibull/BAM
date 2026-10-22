@@ -2,7 +2,8 @@
 
 // Notification bell + inbox (E10.5): unread badge, polling, mark-read (single + all) and deep links.
 // The backend is authoritative on link safety (TD §8.13); this also re-checks before navigating.
-import { useCustom, useCustomMutation } from "@refinedev/core";
+import { useCustomMutation } from "@refinedev/core";
+import { useQuery } from "@tanstack/react-query";
 import { App, Button, Drawer, Empty, List, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -12,7 +13,7 @@ import { useState } from "react";
 dayjs.extend(relativeTime);
 
 import type { Notification } from "@/contracts";
-import type { ApiError } from "@/providers/data-provider";
+import { API_BASE, toApiError, type ApiError } from "@/providers/data-provider";
 
 import { ApiErrorState } from "./api-error-state";
 import { LoadingState } from "./empty-state";
@@ -39,21 +40,30 @@ export function NotificationCenter() {
   // Optimistic overlay on top of the server's `read_at`: set immediately on click, reverted on failure.
   const [locallyRead, setLocallyRead] = useState<ReadonlySet<string>>(new Set());
 
-  const list = useCustom<NotificationPage, ApiError>({
-    url: notificationsPath(),
-    method: "get",
-    config: { query: { limit: UNREAD_PAGE_LIMIT } },
-    queryOptions: {
-      // Polls only while this component is mounted — unmounted (e.g. after logout) means no more requests.
-      refetchInterval: POLL_MS,
-      refetchIntervalInBackground: false,
+  // Plain react-query, not Refine's useCustom: a background poll failing (e.g. a transient 401)
+  // must never trigger Refine's global auth-error redirect and log the user out from under them.
+  const list = useQuery<NotificationPage, ApiError>({
+    queryKey: ["notification-center", notificationsPath()],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/${notificationsPath()}?limit=${UNREAD_PAGE_LIMIT}`, {
+        headers: { accept: "application/json" },
+        credentials: "same-origin",
+      });
+      if (!res.ok) throw await toApiError(res);
+      return (await res.json()) as NotificationPage;
     },
+    // One fetch on mount always populates the badge; the repeating interval only runs while the
+    // drawer is open, so an idle page isn't hitting this endpoint forever in the background.
+    refetchInterval: open ? POLL_MS : false,
+    refetchIntervalInBackground: false,
+    // A failed poll doesn't need its own retry/backoff: the next cycle already is one.
+    retry: false,
   });
 
   const markOne = useCustomMutation<Record<string, never>, ApiError>();
   const markAll = useCustomMutation<Record<string, never>, ApiError>();
 
-  const items = list.result.data?.items ?? [];
+  const items = list.data?.items ?? [];
   const isRead = (n: Notification) => Boolean(n.read_at) || locallyRead.has(n.id);
   const unreadCount = items.filter((n) => !isRead(n)).length;
 
@@ -74,7 +84,7 @@ export function NotificationCenter() {
           revert(n.id);
           void message.error(MARK_READ_FAILED);
         },
-        onSettled: () => void list.query.refetch(),
+        onSettled: () => void list.refetch(),
       },
     );
   };
@@ -94,7 +104,7 @@ export function NotificationCenter() {
           });
           void message.error(MARK_READ_FAILED);
         },
-        onSettled: () => void list.query.refetch(),
+        onSettled: () => void list.refetch(),
       },
     );
   };
@@ -112,11 +122,11 @@ export function NotificationCenter() {
     <>
       <NotificationBell count={unreadCount} onOpen={() => setOpen(true)} />
       <Drawer title="Notifications" open={open} onClose={() => setOpen(false)} width={420}>
-        {list.query.isLoading ? <LoadingState /> : null}
-        {list.query.error ? (
-          <ApiErrorState error={list.query.error} onRetry={() => void list.query.refetch()} />
+        {list.isLoading ? <LoadingState /> : null}
+        {list.error ? (
+          <ApiErrorState error={list.error} onRetry={() => void list.refetch()} />
         ) : null}
-        {!list.query.isLoading && !list.query.error ? (
+        {!list.isLoading && !list.error ? (
           items.length === 0 ? (
             <Empty description={EMPTY_INBOX} style={{ padding: "48px 0" }} />
           ) : (
