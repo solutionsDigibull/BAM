@@ -7,6 +7,10 @@ dependencies = ["sbam-api", "sbam-workers", "sbam-contracts"]
 
 [tool.uv]
 package = false
+# ponytail: pillow 12.x has CRITICAL CVE-2026-112393/112403/112900 (fixed in 13.0.0), but
+# cognee -> fastembed caps it below 13. Nothing of ours uses fastembed's image paths (embeddings go
+# through Bifrost). Drop this once a fastembed that cognee accepts allows pillow 13 (#273).
+override-dependencies = ["pillow>=13.0.0"]
 
 [tool.uv.workspace]
 members = ["api", "workers", "contracts"]
