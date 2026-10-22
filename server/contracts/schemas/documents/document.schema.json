@@ -61,6 +61,10 @@
         "HASH_MISMATCH",
         "NO_DOCUMENTS",
         "PARSE_ERROR",
+        "CORRUPT",
+        "ENCRYPTED",
+        "EMPTY",
+        "TIMEOUT",
         "SCAN_UNAVAILABLE",
         "OCR_UNAVAILABLE",
         "MALWARE",
@@ -98,6 +102,46 @@
       ],
       "title": "ErrorCode",
       "type": "string"
+    },
+    "ParseReport": {
+      "additionalProperties": false,
+      "description": "Kept on the document version (`parse_report`) after every parse attempt.",
+      "properties": {
+        "pages": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Pages",
+          "type": "integer"
+        },
+        "sheets": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Sheets",
+          "type": "integer"
+        },
+        "tables": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tables",
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "ocr_needed_pages": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Ocr Needed Pages",
+          "type": "array"
+        }
+      },
+      "title": "ParseReport",
+      "type": "object"
     }
   },
   "description": "A document with the state of its stored file (`GET`, `POST .../restore`).",
@@ -173,6 +217,28 @@
       "anyOf": [
         {
           "$ref": "#/$defs/ErrorCode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "parse_code": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "parse_report": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ParseReport"
         },
         {
           "type": "null"

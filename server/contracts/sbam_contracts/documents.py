@@ -13,6 +13,13 @@ Rules worth knowing
     it was issued). Uploading with it to another project is refused.
   * Scan (E4.3): every upload is scanned before anything reads it. `ScanStatus` is the verdict kept
     on the document version; INFECTED versions are REJECTED with code MALWARE and quarantined.
+  * Parse (E4.5): a loader turns a clean, type-checked version into `doc.md` and `doc.json`
+    (`ParsedDocument`) under the tenant and project prefix of the storage, and a `ParseReport`.
+    A block says where its text came from: `page` (PDF), `sheet` and `cell` (XLSX, `Sheet1!B4` is
+    sheet `Sheet1`, cell `B4`), `line` (text, Markdown, CSV; for DOCX the 1-based ordinal of the
+    block in the document). Every block has at least one of them. A version that cannot be parsed
+    is PARSE_FAILED with `parse_code` CORRUPT, ENCRYPTED, EMPTY, TIMEOUT or PARSE_ERROR. CORRUPT,
+    ENCRYPTED and EMPTY are final (no retry); a TIMEOUT or an infrastructure error is retried.
 """
 
 from datetime import datetime
@@ -20,7 +27,14 @@ from enum import StrEnum
 from typing import Annotated, Any, Final
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.api import ErrorCode
@@ -37,6 +51,12 @@ PURGE_CRON: Final = "0 2 * * *"  # 02:00 UTC every day
 CLEANUP_UPLOADS: Final = "CleanupAbandonedUploads"  # workflow type of the daily clean-up (E4.12)
 CLEANUP_SCHEDULE_ID: Final = "cleanup-abandoned-uploads"  # Temporal Schedule id
 CLEANUP_HOUR_UTC: Final = 3  # 03:00 UTC every day, an hour after the purge
+# Loader limits (E4.5). A file over a cap is PARSE_FAILED, never silently cut.
+MAX_PDF_PAGES: Final = 2000
+MAX_XLSX_CELLS: Final = 1_000_000
+PARSE_TIMEOUT_SECONDS: Final = 10 * 60  # per file
+PARSE_HEARTBEAT_SECONDS: Final = 60
+PARSE_MEMORY_LIMIT_BYTES: Final = 1024 * 1024 * 1024  # the ingest worker container's cap
 
 _NO_SEPARATORS_OR_CONTROL = r"^[^/\\\x00-\x1f\x7f-\x9f]+$"
 
@@ -103,6 +123,86 @@ class ScanOutcome(BaseModel):
     signature_version: str | None = None  # clamd VERSION, e.g. `ClamAV 1.5.4/27800/<date>`
 
 
+class BlockType(StrEnum):
+    HEADING = "heading"
+    PARAGRAPH = "paragraph"
+    LIST_ITEM = "list_item"
+    ROW = "row"  # one CSV row, as text; the same rows are in the table
+    CELL = "cell"  # one spreadsheet cell with a value
+    TABLE = "table"  # a table in the source; `table` is its index in `ParsedDocument.tables`
+
+
+class Block(BaseModel):
+    """One piece of the document with where it came from."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: BlockType
+    text: str
+    level: int | None = Field(default=None, ge=1, le=6)  # headings only
+    page: int | None = Field(default=None, ge=1)
+    sheet: str | None = Field(default=None, min_length=1, max_length=255)
+    cell: str | None = Field(default=None, pattern=r"^[A-Z]{1,3}[1-9][0-9]*$")
+    line: int | None = Field(default=None, ge=1)
+    table: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _says_where_it_came_from(self) -> "Block":
+        if self.page is None and self.sheet is None and self.cell is None and self.line is None:
+            raise ValueError("a block needs page, sheet, cell or line")
+        if self.cell is not None and self.sheet is None and self.page is None:
+            raise ValueError("a cell needs its sheet")
+        if self.type == BlockType.TABLE and self.table is None:
+            raise ValueError("a table block names its table")
+        return self
+
+
+class Table(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    header: list[str] = Field(default_factory=list)
+    rows: list[list[str]] = Field(default_factory=list)
+    page: int | None = Field(default=None, ge=1)
+    sheet: str | None = Field(default=None, min_length=1, max_length=255)
+    range: str | None = None  # a spreadsheet range such as `A1:D20`
+    start_line: int | None = Field(default=None, ge=1)  # a CSV: the line of the header
+
+
+class ParsedDocument(BaseModel):
+    """`doc.json`: what a loader read from a document version."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1, le=1)
+    document_version_id: UUID
+    loader: str = Field(min_length=1, max_length=40)  # the loader id of the Filetype row
+    blocks: list[Block] = Field(default_factory=list)
+    tables: list[Table] = Field(default_factory=list)
+
+
+class ParseReport(BaseModel):
+    """Kept on the document version (`parse_report`) after every parse attempt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pages: int = Field(default=0, ge=0)  # PDF
+    sheets: int = Field(default=0, ge=0)  # XLSX
+    tables: int = Field(default=0, ge=0)
+    warnings: list[str] = Field(default_factory=list)
+    ocr_needed_pages: list[int] = Field(
+        default_factory=list
+    )  # PDF pages without a text layer (E4.8)
+
+
+class ParseOutcome(BaseModel):
+    """Result of the `parse_document` activity. `code` is set when the version is PARSE_FAILED."""
+
+    document_version_id: UUID
+    parsed: bool
+    code: ErrorCode | None = None
+    report: ParseReport | None = None
+
+
 class DocumentOut(BaseModel):
     """A document with the state of its stored file (`GET`, `POST .../restore`)."""
 
@@ -119,6 +219,10 @@ class DocumentOut(BaseModel):
     # Why the document is REJECTED: MALWARE (the scan), or TYPE_MISMATCH / UNSUPPORTED_TYPE /
     # INVALID_ENCODING (type detection, E4.4). None for every other state.
     reject_code: ErrorCode | None = None
+    # Why a PARSE_FAILED document failed (CORRUPT, ENCRYPTED, EMPTY, TIMEOUT, PARSE_ERROR) and what
+    # the loader found (E4.5). None until a parse attempt has finished.
+    parse_code: ErrorCode | None = None
+    parse_report: ParseReport | None = None
 
 
 class PurgeTarget(BaseModel):
@@ -164,6 +268,9 @@ def schemas() -> dict[str, dict[str, Any]]:
         "upload_request": UploadRequest,
         "upload_token": UploadToken,
         "scan_outcome": ScanOutcome,
+        "parsed_document": ParsedDocument,
+        "parse_report": ParseReport,
+        "parse_outcome": ParseOutcome,
         "document": DocumentOut,
         "purge_target": PurgeTarget,
         "purge_request": PurgeRequest,

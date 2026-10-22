@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:4c7022bd8f106a3e204fce5e34401604fa85b9d6486c777272693f529b118a34
+// source-sha256:a4d491c52c1075fc125537d5f1a5ad2c6c41a8d499d95e53fb64f8ca3f091505
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -50,6 +50,10 @@ export type ErrorCode =
   | "HASH_MISMATCH"
   | "NO_DOCUMENTS"
   | "PARSE_ERROR"
+  | "CORRUPT"
+  | "ENCRYPTED"
+  | "EMPTY"
+  | "TIMEOUT"
   | "SCAN_UNAVAILABLE"
   | "OCR_UNAVAILABLE"
   | "MALWARE"
@@ -258,6 +262,11 @@ export type PipelineStepStatus = "pending" | "running" | "done" | "failed" | "ca
 export type ScanStatus = "CLEAN" | "INFECTED" | "SCAN_FAILED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BlockType".
+ */
+export type BlockType = "heading" | "paragraph" | "list_item" | "row" | "cell" | "table";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterType".
  */
 export type MasterType = "ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS" | "TOOLING" | "FILETYPE";
@@ -367,6 +376,9 @@ export interface SbamContracts {
   UploadRequest?: UploadRequest;
   UploadToken?: UploadToken;
   ScanOutcome?: ScanOutcome;
+  ParsedDocument?: ParsedDocument;
+  ParseReport?: ParseReport;
+  ParseOutcome?: ParseOutcome;
   MasterEntryCreate?: MasterEntryCreate;
   MasterVersionCreate?: MasterVersionCreate;
   MasterEntry?: MasterEntry;
@@ -2349,6 +2361,72 @@ export interface ScanOutcome {
   signature_version?: string | null;
 }
 /**
+ * `doc.json`: what a loader read from a document version.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ParsedDocument".
+ */
+export interface ParsedDocument {
+  schema_version?: number;
+  document_version_id: string;
+  loader: string;
+  blocks?: Block[];
+  tables?: Table[];
+}
+/**
+ * One piece of the document with where it came from.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Block".
+ */
+export interface Block {
+  type: BlockType;
+  text: string;
+  level?: number | null;
+  page?: number | null;
+  sheet?: string | null;
+  cell?: string | null;
+  line?: number | null;
+  table?: number | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Table".
+ */
+export interface Table {
+  header?: string[];
+  rows?: string[][];
+  page?: number | null;
+  sheet?: string | null;
+  range?: string | null;
+  start_line?: number | null;
+}
+/**
+ * Kept on the document version (`parse_report`) after every parse attempt.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ParseReport".
+ */
+export interface ParseReport {
+  pages?: number;
+  sheets?: number;
+  tables?: number;
+  warnings?: string[];
+  ocr_needed_pages?: number[];
+}
+/**
+ * Result of the `parse_document` activity. `code` is set when the version is PARSE_FAILED.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ParseOutcome".
+ */
+export interface ParseOutcome {
+  document_version_id: string;
+  parsed: boolean;
+  code?: ErrorCode | null;
+  report?: ParseReport | null;
+}
+/**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterEntryCreate".
  */
@@ -2604,6 +2682,8 @@ export interface DocumentOut {
   deleted_by?: string | null;
   purge_after?: string | null;
   reject_code?: ErrorCode | null;
+  parse_code?: ErrorCode | null;
+  parse_report?: ParseReport | null;
 }
 /**
  * One deleted document that is due for purging (IDs only, like every workflow input).
