@@ -233,6 +233,10 @@ def test_e0_4_t01_schema_files_are_exactly_the_documented_ones() -> None:
         "inclusion_report.schema.json",  # E3.6
         "import_report.schema.json",  # workbook import (E3.3)
         "master_types.schema.json",  # masters screen layout (E3.10)
+        "master_document_upload.schema.json",  # master documents (E3.8)
+        "master_document_patch.schema.json",
+        "master_document.schema.json",
+        "master_document_list.schema.json",
     }
 
 

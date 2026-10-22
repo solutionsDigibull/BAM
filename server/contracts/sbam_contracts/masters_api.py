@@ -16,6 +16,12 @@ Rules worth knowing
     entries with the same stable id; ILLUSTRATIVE, RETIRED and Restricted entries are left out.
     `sha256` is `canonical.sha256_of({project_id, entries})` (RFC 8785, `sha256:<hex>`), so the same
     versions always give the same hash.
+  * Master documents (E3.8, `/admin/master-documents`): an Admin attaches a context file.
+    The file is scanned (ClamAV) and routed by its Filetype row's `default_route`; the Admin may
+    override the route. A file that is already in the project (same sha256) is not stored twice:
+    the POST answers 200 with the existing document instead of 201. Infected answers 422
+    `MALWARE` (the code E4.3 already uses) and the file is quarantined. PATCH takes the
+    document's ETag as `If-Match` (428 without, 412 when stale).
   * Workbook import (E3.3, `POST /admin/masters/import`) answers an `ImportReport`. Rows are matched
     on (master type, stable id, scope); a changed payload is a new version, an equal one is
     `unchanged`. `upsert` writes all or nothing: any row error leaves `applied: false`. Entries in
@@ -30,6 +36,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
+from sbam_contracts.documents import ScanStatus
 from sbam_contracts.masters import MasterStatus, MasterType, ReadmeTab, SourceKind
 
 RowLabel = Annotated[
@@ -222,6 +229,59 @@ class MasterTypes(BaseModel):
     readme: ReadmeTab
 
 
+# The four masters a document can be routed to: Tooling and Filetype hold no free-form context.
+RoutedMasterType = Literal[
+    MasterType.ORGANIZATION, MasterType.RULES, MasterType.AGENTS, MasterType.SKILLS
+]
+
+
+class RouteSource(StrEnum):
+    DEFAULT_BY_FILETYPE = "DEFAULT_BY_FILETYPE"  # the Filetype row's `default_route`
+    ADMIN_OVERRIDE = "ADMIN_OVERRIDE"  # the Admin chose the master (or an entry) at upload or later
+    CLASSIFIER = "CLASSIFIER"  # reserved for the content classifier (Future); never set today
+
+
+class ParseStatus(StrEnum):
+    PENDING = "PENDING"  # not parsed yet (a file stays here until its loader is available)
+    PARSING = "PARSING"
+    PARSED = "PARSED"
+    FAILED = "FAILED"
+
+
+class MasterDocumentUpload(_Request):
+    """The optional fields of the multipart POST, next to the `file` part."""
+
+    project_id: UUID | None = None  # a project of the caller's tenant
+    master_type: RoutedMasterType | None = None  # override the Filetype default route
+
+
+class MasterDocumentPatch(_Request):
+    """Confirm or override the route. `master_entry_id` must be an entry of `master_type`."""
+
+    master_type: RoutedMasterType
+    master_entry_id: UUID | None = None
+
+
+class MasterDocumentOut(BaseModel):
+    id: UUID
+    project_id: UUID | None = None
+    title: str  # the file name
+    filetype_row_label: str  # e.g. "Filetype #23"
+    intent_class: str  # of that Filetype row, e.g. "Source data (RFQ / BOM / quote)"
+    master_type: RoutedMasterType
+    master_entry_id: UUID | None = None
+    route_source: RouteSource
+    sha256: str
+    size: int
+    scan_status: ScanStatus | None = None  # None while the scan has not finished
+    parse_status: ParseStatus
+    created_at: datetime
+
+
+class MasterDocumentList(BaseModel):
+    items: list[MasterDocumentOut]
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/masters/`."""
     models: dict[str, type[BaseModel]] = {
@@ -233,6 +293,10 @@ def schemas() -> dict[str, dict[str, Any]]:
         "inclusion_report": InclusionReport,
         "import_report": ImportReport,
         "master_types": MasterTypes,
+        "master_document_upload": MasterDocumentUpload,
+        "master_document_patch": MasterDocumentPatch,
+        "master_document": MasterDocumentOut,
+        "master_document_list": MasterDocumentList,
     }
     return {stem: contract_schema(model, f"masters/{stem}") for stem, model in models.items()}
 
