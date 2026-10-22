@@ -393,6 +393,63 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "202"
 
+  # ---- SOW (E6.3) -------------------------------------------------------------------------
+  sow_api_v1_projects__project_id__sow_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  sow_versions_api_v1_projects__project_id__sow_versions_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow/versions
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  sow_version_api_v1_projects__project_id__sow_versions__version__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow/versions/{version}
+      params: {project_id: "@project_a", version: 1}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  save_sow_version_api_v1_projects__project_id__sow_versions_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/sow/versions
+      params: {project_id: "@project_a"}
+      headers: {if-match: "@etag_sow_a"}
+      json: {content_tiptap: "@tiptap_sow_a", base_version: 1}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"  # the same content as v1: answered, nothing written
+
+  sow_diff_api_v1_projects__project_id__sow_versions__version__diff__other__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow/versions/{version}/diff/{other}
+      params: {project_id: "@project_a", version: 1, other: 1}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  regenerate_sow_api_v1_projects__project_id__sow_regenerate_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/sow/regenerate
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 NOT_IN_REVIEW"  # project A's pipeline never reached the SOW
+
   start_ping_api_v1_projects__project_id__runs_ping_post:
     request:
       method: POST

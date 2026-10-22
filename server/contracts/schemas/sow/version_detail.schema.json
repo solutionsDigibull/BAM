@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/version_detail:0.1.0",
+  "$defs": {
+    "SowCitationRef": {
+      "additionalProperties": false,
+      "description": "A citation with where it sits in the document (`features.0`, `scope`, ...).",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "okf_ref_id": {
+          "title": "Okf Ref Id",
+          "type": "string"
+        },
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "location": {
+          "additionalProperties": true,
+          "title": "Location",
+          "type": "object"
+        }
+      },
+      "required": [
+        "path",
+        "okf_ref_id",
+        "document_version_id",
+        "location"
+      ],
+      "title": "SowCitationRef",
+      "type": "object"
+    },
+    "SowVersionSource": {
+      "enum": [
+        "GENERATED",
+        "EDITED"
+      ],
+      "title": "SowVersionSource",
+      "type": "string"
+    },
+    "SowVersionStatus": {
+      "enum": [
+        "GENERATED",
+        "IN_REVIEW",
+        "APPROVED",
+        "SUPERSEDED",
+        "GENERATION_FAILED"
+      ],
+      "title": "SowVersionStatus",
+      "type": "string"
+    },
+    "TipTapMark": {
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "attrs": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attrs"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "TipTapMark",
+      "type": "object"
+    },
+    "TipTapNode": {
+      "additionalProperties": true,
+      "description": "Any TipTap node. The SOW shape (module docstring) is checked by the server on save.",
+      "properties": {
+        "type": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "attrs": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attrs"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/TipTapNode"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "marks": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/TipTapMark"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Marks"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "TipTapNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/SowVersionStatus"
+    },
+    "source": {
+      "$ref": "#/$defs/SowVersionSource"
+    },
+    "sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sha256"
+    },
+    "parent_version": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Version"
+    },
+    "knowledge_version_id": {
+      "format": "uuid",
+      "title": "Knowledge Version Id",
+      "type": "string"
+    },
+    "error_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Reason"
+    },
+    "author": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Author"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "content_tiptap": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TipTapNode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "structured": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Structured"
+    },
+    "citations": {
+      "items": {
+        "$ref": "#/$defs/SowCitationRef"
+      },
+      "title": "Citations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "status",
+    "source",
+    "knowledge_version_id",
+    "created_at"
+  ],
+  "title": "SowVersionDetail",
+  "type": "object"
+}

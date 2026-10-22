@@ -81,6 +81,14 @@ from sbam_contracts.projects import (
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sow import SowDocument
+from sbam_contracts.sow_api import (
+    SowDiff,
+    SowOverview,
+    SowRegenerateRequest,
+    SowSaveRequest,
+    SowVersionDetail,
+    SowVersionList,
+)
 from sbam_contracts.state_machines import StateMachineStates
 
 ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
@@ -101,6 +109,12 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/filetype", FiletypePayload),
     ("masters/rag_reference", RagReference),
     ("sow/sow_document", SowDocument),
+    ("sow/overview", SowOverview),
+    ("sow/version_list", SowVersionList),
+    ("sow/version_detail", SowVersionDetail),
+    ("sow/save_request", SowSaveRequest),
+    ("sow/diff", SowDiff),
+    ("sow/regenerate_request", SowRegenerateRequest),
     ("runs/run", Run),
     ("runs/run_accepted", RunAccepted),
     ("runtime_registry/runtime_registry", RuntimeRegistry),

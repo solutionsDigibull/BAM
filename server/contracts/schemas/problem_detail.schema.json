@@ -68,6 +68,7 @@
         "SOW_NOT_APPROVED",
         "SOW_NOT_LATEST",
         "SOW_VERSION_CONFLICT",
+        "SOW_GENERATING",
         "NO_APPROVED_SOW",
         "NOT_IN_REVIEW",
         "PIPELINE_RUNNING",

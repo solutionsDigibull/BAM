@@ -18,6 +18,8 @@ from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstr
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+import sbam_api.knowledge.models
+import sbam_api.llm.models  # noqa: F401 - llm_calls, a foreign-key target
 from sbam_api.db.base import SCHEMA, Base, ProjectOwned, status_check
 from sbam_api.state_machine import Stateful, state_check
 from sbam_api.state_machine.registry import register_entity

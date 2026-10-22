@@ -30,6 +30,7 @@ from sbam_contracts import (
     runs,
     runtime_registry,
     sow,
+    sow_api,
     state_machines,
 )
 from sbam_contracts._jsonschema import DRAFT, contract_schema
@@ -217,6 +218,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("knowledge", knowledge),
             ("projects", projects),
             ("sow", sow),
+            ("sow", sow_api),
             ("runs", runs),
             ("runtime_registry", runtime_registry),
             ("state_machines", state_machines),

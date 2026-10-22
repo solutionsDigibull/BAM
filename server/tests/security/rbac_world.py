@@ -16,6 +16,7 @@ authorization, never from absence:
 """
 
 import hashlib
+import json
 import time
 import uuid
 from collections.abc import Callable
@@ -50,6 +51,8 @@ from sbam_api.masters.models import MasterEntry, MasterSnapshot
 from sbam_api.projects.models import Project
 from sbam_api.projects.repository import SqlMemberships
 from sbam_api.registry.sync import sync as sync_registry
+from sbam_api.sow.models import Sow
+from sbam_api.sow.service import Generation, record_generation
 from sbam_api.storage import Kind, StorageScope, signed_url
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.temporal.models import TemporalRun
@@ -68,6 +71,7 @@ AUDIENCE = "sbam-api"
 HOOK_SECRET = "rbac-suite-hook-secret"  # noqa: S105 - a test value
 SIGNING_KEY = "rbac-suite-signing-key-0123456789abcdef"
 MATRIX_FILE = Path(__file__).with_name("rbac_matrix.yaml")
+SOW_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "sow" / "ms01_1_sow.json"
 # The seven columns every route must answer for (E2.7). `anon` sends no Authorization header.
 ROLES = (
     "anon",
@@ -334,6 +338,7 @@ class World:
         ).query
         self.file_query = dict(part.split("=", 1) for part in query.split("&"))
         self.kv_a = self._seed_knowledge()
+        self.sow_a, self.sow_a_tiptap = self._seed_sow()
 
     def _create_project(self, role: str, name: str) -> uuid.UUID:
         res = self.call("POST", "/admin/projects", role, json={"name": name})
@@ -410,6 +415,7 @@ class World:
             masters_sha256=okf.sha256(b""),
         )
         stored = storage.put(bundle, where, Kind.OKF, "application/json")
+        self.kv_a_doc = dvid
         with self.sessions() as s:
             s.add(
                 KnowledgeVersion(
@@ -427,6 +433,33 @@ class World:
             )
             s.commit()
         return kv
+
+    def _seed_sow(self) -> tuple[uuid.UUID, dict[str, Any]]:
+        """SOW v1 of project A (E6.3 reads and saves), citing the knowledge bundle's chunk."""
+        doc = json.loads(SOW_FIXTURE.read_text(encoding="utf-8"))
+        cite = {
+            "okf_ref_id": f"{self.kv_a_doc}#c0",
+            "document_version_id": str(self.kv_a_doc),
+            "location": {"line": 1},
+        }
+
+        def walk(node: Any) -> None:
+            if isinstance(node, dict):
+                if "citations" in node:
+                    node["citations"] = [dict(cite)]
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for v in node:
+                    walk(v)
+
+        walk(doc)
+        with self.sessions() as s:
+            ctx = TenantContext(self.tenant_a, self.project_a)
+            gen = Generation(uuid7(), self.kv_a, doc, None)
+            version = record_generation(s, ctx, gen, correlation_id="rbac-world-sow")
+            s.commit()
+            return version.sow_id, dict(version.content_tiptap or {})
 
     # -- placeholders (`@name` in the matrix) ----------------------------------------------
     def value(self, name: str) -> str:
@@ -447,6 +480,7 @@ class World:
             "master_b": self.master_b,
             "snapshot_a": self.snapshot_a,
             "kv_a": self.kv_a,
+            "sow_a": self.sow_a,
         }
         if name in fixed:
             return str(fixed[name])
@@ -467,12 +501,16 @@ class World:
                 row = s.get(Tenant, uuid.UUID(self.value(what)))
             elif what.startswith("master_"):
                 row = s.get(MasterEntry, uuid.UUID(self.value(what)))
+            elif what.startswith("sow_"):
+                row = s.get(Sow, uuid.UUID(self.value(what)))
             else:
                 row = s.get(Project, uuid.UUID(self.value(what)))
             assert row is not None
             return int(row.row_version)
 
     def resolve(self, value: Any) -> Any:
+        if value == "@tiptap_sow_a":  # a whole TipTap document, not a string
+            return self.sow_a_tiptap
         if isinstance(value, str) and value.startswith("@"):
             return self.value(value[1:])
         if isinstance(value, list):

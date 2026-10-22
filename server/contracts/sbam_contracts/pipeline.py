@@ -96,6 +96,7 @@ class ResumeState(_Dto):
         default_factory=list
     )  # in needs_review: an upstream never certified
     build_plan: BuildPlan | None = None
+    refs: dict[str, UUID] = Field(default_factory=dict)  # stage results, e.g. knowledge, okf
 
 
 class PipelineInput(RunInput):
@@ -107,6 +108,7 @@ class PipelineInput(RunInput):
     # Continue-as-new at a wait once history passes this many events (None: when Temporal suggests).
     continue_as_new_after: Annotated[int | None, Field(ge=1)] = None
     resume: ResumeState | None = None
+    sow_hint: Annotated[str | None, Field(max_length=2000)] = None  # FDE's regenerate hint (E6.3)
 
 
 class Generate(_Dto):
@@ -161,6 +163,13 @@ class StageRef(RunInput):
     """Input of stages that work on one id (knowledge version, OKF bundle, ...)."""
 
     ref_id: UUID
+
+
+class SowGenerateInput(StageRef):
+    """`generate_sow`'s input: the knowledge version, and the FDE's hint on a regeneration (a short
+    instruction they typed, never document content)."""
+
+    hint: Annotated[str | None, Field(max_length=2000)] = None
 
 
 class WorkflowRef(RunInput):

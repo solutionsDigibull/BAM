@@ -42,6 +42,7 @@ from sbam_contracts.pipeline import (
     PipelineStatus,
     RebuildSubSkills,
     SowApproved,
+    SowGenerateInput,
     StageRef,
 )
 from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_workflow_id
@@ -97,7 +98,7 @@ async def okf_stand_in(inp: StageRef) -> IdResult:
 
 
 @activity.defn(name="generate_sow")
-async def sow_stand_in(inp: StageRef) -> IdResult:
+async def sow_stand_in(inp: SowGenerateInput) -> IdResult:
     """The real generation (E6.2) reads the bundle and calls sbam-sow; its tests are
     tests/unit/test_sow_generate.py."""
     return IdResult(id=stub_id(inp, "sow"))
@@ -407,7 +408,7 @@ def test_e10_1_t06_cancel_during_building() -> None:
 
 def test_e10_1_t07_sow_generation_failure_stops_the_pipeline() -> None:
     @activity.defn(name="generate_sow")
-    async def broken_sow(inp: StageRef) -> IdResult:
+    async def broken_sow(inp: SowGenerateInput) -> IdResult:
         raise ApplicationError(
             "schema invalid", type="SchemaInvalidAfterRetries", non_retryable=True
         )

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:dcbcdd32ba633d132c7a51697b4331c31056cb1e7ba8650962c2949d42ee6876
+// source-sha256:0bdc40b965c88afe403e37ba2484ff124c2c9561ec055ceef614836a244ecfe5
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -62,6 +62,7 @@ export type ErrorCode =
   | "SOW_NOT_APPROVED"
   | "SOW_NOT_LATEST"
   | "SOW_VERSION_CONFLICT"
+  | "SOW_GENERATING"
   | "NO_APPROVED_SOW"
   | "NOT_IN_REVIEW"
   | "PIPELINE_RUNNING"
@@ -107,6 +108,21 @@ export type ManifestStatus = "DRAFT" | "VALIDATING" | "APPROVED" | "SUPERSEDED";
  * via the `definition` "CertificationState".
  */
 export type CertificationState = "CERTIFIED" | "FROZEN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowVersionStatus".
+ */
+export type SowVersionStatus = "GENERATED" | "IN_REVIEW" | "APPROVED" | "SUPERSEDED" | "GENERATION_FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowVersionSource".
+ */
+export type SowVersionSource = "GENERATED" | "EDITED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SectionChange".
+ */
+export type SectionChange = "ADDED" | "REMOVED" | "MODIFIED" | "UNCHANGED";
 /**
  * What a run works on; `subject_id` is that entity's id.
  *
@@ -310,6 +326,12 @@ export interface SbamContracts {
   FiletypePayload?: FiletypePayload;
   RagReference?: RagReference;
   SowDocument?: SowDocument;
+  SowOverview?: SowOverview;
+  SowVersionList?: SowVersionList;
+  SowVersionDetail?: SowVersionDetail;
+  SowSaveRequest?: SowSaveRequest;
+  SowDiff?: SowDiff;
+  SowRegenerateRequest?: SowRegenerateRequest;
   Run?: Run;
   RunAccepted?: RunAccepted;
   RuntimeRegistry?: RuntimeRegistry;
@@ -1500,6 +1522,153 @@ export interface AssumptionsOpenPoints {
   open_points: string[];
 }
 /**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowOverview".
+ */
+export interface SowOverview {
+  sow_id: string;
+  current?: SowVersionSummary | null;
+  approved?: SowVersionSummary | null;
+  etag: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowVersionSummary".
+ */
+export interface SowVersionSummary {
+  id: string;
+  version: number;
+  status: SowVersionStatus;
+  source: SowVersionSource;
+  sha256?: string | null;
+  parent_version?: number | null;
+  knowledge_version_id: string;
+  error_reason?: string | null;
+  author?: string | null;
+  created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowVersionList".
+ */
+export interface SowVersionList {
+  items: SowVersionSummary[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowVersionDetail".
+ */
+export interface SowVersionDetail {
+  id: string;
+  version: number;
+  status: SowVersionStatus;
+  source: SowVersionSource;
+  sha256?: string | null;
+  parent_version?: number | null;
+  knowledge_version_id: string;
+  error_reason?: string | null;
+  author?: string | null;
+  created_at: string;
+  content_tiptap?: TipTapNode | null;
+  structured?: {
+    [k: string]: unknown | undefined;
+  } | null;
+  citations?: SowCitationRef[];
+}
+/**
+ * Any TipTap node. The SOW shape (module docstring) is checked by the server on save.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TipTapNode".
+ */
+export interface TipTapNode {
+  type: string;
+  attrs?: {
+    [k: string]: unknown | undefined;
+  } | null;
+  content?: TipTapNode[] | null;
+  text?: string | null;
+  marks?: TipTapMark[] | null;
+  [k: string]: unknown | undefined;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TipTapMark".
+ */
+export interface TipTapMark {
+  type: string;
+  attrs?: {
+    [k: string]: unknown | undefined;
+  } | null;
+  [k: string]: unknown | undefined;
+}
+/**
+ * A citation with where it sits in the document (`features.0`, `scope`, ...).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowCitationRef".
+ */
+export interface SowCitationRef {
+  path: string;
+  okf_ref_id: string;
+  document_version_id: string;
+  location: {
+    [k: string]: unknown | undefined;
+  };
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowSaveRequest".
+ */
+export interface SowSaveRequest {
+  content_tiptap: TipTapNode;
+  base_version: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowDiff".
+ */
+export interface SowDiff {
+  version: number;
+  other: number;
+  sections: SowSectionDiff[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowSectionDiff".
+ */
+export interface SowSectionDiff {
+  section_id:
+    | "overview"
+    | "users_authority"
+    | "scope"
+    | "modules"
+    | "features"
+    | "data_integrations"
+    | "rules_constraints"
+    | "deliverables_acceptance"
+    | "assumptions_open_points";
+  change: SectionChange;
+  items?: SowDiffItem[];
+}
+/**
+ * A changed module / feature (by id) or, in other sections, a changed field (by name).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowDiffItem".
+ */
+export interface SowDiffItem {
+  id: string;
+  change: SectionChange;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowRegenerateRequest".
+ */
+export interface SowRegenerateRequest {
+  hint?: string | null;
+}
+/**
  * One Temporal execution as the API returns it (mirror of `temporal_runs`).
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -1508,7 +1677,7 @@ export interface AssumptionsOpenPoints {
 export interface Run {
   id: string;
   /**
-   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
    */
   temporal_workflow_id: string;
   temporal_run_id: string;
