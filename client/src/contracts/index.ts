@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:fd76a9dd44e2ba927761250a1224ae9d71c7b0bc3419544f660abd7677c3efc2
+// source-sha256:4c7022bd8f106a3e204fce5e34401604fa85b9d6486c777272693f529b118a34
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -100,6 +100,49 @@ export type ExternalKind = "FILE" | "API" | "URL";
  */
 export type JsonValue = string | number | boolean | null | JsonValue[] | {[key: string]: JsonValue};
 /**
+ * The only cell editors the client implements (allow-list).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Editor".
+ */
+export type Editor =
+  "text" | "largeText" | "number" | "boolean" | "json" | "expression" | "stringList" | "select" | "readonly";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowState".
+ */
+export type WorkflowState =
+  | "CREATED"
+  | "ISATVON_EXTRACTING"
+  | "ISATVON_REVIEW"
+  | "BUILDING"
+  | "CERTIFYING"
+  | "CERTIFIED"
+  | "FROZEN"
+  | "EXTRACTION_FAILED"
+  | "NEEDS_FDE_REVIEW"
+  | "WORKFLOW_VALIDATION_FAILED"
+  | "CANCELLED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillState".
+ */
+export type SubSkillState =
+  | "DRAFT"
+  | "VALID"
+  | "INVALID"
+  | "BUILDING"
+  | "CORRECTING"
+  | "TESTING"
+  | "TESTING_BLOCKED"
+  | "NEEDS_FDE_REVIEW"
+  | "DEPENDENCY_FAILED"
+  | "BUILD_ERROR"
+  | "CERTIFIED"
+  | "FROZEN"
+  | "INVALIDATED"
+  | "SUPERSEDED";
+/**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ManifestStatus".
  */
@@ -167,22 +210,6 @@ export type ProjectPipelineState =
   | "CANCELLED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "WorkflowState".
- */
-export type WorkflowState =
-  | "CREATED"
-  | "ISATVON_EXTRACTING"
-  | "ISATVON_REVIEW"
-  | "BUILDING"
-  | "CERTIFYING"
-  | "CERTIFIED"
-  | "FROZEN"
-  | "EXTRACTION_FAILED"
-  | "NEEDS_FDE_REVIEW"
-  | "WORKFLOW_VALIDATION_FAILED"
-  | "CANCELLED";
-/**
- * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "DocumentVersionState".
  */
 export type DocumentVersionState =
@@ -192,25 +219,6 @@ export type DocumentVersionState =
  * via the `definition` "SowVersionState".
  */
 export type SowVersionState = "GENERATED" | "IN_REVIEW" | "APPROVED" | "SUPERSEDED" | "GENERATION_FAILED";
-/**
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "SubSkillState".
- */
-export type SubSkillState =
-  | "DRAFT"
-  | "VALID"
-  | "INVALID"
-  | "BUILDING"
-  | "CORRECTING"
-  | "TESTING"
-  | "TESTING_BLOCKED"
-  | "NEEDS_FDE_REVIEW"
-  | "DEPENDENCY_FAILED"
-  | "BUILD_ERROR"
-  | "CERTIFIED"
-  | "FROZEN"
-  | "INVALIDATED"
-  | "SUPERSEDED";
 /**
  * Agent = TD Macro Skill (§14.5).
  *
@@ -314,6 +322,11 @@ export interface SbamContracts {
   Agent?: Agent;
   SubSkill?: SubSkill;
   RuleViolation?: RuleViolation;
+  IsatvonSchemaResponse?: IsatvonSchemaResponse;
+  WorkbenchTree?: WorkbenchTree;
+  WorkbenchSubSkill?: WorkbenchSubSkill;
+  SubSkillPatch?: SubSkillPatch;
+  ValidationReport?: ValidationReport;
   Isa14Manifest?: Isa14Manifest;
   SkillManifest?: SkillManifest;
   WorkflowManifest?: WorkflowManifest;
@@ -635,6 +648,129 @@ export interface RuleViolation {
   rule: number;
   path: string;
   message: string;
+}
+/**
+ * GET /schemas/isatvon/{version}.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "IsatvonSchemaResponse".
+ */
+export interface IsatvonSchemaResponse {
+  version: string;
+  json_schema: {
+    [k: string]: unknown | undefined;
+  };
+  grid: Grid;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Grid".
+ */
+export interface Grid {
+  column_groups: GridGroup[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GridGroup".
+ */
+export interface GridGroup {
+  id: string;
+  header: string;
+  description: string;
+  children: GridColumn[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GridColumn".
+ */
+export interface GridColumn {
+  field_path: string;
+  header: string;
+  type: string;
+  editor: Editor;
+  required: boolean;
+  editable: boolean;
+  platform: boolean;
+  enum?: string[] | null;
+  min?: number | null;
+  max?: number | null;
+  width: number;
+}
+/**
+ * `GET W/macro-skills`. `workflow_state` and `sow_approved` decide whether the grid is editable
+ * and whether Generate can be offered; the server enforces both again (409/423).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkbenchTree".
+ */
+export interface WorkbenchTree {
+  workflow_id: string;
+  workflow_state: WorkflowState;
+  sow_approved: boolean;
+  macros: WorkbenchMacro[];
+}
+/**
+ * A Macro Skill (contract `Agent`) with its Sub-Skills in order.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkbenchMacro".
+ */
+export interface WorkbenchMacro {
+  id: string;
+  macro_category: string;
+  name: string;
+  description: string;
+  order: number;
+  sub_skills: WorkbenchSubSkill[];
+}
+/**
+ * One Sub-Skill row: ISATVON 1.4 content plus the platform fields the grid shows read-only.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkbenchSubSkill".
+ */
+export interface WorkbenchSubSkill {
+  id: string;
+  macro_id: string;
+  state: SubSkillState;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  content_sha256: string;
+  validation_errors?: RuleViolation[];
+  sub_skill: SubSkill;
+}
+/**
+ * `PATCH W/sub-skills/{sub_id}`: a partial ISATVON 1.4 Sub-Skill. Keys are dotted grid
+ * `field_path`s (e.g. `isatvon_definition.v_variables.max_iterations`); the server merges them
+ * into the row, revalidates and answers the whole row. `skill_metadata.skill_id` is never
+ * accepted.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillPatch".
+ */
+export interface SubSkillPatch {
+  changes: {
+    [k: string]: unknown | undefined;
+  };
+}
+/**
+ * `POST W/isatvon/validate`: every Sub-Skill of the Workflow, revalidated.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ValidationReport".
+ */
+export interface ValidationReport {
+  sub_skills: SubSkillValidation[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillValidation".
+ */
+export interface SubSkillValidation {
+  id: string;
+  state: SubSkillState;
+  validation_errors?: RuleViolation[];
 }
 /**
  * The ISA14 Skill Manifest: exactly these five blocks.
