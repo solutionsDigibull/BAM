@@ -1,6 +1,7 @@
 // The ISATVON workbench's data rules (TD §9.3, E8.7), free of AG Grid so they can be tested alone.
 // The tree endpoints are #94's; until they land the shapes are sbam_contracts.isatvon_workbench (#307).
 import type {
+  Editor,
   GridColumn,
   GridGroup,
   RuleViolation,
@@ -13,6 +14,8 @@ import type {
 export const SCHEMA_URL = "schemas/isatvon/1.4";
 export const treeUrl = (projectId: string, workflowId: string) =>
   `projects/${projectId}/workflows/${workflowId}/macro-skills`;
+export const subSkillUrl = (projectId: string, workflowId: string, subId: string) =>
+  `projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}`;
 
 export type MacroRow = {
   kind: "macro";
@@ -70,6 +73,9 @@ function malformed(raw: unknown): string | null {
   return null;
 }
 
+// The same Sub-Skill object gives the same row object, so AG Grid redraws only rows that changed.
+const subRows = new WeakMap<WorkbenchSubSkill, SubRow>();
+
 /**
  * The tree as grid rows: each Macro, then (when expanded) its Sub-Skills. Anything the API sends that
  * isn't usable — null, {}, a row without its ISATVON object — becomes an "Invalid data" row, never a crash.
@@ -103,7 +109,9 @@ export function toRows(tree: unknown, expanded: ReadonlySet<string>): GridRow[] 
         });
       } else {
         const row = s as WorkbenchSubSkill;
-        rows.push({ kind: "sub", id: row.id, macroId: macro.id, row });
+        let sub = subRows.get(row);
+        if (!sub) subRows.set(row, (sub = { kind: "sub", id: row.id, macroId: macro.id, row }));
+        rows.push(sub);
       }
     });
   });
@@ -149,3 +157,118 @@ export const STATE_COLOR: Partial<Record<SubSkillState, string>> = {
   BUILD_ERROR: "error",
   DEPENDENCY_FAILED: "error",
 };
+
+const EDITORS: ReadonlySet<Editor> = new Set([
+  "text",
+  "largeText",
+  "number",
+  "boolean",
+  "json",
+  "expression",
+  "stringList",
+  "select",
+]);
+
+/** A cell is editable only in review, unlocked, on a model field the metadata marks editable. */
+export const canEdit = (column: GridColumn, state: WorkflowState | undefined, locked: boolean) =>
+  isEditable(state) && !locked && column.editable && !column.platform && EDITORS.has(column.editor);
+
+/** The text an editor starts from: JSON for objects, a line per item for string lists. */
+export function toEditText(column: GridColumn, value: unknown): unknown {
+  if (column.editor === "stringList") return Array.isArray(value) ? value.join("\n") : "";
+  if (column.editor === "json") return value === undefined ? "" : JSON.stringify(value, null, 2);
+  return value;
+}
+
+const balanced = (text: string) => {
+  const open: string[] = [];
+  const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+  for (const ch of text) {
+    if ("([{".includes(ch)) open.push(ch);
+    else if (ch in pairs && open.pop() !== pairs[ch]) return false;
+  }
+  return open.length === 0;
+};
+
+/** The client-side check before a PATCH (E8.7); the server still revalidates everything. */
+export function parseEdit(
+  column: GridColumn,
+  raw: unknown,
+): { value: unknown } | { error: string } {
+  const text = typeof raw === "string" ? raw.trim() : raw;
+  const empty = text === "" || text === null || text === undefined;
+  if (empty && column.editor !== "boolean")
+    return column.required ? { error: `${column.header} is required` } : { value: null };
+  switch (column.editor) {
+    case "number": {
+      const n = Number(text);
+      if (!Number.isFinite(n)) return { error: `${column.header} must be a number` };
+      if (column.type === "integer" && !Number.isInteger(n))
+        return { error: `${column.header} must be a whole number` };
+      // Out of min/max is still sent: range is an ISATVON rule, so the server stores the Sub-Skill as
+      // INVALID with its own message (E8.7-T04) instead of the edit vanishing client-side.
+      return { value: n };
+    }
+    case "boolean":
+      return { value: raw === true };
+    case "select":
+      return column.enum && !column.enum.includes(String(text))
+        ? { error: `${column.header} must be one of ${column.enum.join(", ")}` }
+        : { value: text };
+    case "json":
+      try {
+        return { value: JSON.parse(String(text)) };
+      } catch {
+        return { error: `${column.header} is not valid JSON` };
+      }
+    case "expression":
+      return balanced(String(text))
+        ? { value: text }
+        : { error: `${column.header} has unbalanced brackets` };
+    case "stringList":
+      return {
+        value: String(text)
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean),
+      };
+    default:
+      return { value: text };
+  }
+}
+
+/** The tree with one Sub-Skill replaced; every other object keeps its identity (one row refreshes). */
+export function replaceSub(tree: unknown, next: WorkbenchSubSkill): unknown {
+  if (!isObject(tree) || !Array.isArray(tree.macros)) return tree;
+  return {
+    ...tree,
+    macros: (tree.macros as unknown[]).map((m) =>
+      isObject(m) &&
+      Array.isArray(m.sub_skills) &&
+      m.sub_skills.some((s) => isObject(s) && s.id === next.id)
+        ? {
+            ...m,
+            sub_skills: (m.sub_skills as unknown[]).map((s) =>
+              isObject(s) && s.id === next.id ? next : s,
+            ),
+          }
+        : m,
+    ),
+  };
+}
+
+/** Edit errors the server hasn't stored (client check, 422), shown on the cell like its own violations. */
+export type LocalErrors = Record<string, RuleViolation[]>;
+
+export function withLocal(tree: unknown, local: LocalErrors): unknown {
+  let out = tree;
+  for (const row of subSkills(tree)) {
+    const extra = local[row.id];
+    if (extra?.length)
+      out = replaceSub(out, {
+        ...row,
+        validation_errors: [...(row.validation_errors ?? []), ...extra],
+      });
+  }
+  return out;
+}

@@ -5,14 +5,19 @@ import type { GridColumn, WorkbenchSubSkill } from "@/contracts";
 
 import { fakeApi, problem, renderWithRefine } from "@/app/(admin)/admin/projects/test-harness";
 import {
+  canEdit,
   cellErrors,
   cellText,
   cellValue,
   isEditable,
   metadataColumns,
+  parseEdit,
+  replaceSub,
   subSkills,
+  toEditText,
   toRows,
   valueAt,
+  withLocal,
 } from "./workbench-api";
 import { EMPTY_MESSAGE, WorkbenchScreen } from "./workbench-screen";
 
@@ -64,7 +69,7 @@ const tree = (macros: unknown[], workflow_state = "ISATVON_REVIEW") => ({
   macros,
 });
 
-const column = (field_path: string, platform = false) =>
+const column = (field_path: string, platform = false, over: Partial<GridColumn> = {}) =>
   ({
     field_path,
     platform,
@@ -74,7 +79,10 @@ const column = (field_path: string, platform = false) =>
     required: true,
     editable: true,
     width: 100,
+    ...over,
   }) as GridColumn;
+const ed = (editor: GridColumn["editor"], over: Partial<GridColumn> = {}) =>
+  column("x", false, { header: "X", editor, ...over });
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -146,6 +154,71 @@ describe("workbench data rules (E8.7)", () => {
     expect(isEditable("ISATVON_REVIEW")).toBe(true);
     for (const s of ["BUILDING", "CERTIFIED", "FROZEN", undefined] as const)
       expect(isEditable(s)).toBe(false);
+  });
+});
+
+describe("workbench edits (E8.7)", () => {
+  test("only model fields the metadata marks editable, in review, unlocked", () => {
+    const c = column("isatvon_definition.v_variables.max_iterations");
+    expect(canEdit(c, "ISATVON_REVIEW", false)).toBe(true);
+    expect(canEdit(c, "ISATVON_REVIEW", true)).toBe(false);
+    expect(canEdit(c, "BUILDING", false)).toBe(false);
+    expect(canEdit(column("state", true), "ISATVON_REVIEW", false)).toBe(false);
+    expect(canEdit({ ...c, editable: false }, "ISATVON_REVIEW", false)).toBe(false);
+    expect(canEdit({ ...c, editor: "readonly" }, "ISATVON_REVIEW", false)).toBe(false);
+    expect(canEdit({ ...c, editor: "wysiwyg" as never }, "ISATVON_REVIEW", false)).toBe(false);
+  });
+
+  test("numbers: type and whole-number checks; out of range still goes to the server (T04)", () => {
+    const n = ed("number", { type: "integer", min: 1, max: 10 });
+    expect(parseEdit(n, "3")).toEqual({ value: 3 });
+    expect(parseEdit(n, 11)).toEqual({ value: 11 });
+    expect(parseEdit(n, "abc")).toEqual({ error: "X must be a number" });
+    expect(parseEdit(n, "2.5")).toEqual({ error: "X must be a whole number" });
+    expect(parseEdit(n, "")).toEqual({ error: "X is required" });
+    expect(parseEdit({ ...n, required: false }, "")).toEqual({ value: null });
+  });
+
+  test("json, select, expression, string list and boolean", () => {
+    expect(parseEdit(ed("json"), '{"a":1}')).toEqual({ value: { a: 1 } });
+    expect(parseEdit(ed("json"), "{a:")).toEqual({ error: "X is not valid JSON" });
+    expect(parseEdit(ed("select", { enum: ["A", "B"] }), "B")).toEqual({ value: "B" });
+    expect(parseEdit(ed("select", { enum: ["A", "B"] }), "C")).toEqual({
+      error: "X must be one of A, B",
+    });
+    expect(parseEdit(ed("expression"), "len(items[0]) > 2")).toEqual({
+      value: "len(items[0]) > 2",
+    });
+    expect(parseEdit(ed("expression"), "len(items[0) > 2")).toEqual({
+      error: "X has unbalanced brackets",
+    });
+    expect(parseEdit(ed("stringList"), " a \n\n b ")).toEqual({ value: ["a", "b"] });
+    expect(parseEdit(ed("boolean"), false)).toEqual({ value: false });
+    expect(toEditText(ed("stringList"), ["a", "b"])).toBe("a\nb");
+    expect(toEditText(ed("json"), { a: 1 })).toBe('{\n  "a": 1\n}');
+  });
+
+  test("replacing one Sub-Skill keeps every other object, so only its row redraws", () => {
+    const a = row({ id: "a" });
+    const b = row({ id: "b" });
+    const other = macro("m2", [b]);
+    const t = tree([macro("m1", [a]), other]);
+    const next = replaceSub(t, row({ id: "a", state: "INVALID" })) as ReturnType<typeof tree>;
+    expect(subSkills(next).map((s) => s.state)).toEqual(["INVALID", "VALID"]);
+    expect(next.macros[1]).toBe(other);
+    const before = toRows(t, new Set(["m1", "m2"]));
+    const after = toRows(next, new Set(["m1", "m2"]));
+    expect(after[3]).toBe(before[3]); // b's row object is reused
+    expect(after[1]).not.toBe(before[1]);
+  });
+
+  test("a local edit error shows on its cell like a server violation", () => {
+    const t = tree([macro("m1", [row({ id: "a" })])]);
+    const shown = withLocal(t, {
+      a: [{ rule: 0, path: "skill_metadata.skill_name", message: "no" }],
+    });
+    expect(cellErrors(subSkills(shown)[0]!, "skill_metadata.skill_name")).toHaveLength(1);
+    expect(withLocal(t, {})).toBe(t);
   });
 });
 

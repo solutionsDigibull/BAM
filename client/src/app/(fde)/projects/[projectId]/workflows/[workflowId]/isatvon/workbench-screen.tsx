@@ -4,23 +4,42 @@
 // approved SOW, in a grid whose columns come only from the published metadata (GET /schemas/isatvon/1.4).
 // The breakdown endpoints are #94's; until they land this screen is built against sbam_contracts.
 
-import { useCustom } from "@refinedev/core";
-import { Alert, Button, Flex, Spin, Typography } from "antd";
+import { useCustom, useCustomMutation } from "@refinedev/core";
+import { Alert, App, Button, Flex, Spin, Typography } from "antd";
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ApiErrorState, EmptyState, LoadingState, Meta, MUTED } from "@/components/ui-kit";
-import type { IsatvonSchemaResponse, WorkbenchTree } from "@/contracts";
+import {
+  ApiErrorState,
+  EmptyState,
+  LoadingState,
+  LOCKED_MESSAGE,
+  Meta,
+  MUTED,
+} from "@/components/ui-kit";
+import type {
+  IsatvonSchemaResponse,
+  RuleViolation,
+  SubSkillPatch,
+  WorkbenchSubSkill,
+  WorkbenchTree,
+} from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
+import type { EditRequest } from "./isatvon-grid";
 import {
   isEditable,
   macroIds,
   metadataColumns,
+  parseEdit,
+  replaceSub,
   SCHEMA_URL,
   subSkills,
+  subSkillUrl,
   toRows,
   treeUrl,
+  withLocal,
+  type LocalErrors,
 } from "./workbench-api";
 
 const IsatvonGrid = dynamic(() => import("./isatvon-grid"), {
@@ -30,6 +49,8 @@ const IsatvonGrid = dynamic(() => import("./isatvon-grid"), {
 
 export const EMPTY_MESSAGE = "No Macro Skills yet";
 const EXTRACT_POLL_MS = 5_000;
+const REVIEW_POLL_MS = 30_000; // notices the Workflow leaving review (e.g. to BUILDING) while open
+export const CONFLICT_TOAST = "Updated elsewhere: the row was reloaded with the latest version.";
 
 export function WorkbenchScreen({
   projectId,
@@ -38,25 +59,97 @@ export function WorkbenchScreen({
   projectId: string;
   workflowId: string;
 }) {
+  const { message } = App.useApp();
   const schema = useCustom<IsatvonSchemaResponse, ApiError>({ url: SCHEMA_URL, method: "get" });
   const treeQuery = useCustom<WorkbenchTree, ApiError>({
     url: treeUrl(projectId, workflowId),
     method: "get",
     queryOptions: {
-      refetchInterval: (q) =>
-        q.state.data?.data?.workflow_state === "ISATVON_EXTRACTING" ? EXTRACT_POLL_MS : false,
+      refetchInterval: (q) => {
+        const s = q.state.data?.data?.workflow_state;
+        return s === "ISATVON_EXTRACTING"
+          ? EXTRACT_POLL_MS
+          : isEditable(s)
+            ? REVIEW_POLL_MS
+            : false;
+      },
     },
   });
+  const { mutateAsync } = useCustomMutation<WorkbenchSubSkill, ApiError>();
   // `useCustom` hands back `{}` while loading and the API may send null: never trust the shape.
-  const tree = treeQuery.result.data as unknown;
-  const state = (tree as Partial<WorkbenchTree> | null)?.workflow_state;
+  const server = treeQuery.result.data as unknown;
+  // PATCH answers replace their row here; any refetch (a new `server`) supersedes them.
+  const [patched, setPatched] = useState<{ base: unknown; tree: unknown } | null>(null);
+  const current = patched && patched.base === server ? patched.tree : server;
+  const [local, setLocal] = useState<LocalErrors>({});
+  const [locked, setLocked] = useState(false);
+  const tree = useMemo(() => withLocal(current, local), [current, local]);
+  const latest = useRef({ server, current });
+  useEffect(() => {
+    latest.current = { server, current };
+  }, [server, current]);
+  const queues = useRef(new Map<string, Promise<void>>());
+
+  const state = (current as Partial<WorkbenchTree> | null)?.workflow_state;
   const groups = schema.result.data?.grid?.column_groups;
   const ids = useMemo(() => macroIds(tree), [tree]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // all expanded at first
   const expanded = useMemo(() => new Set(ids.filter((id) => !collapsed.has(id))), [ids, collapsed]);
   const rows = useMemo(() => toRows(tree, expanded), [tree, expanded]);
-  const subs = useMemo(() => subSkills(tree), [tree]);
+  const subs = useMemo(() => subSkills(current), [current]);
   const invalid = subs.filter((s) => s.state === "INVALID").length;
+
+  /** Set one cell's edit errors; no messages clears them. */
+  const mark = (id: string, path: string, messages: string[]) =>
+    setLocal((all) => {
+      const kept = (all[id] ?? []).filter((v) => v.path !== path);
+      const added = messages.map((m): RuleViolation => ({ rule: 0, path, message: m }));
+      return { ...all, [id]: [...kept, ...added] };
+    });
+
+  const save = async (id: string, path: string, value: unknown) => {
+    // The row as it is now: an earlier edit to it may have changed its ETag.
+    const row = subSkills(latest.current.current).find((s) => s.id === id);
+    if (!row) return;
+    try {
+      const res = await mutateAsync({
+        url: subSkillUrl(projectId, workflowId, id),
+        method: "patch",
+        values: { changes: { [path]: value } } satisfies SubSkillPatch,
+        config: { headers: { "if-match": `"${row.content_sha256}"` } },
+        successNotification: false,
+        errorNotification: false,
+      });
+      const next = replaceSub(latest.current.current, res.data);
+      latest.current.current = next;
+      setPatched({ base: latest.current.server, tree: next });
+      mark(id, path, []);
+    } catch (e) {
+      const err = e as ApiError;
+      if (err.statusCode === 422) {
+        const msgs = (err.problem?.errors ?? []).map((v) => v.message);
+        mark(id, path, msgs.length ? msgs : [err.message]);
+      } else if (err.statusCode === 412) {
+        mark(id, path, []);
+        message.warning(CONFLICT_TOAST);
+        await treeQuery.query.refetch();
+      } else if (err.statusCode === 423) {
+        setLocked(true);
+      } else {
+        message.error(err.message);
+      }
+    }
+  };
+
+  // Client check first; then one PATCH at a time per row, so each carries the ETag the last one returned.
+  const edit = ({ row, column, value }: EditRequest) => {
+    const parsed = parseEdit(column, value);
+    if ("error" in parsed) return mark(row.id, column.field_path, [parsed.error]);
+    const queued = (queues.current.get(row.id) ?? Promise.resolve()).then(() =>
+      save(row.id, column.field_path, parsed.value),
+    );
+    queues.current.set(row.id, queued);
+  };
 
   const toggle = (id: string) =>
     setCollapsed((c) => {
@@ -97,13 +190,17 @@ export function WorkbenchScreen({
   else
     body = (
       <>
-        {!isEditable(state) && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginBottom: 12 }}
-            message={`Read-only: the Workflow is ${state ?? "not in review"}.`}
-          />
+        {locked ? (
+          <Alert type="warning" showIcon style={{ marginBottom: 12 }} message={LOCKED_MESSAGE} />
+        ) : (
+          !isEditable(state) && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`Read-only: the Workflow is ${state ?? "not in review"}.`}
+            />
+          )
         )}
         <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 12 }}>
           <Meta>
@@ -120,10 +217,20 @@ export function WorkbenchScreen({
             </Button>
           </Flex>
         </Flex>
-        <IsatvonGrid groups={groups ?? []} rows={rows} onToggle={toggle} />
+        <IsatvonGrid
+          groups={groups ?? []}
+          rows={rows}
+          onToggle={toggle}
+          onEdit={edit}
+          state={state}
+          locked={locked}
+        />
         <Flex justify="space-between" wrap gap={8} style={{ marginTop: 12 }}>
           <Meta>{metadataColumns(groups).length} columns from the ISATVON 1.4 metadata</Meta>
-          <Meta>Hover a header for its path · a red cell shows the rule it breaks</Meta>
+          <Meta>
+            {isEditable(state) && !locked ? "Double-click a cell to edit · " : ""}Hover a header for
+            its path · a red cell shows the rule it breaks
+          </Meta>
         </Flex>
       </>
     );

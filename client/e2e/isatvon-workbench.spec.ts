@@ -105,12 +105,23 @@ const tree = (macros: unknown[], workflow_state = "ISATVON_REVIEW") => ({
   macros,
 });
 
-async function open(page: Page, baseURL: string, body: unknown) {
+type Patch = { ifMatch: string | null; changes: Record<string, unknown> };
+
+async function open(
+  page: Page,
+  baseURL: string,
+  body: unknown,
+  patch?: (p: Patch, route: Route) => Promise<void>,
+) {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL }]);
   await page.route("**/api/proxy/api/v1/**", (route) => {
-    const path = new URL(route.request().url()).pathname.replace("/api/proxy/api/v1", "");
+    const req = route.request();
+    const path = new URL(req.url()).pathname.replace("/api/proxy/api/v1", "");
     if (path === "/schemas/isatvon/1.4") return json(route, SCHEMA);
-    if (path.endsWith("/macro-skills")) return json(route, body);
+    if (path.endsWith("/macro-skills"))
+      return json(route, typeof body === "function" ? (body as () => unknown)() : body);
+    if (req.method() === "PATCH" && path.includes("/sub-skills/") && patch)
+      return patch({ ifMatch: req.headers()["if-match"] ?? null, ...req.postDataJSON() }, route);
     return json(route, { type: "about:blank", title: "Not found", status: 404 }, 404);
   });
   const errors: string[] = [];
@@ -250,4 +261,165 @@ test("e8_7_t03 500 Sub-Skills across 40 macros render within 2 s and scroll", as
   const last = grid(page).getByRole("button", { name: "Collapse MS40 Macro 40" });
   for (let i = 0; i < 60 && !(await last.isVisible()); i++) await page.mouse.wheel(0, 2_000); // as a user scrolls
   await expect(last).toBeVisible();
+});
+
+// ---- edits (part 3): PATCH with If-Match, the row replaced by the server's answer ----
+
+const MAX = "isatvon_definition.v_variables.max_iterations";
+const maxCell = (page: Page) => grid(page).locator(`[role="gridcell"][col-id="${MAX}"]`).first();
+
+async function typeInto(page: Page, value: string) {
+  await maxCell(page).dblclick();
+  const input = grid(page).locator(".ag-cell-inline-editing input");
+  await input.fill(value);
+  await input.press("Enter");
+}
+
+const withMax = (n: number, sha: string, errors: unknown[] = []) => {
+  const s = sub(1, 1, {
+    content_sha256: sha,
+    state: errors.length ? "INVALID" : "VALID",
+    validation_errors: errors,
+  });
+  (s.sub_skill.isatvon_definition.v_variables as Record<string, unknown>).max_iterations = n;
+  return s;
+};
+const RULE5 = { rule: 5, path: MAX, message: "max_iterations must be 1-10" };
+
+test("e8_7_t04 / e8_7_t05 edit -> PATCH with If-Match -> invalid, then fixed -> valid", async ({
+  page,
+  baseURL,
+}) => {
+  const sent: Patch[] = [];
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])]), async (p, route) => {
+    sent.push(p);
+    const n = p.changes[MAX] as number;
+    const sha = String(sent.length + 1).repeat(64);
+    await json(route, withMax(n, sha, n > 10 ? [RULE5] : []));
+  });
+  await typeInto(page, "11");
+  await expect(page.getByText("1 Macro Skill · 1 Sub-Skill · 1 invalid")).toBeVisible();
+  await expect(maxCell(page)).toHaveText("11");
+  await expect(maxCell(page)).toHaveCSS("background-color", "rgb(255, 241, 240)");
+  await expect(grid(page).getByText("INVALID", { exact: true })).toBeVisible();
+  expect(sent[0]).toEqual({ ifMatch: `"${"a".repeat(64)}"`, changes: { [MAX]: 11 } });
+
+  await typeInto(page, "3");
+  await expect(page.getByText("1 Macro Skill · 1 Sub-Skill", { exact: true })).toBeVisible();
+  await expect(maxCell(page)).toHaveText("3");
+  await expect(maxCell(page)).not.toHaveCSS("background-color", "rgb(255, 241, 240)");
+  expect(sent[1]!.ifMatch).toBe(`"${"2".repeat(64)}"`); // the ETag the first answer carried
+});
+
+test("a client-side type error never reaches the API", async ({ page, baseURL }) => {
+  let calls = 0;
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])]), async (_p, route) => {
+    calls += 1;
+    await json(route, {});
+  });
+  await typeInto(page, "2.5");
+  await expect(maxCell(page)).toHaveCSS("background-color", "rgb(255, 241, 240)");
+  await maxCell(page).hover();
+  await expect(page.getByText("Max Iterations must be a whole number")).toBeVisible();
+  expect(calls).toBe(0);
+});
+
+test("a 422 keeps the old value and marks the cell with the server's message", async ({
+  page,
+  baseURL,
+}) => {
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])]), (_p, route) =>
+    json(
+      route,
+      {
+        type: "about:blank",
+        title: "Unprocessable",
+        status: 422,
+        errors: [{ path: "changes", message: "Rejected by the ISATVON schema" }],
+      },
+      422,
+    ),
+  );
+  await typeInto(page, "5");
+  await expect(maxCell(page)).toHaveCSS("background-color", "rgb(255, 241, 240)");
+  await expect(maxCell(page)).toHaveText("3");
+  await maxCell(page).hover();
+  await expect(page.getByText("Rejected by the ISATVON schema")).toBeVisible();
+});
+
+test("e8_7_t08 a 412 reloads the row and says 'Updated elsewhere'", async ({ page, baseURL }) => {
+  let reloaded = false;
+  await open(
+    page,
+    baseURL!,
+    () => tree([macro(1, [reloaded ? withMax(7, "c".repeat(64)) : sub(1, 1)])]),
+    async (_p, route) => {
+      reloaded = true;
+      await json(route, { type: "about:blank", title: "Stale", status: 412 }, 412);
+    },
+  );
+  await typeInto(page, "5");
+  await expect(page.getByText(/Updated elsewhere/)).toBeVisible();
+  await expect(maxCell(page)).toHaveText("7");
+});
+
+test("a 423 makes the grid read-only", async ({ page, baseURL }) => {
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])]), (_p, route) =>
+    json(route, { type: "about:blank", title: "Locked", status: 423 }, 423),
+  );
+  await typeInto(page, "5");
+  await expect(page.getByText(/This item is frozen \/ approved/)).toBeVisible();
+  await maxCell(page).dblclick();
+  await expect(grid(page).locator(".ag-cell-inline-editing")).toHaveCount(0);
+});
+
+test("outside review cells don't open an editor", async ({ page, baseURL }) => {
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])], "BUILDING"));
+  await maxCell(page).dblclick();
+  await expect(grid(page).locator(".ag-cell-inline-editing")).toHaveCount(0);
+});
+
+test("e8_7_t03 an edit with 500 rows loaded answers within 500 ms", async ({ page, baseURL }) => {
+  const macros = Array.from({ length: 40 }, (_, m) =>
+    macro(
+      m + 1,
+      Array.from({ length: m < 20 ? 13 : 12 }, (_, n) => sub(m + 1, n + 1)),
+    ),
+  );
+  await open(page, baseURL!, tree(macros), (p, route) =>
+    json(route, withMax(p.changes[MAX] as number, "d".repeat(64))),
+  );
+  await expect(page.getByText("40 Macro Skills · 500 Sub-Skills")).toBeVisible();
+  // Timed in the page from the Enter keydown to the replaced cell (each animation frame), so neither
+  // Playwright's polling nor its round trips are counted. Median of 5: one sample on a busy CI box is noise.
+  const sel = `[data-testid="isatvon-grid"] [role="gridcell"][col-id="${MAX}"]`;
+  const samples: number[] = [];
+  for (const v of ["4", "5", "6", "7", "8"]) {
+    await maxCell(page).dblclick();
+    const input = grid(page).locator(".ag-cell-inline-editing input");
+    await input.fill(v);
+    const waited = page.evaluate(
+      ([s, want]) =>
+        new Promise<number>((done) => {
+          document.addEventListener(
+            "keydown",
+            () => {
+              const t0 = performance.now();
+              const tick = () =>
+                document.querySelector(s)?.textContent === want
+                  ? done(performance.now() - t0)
+                  : requestAnimationFrame(tick);
+              requestAnimationFrame(tick);
+            },
+            { capture: true, once: true },
+          );
+        }),
+      [sel, v] as const,
+    );
+    await input.press("Enter");
+    samples.push(await waited);
+  }
+  samples.sort((a, b) => a - b);
+  console.log(`edit -> row replaced (ms): ${samples.map(Math.round).join(", ")}`);
+  expect(samples[2]).toBeLessThan(500);
 });
