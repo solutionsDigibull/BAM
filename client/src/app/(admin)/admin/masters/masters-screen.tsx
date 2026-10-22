@@ -3,8 +3,8 @@
 // Layout follows the UI team's admin masters reference (docs/reference/ui/README.md, admin-masters/): one tab
 // per workbook sheet, the frozen BAM 0.2 columns with their row-3 descriptions, Filetype read-only.
 
-import { DownloadOutlined, FileExcelOutlined } from "@ant-design/icons";
-import { useCustom } from "@refinedev/core";
+import { DownloadOutlined, FileExcelOutlined, UploadOutlined } from "@ant-design/icons";
+import { useCustom, useInvalidate } from "@refinedev/core";
 import { Alert, App, Button, Flex, Table, Tabs, Typography } from "antd";
 import { useState } from "react";
 
@@ -14,7 +14,8 @@ import type { ApiError } from "@/providers/data-provider";
 
 import { FiletypeTable } from "./filetype-table";
 import { MasterTable } from "./master-table";
-import { download, LAYOUT_URL, SCREEN_TYPES } from "./masters-api";
+import { ImportWizard } from "./import-wizard";
+import { download, entriesResource, LAYOUT_URL, SCREEN_TYPES } from "./masters-api";
 
 function Readme({ readme }: { readme: ReadmeTab }) {
   const rows = readme.rows.map((cells, i) => ({ key: i, cells }));
@@ -47,6 +48,8 @@ export function MastersScreen() {
   const { message } = App.useApp();
   const [busy, setBusy] = useState<"export" | "template" | null>(null);
   const [downloadError, setDownloadError] = useState<ApiError | null>(null);
+  const [importing, setImporting] = useState(false);
+  const invalidate = useInvalidate();
   const { result, query } = useCustom<MasterTypes, ApiError>({ url: LAYOUT_URL, method: "get" });
   const layout = result.data;
 
@@ -108,12 +111,14 @@ export function MastersScreen() {
             Download template
           </Button>
           <Button
-            type="primary"
             icon={<DownloadOutlined />}
             loading={busy === "export"}
             onClick={() => fetchFile("export")}
           >
             Export
+          </Button>
+          <Button type="primary" icon={<UploadOutlined />} onClick={() => setImporting(true)}>
+            Import workbook
           </Button>
         </Flex>
       </Flex>
@@ -123,6 +128,19 @@ export function MastersScreen() {
         </div>
       )}
       {body}
+      {importing && (
+        <ImportWizard
+          onClose={() => setImporting(false)}
+          onApplied={(report) => {
+            setImporting(false);
+            const created = report.tabs.reduce((n, t) => n + (t.created ?? 0), 0);
+            const updated = report.tabs.reduce((n, t) => n + (t.updated ?? 0), 0);
+            message.success(`Imported: ${created} created, ${updated} updated`);
+            for (const t of SCREEN_TYPES)
+              void invalidate({ resource: entriesResource(t), invalidates: ["list"] });
+          }}
+        />
+      )}
     </div>
   );
 }
