@@ -16,17 +16,22 @@ DATA = DOC.model_dump(mode="json")
 
 
 def editor() -> dict[str, Any]:
-    return json.loads(json.dumps(to_tiptap(DATA)))
+    doc: dict[str, Any] = json.loads(json.dumps(to_tiptap(DATA)))
+    return doc
 
 
 def section(doc: dict[str, Any], section_id: str) -> dict[str, Any]:
-    [found] = [s for s in doc["content"] if s["attrs"]["section_id"] == section_id]
-    return found
+    found: list[dict[str, Any]] = [
+        s for s in doc["content"] if s["attrs"]["section_id"] == section_id
+    ]
+    return found[0]
 
 
 def field(node: dict[str, Any], name: str) -> dict[str, Any]:
-    [found] = [n for n in node["content"] if n.get("attrs", {}).get("field") == name]
-    return found
+    found: list[dict[str, Any]] = [
+        n for n in node["content"] if n.get("attrs", {}).get("field") == name
+    ]
+    return found[0]
 
 
 def paths(doc: Any) -> list[str]:
