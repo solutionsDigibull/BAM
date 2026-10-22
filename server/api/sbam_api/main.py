@@ -113,8 +113,12 @@ def create_app(
     app.add_middleware(
         BodyLimitMiddleware,
         max_bytes=settings.max_body_bytes,
-        # The workbook import takes a 15 MB .xlsx plus the multipart framing (E3.3).
-        per_path={f"{API_BASE}/admin/masters/import": 16 * 1024 * 1024},
+        # The workbook import (E3.3) and a master document (E3.8) take a 15 MB file plus the
+        # multipart framing.
+        per_path={
+            f"{API_BASE}/admin/masters/import": 16 * 1024 * 1024,
+            f"{API_BASE}/admin/master-documents": 16 * 1024 * 1024,
+        },
     )
     app.add_middleware(CorrelationIdMiddleware)
     configure_telemetry(app, settings)  # wraps the whole stack: one server span per request

@@ -237,6 +237,33 @@ routes:
       admin_a: "422 VALIDATION_ERROR"
       admin_b: "422 VALIDATION_ERROR"
 
+  attach_document_api_v1_admin_master_documents_post:  # E3.8; no file = 422 once the role passes
+    request: {method: POST, path: /api/v1/admin/master-documents}
+    expect:
+      <<: *tenant_admin_list
+      admin_a: "422 VALIDATION_ERROR"
+      admin_b: "422 VALIDATION_ERROR"
+
+  list_documents_api_v1_admin_master_documents_get:  # E3.8
+    request: {method: GET, path: /api/v1/admin/master-documents}
+    expect: *tenant_admin_list
+
+  get_document_api_v1_admin_master_documents__document_id__get:  # E3.8
+    request:
+      method: GET
+      path: /api/v1/admin/master-documents/{document_id}
+      params: {document_id: "@master_doc_a"}
+    expect: *tenant_admin_a_resource
+
+  route_document_api_v1_admin_master_documents__document_id__patch:  # E3.8
+    request:
+      method: PATCH
+      path: /api/v1/admin/master-documents/{document_id}
+      params: {document_id: "@master_doc_a"}
+      headers: {if-match: "@etag_master_doc_a"}
+      json: {master_type: RULES}
+    expect: *tenant_admin_a_resource
+
   master_types_api_v1_admin_master_types_get:  # E3.10 masters screen layout
     request: {method: GET, path: /api/v1/admin/master-types}
     expect: *tenant_admin_list

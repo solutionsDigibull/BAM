@@ -47,7 +47,7 @@ from sbam_api.identity.service import SqlUserDirectory
 from sbam_api.ingest.models import Document, DocumentVersion
 from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.main import create_app
-from sbam_api.masters.models import MasterEntry, MasterSnapshot
+from sbam_api.masters.models import MasterDocument, MasterEntry, MasterSnapshot
 from sbam_api.projects.models import Project
 from sbam_api.projects.repository import SqlMemberships
 from sbam_api.registry.sync import sync as sync_registry
@@ -319,6 +319,7 @@ class World:
         sync_registry(self.sessions, sample_registry(), activate=True)
         self.master_a = self._create_master("admin_a")
         self.master_b = self._create_master("admin_b")
+        self.master_doc_a = self._create_master_document(self.tenant_a)
         with self.sessions() as s:  # a pinned snapshot of project A's masters (E3.2)
             snapshot = MasterSnapshot(
                 tenant_id=self.tenant_a,
@@ -350,6 +351,27 @@ class World:
         res = self.call("POST", "/admin/masters/RULES", role, json=body)
         assert res.status_code == 201, res.text
         return uuid.UUID(res.json()["id"])
+
+    def _create_master_document(self, tenant: uuid.UUID) -> uuid.UUID:
+        """A clean master document (E3.8), written like the upload would leave it."""
+        with self.sessions() as s:
+            doc = MasterDocument(
+                tenant_id=tenant,
+                title="rates.xlsx",
+                filetype_row_label="Filetype #23",
+                intent_class="Source data (RFQ / BOM / quote)",
+                master_type="SKILLS",
+                route_source="DEFAULT_BY_FILETYPE",
+                storage_key=f"{tenant}/{uuid.UUID(int=0)}/uploads/{'0' * 64}",
+                sha256="0" * 64,
+                size=1,
+                mime="application/octet-stream",
+                scan_status="CLEAN",
+                parse_status="PENDING",
+            )
+            s.add(doc)
+            s.commit()
+            return doc.id
 
     def _assign(self, admin: str, project: uuid.UUID, fde: str) -> None:
         body = {"user_ids": [str(self.actors[fde].id)]}
@@ -478,6 +500,7 @@ class World:
             "file_key": self.file_key,
             "master_a": self.master_a,
             "master_b": self.master_b,
+            "master_doc_a": self.master_doc_a,
             "snapshot_a": self.snapshot_a,
             "kv_a": self.kv_a,
             "sow_a": self.sow_a,
@@ -499,6 +522,8 @@ class World:
                 row: Any = s.get(User, self.actors[what.removeprefix("user_")].id)
             elif what.startswith("tenant_"):
                 row = s.get(Tenant, uuid.UUID(self.value(what)))
+            elif what.startswith("master_doc_"):
+                row = s.get(MasterDocument, uuid.UUID(self.value(what)))
             elif what.startswith("master_"):
                 row = s.get(MasterEntry, uuid.UUID(self.value(what)))
             elif what.startswith("sow_"):

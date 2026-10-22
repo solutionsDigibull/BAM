@@ -1,4 +1,5 @@
-"""Masters engine API (E3.2): entries, versions and snapshots under `/admin/masters`.
+"""Masters engine API (E3.2): entries, versions and snapshots under `/admin/masters`, and the
+master documents of E3.8 under `/admin/master-documents`.
 
 Snapshots are made by the modules that use the masters (SOW generation, knowledge builds) through
 `service.create_snapshot`; the API only reads them.
@@ -10,15 +11,20 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Header, Request, Response, UploadFile
 from sbam_contracts.api import Page
+from sbam_contracts.documents import MAX_FILE_BYTES
 from sbam_contracts.masters import MasterStatus, MasterType, SourceKind
 from sbam_contracts.masters_api import (
     ImportMode,
     ImportReport,
+    MasterDocumentList,
+    MasterDocumentOut,
+    MasterDocumentPatch,
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
     MasterTypes,
     MasterVersionCreate,
+    RoutedMasterType,
 )
 from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
 from sqlalchemy.orm import Session
@@ -26,7 +32,8 @@ from sqlalchemy.orm import Session
 from sbam_api.core.auth import CurrentUser, admin
 from sbam_api.core.conventions import etag
 from sbam_api.db.session import app_sessions
-from sbam_api.masters import exporter, importer, models, service
+from sbam_api.masters import documents, exporter, importer, models, service
+from sbam_api.storage.router import backend
 
 router = APIRouter(tags=["masters"])
 
@@ -177,3 +184,72 @@ def create_version(
 ) -> MasterEntry:
     entry, version = service.new_version(session, user, master_type, entry_id, body, if_match)
     return _out(entry, version, response)
+
+
+# --- master documents (E3.8) ----------------------------------------------------------------
+
+
+def _document(row: models.MasterDocument, response: Response | None = None) -> MasterDocumentOut:
+    if response is not None:
+        response.headers["ETag"] = etag(row.row_version)
+    return documents.to_out(row)
+
+
+@router.post("/admin/master-documents", status_code=201)
+def attach_document(
+    request: Request,
+    file: UploadFile,
+    user: Admin,
+    session: Db,
+    response: Response,
+    project_id: Annotated[uuid.UUID | None, Form()] = None,
+    master_type: Annotated[RoutedMasterType | None, Form()] = None,
+) -> MasterDocumentOut:
+    """Attach a context file: scan, route by its Filetype, 201 (or 200 for a file already there)."""
+    data = file.file.read(MAX_FILE_BYTES + 1)  # one byte over is enough to answer 413
+    done = documents.attach(
+        session,
+        user,
+        request.app.state.settings,
+        backend(request),
+        file.filename or "",
+        data,
+        project_id,
+        MasterType(master_type) if master_type else None,
+    )
+    if not done.created:
+        response.status_code = 200
+    return _document(done.document, response)
+
+
+@router.get("/admin/master-documents")
+def list_documents(
+    user: Admin,
+    session: Db,
+    master_type: MasterType | None = None,
+    project_id: uuid.UUID | None = None,
+) -> MasterDocumentList:
+    rows = documents.listing(session, user, master_type, project_id)
+    return MasterDocumentList(items=[documents.to_out(r) for r in rows])
+
+
+@router.get("/admin/master-documents/{document_id}")
+def get_document(
+    document_id: uuid.UUID, user: Admin, session: Db, response: Response
+) -> MasterDocumentOut:
+    return _document(documents.get(session, user, document_id), response)
+
+
+@router.patch("/admin/master-documents/{document_id}")
+def route_document(
+    document_id: uuid.UUID,
+    body: MasterDocumentPatch,
+    user: Admin,
+    session: Db,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> MasterDocumentOut:
+    row = documents.reroute(
+        session, user, document_id, MasterType(body.master_type), body.master_entry_id, if_match
+    )
+    return _document(row, response)

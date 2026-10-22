@@ -4,6 +4,7 @@
   the SBAM metadata (`stable_id`, `status`, `source_kind`) and points at its current version.
 * `master_entry_versions`: the payloads, append-only. A change is a new version n+1.
 * `master_snapshots`: the versions a project used, pinned with their hash, append-only.
+* `master_documents`: context files an Admin attaches to a master (E3.8), routed by Filetype.
 
 The append-only guard is a trigger on both tables. Postgres gets it from the migration; the DDL
 hooks below add the same guard wherever the tables are created with `create_all` (the SQLite test
@@ -13,7 +14,9 @@ databases), so the rule is tested without Docker too.
 import uuid
 from datetime import datetime
 
+from sbam_contracts.documents import ScanStatus
 from sbam_contracts.masters import MasterStatus, MasterType, SourceKind
+from sbam_contracts.masters_api import ParseStatus, RouteSource
 from sqlalchemy import (
     JSON,
     Connection,
@@ -110,6 +113,64 @@ class MasterSnapshot(Base):
         DateTime(timezone=True), default=utcnow, server_default=func.now()
     )
     created_by: Mapped[str | None] = mapped_column(String(255))
+
+
+_ROUTED = (MasterType.ORGANIZATION, MasterType.RULES, MasterType.AGENTS, MasterType.SKILLS)
+
+
+class MasterDocument(TenantOwned, Base):
+    """A file attached to a master. `project_id` empty means the whole tenant."""
+
+    __tablename__ = "master_documents"
+    __table_args__ = (
+        status_check([m.value for m in _ROUTED], "master_type"),
+        status_check(RouteSource, "route_source"),
+        status_check(ScanStatus, "scan_status"),  # NULL (not scanned yet) passes a CHECK
+        status_check(ParseStatus, "parse_status"),
+    )
+
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey(f"{SCHEMA}.projects.id"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    filetype_row_label: Mapped[str] = mapped_column(String(40))
+    intent_class: Mapped[str] = mapped_column(String(100))
+    master_type: Mapped[str] = mapped_column(String(20))
+    master_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey(f"{SCHEMA}.master_entries.id")
+    )
+    route_source: Mapped[str] = mapped_column(String(30))
+    storage_key: Mapped[str] = mapped_column(String(512))
+    sha256: Mapped[str] = mapped_column(String(64))
+    size: Mapped[int] = mapped_column(Integer)
+    mime: Mapped[str] = mapped_column(String(100))
+    scan_status: Mapped[str | None] = mapped_column(String(20))
+    scan_signature_version: Mapped[str | None] = mapped_column(String(100))
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    parse_status: Mapped[str] = mapped_column(String(20), default=ParseStatus.PENDING.value)
+
+
+# The same bytes are attached once per scope: the tenant's own, and each project's (a plain unique
+# index treats NULL project ids as distinct, hence the two partial ones).
+_DOC_TENANT = MasterDocument.project_id.is_(None) & MasterDocument.deleted_at.is_(None)
+_DOC_PROJECT = MasterDocument.project_id.is_not(None) & MasterDocument.deleted_at.is_(None)
+Index(
+    "uq_master_documents_tenant_sha256",
+    MasterDocument.tenant_id,
+    MasterDocument.sha256,
+    unique=True,
+    postgresql_where=_DOC_TENANT,
+    sqlite_where=_DOC_TENANT,
+)
+Index(
+    "uq_master_documents_project_sha256",
+    MasterDocument.tenant_id,
+    MasterDocument.project_id,
+    MasterDocument.sha256,
+    unique=True,
+    postgresql_where=_DOC_PROJECT,
+    sqlite_where=_DOC_PROJECT,
+)
 
 
 # --- Append-only guard (Postgres: migration, see sql.py) -------------------------------------
