@@ -603,6 +603,8 @@ SECRET_NAMES = [
     "storage_signing_key",
     "auth_secret",
     "openrouter_api_key",
+    "cognee_user_secret",
+    "bifrost_virtual_key",
 ]
 
 

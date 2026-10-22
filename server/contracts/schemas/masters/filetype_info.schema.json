@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/filetype_info:0.1.0",
+  "description": "GET /admin/filetypes (E3.7): a frozen Filetype row plus SBAM's loader configuration.",
+  "properties": {
+    "row_label": {
+      "title": "Row Label",
+      "type": "string"
+    },
+    "file_format": {
+      "title": "File Format",
+      "type": "string"
+    },
+    "tier": {
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Tier",
+      "type": "integer"
+    },
+    "purpose": {
+      "title": "Purpose",
+      "type": "string"
+    },
+    "rag_ingestion": {
+      "title": "Rag Ingestion",
+      "type": "string"
+    },
+    "example": {
+      "title": "Example",
+      "type": "string"
+    },
+    "mvp_enabled": {
+      "title": "Mvp Enabled",
+      "type": "boolean"
+    },
+    "loader": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Loader"
+    },
+    "extensions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Extensions",
+      "type": "array"
+    },
+    "intent_class": {
+      "title": "Intent Class",
+      "type": "string"
+    },
+    "default_route": {
+      "title": "Default Route",
+      "type": "string"
+    }
+  },
+  "required": [
+    "row_label",
+    "file_format",
+    "tier",
+    "purpose",
+    "rag_ingestion",
+    "example",
+    "mvp_enabled",
+    "loader",
+    "extensions",
+    "intent_class",
+    "default_route"
+  ],
+  "title": "FiletypeInfo",
+  "type": "object"
+}

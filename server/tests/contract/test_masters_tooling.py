@@ -176,10 +176,18 @@ def test_e3_2_restricted_entries_are_detected(payload: Any, restricted: bool) ->
 def test_e3_2_snapshot_hash_ignores_entry_order() -> None:
     project = uuid.uuid4()
     a = SnapshotEntry(
-        entry_id=uuid.uuid4(), master_type=MasterType.RULES, stable_id="RULE-BOM", version=2
+        entry_id=uuid.uuid4(),
+        master_type=MasterType.RULES,
+        stable_id="RULE-BOM",
+        version=2,
+        status=MasterStatus.PROPOSED,
     )
     b = SnapshotEntry(
-        entry_id=uuid.uuid4(), master_type=MasterType.SKILLS, stable_id="SK-BOM", version=1
+        entry_id=uuid.uuid4(),
+        master_type=MasterType.SKILLS,
+        stable_id="SK-BOM",
+        version=1,
+        status=MasterStatus.PROPOSED,
     )
     one = sha256_of(snapshot_document(project, [a, b]))
     two = sha256_of(snapshot_document(project, [b, a]))

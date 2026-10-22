@@ -10,6 +10,7 @@ from typing import Any
 
 import openpyxl
 import pytest
+from pydantic import ValidationError
 from sbam_contracts.api import DiffKind, ErrorCode, FieldError, StructureDiff
 from sbam_contracts.masters import (
     AgentsPayload,
@@ -25,7 +26,7 @@ from sbam_contracts.masters import (
     ToolingPayload,
     schemas,
 )
-from sbam_contracts.masters_api import ImportMode, ImportReport, ImportTabReport
+from sbam_contracts.masters_api import ImportMode, ImportReport, ImportRowError, ImportTabReport
 from sbam_contracts.masters_workbook import (
     COLUMNS,
     FILETYPE_COUNT,
@@ -34,6 +35,7 @@ from sbam_contracts.masters_workbook import (
     PAYLOAD_MODELS,
     SPREADSHEET_MAIN,
     TAB_ORDER,
+    TAB_ORDER_WITH_TOOLING,
     WorkbookReport,
     check_archive,
     check_content_types,
@@ -225,8 +227,10 @@ def test_e0_4_t01_schema_files_are_exactly_the_documented_ones() -> None:
         # masters engine API (E3.2)
         "master_entry_create.schema.json",
         "master_version_create.schema.json",
+        "filetype_info.schema.json",  # E3.7
         "master_entry.schema.json",
         "masters_snapshot.schema.json",
+        "inclusion_report.schema.json",  # E3.6
         "import_report.schema.json",  # workbook import (E3.3)
     }
 
@@ -586,3 +590,77 @@ def test_e3_3_import_report_round_trips() -> None:
         statuses={MasterStatus.APPROVED: 1},
     )
     assert ImportReport.model_validate_json(report.model_dump_json()) == report
+
+
+def test_e3_3_inserted_column_is_one_added_diff_not_a_shifted_run(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    headers(bad, "Agents").insert(2, "Priority")
+    assert diffs(bad) == [
+        StructureDiff(tab="Agents", expected=None, actual="Priority", kind=DiffKind.ADDED)
+    ]
+
+
+def test_e3_3_dropped_column_is_one_removed_diff(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    gone = str(headers(bad, "Skills").pop(3)).strip()
+    assert diffs(bad) == [
+        StructureDiff(tab="Skills", expected=gone, actual=None, kind=DiffKind.REMOVED)
+    ]
+
+
+def test_e3_3_swapped_tabs_with_tooling_are_reordered_not_added(sheets: Sheets) -> None:
+    order = list(TAB_ORDER_WITH_TOOLING)
+    order[1], order[2] = order[2], order[1]
+    grids = {**sheets, "Tooling": [[]]}
+    found = diffs({tab: grids[tab] for tab in order})
+    assert [d.kind for d in found] == [DiffKind.REORDERED]
+    assert found[0].expected == ", ".join(TAB_ORDER_WITH_TOOLING)
+
+
+def test_e3_3_content_types_ignore_comments_and_need_a_real_override() -> None:
+    commented = f"<Types><!-- {SPREADSHEET_MAIN} --></Types>"
+    assert check_content_types(commented) is not None
+    attribute = f'<Types><Default Extension="xml" ContentType="{SPREADSHEET_MAIN}"/></Types>'
+    assert check_content_types(attribute) is not None
+    real = (
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        f'<Override PartName="/xl/workbook.xml" ContentType="{SPREADSHEET_MAIN}"/></Types>'
+    )
+    assert check_content_types(real) is None
+    assert check_content_types("<!DOCTYPE x [<!ENTITY a 'b'>]><Types/>") is not None
+
+
+def _report(**kw: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "mode": "upsert",
+        "applied": True,
+        "sha256": "sha256:" + "0" * 64,
+        "tabs": [{"name": "Rules", "created": 1}],
+        "stable_ids": ["RULE-1"],
+        "statuses": {"APPROVED": 1},
+    }
+    return {**base, **kw}
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"mode": "validate-only"},  # validate-only never applies
+        {"tabs": [{"name": "Rules", "errors": [{"tab": "Rules", "message": "x"}]}]},
+        {"tabs": [{"name": "Rules", "createdd": 2}]},  # a typo must not zero the count
+        {"statuses": {"APPROVED": -1}},
+        {"extra": True},
+    ],
+)
+def test_e3_3_import_report_rejects_contradictions(bad: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        ImportReport.model_validate(_report(**bad))
+
+
+def test_e3_3_validate_only_report_is_not_applied() -> None:
+    assert not ImportReport.model_validate(_report(mode="validate-only", applied=False)).applied
+
+
+def test_e3_3_import_row_error_forbids_extras() -> None:
+    with pytest.raises(ValidationError):
+        ImportRowError.model_validate({"tab": "Rules", "message": "x", "col": "A"})

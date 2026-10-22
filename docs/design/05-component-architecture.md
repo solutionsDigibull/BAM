@@ -70,6 +70,8 @@ okf-bundle/
 | `sbam-codegen`   | Function bodies                | `CodeBodies`                                    | Code-specialised model |
 | `sbam-testgen`   | Test scenarios + data          | `TestSuiteSpec`                                 | —                     |
 | `sbam-corrector` | Correction                     | `CorrectionPatch` (ISATVON patch and/or bodies) | Receives findings only |
+| `sbam-knowledge` | Cognee graph extraction        | Cognee's `KnowledgeGraph`                       | Cognee only (worker-knowledge), not the SBAM client |
+| `sbam-embed`     | Cognee embeddings              | 1536-dim vectors (`/v1/embeddings`)             | Cognee only; fallback is the same model (vector size) |
 
 Model choice per alias is configured in Bifrost (OpenRouter models, "depending on situation", C-41), with a fallback model per alias. Every call writes `llm_calls` and a Langfuse trace (prompt version, model, tokens, latency, cost). Prompts are versioned files in `services/workers/sbam_workers/llm/prompts/`.
 

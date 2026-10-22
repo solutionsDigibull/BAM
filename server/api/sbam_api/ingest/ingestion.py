@@ -13,7 +13,7 @@ from datetime import datetime
 
 from sbam_contracts.documents import DOCUMENT_INGESTION
 from sbam_contracts.pipeline import StageRef
-from sbam_contracts.runs import SubjectType, TaskQueue, ingest_workflow_id
+from sbam_contracts.runs import Run, SubjectType, TaskQueue, ingest_workflow_id
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import Client
 
@@ -38,6 +38,23 @@ async def start_ingestion(
     with_search_attributes: bool = True,
 ) -> bool:
     """True when the workflow is running for this version. False = Temporal unavailable."""
+    run = await start_ingestion_run(
+        client, sessions, ctx, version_id, correlation_id,
+        with_search_attributes=with_search_attributes,
+    )  # fmt: skip
+    return run is not None
+
+
+async def start_ingestion_run(
+    client: Client,
+    sessions: sessionmaker[Session],
+    ctx: TenantContext,
+    version_id: uuid.UUID,
+    correlation_id: str,
+    *,
+    with_search_attributes: bool = True,
+) -> Run | None:
+    """The run started (or found running) for this version; None = Temporal is unavailable."""
     if ctx.project_id is None:
         raise ValueError("ingestion needs a project")
     spec = StartSpec(
@@ -56,12 +73,12 @@ async def start_ingestion(
         ),
     )
     try:
-        await start_run(client, sessions, spec, with_search_attributes=with_search_attributes)
+        run = await start_run(client, sessions, spec, with_search_attributes=with_search_attributes)
     except ApiError as exc:  # Temporal down (503): the version waits, the upload stands
         log.warning("ingestion not started yet: %s", exc.code)
-        return False
+        return None
     await asyncio.to_thread(_mark_started, sessions, ctx, version_id, utcnow())
-    return True
+    return run
 
 
 def _mark_started(

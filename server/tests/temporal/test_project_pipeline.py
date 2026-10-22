@@ -44,9 +44,10 @@ from sbam_contracts.pipeline import (
     SowApproved,
     StageRef,
 )
-from sbam_contracts.runs import MirrorUpdate, TaskQueue, pipeline_workflow_id
+from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_workflow_id
 from sbam_workers import mirror, registry
 from sbam_workers.pipeline.project_pipeline import ProjectPipeline
+from sbam_workers.stub_ids import stub_id
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.client import Client, WorkflowHandle, WorkflowHistory
@@ -59,6 +60,7 @@ TENANT = uuid.uuid4()
 FDE = str(uuid.uuid4())
 SHA = "ab" * 32
 HISTORY = Path(__file__).parent / "histories" / "project_pipeline.json"
+BEFORE_E5_2 = HISTORY.with_name("project_pipeline_before_e5_2.json")  # no heartbeat patch
 FULL_ORDER = [
     "ingest",
     "knowledge",
@@ -80,6 +82,25 @@ FULL_ORDER = [
 Overrides = dict[str, Callable[..., Any]]
 
 
+@activity.defn(name="build_knowledge")
+async def knowledge_stand_in(inp: RunInput) -> IdResult:
+    """The real build (E5.2) needs Cognee; its own tests are tests/unit/test_knowledge_build.py.
+    These tests drive the pipeline, so the stage answers like the stub it replaced."""
+    return IdResult(id=stub_id(inp, "knowledge"))
+
+
+@activity.defn(name="build_okf_bundle")
+async def okf_stand_in(inp: StageRef) -> IdResult:
+    """The real bundle (E5.3) reads Cognee's graph; its tests are tests/unit/test_okf_bundle.py."""
+    return IdResult(id=stub_id(inp, "okf"))
+
+
+DEFAULT_OVERRIDES: "Overrides" = {
+    "build_knowledge": knowledge_stand_in,
+    "build_okf_bundle": okf_stand_in,
+}
+
+
 def name_of(fn: Any) -> str:
     return str(fn.__temporal_activity_definition.name)
 
@@ -90,7 +111,7 @@ async def environment(
 ) -> AsyncIterator[WorkflowEnvironment]:
     registry.load_all()
     env = await WorkflowEnvironment.start_time_skipping(data_converter=pydantic_data_converter)
-    async with env, workers(env.client, overrides or {}, skip or set()):
+    async with env, workers(env.client, {**DEFAULT_OVERRIDES, **(overrides or {})}, skip or set()):
         yield env
 
 
@@ -546,10 +567,12 @@ def test_e10_1_signal_helper_refuses_when_not_waiting() -> None:
 # --- replay --------------------------------------------------------------------------------------
 
 
-def test_e10_1_replays_from_recorded_history() -> None:
-    """Determinism guard (TD §13.4): a change that breaks running pipelines fails here."""
+@pytest.mark.parametrize("recorded", [HISTORY, BEFORE_E5_2], ids=["current", "before_e5_2"])
+def test_e10_1_replays_from_recorded_history(recorded: Path) -> None:
+    """Determinism guard (TD §13.4): a change that breaks running pipelines fails here. E5.2-T09:
+    `before_e5_2` was recorded before the knowledge stage's heartbeat patch, `current` after it."""
     workflow_id = pipeline_workflow_id(uuid.UUID(int=0))
-    history = WorkflowHistory.from_json(workflow_id, json.loads(HISTORY.read_text("utf-8")))
+    history = WorkflowHistory.from_json(workflow_id, json.loads(recorded.read_text("utf-8")))
     replayer = Replayer(workflows=[ProjectPipeline], data_converter=pydantic_data_converter)
     asyncio.run(replayer.replay_workflow(history))
 

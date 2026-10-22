@@ -395,6 +395,12 @@
         "actor": "SYSTEM"
       },
       {
+        "from": "PARSE_FAILED",
+        "event": "retry",
+        "to": "SCANNING",
+        "actor": "FDE"
+      },
+      {
         "from": "UPLOADED",
         "event": "delete",
         "to": "DELETED",
@@ -770,6 +776,57 @@
         "from": "FROZEN",
         "event": "start_patch_version",
         "to": "BUILDING",
+        "actor": "SYSTEM"
+      }
+    ]
+  },
+  "knowledge_version": {
+    "states": [
+      "BUILDING",
+      "READY",
+      "FAILED",
+      "OUTDATED"
+    ],
+    "initial": [
+      "BUILDING"
+    ],
+    "terminal": [
+      "FAILED",
+      "OUTDATED"
+    ],
+    "locked": [
+      "OUTDATED",
+      "READY"
+    ],
+    "transitions": [
+      {
+        "from": null,
+        "event": "build_started",
+        "to": "BUILDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": null,
+        "event": "rebuild",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
+        "from": "BUILDING",
+        "event": "build_ready",
+        "to": "READY",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "BUILDING",
+        "event": "build_failed",
+        "to": "FAILED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": "READY",
+        "event": "superseded",
+        "to": "OUTDATED",
         "actor": "SYSTEM"
       }
     ]

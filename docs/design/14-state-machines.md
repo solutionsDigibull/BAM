@@ -40,7 +40,7 @@ CREATED → ISATVON_EXTRACTING → ISATVON_REVIEW → BUILDING → CERTIFYING �
 
 ## 14.2 Document version
 
-`UPLOADED → SCANNING → (REJECTED | SCAN_FAILED | PARSING) → (PARSED | PARSE_FAILED)`, plus `DELETED` (soft, restorable for 90 days) → `PURGED`. `SCAN_FAILED` = ClamAV unavailable or signatures older than 24 h after retries; retryable.
+`UPLOADED → SCANNING → (REJECTED | SCAN_FAILED | PARSING) → (PARSED | PARSE_FAILED)`, plus `DELETED` (soft, restorable for 90 days) → `PURGED`. `SCAN_FAILED` = ClamAV unavailable or signatures older than 24 h after retries; retryable. `PARSE_FAILED` is retryable too: `retry` runs the scan and the parse again.
 
 ## 14.3 SOW version
 
@@ -152,6 +152,7 @@ The machines above are implemented in `server/contracts/sbam_contracts/state_mac
 | SCAN_FAILED | `retry` | SCANNING | FDE |
 | PARSING | `parse_completed` | PARSED | SYSTEM |
 | PARSING | `parse_failed` | PARSE_FAILED | SYSTEM |
+| PARSE_FAILED | `retry` | SCANNING | FDE |
 | UPLOADED | `delete` | DELETED | FDE |
 | PARSED | `delete` | DELETED | FDE |
 | REJECTED | `delete` | DELETED | FDE |

@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:knowledge/version_list:0.1.0",
+  "$defs": {
+    "BundleCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/DocumentCoverage"
+          },
+          "title": "Documents",
+          "type": "array"
+        },
+        "dropped_entities": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Dropped Entities",
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "documents"
+      ],
+      "title": "BundleCoverage",
+      "type": "object"
+    },
+    "CoverageEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SourceStatus"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "document_version_id",
+        "status"
+      ],
+      "title": "CoverageEntry",
+      "type": "object"
+    },
+    "CoverageRow": {
+      "additionalProperties": false,
+      "description": "One document of a version, ready to show (E5.6): the bundle's view once it exists, else the\nbuild's. `title` is the uploaded file's name; `reason` is a code, shown as text.",
+      "properties": {
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "document_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Id"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "chunks": {
+          "default": 0,
+          "title": "Chunks",
+          "type": "integer"
+        },
+        "entities": {
+          "default": 0,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "document_version_id",
+        "title",
+        "status"
+      ],
+      "title": "CoverageRow",
+      "type": "object"
+    },
+    "CoverageStatus": {
+      "enum": [
+        "COVERED",
+        "CHUNKS_ONLY",
+        "FAILED"
+      ],
+      "title": "CoverageStatus",
+      "type": "string"
+    },
+    "DocumentCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "document_version_id": {
+          "format": "uuid",
+          "title": "Document Version Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/CoverageStatus"
+        },
+        "chunks": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Chunks",
+          "type": "integer"
+        },
+        "entities": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "document_version_id",
+        "status"
+      ],
+      "title": "DocumentCoverage",
+      "type": "object"
+    },
+    "KnowledgeCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "default": 0,
+          "title": "Documents",
+          "type": "integer"
+        },
+        "entities": {
+          "default": 0,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "relations": {
+          "default": 0,
+          "title": "Relations",
+          "type": "integer"
+        },
+        "chunks": {
+          "default": 0,
+          "title": "Chunks",
+          "type": "integer"
+        }
+      },
+      "title": "KnowledgeCounts",
+      "type": "object"
+    },
+    "KnowledgeCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/CoverageEntry"
+          },
+          "title": "Documents",
+          "type": "array"
+        },
+        "masters_included": {
+          "default": 0,
+          "title": "Masters Included",
+          "type": "integer"
+        },
+        "entities": {
+          "default": 0,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "relations": {
+          "default": 0,
+          "title": "Relations",
+          "type": "integer"
+        },
+        "chunks": {
+          "default": 0,
+          "title": "Chunks",
+          "type": "integer"
+        },
+        "bundle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BundleCoverage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "KnowledgeCoverage",
+      "type": "object"
+    },
+    "KnowledgeVersionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "coverage": {
+          "$ref": "#/$defs/KnowledgeCoverage"
+        },
+        "error_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Reason"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "okf_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Okf Sha256"
+        },
+        "counts": {
+          "$ref": "#/$defs/KnowledgeCounts"
+        },
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/CoverageRow"
+          },
+          "title": "Documents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "status",
+        "coverage",
+        "created_at"
+      ],
+      "title": "KnowledgeVersionSummary",
+      "type": "object"
+    },
+    "SourceStatus": {
+      "description": "A document's fate in one knowledge build (E5.2); the OKF bundle (E5.3) refines ADDED.",
+      "enum": [
+        "ADDED",
+        "FAILED"
+      ],
+      "title": "SourceStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET P/knowledge`: this project's versions, newest first.",
+  "properties": {
+    "versions": {
+      "items": {
+        "$ref": "#/$defs/KnowledgeVersionSummary"
+      },
+      "title": "Versions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "versions"
+  ],
+  "title": "KnowledgeVersionList",
+  "type": "object"
+}

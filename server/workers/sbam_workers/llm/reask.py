@@ -9,8 +9,12 @@ caller passes an async `LlmCall`, so the Bifrost client in E6.1 plugs in unchang
   which is non-retryable (a Temporal retry would only pay for the same bad answer).
 - Transport errors raised by the caller propagate untouched. They are retryable and never count as
   a re-ask.
-- The re-ask message carries error locations and messages only. It never echoes input values and
-  never adds documents, so a re-ask cannot widen what the model sees.
+- The re-ask message carries `path: error type` only (E1.21). The path keeps only names the output
+  schema defines, so a mapping key or an invented field shows as `<key>`; the error type is
+  Pydantic's stable code (`missing`, `int_type`, ...), never the validator's message, which can name
+  the offending value. It never echoes input values and never adds documents, so a re-ask cannot
+  widen what the model sees, and `Attempt.errors` (written to `llm_calls`) holds no document text
+  either.
 """
 
 import re
@@ -30,6 +34,10 @@ _FENCE = re.compile(r"\A```[A-Za-z0-9_-]*[ \t]*\n(.*?)\n?```\Z", re.S)
 class Reply:
     text: str
     model: str  # the model that answered; after a Bifrost failover this is the fallback
+    tokens_in: int = 0  # usage as the gateway reported it (E6.1 writes it to llm_calls)
+    tokens_out: int = 0
+    cost_usd: float = 0.0
+    latency_ms: int = 0
 
 
 @dataclass(frozen=True)
@@ -68,11 +76,62 @@ def strip_fences(text: str) -> str:
     return match.group(1).strip() if match else stripped
 
 
-def error_lines(exc: ValidationError) -> tuple[str, ...]:
-    """`path: message` per error. Never `input`: it can hold document text or secrets."""
-    return tuple(
-        f"{'.'.join(str(p) for p in err['loc']) or '<root>'}: {err['msg']}" for err in exc.errors()
-    )
+# Segments Pydantic adds for union members and similar; they name a type, never data.
+_TYPE_SEGMENTS = frozenset(
+    "str int float bool none list dict tuple set frozenset date datetime time timedelta bytes "
+    "decimal uuid url".split()
+)
+# `ctx` entries that are constants of the schema (a limit, the allowed literals). Every other entry
+# is left out: `value_error` carries the exception, which can hold the offending value.
+_CONSTRAINT_CTX = ("ge", "gt", "le", "lt", "min_length", "max_length", "multiple_of", "expected")
+
+
+def schema_names(output_type: type[BaseModel]) -> frozenset[str]:
+    """Every property name the output schema defines, in the model and in the models it contains."""
+    names: set[str] = set()
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if isinstance(properties, dict):
+                names.update(str(name) for name in properties)
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(output_type.model_json_schema())
+    return frozenset(names)
+
+
+def _path(loc: tuple[int | str, ...], names: frozenset[str]) -> str:
+    out = ""
+    for part in loc:
+        if isinstance(part, int):
+            out += f"[{part}]"  # a position in a list, not data
+            continue
+        known = part in names or part in _TYPE_SEGMENTS
+        out += ("." if out else "") + (part if known else "<key>")
+    return out or "<root>"
+
+
+def error_lines(exc: ValidationError, names: frozenset[str]) -> tuple[str, ...]:
+    """`path: type (constraint)` per error, built only from what the schema defines (E1.21).
+
+    Never `input` and never `msg`: both can hold document text or secrets (a validator that raises
+    ``ValueError(f"duplicate id {value}")`` puts the value in the message). `loc` segments the
+    schema does not define (mapping keys, fields the model invented) become `<key>`.
+    """
+    lines: list[str] = []
+    for err in exc.errors():
+        hint = ", ".join(
+            f"{key}={err['ctx'][key]}"
+            for key in _CONSTRAINT_CTX
+            if key in (err.get("ctx") or {}) and isinstance(err["ctx"][key], int | float | str)
+        )
+        lines.append(f"{_path(err['loc'], names)}: {err['type']}" + (f" ({hint})" if hint else ""))
+    return tuple(lines)
 
 
 def reask_messages(previous: list[Message], reply: Reply, errors: tuple[str, ...]) -> list[Message]:
@@ -95,6 +154,7 @@ async def run_structured[T: BaseModel](
     max_reasks: int = MAX_REASKS,
     on_attempt: OnAttempt | None = None,
 ) -> StructuredResult[T]:
+    names = schema_names(output_type)
     attempts: list[Attempt] = []
     current = list(messages)
     for number in range(1, max_reasks + 2):
@@ -103,7 +163,7 @@ async def run_structured[T: BaseModel](
             # strict: the model must send the exact JSON types, no "12" -> 12 coercion.
             output = output_type.model_validate_json(strip_fences(reply.text), strict=True)
         except ValidationError as exc:
-            errors = error_lines(exc)
+            errors = error_lines(exc, names)
             attempt = Attempt(number, "SCHEMA_INVALID", reply.model, errors)
             attempts.append(attempt)
             if on_attempt:

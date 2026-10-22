@@ -4,6 +4,7 @@
 it to find rows still RUNNING. It is never reachable from a request.
 """
 
+import uuid
 from datetime import UTC, datetime
 
 from sbam_contracts.runs import TERMINAL_STATES, Run, RunState, SubjectType
@@ -21,6 +22,16 @@ class TemporalRunRepository(TenantScopedRepository[TemporalRun]):
         query = self._scoped().where(
             TemporalRun.temporal_workflow_id == temporal_workflow_id,
             TemporalRun.temporal_run_id == temporal_run_id,
+        )
+        return self.session.scalars(query).one_or_none()
+
+    def latest_for_subject(self, subject_type: str, subject_id: uuid.UUID) -> TemporalRun | None:
+        """The newest run recorded for a subject (a document version, a project, ...)."""
+        query = (
+            self._scoped()
+            .where(TemporalRun.subject_type == subject_type, TemporalRun.subject_id == subject_id)
+            .order_by(TemporalRun.id.desc())
+            .limit(1)
         )
         return self.session.scalars(query).one_or_none()
 

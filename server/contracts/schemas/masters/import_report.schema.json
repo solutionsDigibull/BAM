@@ -11,6 +11,7 @@
       "type": "string"
     },
     "ImportRowError": {
+      "additionalProperties": false,
       "properties": {
         "tab": {
           "title": "Tab",
@@ -54,6 +55,7 @@
       "type": "object"
     },
     "ImportTabReport": {
+      "additionalProperties": false,
       "properties": {
         "name": {
           "title": "Name",
@@ -108,6 +110,7 @@
       "type": "string"
     }
   },
+  "additionalProperties": false,
   "properties": {
     "mode": {
       "$ref": "#/$defs/ImportMode"
@@ -137,6 +140,7 @@
     },
     "statuses": {
       "additionalProperties": {
+        "minimum": 0,
         "type": "integer"
       },
       "propertyNames": {

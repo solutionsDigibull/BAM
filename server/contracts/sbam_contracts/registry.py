@@ -31,6 +31,11 @@ from sbam_contracts.identity import (
     UserPatch,
 )
 from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
+from sbam_contracts.knowledge import (
+    KnowledgeGraphPage,
+    KnowledgeNodeDetail,
+    KnowledgeVersionList,
+)
 from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
 from sbam_contracts.masters import (
     AgentsPayload,
@@ -43,13 +48,22 @@ from sbam_contracts.masters import (
     ToolingPayload,
 )
 from sbam_contracts.masters_api import (
+    FiletypeInfo,
     ImportReport,
+    InclusionReport,
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
     MasterVersionCreate,
 )
 from sbam_contracts.notifications import Notification
+from sbam_contracts.okf import (
+    BundleCoverage,
+    BundleManifest,
+    OkfChunk,
+    OkfEntity,
+    OkfRelation,
+)
 from sbam_contracts.projects import (
     PipelineTimeline,
     Project,
@@ -106,7 +120,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/master_entry_create", MasterEntryCreate),
     ("masters/master_version_create", MasterVersionCreate),
     ("masters/master_entry", MasterEntry),
+    ("masters/filetype_info", FiletypeInfo),
     ("masters/masters_snapshot", MastersSnapshot),
+    ("masters/inclusion_report", InclusionReport),
     ("masters/import_report", ImportReport),
     ("documents/document", DocumentOut),
     ("documents/purge_target", PurgeTarget),
@@ -115,4 +131,12 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/cleanup_result", CleanupResult),
     ("notifications/notification", Notification),
     ("audit/audit_entry", AuditEntry),
+    ("okf/bundle", BundleManifest),
+    ("okf/entity", OkfEntity),
+    ("okf/relation", OkfRelation),
+    ("okf/chunk", OkfChunk),
+    ("okf/coverage", BundleCoverage),
+    ("knowledge/version_list", KnowledgeVersionList),
+    ("knowledge/graph_page", KnowledgeGraphPage),
+    ("knowledge/node_detail", KnowledgeNodeDetail),
 )

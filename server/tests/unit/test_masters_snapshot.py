@@ -58,7 +58,8 @@ def test_e3_2_other_projects_entries_never_reach_a_snapshot() -> None:
     assert resolve(PROJECT, [entry("RULE-BOM", project_id=OTHER)]) == []
 
 
-def test_e3_2_illustrative_retired_and_restricted_are_left_out() -> None:
+def test_e3_2_every_entry_is_pinned_with_its_status_and_restricted_flag() -> None:
+    """E3.6 decision: the snapshot pins every live entry; consumers decide inclusion from these."""
     restricted_tool = entry(
         "TOOL-MFG-02",
         master_type="TOOLING",
@@ -71,7 +72,14 @@ def test_e3_2_illustrative_retired_and_restricted_are_left_out() -> None:
         entry("RULE-BOM"),
         entry("TOOL-MFG-01", master_type="TOOLING", payload={"category": "MCP"}),
     ]
-    assert [e.stable_id for e in resolve(PROJECT, rows)] == ["RULE-BOM", "TOOL-MFG-01"]
+    pinned = {e.stable_id: (e.status.value, e.restricted) for e in resolve(PROJECT, rows)}
+    assert pinned == {
+        "Rule #1": ("ILLUSTRATIVE", False),
+        "RULE-OLD": ("RETIRED", False),
+        "RULE-BOM": ("PROPOSED", False),
+        "TOOL-MFG-01": ("PROPOSED", False),
+        "TOOL-MFG-02": ("PROPOSED", True),
+    }
 
 
 def test_e3_2_empty_snapshot_is_valid_and_hashed() -> None:

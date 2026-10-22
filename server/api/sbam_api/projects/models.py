@@ -8,7 +8,7 @@ import uuid
 
 from sbam_contracts.projects import ProjectStatus
 from sbam_contracts.state_machines import MachineName
-from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, ForeignKey, Index, String, Text, UniqueConstraint, Uuid, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from sbam_api.db.base import Base, TenantOwned, status_check
@@ -27,6 +27,8 @@ class Project(Stateful, TenantOwned, Base):
     client_name: Mapped[str | None] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text)
     context_notes: Mapped[str | None] = mapped_column(Text)  # Markdown; the client sanitises it
+    # E3.6: Restricted master entries may enter this project's knowledge context (sbam-admin only).
+    allow_restricted: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     status: Mapped[str] = mapped_column(String(20), default=ProjectStatus.ACTIVE.value)
 
 
