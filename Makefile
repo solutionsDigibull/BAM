@@ -52,6 +52,12 @@ contracts-check:
 migrations-check:
 	cd server && test "$$(uv run python -m sbam_api.db.migrate heads | grep -c '(head)')" -eq 1
 
+# Re-record the Temporal replay histories from their fixture runs (E10.6). Review the diff, and keep the
+# old file as <name>_before_<change>.json while runs started on the old code can still be running.
+.PHONY: record-histories
+record-histories:
+	cd server && RECORD_HISTORY=1 uv run pytest tests/temporal -k test_record_ -q
+
 up:
 	@test -f $(ENV_FILE) || { echo "$(ENV_FILE) not found: cp compose/.env.example compose/.env and set the passwords" >&2; exit 1; }
 	$(COMPOSE) up -d --build --wait --wait-timeout 900

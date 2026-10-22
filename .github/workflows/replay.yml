@@ -1,0 +1,44 @@
+# Temporal replay gate (E10.6, TD §13.4): every recorded history in server/tests/temporal/histories must
+# replay against the PR's workflow code. A workflow change without `workflow.patched` raises
+# NondeterminismError and fails `temporal-replay`; make it a required check in branch protection.
+# The SDK comes from server/uv.lock (`uv sync --locked`), so replay uses the version workers run.
+# Histories are committed files, so they are also scanned for secrets (ci.yml's secret-scan covers commits).
+name: replay
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: replay-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  LLM_PROVIDER: mock
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+
+jobs:
+  temporal-replay: # required-check name
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: server/uv.lock
+      - run: cd server && uv sync --locked
+      - name: Replay every recorded history
+        run: cd server && uv run pytest tests/temporal/test_replay_histories.py -v
+      - name: Scan the histories for secrets
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS_IMAGE" \
+            dir --redact --no-banner --exit-code 1 server/tests/temporal/histories
