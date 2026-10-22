@@ -43,7 +43,7 @@ from sbam_api.sow.service import Generation, record_generation
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.factory import make_backend
 from sbam_contracts.okf import BundleManifest
-from sbam_contracts.pipeline import IdResult, StageRef
+from sbam_contracts.pipeline import IdResult, SowGenerateInput, StageRef
 from sbam_contracts.runs import TaskQueue
 from sbam_contracts.sow import SECTIONS, Citation, SowDocument
 from sbam_contracts.state_machines import KnowledgeVersionState, SowVersionState
@@ -288,7 +288,7 @@ def _deps() -> SowDeps:
 
 @activity_for(TaskQueue.LLM)
 @activity.defn(name="generate_sow")
-async def generate_sow(inp: StageRef) -> IdResult:
+async def generate_sow(inp: SowGenerateInput) -> IdResult:
     """The SOW version id. Non-retryable failure type: SchemaInvalidAfterRetries."""
     info = activity.info()
     scope = LlmScope(
@@ -299,4 +299,5 @@ async def generate_sow(inp: StageRef) -> IdResult:
         activity_id=info.activity_id,
         attempt=info.attempt,
     )
-    return IdResult(id=await generate_version(_deps(), inp, scope))
+    ref = StageRef(**inp.model_dump(exclude={"hint"}))
+    return IdResult(id=await generate_version(_deps(), ref, scope, hint=inp.hint))

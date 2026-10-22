@@ -55,6 +55,7 @@ with workflow.unsafe.imports_passed_through():
         RebuildSubSkills,
         ResumeState,
         SowApproved,
+        SowGenerateInput,
         StageRef,
         SubSkillBuildInput,
         SubSkillBuildResult,
@@ -285,7 +286,7 @@ class ProjectPipeline:
 
     async def _stage_sow(self) -> None:
         await self._enter(PipelineStage.SOW)
-        ref = StageRef(**self._base(), ref_id=self.refs["okf"])
+        ref = SowGenerateInput(**self._base(), ref_id=self.refs["okf"], hint=self.inp.sow_hint)
         failed = ("sow_generation_failed", MachineName.PROJECT_PIPELINE)
         await self._attempt(generate_sow, ref, IdResult, failed)
         await self._project("sow_generated")
@@ -629,10 +630,12 @@ class ProjectPipeline:
             certified=sorted(self.done, key=str),
             blocked=sorted(self.blocked, key=str),
             build_plan=self.build_plan,
+            refs=dict(self.refs),
         )
         workflow.continue_as_new(self.inp.model_copy(update={"resume": resume}))
 
     def _restore(self, resume: ResumeState) -> None:
+        self.refs.update(resume.refs)  # a regeneration resumes at the SOW stage (E6.3)
         self.workflow_id = resume.workflow_id
         self.sub_skill_ids = list(resume.sub_skill_ids)
         self.needs_review = list(resume.needs_review)

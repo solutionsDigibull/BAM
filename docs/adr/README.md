@@ -24,6 +24,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0016](0016-audit-observability-and-nfrs.md) | Audit, observability and NFRs | Accepted | C-42, C-43, C-44 |
 | [0017](0017-authorization-chain.md) | Authorization chain: policies, ports and token leeway (#48) | Accepted | refines 0002 |
 | [0018](0018-llm-wrapper.md) | LLM wrapper: httpx, Langfuse REST, replay cache in `llm_calls` (#85) | Accepted | refines 0015 |
+| [0019](0019-sow-editor-format-and-regenerate.md) | SOW editor format (SBAM TipTap shape) and regenerate (#87) | Accepted | — |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 

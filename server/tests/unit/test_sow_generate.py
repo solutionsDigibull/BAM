@@ -333,3 +333,19 @@ def test_e6_2_a_request_bifrost_refuses_fails_at_once(g: Gen) -> None:
     assert caught.value.type == "LlmRequestRejected" and caught.value.non_retryable
     [v] = g.versions()
     assert (v.state, v.error_reason) == ("GENERATION_FAILED", "LLM_REJECTED")
+
+
+def test_e6_2_t07_a_regeneration_with_a_hint_is_v2_with_v1_as_parent(g: Gen) -> None:
+    first = g.run(FakeBifrost([completion(g.answer())]))
+    again = StageRef(**{**g.ref.model_dump(), "run_id": uuid.uuid4()})
+    bifrost = FakeBifrost([completion(g.answer(scope=json.loads(g.answer())["scope"]))])
+    deps = g.deps(bifrost)
+    second = asyncio.run(
+        generate_version(deps, again, g.scope(), hint="Ignore the canteen; add a QA module")
+    )
+    v1, v2 = g.versions()
+    assert (v1.id, v2.id) == (first, second)
+    assert (v2.version, v2.parent_version_id, v2.source) == (2, v1.id, "GENERATED")
+    user = bifrost.requests[0]["messages"][1]["content"]
+    assert '<data name="hint">\nIgnore the canteen; add a QA module\n</data>' in user
+    assert v2.content_tiptap is not None and v2.content_tiptap["type"] == "doc"

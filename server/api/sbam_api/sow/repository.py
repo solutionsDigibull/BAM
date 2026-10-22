@@ -32,6 +32,16 @@ class SowVersionRepository(StatefulRepository):
         found: SowVersion | None = self.session.scalars(query).one_or_none()
         return found
 
+    def by_number(self, sow_id: uuid.UUID, version: int) -> SowVersion | None:
+        query = self._scoped().where(SowVersion.sow_id == sow_id, SowVersion.version == version)
+        found: SowVersion | None = self.session.scalars(query).one_or_none()
+        return found
+
+    def of_sow(self, sow_id: uuid.UUID) -> list[SowVersion]:
+        """Newest first."""
+        query = self._scoped().where(SowVersion.sow_id == sow_id)
+        return list(self.session.scalars(query.order_by(SowVersion.version.desc())))
+
     def next_number(self, sow_id: uuid.UUID) -> int:
         query = (
             self._scoped(include_deleted=True)

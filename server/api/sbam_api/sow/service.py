@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from sbam_contracts.sow import SowDocument
 from sbam_contracts.state_machines import Actor, MachineName
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.projects.repository import ProjectRepository
 from sbam_api.sow.models import Sow, SowSource, SowVersion
 from sbam_api.sow.repository import SowRepository, SowVersionRepository
+from sbam_api.sow.tiptap import to_tiptap
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID, apply_create
 
 
@@ -60,6 +62,9 @@ def record_generation(
     if sow is None:
         sow = sows.add(Sow(id=uuid7()))
     failed = gen.structured is None
+    structured = (
+        None if failed else SowDocument.model_validate(gen.structured).model_dump(mode="json")
+    )
     version = SowVersion(
         id=uuid7(),
         sow_id=sow.id,
@@ -69,8 +74,9 @@ def record_generation(
         knowledge_version_id=gen.knowledge_version_id,
         parent_version_id=gen.parent_version_id or sow.current_version_id,
         llm_call_id=gen.llm_call_id,
-        structured=gen.structured,
-        sha256=None if failed else canonical_sha256(gen.structured or {}),
+        structured=structured,
+        content_tiptap=None if structured is None else to_tiptap(structured),
+        sha256=None if structured is None else canonical_sha256(structured),
         error_reason=gen.error_reason,
     )
     event = "generation_failed" if failed else "generated"
