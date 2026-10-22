@@ -5,7 +5,7 @@ description = "SBAM Pydantic contracts, the single source of truth"
 requires-python = "==3.12.*"
 dependencies = [
     "email-validator>=2.2",
-    "pydantic>=2.11",
+    "pydantic>=2.12",  # Field(exclude_if=...)
     "rfc8785>=0.1.4",
 ]
 

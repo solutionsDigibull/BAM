@@ -10,7 +10,8 @@ from typing import Any
 
 import openpyxl
 import pytest
-from sbam_contracts.api import ErrorCode
+from pydantic import ValidationError
+from sbam_contracts.api import DiffKind, ErrorCode, FieldError, StructureDiff
 from sbam_contracts.masters import (
     AgentsPayload,
     FiletypePayload,
@@ -25,14 +26,21 @@ from sbam_contracts.masters import (
     ToolingPayload,
     schemas,
 )
+from sbam_contracts.masters_api import ImportMode, ImportReport, ImportRowError, ImportTabReport
 from sbam_contracts.masters_workbook import (
     COLUMNS,
     FILETYPE_COUNT,
+    MAX_UNPACKED_BYTES,
     MAX_WORKBOOK_BYTES,
     PAYLOAD_MODELS,
+    SPREADSHEET_MAIN,
     TAB_ORDER,
+    TAB_ORDER_WITH_TOOLING,
     WorkbookReport,
+    check_archive,
+    check_content_types,
     check_workbook_container,
+    frozen_filetype,
     parse_workbook,
     validate_structure,
 )
@@ -223,6 +231,7 @@ def test_e0_4_t01_schema_files_are_exactly_the_documented_ones() -> None:
         "master_entry.schema.json",
         "masters_snapshot.schema.json",
         "inclusion_report.schema.json",  # E3.6
+        "import_report.schema.json",  # workbook import (E3.3)
     }
 
 
@@ -455,3 +464,203 @@ def test_e0_4_t09_the_shipped_workbook_passes_the_container_check() -> None:
 
 def test_e0_4_t01_status_enum_is_the_documented_set() -> None:
     assert [s.value for s in MasterStatus] == ["PROPOSED", "ILLUSTRATIVE", "APPROVED", "RETIRED"]
+
+
+# E3.3: structure diffs, archive and content-type guards, frozen Filetype, import report.
+
+
+def diffs(sheets: Sheets) -> list[StructureDiff]:
+    return [e.diff for e in validate_structure(sheets) if e.diff is not None]
+
+
+def headers(sheets: Sheets, tab: str) -> list[object]:
+    return sheets[tab][1]
+
+
+def test_e3_3_t02_renamed_rules_column_is_a_renamed_diff(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    row = headers(bad, "Rules")
+    row[row.index("Components (BOM)")] = "BOM"
+    assert diffs(bad) == [
+        StructureDiff(tab="Rules", expected="Components (BOM)", actual="BOM", kind=DiffKind.RENAMED)
+    ]
+
+
+def test_e3_3_t03_added_agents_column_is_an_added_diff(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    row = headers(bad, "Agents")
+    last = max(i for i, c in enumerate(row) if c not in (None, ""))
+    row.insert(last + 1, "Priority")
+    assert diffs(bad) == [
+        StructureDiff(tab="Agents", expected=None, actual="Priority", kind=DiffKind.ADDED)
+    ]
+
+
+def test_e3_3_inserted_column_starts_with_added(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    headers(bad, "Agents").insert(2, "Priority")
+    found = diffs(bad)
+    assert found[0].kind == DiffKind.ADDED and found[0].actual == "Priority"
+
+
+def test_e3_3_dropped_column_is_removed(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    row = headers(bad, "Skills")
+    gone = row.pop(3)
+    found = diffs(bad)
+    assert found[0] == StructureDiff(
+        tab="Skills", expected=str(gone).strip(), actual=found[0].actual, kind=DiffKind.REMOVED
+    )
+
+
+def test_e3_3_swapped_columns_are_reordered(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    row = headers(bad, "Filetype")
+    row[1], row[2] = row[2], row[1]
+    assert [d.kind for d in diffs(bad)] == [DiffKind.REORDERED, DiffKind.REORDERED]
+
+
+def test_e3_3_tab_diffs(sheets: Sheets) -> None:
+    missing = {tab: grid for tab, grid in sheets.items() if tab != "Filetype"}
+    assert diffs(missing)[0].kind == DiffKind.REMOVED
+    assert diffs(missing)[0].expected == "Filetype"
+    extra = {**sheets, "Notes": [["x"]]}
+    assert diffs(extra)[0] == StructureDiff(
+        tab="workbook", expected=None, actual="Notes", kind=DiffKind.ADDED
+    )
+
+
+def test_e3_3_structure_errors_keep_their_messages(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    row = headers(bad, "Rules")
+    row[row.index("Components (BOM)")] = "BOM"
+    report = parse_workbook(bad)
+    assert report.errors[0].message == "expected 'Components (BOM)', found 'BOM'"
+
+
+def test_e3_3_diff_is_omitted_from_errors_without_one() -> None:
+    assert FieldError(path="file", message="x").model_dump(mode="json") == {
+        "path": "file",
+        "message": "x",
+    }
+
+
+@pytest.mark.parametrize(
+    ("members", "bad"),
+    [
+        ([("a", 1000, 500), ("b", 2000, 1000)], False),
+        ([("a", MAX_UNPACKED_BYTES, MAX_UNPACKED_BYTES)], False),
+        ([("a", MAX_UNPACKED_BYTES + 1, MAX_UNPACKED_BYTES)], True),  # over 100 MB
+        ([("a", 101_000, 1_000)], True),  # ratio 101
+        ([("a", 100_000, 1_000)], False),  # ratio 100
+        ([("a", 200, 0)], True),  # stored as nothing
+        ([], False),
+    ],
+)
+def test_e3_3_t08_archive_guard(members: list[tuple[str, int, int]], bad: bool) -> None:
+    assert (check_archive(members) is not None) is bad
+
+
+def test_e3_3_t07_content_types() -> None:
+    xlsx = f'<Override PartName="/xl/workbook.xml" ContentType="{SPREADSHEET_MAIN}"/>'
+    assert check_content_types(xlsx) is None
+    xlsm = (
+        '<Override PartName="/xl/workbook.xml" '
+        'ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/>'
+    )
+    assert check_content_types(xlsm) is not None
+    docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    assert check_content_types(docx) is not None
+
+
+def test_e3_3_frozen_filetype_matches_the_reference_workbook(sheets: Sheets) -> None:
+    rows = [r.payload for r in parse_workbook(sheets).rows if r.master_type == MasterType.FILETYPE]
+    frozen = frozen_filetype()
+    assert len(frozen) == FILETYPE_COUNT
+    assert frozen == rows
+
+
+def test_e3_3_import_report_round_trips() -> None:
+    report = ImportReport(
+        mode=ImportMode.UPSERT,
+        applied=True,
+        sha256="sha256:" + "0" * 64,
+        tabs=[ImportTabReport(name="Rules", created=2, unchanged=1)],
+        stable_ids=["RULE-1"],
+        statuses={MasterStatus.APPROVED: 1},
+    )
+    assert ImportReport.model_validate_json(report.model_dump_json()) == report
+
+
+def test_e3_3_inserted_column_is_one_added_diff_not_a_shifted_run(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    headers(bad, "Agents").insert(2, "Priority")
+    assert diffs(bad) == [
+        StructureDiff(tab="Agents", expected=None, actual="Priority", kind=DiffKind.ADDED)
+    ]
+
+
+def test_e3_3_dropped_column_is_one_removed_diff(sheets: Sheets) -> None:
+    bad = mutated(sheets)
+    gone = str(headers(bad, "Skills").pop(3)).strip()
+    assert diffs(bad) == [
+        StructureDiff(tab="Skills", expected=gone, actual=None, kind=DiffKind.REMOVED)
+    ]
+
+
+def test_e3_3_swapped_tabs_with_tooling_are_reordered_not_added(sheets: Sheets) -> None:
+    order = list(TAB_ORDER_WITH_TOOLING)
+    order[1], order[2] = order[2], order[1]
+    grids = {**sheets, "Tooling": [[]]}
+    found = diffs({tab: grids[tab] for tab in order})
+    assert [d.kind for d in found] == [DiffKind.REORDERED]
+    assert found[0].expected == ", ".join(TAB_ORDER_WITH_TOOLING)
+
+
+def test_e3_3_content_types_ignore_comments_and_need_a_real_override() -> None:
+    commented = f"<Types><!-- {SPREADSHEET_MAIN} --></Types>"
+    assert check_content_types(commented) is not None
+    attribute = f'<Types><Default Extension="xml" ContentType="{SPREADSHEET_MAIN}"/></Types>'
+    assert check_content_types(attribute) is not None
+    real = (
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        f'<Override PartName="/xl/workbook.xml" ContentType="{SPREADSHEET_MAIN}"/></Types>'
+    )
+    assert check_content_types(real) is None
+    assert check_content_types("<!DOCTYPE x [<!ENTITY a 'b'>]><Types/>") is not None
+
+
+def _report(**kw: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "mode": "upsert",
+        "applied": True,
+        "sha256": "sha256:" + "0" * 64,
+        "tabs": [{"name": "Rules", "created": 1}],
+        "stable_ids": ["RULE-1"],
+        "statuses": {"APPROVED": 1},
+    }
+    return {**base, **kw}
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"mode": "validate-only"},  # validate-only never applies
+        {"tabs": [{"name": "Rules", "errors": [{"tab": "Rules", "message": "x"}]}]},
+        {"tabs": [{"name": "Rules", "createdd": 2}]},  # a typo must not zero the count
+        {"statuses": {"APPROVED": -1}},
+        {"extra": True},
+    ],
+)
+def test_e3_3_import_report_rejects_contradictions(bad: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        ImportReport.model_validate(_report(**bad))
+
+
+def test_e3_3_validate_only_report_is_not_applied() -> None:
+    assert not ImportReport.model_validate(_report(mode="validate-only", applied=False)).applied
+
+
+def test_e3_3_import_row_error_forbids_extras() -> None:
+    with pytest.raises(ValidationError):
+        ImportRowError.model_validate({"tab": "Rules", "message": "x", "col": "A"})

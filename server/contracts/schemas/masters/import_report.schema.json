@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters/import_report:0.1.0",
+  "$defs": {
+    "ImportMode": {
+      "enum": [
+        "validate-only",
+        "upsert"
+      ],
+      "title": "ImportMode",
+      "type": "string"
+    },
+    "ImportRowError": {
+      "additionalProperties": false,
+      "properties": {
+        "tab": {
+          "title": "Tab",
+          "type": "string"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tab",
+        "message"
+      ],
+      "title": "ImportRowError",
+      "type": "object"
+    },
+    "ImportTabReport": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "created": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Created",
+          "type": "integer"
+        },
+        "updated": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Updated",
+          "type": "integer"
+        },
+        "unchanged": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Unchanged",
+          "type": "integer"
+        },
+        "missing": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Missing",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ImportRowError"
+          },
+          "title": "Errors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ImportTabReport",
+      "type": "object"
+    },
+    "MasterStatus": {
+      "enum": [
+        "PROPOSED",
+        "ILLUSTRATIVE",
+        "APPROVED",
+        "RETIRED"
+      ],
+      "title": "MasterStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "$ref": "#/$defs/ImportMode"
+    },
+    "applied": {
+      "title": "Applied",
+      "type": "boolean"
+    },
+    "sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "tabs": {
+      "items": {
+        "$ref": "#/$defs/ImportTabReport"
+      },
+      "title": "Tabs",
+      "type": "array"
+    },
+    "stable_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Stable Ids",
+      "type": "array"
+    },
+    "statuses": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/MasterStatus"
+      },
+      "title": "Statuses",
+      "type": "object"
+    }
+  },
+  "required": [
+    "mode",
+    "applied",
+    "sha256",
+    "tabs",
+    "stable_ids",
+    "statuses"
+  ],
+  "title": "ImportReport",
+  "type": "object"
+}

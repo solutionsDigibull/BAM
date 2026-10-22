@@ -104,11 +104,31 @@ class ErrorCode(StrEnum):
     NOT_FROZEN = "NOT_FROZEN"
 
 
+class DiffKind(StrEnum):
+    RENAMED = "renamed"
+    ADDED = "added"
+    REMOVED = "removed"
+    REORDERED = "reordered"
+
+
+class StructureDiff(BaseModel):
+    """How an uploaded layout differs from the frozen one (workbook import, E3.3)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tab: str = Field(min_length=1)
+    expected: str | None
+    actual: str | None
+    kind: DiffKind
+
+
 class FieldError(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     path: str = Field(min_length=1, description="Dotted path of the offending field, e.g. 'limit'")
     message: str = Field(min_length=1)
+    # Only on STRUCTURE_MISMATCH errors; left out of the body everywhere else.
+    diff: StructureDiff | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 # ponytail: pattern screen, not a parser. It catches the usual leaks (tracebacks, SQL echoes,
