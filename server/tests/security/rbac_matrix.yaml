@@ -237,6 +237,17 @@ routes:
       admin_a: "422 VALIDATION_ERROR"
       admin_b: "422 VALIDATION_ERROR"
 
+  export_workbook_api_v1_admin_masters_export_get:  # E3.4; admin-B asking for A's project: 404
+    request:
+      method: GET
+      path: /api/v1/admin/masters/export
+      query: {project_id: "@project_a"}
+    expect: *tenant_admin_a_resource
+
+  workbook_template_api_v1_admin_masters_template_get:  # E3.4
+    request: {method: GET, path: /api/v1/admin/masters/template}
+    expect: *tenant_admin_list
+
   get_snapshot_api_v1_admin_masters_snapshots__snapshot_id__get:
     request:
       method: GET

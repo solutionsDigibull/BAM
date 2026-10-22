@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from sbam_api.core.auth import CurrentUser, admin
 from sbam_api.core.conventions import etag
 from sbam_api.db.session import app_sessions
-from sbam_api.masters import importer, models, service
+from sbam_api.masters import exporter, importer, models, service
 
 router = APIRouter(tags=["masters"])
 
@@ -76,7 +76,8 @@ def _snapshot(row: models.MasterSnapshot) -> MastersSnapshot:
     )
 
 
-# Declared before `/{master_type}/…` so "snapshots" and "import" are never read as a master type.
+# Declared before `/{master_type}/…` so "snapshots", "import", "export" and "template" are never
+# read as a master type.
 @router.get("/admin/masters/snapshots/{snapshot_id}")
 def get_snapshot(snapshot_id: uuid.UUID, user: Admin, session: Db) -> MastersSnapshot:
     return _snapshot(service.get_snapshot(session, user, snapshot_id))
@@ -97,6 +98,35 @@ def import_workbook(
     return importer.import_workbook(
         session, user, settings, file.filename or "", data, mode, project_id
     )
+
+
+@router.get(
+    "/admin/masters/export",
+    response_class=Response,
+    responses={200: {"content": {exporter.XLSX: {}}, "description": "The masters workbook"}},
+)
+def export_workbook(user: Admin, session: Db, project_id: uuid.UUID | None = None) -> Response:
+    """The caller's masters in the BAM 0.2 layout (E3.4); see `exporter`."""
+    name, data = exporter.export(session, user, project_id)
+    return _xlsx(name, data)
+
+
+@router.get(
+    "/admin/masters/template",
+    response_class=Response,
+    responses={200: {"content": {exporter.XLSX: {}}, "description": "The empty template"}},
+)
+def workbook_template(user: Admin) -> Response:
+    """The empty BAM 0.2 workbook: README, header rows and the frozen Filetype rows (E3.4)."""
+    return _xlsx("BAM_masters_template.xlsx", exporter.template())
+
+
+def _xlsx(name: str, data: bytes) -> Response:
+    headers = {
+        "Content-Disposition": f'attachment; filename="{name}"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=data, media_type=exporter.XLSX, headers=headers)
 
 
 @router.post("/admin/masters/{master_type}", status_code=201)
