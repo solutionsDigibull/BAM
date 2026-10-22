@@ -205,7 +205,9 @@ test("e5_5_t05 read-only: no connect, no delete, no mutation request", async ({
   await fakeGraph(page, { nodes: [node("a", "Alpha"), node("b", "Beta")] });
   await open(page, baseURL!);
   await expect(canvasNodes(page)).toHaveCount(2);
-  const edgesBefore = await page.locator(".react-flow__edge").count();
+  // edges render a moment after nodes; the fake links Alpha -> Beta, so wait for that one
+  const edges = page.locator(".react-flow__edge");
+  await expect(edges).toHaveCount(1);
   const [a, b] = [canvasNodes(page).nth(0), canvasNodes(page).nth(1)];
   const from = (await a.boundingBox())!;
   const to = (await b.boundingBox())!;
@@ -220,7 +222,7 @@ test("e5_5_t05 read-only: no connect, no delete, no mutation request", async ({
   await expect(page.locator(".ant-drawer-open")).toHaveCount(0);
   await a.dblclick({ force: true });
   await expect(canvasNodes(page)).toHaveCount(2);
-  expect(await page.locator(".react-flow__edge").count()).toBe(edgesBefore);
+  expect(await edges.count()).toBe(1);
   expect(mutations(requests)).toEqual([]);
 });
 
