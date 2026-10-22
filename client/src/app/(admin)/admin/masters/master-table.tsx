@@ -1,7 +1,8 @@
 "use client";
 
-import { useList } from "@refinedev/core";
-import { ConfigProvider, Flex, Input, Table, Tag, Tooltip, Typography } from "antd";
+import { EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { useInvalidate, useList } from "@refinedev/core";
+import { App, Button, ConfigProvider, Flex, Input, Table, Tag, Tooltip, Typography } from "antd";
 import { useMemo, useState } from "react";
 
 import {
@@ -16,6 +17,7 @@ import {
 import type { MasterEntry, MasterTypeInfo } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
+import { EntryDrawer } from "./entry-drawer";
 import { cellText, emptyMessage, entriesResource, STATUS_COLOR } from "./masters-api";
 
 const COLUMN_WIDTH = 220;
@@ -44,7 +46,10 @@ function Cell({ value }: { value: unknown }) {
 }
 
 export function MasterTable({ info }: { info: MasterTypeInfo }) {
+  const { message } = App.useApp();
+  const invalidate = useInvalidate();
   const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const { result, query } = useList<MasterEntry, ApiError>({
     resource: entriesResource(info.master_type),
     pagination: { mode: "off" },
@@ -60,11 +65,40 @@ export function MasterTable({ info }: { info: MasterTypeInfo }) {
     );
   }, [entries, search]);
 
+  const addRow = info.editable && (
+    <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditing({})}>
+      Add Row
+    </Button>
+  );
+  const drawer = editing && (
+    <EntryDrawer
+      info={info}
+      entryId={editing.id}
+      onClose={() => setEditing(null)}
+      onSaved={(e) => {
+        setEditing(null);
+        void invalidate({
+          resource: entriesResource(info.master_type),
+          invalidates: ["list", "detail"],
+        });
+        message.success(
+          editing.id ? `Saved ${e.row_label} (version ${e.version})` : `Created ${e.row_label}`,
+        );
+      }}
+    />
+  );
+
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ApiErrorState error={query.error} onRetry={() => query.refetch()} />;
-  if (!entries.length) return <EmptyState message={emptyMessage(info.tab)} />;
+  if (!entries.length)
+    return (
+      <>
+        <EmptyState message={emptyMessage(info.tab)} action={addRow || undefined} />
+        {drawer}
+      </>
+    );
 
-  const width = 3 * 160 + info.columns.length * COLUMN_WIDTH;
+  const width = 4 * 160 + info.columns.length * COLUMN_WIDTH;
   return (
     <>
       <Flex justify="space-between" align="center" wrap gap={12} style={{ margin: "16px 0" }}>
@@ -76,9 +110,12 @@ export function MasterTable({ info }: { info: MasterTypeInfo }) {
           onChange={(e) => setSearch(e.target.value)}
           style={{ width: 340, maxWidth: "100%" }}
         />
-        <Meta>
-          {rows.length} of {entries.length} rows
-        </Meta>
+        <Flex align="center" gap={16}>
+          <Meta>
+            {rows.length} of {entries.length} rows
+          </Meta>
+          {addRow}
+        </Flex>
       </Flex>
       <ConfigProvider theme={GRID_THEME}>
         <Table<MasterEntry>
@@ -119,6 +156,27 @@ export function MasterTable({ info }: { info: MasterTypeInfo }) {
               width: COLUMN_WIDTH,
               render: (_: unknown, e: MasterEntry) => <Cell value={e.payload[c.field]} />,
             })),
+            ...(info.editable
+              ? [
+                  {
+                    title: head("Actions"),
+                    key: "actions",
+                    fixed: "right" as const,
+                    width: 100,
+                    render: (_: unknown, e: MasterEntry) => (
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<EditOutlined />}
+                        aria-label={`Edit ${e.row_label}`}
+                        onClick={() => setEditing({ id: e.id })}
+                      >
+                        Edit
+                      </Button>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </ConfigProvider>
@@ -127,8 +185,9 @@ export function MasterTable({ info }: { info: MasterTypeInfo }) {
           {info.columns.length} columns · workbook order preserved · scroll horizontally for all
           fields
         </Meta>
-        <Meta>Hover a column name for its description</Meta>
+        <Meta>Hover a column name for its description · Edit saves a new version</Meta>
       </Flex>
+      {drawer}
     </>
   );
 }
