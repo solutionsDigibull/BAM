@@ -6,8 +6,10 @@ first). Reading the .xlsx with openpyxl belongs to the importer (E3.3). Error pa
 (Rules and Skills number their columns from 0, the others from 1). Column A is `colA`.
 """
 
+import difflib
 import json
 import re
+import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping, Sequence
 from importlib.resources import files
 from typing import Any, Final
@@ -233,25 +235,56 @@ def check_archive(members: Iterable[tuple[str, int, int]]) -> FieldError | None:
 
 
 def check_content_types(content_types_xml: str) -> FieldError | None:
-    """An .xlsx declares the spreadsheetml main part; macro-enabled or other OOXML files don't."""
-    if "macroEnabled" in content_types_xml:
+    """An .xlsx declares the spreadsheetml main part in an `Override`; macro-enabled or other OOXML
+    files don't. Comments and other text don't count as declarations."""
+    not_xlsx = FieldError(path="file", message="the file is not an Excel .xlsx workbook")
+    if "<!DOCTYPE" in content_types_xml:  # [Content_Types].xml never has one; no entity games
+        return not_xlsx
+    try:
+        root = ET.fromstring(content_types_xml)  # noqa: S314 - no DOCTYPE (above), size-capped
+    except ET.ParseError:
+        return not_xlsx
+    declared = [
+        el.get("ContentType", "") for el in root.iter() if el.tag.rsplit("}", 1)[-1] == "Override"
+    ]
+    if any("macroEnabled" in ct for ct in declared):
         return FieldError(path="file", message="workbooks with macros are not accepted")
-    if SPREADSHEET_MAIN not in content_types_xml:
-        return FieldError(path="file", message="the file is not an Excel .xlsx workbook")
+    if SPREADSHEET_MAIN not in declared:
+        return not_xlsx
     return None
 
 
-def _diff_kind(
-    want: str | None, got: str | None, expected: list[str], actual: list[str]
-) -> DiffKind:
-    """Name the kind of a header mismatch at one position."""
-    if want is None or (got is not None and got not in expected and want in actual):
-        return DiffKind.ADDED
-    if got is None or (want not in actual and got in expected):
-        return DiffKind.REMOVED
-    if got in expected and want in actual:
-        return DiffKind.REORDERED
-    return DiffKind.RENAMED
+def _header_diffs(
+    expected: list[str], actual: list[str]
+) -> list[tuple[int, str | None, str | None, DiffKind]]:
+    """(position, want, got, kind) per header mismatch. The two sequences are aligned first, so
+    one inserted or dropped column is one ADDED / REMOVED, not a run of shifted columns."""
+    found: list[tuple[int, str | None, str | None, DiffKind]] = []
+    matcher = difflib.SequenceMatcher(a=expected, b=actual, autojunk=False)
+    for op, i1, i2, j1, j2 in matcher.get_opcodes():
+        if op == "equal":
+            continue
+        wants, gots = expected[i1:i2], actual[j1:j2]
+        for k in range(max(len(wants), len(gots))):
+            want = wants[k] if k < len(wants) else None
+            got = gots[k] if k < len(gots) else None
+            if want is None:
+                kind = DiffKind.ADDED
+            elif got is None:
+                kind = DiffKind.REMOVED
+            elif got in expected and want in actual:
+                kind = DiffKind.REORDERED
+            else:
+                kind = DiffKind.RENAMED
+            found.append((j1 + k if got is not None else i1 + k, want, got, kind))
+    # A column that is both "added" somewhere and "removed" elsewhere was moved.
+    moved = {g for _, w, g, kd in found if kd is DiffKind.ADDED} & {
+        w for _, w, g, kd in found if kd is DiffKind.REMOVED
+    }
+    return [
+        (i, w, g, DiffKind.REORDERED if (g or w) in moved and None in (w, g) else kd)
+        for i, w, g, kd in found
+    ]
 
 
 def _col_path(master_type: MasterType, row: int, index: int) -> str:
@@ -280,14 +313,10 @@ def _validate_headers(master_type: MasterType, grid: Grid) -> list[FieldError]:
         errors.append(FieldError(path=f"{tab}!row2:colA", message="column A must be 'Name'"))
     expected = [name for name, _ in COLUMNS[master_type]]
     actual = headers[1:]
-    for index in range(max(len(expected), len(actual))):
-        want = expected[index] if index < len(expected) else None
-        got = actual[index] if index < len(actual) else None
-        if want != got:
-            path = _col_path(master_type, NAME_HEADER_ROW, index)
-            kind = _diff_kind(want, got, expected, actual)
-            diff = StructureDiff(tab=tab, expected=want, actual=got, kind=kind)
-            errors.append(FieldError(path=path, message=_header_problem(want, got), diff=diff))
+    for index, want, got, kind in _header_diffs(expected, actual):
+        path = _col_path(master_type, NAME_HEADER_ROW, index)
+        diff = StructureDiff(tab=tab, expected=want, actual=got, kind=kind)
+        errors.append(FieldError(path=path, message=_header_problem(want, got), diff=diff))
     return errors
 
 
@@ -327,7 +356,7 @@ def validate_structure(sheets: Mapping[str, Grid]) -> list[FieldError]:
     """The frozen structure: tabs, column names and order, Filetype labels. Never auto-maps."""
     if tuple(sheets) not in (TAB_ORDER, TAB_ORDER_WITH_TOOLING):
         missing = [t for t in TAB_ORDER if t not in sheets]
-        extra = [t for t in sheets if t not in TAB_ORDER]
+        extra = [t for t in sheets if t not in TAB_ORDER_WITH_TOOLING]  # Tooling is permitted
         detail = (
             f"missing {missing}, unexpected {extra}" if missing or extra else "tabs are reordered"
         )
@@ -342,8 +371,9 @@ def validate_structure(sheets: Mapping[str, Grid]) -> list[FieldError]:
             )
         else:
             order = ", ".join(sheets)
+            want = TAB_ORDER_WITH_TOOLING if "Tooling" in sheets else TAB_ORDER
             diff = StructureDiff(
-                tab="workbook", expected=", ".join(TAB_ORDER), actual=order, kind=DiffKind.REORDERED
+                tab="workbook", expected=", ".join(want), actual=order, kind=DiffKind.REORDERED
             )
         return [FieldError(path="workbook!tabs", message=message, diff=diff)]
     errors: list[FieldError] = []

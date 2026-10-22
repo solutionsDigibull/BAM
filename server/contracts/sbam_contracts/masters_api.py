@@ -27,7 +27,7 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.masters import MasterStatus, MasterType, SourceKind
@@ -153,6 +153,8 @@ class ImportMode(StrEnum):
 
 
 class ImportRowError(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     tab: str
     row: int | None = Field(default=None, ge=1)  # the sheet row; None for a tab-level problem
     column: str | None = None  # the row-2 header name
@@ -160,6 +162,8 @@ class ImportRowError(BaseModel):
 
 
 class ImportTabReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     created: int = Field(default=0, ge=0)
     updated: int = Field(default=0, ge=0)
@@ -169,12 +173,22 @@ class ImportTabReport(BaseModel):
 
 
 class ImportReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     mode: ImportMode
     applied: bool  # true only for an upsert that wrote its changes
     sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")  # of the uploaded file
     tabs: list[ImportTabReport]
     stable_ids: list[str]  # of every parsed row, in workbook order
-    statuses: dict[MasterStatus, int]  # parsed rows per status
+    statuses: dict[MasterStatus, Annotated[int, Field(ge=0)]]  # parsed rows per status
+
+    @model_validator(mode="after")
+    def _applied_only_for_a_clean_upsert(self) -> "ImportReport":
+        if self.applied and (
+            self.mode is not ImportMode.UPSERT or any(t.errors for t in self.tabs)
+        ):
+            raise ValueError("applied is true only for an upsert without row errors")
+        return self
 
 
 def schemas() -> dict[str, dict[str, Any]]:
