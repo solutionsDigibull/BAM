@@ -104,6 +104,7 @@ async function fakeMasters(
 ) {
   const rules: unknown[] = [];
   const modes: string[] = [];
+  const docs: Record<string, unknown>[] = []; // master documents (E3.11)
   await page.route("**/api/proxy/api/v1/**", async (route) => {
     const req = route.request();
     const path = new URL(req.url()).pathname.replace("/api/proxy/api/v1", "");
@@ -116,11 +117,55 @@ async function fakeMasters(
       if (mode === "upsert" && (reply.status ?? 200) === 200) rules.push(RULE_BOM);
       return json(route, reply.body, reply.status);
     }
+    if (path.startsWith("/admin/master-documents")) return masterDocuments(route, docs);
     if (path === "/admin/masters/RULES") return json(route, { items: rules, next_cursor: null });
     if (/^\/admin\/masters\/\w+$/.test(path)) return json(route, { items: [], next_cursor: null });
     return json(route, { title: "Not found", status: 404 }, 404);
   });
   return { modes };
+}
+
+const PARSE_STEPS = ["PENDING", "PARSING", "PARSED"];
+
+/** In-memory master documents: a .png routes to Organization; each list read advances parsing. */
+async function masterDocuments(route: Route, docs: Record<string, unknown>[]) {
+  const req = route.request();
+  const url = new URL(req.url());
+  const id = url.pathname.split("/master-documents/")[1];
+  if (req.method() === "POST") {
+    const name = /filename="([^"]+)"/.exec(req.postData() ?? "")?.[1] ?? "file";
+    const doc = {
+      id: "0190f3a2-7b1c-7d4e-8f00-00000000d001",
+      project_id: null,
+      title: name,
+      filetype_row_label: "Filetype #31",
+      intent_class: "Evidence / media",
+      master_type: "ORGANIZATION",
+      master_entry_id: null,
+      route_source: "DEFAULT_BY_FILETYPE",
+      sha256: `sha256:${"b".repeat(64)}`,
+      size: 2048,
+      scan_status: "CLEAN",
+      parse_status: "PENDING",
+      created_at: new Date().toISOString(),
+    };
+    docs.push(doc);
+    return json(route, doc, 201);
+  }
+  const doc = docs.find((d) => d.id === id);
+  if (req.method() === "PATCH" && doc) {
+    if (req.headers()["if-match"] !== '"1"')
+      return json(route, { title: "Stale", status: 412 }, 412);
+    Object.assign(doc, req.postDataJSON(), { route_source: "ADMIN_OVERRIDE" });
+    return json(route, doc);
+  }
+  if (doc) return route.fulfill({ json: doc, headers: { etag: '"1"' } });
+  for (const d of docs) {
+    const step = PARSE_STEPS.indexOf(String(d.parse_status));
+    d.parse_status = PARSE_STEPS[Math.min(step + 1, PARSE_STEPS.length - 1)];
+  }
+  const type = url.searchParams.get("master_type");
+  return json(route, { items: docs.filter((d) => !type || d.master_type === type) });
 }
 
 const WORKBOOK = {
@@ -149,7 +194,7 @@ test("e3_10 FDE on /admin/masters gets Forbidden and no data request", async ({
   expect(apiCalls).toEqual([]);
 });
 
-test("e3_10 six tabs; Filetype has no edit controls", async ({ page, baseURL }) => {
+test("e3_10 the tabs; Filetype has no edit controls", async ({ page, baseURL }) => {
   await signInAs(page, "sbam-admin", baseURL!);
   await fakeMasters(page, () => ({ body: {} }));
   await page.goto("/admin/masters");
@@ -159,6 +204,7 @@ test("e3_10 six tabs; Filetype has no edit controls", async ({ page, baseURL }) 
     "Rules",
     "Agents",
     "Skills",
+    "Documents",
     "Filetype",
   ]);
   await page.getByRole("tab", { name: "Filetype" }).click();
@@ -231,4 +277,55 @@ test("e3_10_t02 reordered Skills columns: diff table, Apply disabled", async ({
   await expect(dialog.getByText("reordered")).toHaveCount(2);
   await expect(dialog.getByRole("button", { name: "Apply" })).toBeDisabled();
   expect(modes).toEqual(["validate-only"]);
+});
+
+test("e3_11_t01 upload and route: Organization (Evidence / media), chips progress to PARSED", async ({
+  page,
+  baseURL,
+}) => {
+  await signInAs(page, "sbam-admin", baseURL!);
+  await fakeMasters(page, () => ({ body: {} }));
+  await page.goto("/admin/masters");
+  await page.getByRole("tab", { name: "Documents" }).click();
+  const panel = page.getByRole("tabpanel");
+  await expect(panel.getByText(/No master documents yet/)).toBeVisible();
+  await panel.locator('input[type="file"]').setInputFiles({
+    name: "certification.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("png"),
+  });
+  await expect(panel.getByText("Routed to Organization (Evidence / media)")).toBeVisible();
+  const row = panel.getByRole("row", { name: /certification\.png/ });
+  await expect(row.getByText("Evidence / media")).toBeVisible();
+  await expect(row.getByText("Clean")).toBeVisible();
+  await expect(row.getByText("PARSED")).toBeVisible({ timeout: 20_000 }); // polled every 5 s
+});
+
+test("e3_11_t02 override to Skills is persisted: reload shows Skills with ADMIN_OVERRIDE", async ({
+  page,
+  baseURL,
+}) => {
+  await signInAs(page, "sbam-admin", baseURL!);
+  await fakeMasters(page, () => ({ body: {} }));
+  await page.goto("/admin/masters");
+  await page.getByRole("tab", { name: "Documents" }).click();
+  const panel = page.getByRole("tabpanel");
+  await panel.locator('input[type="file"]').setInputFiles({
+    name: "certification.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("png"),
+  });
+  await panel.getByRole("button", { name: "Change route of certification.png" }).click();
+  await panel
+    .getByRole("combobox", { name: "Master for certification.png" })
+    .click({ force: true });
+  await page.locator(".ant-select-item-option").filter({ hasText: "Skills" }).click();
+  await panel.getByRole("button", { name: "Save route" }).click();
+  await expect(panel.getByText("ADMIN_OVERRIDE")).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("tab", { name: "Documents" }).click();
+  const row = page.getByRole("tabpanel").getByRole("row", { name: /certification\.png/ });
+  await expect(row.getByText("Skills", { exact: true })).toBeVisible();
+  await expect(row.getByText("ADMIN_OVERRIDE")).toBeVisible();
 });

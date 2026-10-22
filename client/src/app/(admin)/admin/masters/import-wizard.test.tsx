@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { configure, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { ImportReport } from "@/contracts";
@@ -33,6 +33,9 @@ function pick(name = "BuLLM - Admin Masters.xlsx", size = 40_000) {
 }
 
 const button = (name: string) => screen.getByRole("button", { name });
+
+// A loaded machine can take over findBy's 1 s default to render the next step (seen in a full run).
+configure({ asyncUtilTimeout: 4_000 });
 
 afterEach(() => vi.unstubAllGlobals());
 

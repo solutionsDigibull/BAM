@@ -12,6 +12,7 @@ import { ApiErrorState, LoadingState, MUTED } from "@/components/ui-kit";
 import type { MasterTypes, ReadmeTab } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
+import { DocumentsPanel } from "./documents-panel";
 import { FiletypeTable } from "./filetype-table";
 import { MasterTable } from "./master-table";
 import { ImportWizard } from "./import-wizard";
@@ -85,6 +86,7 @@ export function MastersScreen() {
             label: info.tab,
             children: <MasterTable info={info} />,
           })),
+          { key: "DOCUMENTS", label: "Documents", children: <DocumentsPanel /> },
           { key: "FILETYPE", label: "Filetype", children: <FiletypeTable /> },
         ]}
       />

@@ -21,12 +21,20 @@ const openTab = async (name: string) => fireEvent.click(await screen.findByRole(
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Admin Masters screen (E3.10)", () => {
-  test("tabs: README, the four editable masters and Filetype (no Tooling yet)", async () => {
+  test("tabs: README, the four editable masters, Documents and Filetype (no Tooling yet)", async () => {
     fakeApi(routes());
     renderWithRefine(<MastersScreen />);
     await screen.findByText(LAYOUT.readme.title);
     const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["README", "Organization", "Rules", "Agents", "Skills", "Filetype"]);
+    expect(tabs).toEqual([
+      "README",
+      "Organization",
+      "Rules",
+      "Agents",
+      "Skills",
+      "Documents",
+      "Filetype",
+    ]);
     expect(screen.getByText("1. STRUCTURE")).toBeDefined();
   });
 

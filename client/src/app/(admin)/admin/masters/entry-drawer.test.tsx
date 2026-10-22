@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { configure, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { STALE_MESSAGE } from "@/components/ui-kit";
@@ -37,6 +37,9 @@ const pickStatus = async (drawer: HTMLElement, label: string) => {
   fireEvent.mouseDown(within(drawer).getByRole("combobox", { name: "Status" }));
   fireEvent.click((await screen.findAllByText(label)).at(-1)!);
 };
+
+// A loaded machine can take over findBy's 1 s default to render the next step (seen in a full run).
+configure({ asyncUtilTimeout: 4_000 });
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -94,28 +97,32 @@ describe("Masters edit drawer (E3.10)", () => {
     SLOW,
   );
 
-  test("e3_10_t05 removing a RAG key shows the error and disables Save", async () => {
-    fakeApi({ [LIST]: { body: { items: [E] } }, [ONE]: { body: E, etag: '"1"' } });
-    renderWithRefine(<MasterTable info={RULES} />);
-    const drawer = await openEditor();
-    const rag = within(drawer).getByLabelText("RAG Reference");
-    const sixKeys = Object.fromEntries(
-      RAG_KEYS.filter((k) => k !== "Parent Entity").map((k) => [k, ""]),
-    );
-    fireEvent.change(rag, { target: { value: JSON.stringify(sixKeys) } });
-    expect(await within(drawer).findByText("Missing key: Parent Entity")).toBeDefined();
-    expect(within(drawer).getByRole("button", { name: "Save new version" })).toHaveProperty(
-      "disabled",
-      true,
-    );
-    fireEvent.change(rag, { target: { value: RAG_TEMPLATE } });
-    await waitFor(() =>
+  test(
+    "e3_10_t05 removing a RAG key shows the error and disables Save",
+    async () => {
+      fakeApi({ [LIST]: { body: { items: [E] } }, [ONE]: { body: E, etag: '"1"' } });
+      renderWithRefine(<MasterTable info={RULES} />);
+      const drawer = await openEditor();
+      const rag = within(drawer).getByLabelText("RAG Reference");
+      const sixKeys = Object.fromEntries(
+        RAG_KEYS.filter((k) => k !== "Parent Entity").map((k) => [k, ""]),
+      );
+      fireEvent.change(rag, { target: { value: JSON.stringify(sixKeys) } });
+      expect(await within(drawer).findByText("Missing key: Parent Entity")).toBeDefined();
       expect(within(drawer).getByRole("button", { name: "Save new version" })).toHaveProperty(
         "disabled",
-        false,
-      ),
-    );
-  });
+        true,
+      );
+      fireEvent.change(rag, { target: { value: RAG_TEMPLATE } });
+      await waitFor(() =>
+        expect(within(drawer).getByRole("button", { name: "Save new version" })).toHaveProperty(
+          "disabled",
+          false,
+        ),
+      );
+    },
+    SLOW,
+  );
 
   test.each([
     ["412", problem(412, "PRECONDITION_FAILED")],
@@ -147,17 +154,25 @@ describe("Masters edit drawer (E3.10)", () => {
     SLOW,
   );
 
-  test("a 422 lands on the field it names", async () => {
-    const bad = problem(422, "VALIDATION_ERROR", "Check the fields");
-    (bad.body as Record<string, unknown>).errors = [
-      { path: "payload", message: "multiple Status fragments in Misc" },
-    ];
-    fakeApi({ [LIST]: { body: { items: [E] } }, [ONE]: { body: E, etag: '"1"' }, [VERSION]: bad });
-    renderWithRefine(<MasterTable info={RULES} />);
-    const drawer = await openEditor();
-    fireEvent.click(within(drawer).getByRole("button", { name: "Save new version" }));
-    expect(await within(drawer).findByText("multiple Status fragments in Misc")).toBeDefined();
-  });
+  test(
+    "a 422 lands on the field it names",
+    async () => {
+      const bad = problem(422, "VALIDATION_ERROR", "Check the fields");
+      (bad.body as Record<string, unknown>).errors = [
+        { path: "payload", message: "multiple Status fragments in Misc" },
+      ];
+      fakeApi({
+        [LIST]: { body: { items: [E] } },
+        [ONE]: { body: E, etag: '"1"' },
+        [VERSION]: bad,
+      });
+      renderWithRefine(<MasterTable info={RULES} />);
+      const drawer = await openEditor();
+      fireEvent.click(within(drawer).getByRole("button", { name: "Save new version" }));
+      expect(await within(drawer).findByText("multiple Status fragments in Misc")).toBeDefined();
+    },
+    SLOW,
+  );
 
   test("sample rows (#1) keep Illustrative: the status can't be changed", async () => {
     const sample = entry({
@@ -179,29 +194,33 @@ describe("Masters edit drawer (E3.10)", () => {
     );
   });
 
-  test("Add Row creates an entry and refreshes the list", async () => {
-    const created = entry({
-      id: "0190f3a2-7b1c-7d4e-8f00-00000000e009",
-      row_label: "Rule #7",
-      stable_id: "RULE-NEW",
-    });
-    const { calls } = fakeApi({
-      [LIST]: [{ body: { items: [] } }, { body: { items: [created] } }],
-      "POST /admin/masters/RULES": { status: 201, body: created },
-    });
-    renderWithRefine(<MasterTable info={RULES} />);
-    fireEvent.click(await screen.findByRole("button", { name: /Add Row/ }));
-    const drawer = await screen.findByRole("dialog");
-    fireEvent.change(within(drawer).getByLabelText("Domain Rule"), {
-      target: { value: "RULE-NEW: new rule. Policy: x" },
-    });
-    fireEvent.click(within(drawer).getByRole("button", { name: "Create" }));
-    expect(await screen.findByText("Created Rule #7")).toBeDefined();
-    const post = calls.find((c) => c.method === "POST")!;
-    expect(new Headers(post.init.headers).get("if-match")).toBeNull();
-    expect(body(post.init).payload.domain_rule).toBe("RULE-NEW: new rule. Policy: x");
-    expect(await screen.findByText("RULE-NEW")).toBeDefined();
-  });
+  test(
+    "Add Row creates an entry and refreshes the list",
+    async () => {
+      const created = entry({
+        id: "0190f3a2-7b1c-7d4e-8f00-00000000e009",
+        row_label: "Rule #7",
+        stable_id: "RULE-NEW",
+      });
+      const { calls } = fakeApi({
+        [LIST]: [{ body: { items: [] } }, { body: { items: [created] } }],
+        "POST /admin/masters/RULES": { status: 201, body: created },
+      });
+      renderWithRefine(<MasterTable info={RULES} />);
+      fireEvent.click(await screen.findByRole("button", { name: /Add Row/ }));
+      const drawer = await screen.findByRole("dialog");
+      fireEvent.change(within(drawer).getByLabelText("Domain Rule"), {
+        target: { value: "RULE-NEW: new rule. Policy: x" },
+      });
+      fireEvent.click(within(drawer).getByRole("button", { name: "Create" }));
+      expect(await screen.findByText("Created Rule #7")).toBeDefined();
+      const post = calls.find((c) => c.method === "POST")!;
+      expect(new Headers(post.init.headers).get("if-match")).toBeNull();
+      expect(body(post.init).payload.domain_rule).toBe("RULE-NEW: new rule. Policy: x");
+      expect(await screen.findByText("RULE-NEW")).toBeDefined();
+    },
+    SLOW,
+  );
 
   test("Filetype has no edit controls even through the table", async () => {
     const FILETYPE = LAYOUT.types.find((t) => t.master_type === "FILETYPE")!;
