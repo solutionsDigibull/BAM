@@ -186,3 +186,48 @@ def test_e4_13_without_a_token_it_is_401(h: Harness) -> None:
     document_id = failed(h, "SCAN_FAILED")
     res = h.client.post(f"/api/v1{h.docs()}/{document_id}/retry")
     assert res.status_code == 401
+
+
+# --- E4.5: why a parse failed is shown, and a retry starts from a clean slate -------------------
+
+
+def set_parse_result(h: Harness, document_id: uuid.UUID | str, code: str) -> None:
+    with h.sessions() as s:
+        query = select(DocumentVersion).where(
+            DocumentVersion.document_id == uuid.UUID(str(document_id))
+        )
+        for version in s.scalars(query):
+            version.parse_code = code
+            version.parse_report = {
+                "pages": 0,
+                "sheets": 0,
+                "tables": 0,
+                "warnings": ["the file has no text"],
+                "ocr_needed_pages": [],
+            }
+        s.commit()
+
+
+def test_e4_5_a_parse_failed_document_says_why_in_the_listing(h: Harness) -> None:
+    document_id = failed(h, "PARSE_FAILED")
+    set_parse_result(h, document_id, "EMPTY")
+    [item] = h.listing()
+    assert item["state"] == "PARSE_FAILED" and item["parse_code"] == "EMPTY"
+    assert item["parse_report"]["warnings"] == ["the file has no text"]
+
+
+def test_e4_5_a_document_that_was_never_parsed_has_no_parse_fields(h: Harness) -> None:
+    h.uploaded()
+    [item] = h.listing()
+    assert item.get("parse_code") is None and item.get("parse_report") is None
+
+
+def test_e4_5_a_retry_clears_the_old_verdict_and_report(h: Harness) -> None:
+    document_id = failed(h, "PARSE_FAILED")
+    set_parse_result(h, document_id, "CORRUPT")
+    assert h.retry(document_id).status_code == 202
+    [item] = h.listing()
+    assert item["state"] == "SCANNING"
+    assert item.get("parse_code") is None and item.get("parse_report") is None
+    [version] = h.versions()
+    assert version.parse_code is None and version.parse_report is None

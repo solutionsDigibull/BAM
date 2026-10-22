@@ -11,12 +11,15 @@ from enum import StrEnum
 
 from sbam_contracts.documents import ScanStatus
 from sbam_contracts.state_machines import MachineName
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Uuid
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Index, String, Uuid
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from sbam_api.db.base import Base, ProjectOwned, status_check
 from sbam_api.state_machine import Stateful, state_check
 from sbam_api.state_machine.registry import register_entity
+
+Json = JSON().with_variant(JSONB(), "postgresql")
 
 
 class ReservationStatus(StrEnum):
@@ -63,6 +66,13 @@ class DocumentVersion(Stateful, ProjectOwned, Base):
     # as "pdf" or "tar.gz") and the Filetype master row it maps to (e.g. "Filetype #21").
     detected_type: Mapped[str | None] = mapped_column(String(40))
     filetype_row_label: Mapped[str | None] = mapped_column(String(40))
+    # Parsing (E4.5). `parse_report` is the loader's report after the last attempt; `parse_code`
+    # says why a PARSE_FAILED version failed (CORRUPT, ENCRYPTED, EMPTY, TIMEOUT, PARSE_ERROR).
+    # The derivatives are stored under their own content hash, so each has its own key.
+    parse_code: Mapped[str | None] = mapped_column(String(40))
+    parse_report: Mapped[dict[str, object] | None] = mapped_column(Json)
+    derived_md_key: Mapped[str | None] = mapped_column(String(255))  # doc.md
+    derived_json_key: Mapped[str | None] = mapped_column(String(255))  # doc.json
 
 
 class UploadReservation(ProjectOwned, Base):
