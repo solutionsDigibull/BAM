@@ -1,10 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 
-import type { UploadToken } from "@/contracts";
+import type { DocumentOut, UploadToken } from "@/contracts";
 
 import {
   MAX_ACTIVE_FILES,
   MAX_FILE_BYTES,
+  IN_BIN,
   REASONS,
   announceBody,
   createUploader,
@@ -21,12 +22,17 @@ const answer = (over: Partial<UploadToken> = {}): UploadToken => ({
   ...over,
 });
 
-function setup(announce: (b: unknown) => Promise<UploadToken> = async () => answer(), active = 0) {
+function setup(
+  announce: (b: unknown) => Promise<UploadToken> = async () => answer(),
+  active = 0,
+  documents: DocumentOut[] = [],
+) {
   const rejected: Rejection[] = [];
   const failed: string[] = [];
   const uppy = createUploader({
     projectId: "p1",
     getActive: () => active,
+    getDocuments: () => documents,
     announce: announce as never,
     onRejected: (r) => rejected.push(r),
     onFailed: (m) => failed.push(m),
@@ -154,5 +160,99 @@ describe("Documents upload session (E4.10)", () => {
     );
     expect(describeTusError(res(500, "boom"))).toBe("Upload failed (500)");
     expect(describeTusError(new Error("network"))).toMatch(/interrupted/);
+  });
+});
+
+// sha256("abc"): a known vector, so the test does not depend on the code that hashes.
+const ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+const binned = (over: Partial<DocumentOut> = {}): DocumentOut => ({
+  id: "bin-1",
+  title: "old-quote.pdf",
+  state: "DELETED",
+  size: 3,
+  mime: "application/pdf",
+  sha256: ABC,
+  created_at: "2026-10-01T10:00:00Z",
+  deleted_at: "2026-10-10T10:00:00Z",
+  purge_after: "2027-01-08T10:00:00Z",
+  ...over,
+});
+
+const addAbc = (uppy: ReturnType<typeof setup>["uppy"], name = "quote.pdf") =>
+  uppy.addFile({ name, type: "application/pdf", data: new Blob(["abc"]), meta: {} } as never);
+
+describe("Documents upload: a file that is in the recycle bin (E4.4)", () => {
+  test("e4_4 it is not uploaded; the FDE is offered the document to restore", async () => {
+    const announce = vi.fn(async () => answer());
+    const { uppy, rejected } = setup(announce, 0, [binned()]);
+    addAbc(uppy);
+    await uppy.upload();
+    expect(announce).not.toHaveBeenCalled();
+    expect(uppy.getFiles()).toHaveLength(0);
+    expect(rejected).toEqual([
+      { name: "quote.pdf", reason: IN_BIN, restore: { id: "bin-1", title: "old-quote.pdf" } },
+    ]);
+  });
+
+  test("e4_4 the other files of the batch still go on", async () => {
+    const announce = vi.fn(async (body: unknown) => (void body, answer()));
+    const { uppy, rejected, add } = setup(announce, 0, [binned()]);
+    addAbc(uppy);
+    add("new.pdf", 5);
+    await uppy.upload();
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce.mock.calls[0]![0]).toMatchObject({ files: [{ name: "new.pdf" }] });
+    expect(rejected.filter((r) => r.reason === IN_BIN).map((r) => r.name)).toEqual(["quote.pdf"]);
+  });
+
+  test("e4_4 a file that matches no deleted document is uploaded as usual", async () => {
+    const other = binned({ sha256: "0".repeat(64) });
+    const announce = vi.fn(async () => answer());
+    const { uppy, rejected } = setup(announce, 0, [other]);
+    addAbc(uppy);
+    await uppy.upload();
+    expect(announce).toHaveBeenCalledTimes(1); // the file went on to the server
+    expect(rejected.map((r) => r.reason)).not.toContain(IN_BIN);
+  });
+
+  test("e4_4 a live copy wins: the server links the upload to it, there is nothing to restore", async () => {
+    const live = binned({ id: "live-1", state: "PARSED", deleted_at: undefined });
+    const announce = vi.fn(async () => answer());
+    const { uppy, rejected } = setup(announce, 0, [binned(), live]);
+    addAbc(uppy);
+    await uppy.upload();
+    expect(announce).toHaveBeenCalledTimes(1); // the file went on to the server
+    expect(rejected.map((r) => r.reason)).not.toContain(IN_BIN);
+  });
+
+  test("e4_4 a purged document cannot be restored, so the file is uploaded", async () => {
+    const announce = vi.fn(async () => answer());
+    const { uppy, rejected } = setup(announce, 0, [binned({ state: "PURGED" })]);
+    addAbc(uppy);
+    await uppy.upload();
+    expect(announce).toHaveBeenCalledTimes(1); // the file went on to the server
+    expect(rejected.map((r) => r.reason)).not.toContain(IN_BIN);
+  });
+
+  test("e4_4 with nothing in the bin the file is not read at all", async () => {
+    const announce = vi.fn(async () => answer());
+    const { uppy } = setup(announce, 0, []);
+    const blob = new Blob(["abc"]);
+    const read = vi.spyOn(blob, "arrayBuffer");
+    uppy.addFile({ name: "quote.pdf", type: "application/pdf", data: blob, meta: {} } as never);
+    await uppy.upload();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  test("e4_4 where Web Crypto is missing the check is skipped and the server decides", async () => {
+    vi.stubGlobal("crypto", {});
+    const announce = vi.fn(async () => answer());
+    const { uppy, rejected } = setup(announce, 0, [binned()]);
+    addAbc(uppy);
+    await uppy.upload();
+    vi.unstubAllGlobals();
+    expect(announce).toHaveBeenCalledTimes(1); // the file went on to the server
+    expect(rejected.map((r) => r.reason)).not.toContain(IN_BIN);
   });
 });

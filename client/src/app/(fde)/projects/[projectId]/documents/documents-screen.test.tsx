@@ -106,6 +106,38 @@ describe("Documents screen (E4.11)", () => {
     expect(screen.getByText(/quarantined: it cannot be downloaded/)).toBeDefined();
   });
 
+  test("e4_4 a file the type check rejected says why and is not called Quarantined", async () => {
+    fakeApi(
+      api([
+        doc({ state: "REJECTED", title: "fake.pdf", reject_code: "TYPE_MISMATCH" }),
+        doc({ id: "d2", state: "REJECTED", title: "song.mp3", reject_code: "UNSUPPORTED_TYPE" }),
+        doc({ id: "d3", state: "REJECTED", title: "notes.md", reject_code: "INVALID_ENCODING" }),
+      ]),
+    );
+    renderWithRefine(<DocumentsScreen projectId={ID} />);
+    expect(await screen.findByText(/does not match its extension/)).toBeDefined();
+    expect(screen.getByText(/this file type is not supported/)).toBeDefined();
+    expect(screen.getByText(/not valid UTF-8/)).toBeDefined();
+    expect(screen.getAllByText("Scan: Clean")).toHaveLength(3);
+    expect(screen.getAllByText("Parse: Rejected")).toHaveLength(3);
+    expect(screen.queryByText("Scan: Quarantined")).toBeNull();
+    expect(screen.queryByText(/malware/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /retry/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
+  });
+
+  test("e4_4 a quarantined file keeps the malware wording next to a type-rejected one", async () => {
+    fakeApi(
+      api([
+        doc({ state: "REJECTED", title: "evil.pdf", reject_code: "MALWARE" }),
+        doc({ id: "d2", state: "REJECTED", title: "fake.pdf", reject_code: "TYPE_MISMATCH" }),
+      ]),
+    );
+    renderWithRefine(<DocumentsScreen projectId={ID} />);
+    expect(await screen.findByText("Scan: Quarantined")).toBeDefined();
+    expect(screen.getByText("Parse: Rejected")).toBeDefined();
+  });
+
   test("Retry is offered only for failed documents", async () => {
     fakeApi(
       api([

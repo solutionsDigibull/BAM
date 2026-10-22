@@ -9,13 +9,15 @@ import "@uppy/dashboard/css/style.min.css";
 
 import Dashboard from "@uppy/dashboard";
 import { useCustomMutation } from "@refinedev/core";
-import { Alert, Flex, Typography } from "antd";
+import { Alert, App, Flex, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
 
-import type { UploadRequest, UploadToken } from "@/contracts";
+import type { DocumentOut, UploadRequest, UploadToken } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
-import { uploadsPath } from "../../workspace-api";
+import { restorePath, uploadsPath } from "../../workspace-api";
+import { restoreErrorMessage } from "./document-state";
+import { RejectionList } from "./rejection-list";
 import {
   DUPLICATE_NOTE,
   NOTE,
@@ -28,27 +30,48 @@ type Props = {
   projectId: string;
   /** Documents of the project that count toward the 20-file limit. */
   active: number;
+  /** Every document of the project, deleted ones included (a file in the recycle bin is not re-uploaded). */
+  documents: DocumentOut[];
   /** Called when a batch has finished, so the documents list can refresh. */
   onUploaded: () => void;
 };
 
-export default function UploadPanel({ projectId, active, onUploaded }: Props) {
+export default function UploadPanel({ projectId, active, documents, onUploaded }: Props) {
+  const { message } = App.useApp();
   const target = useRef<HTMLDivElement>(null);
   const announce = useCustomMutation<UploadToken, ApiError, UploadRequest>();
+  const restore = useCustomMutation<DocumentOut, ApiError>();
   const [rejections, setRejections] = useState<Rejection[]>([]);
   const [failure, setFailure] = useState<string | null>(null);
 
   // The Uppy instance is created once per project; it reads the live values through these refs.
-  const live = useRef({ active, onUploaded, send: announce.mutateAsync });
+  const live = useRef({ active, documents, onUploaded, send: announce.mutateAsync });
   useEffect(() => {
-    live.current = { active, onUploaded, send: announce.mutateAsync };
+    live.current = { active, documents, onUploaded, send: announce.mutateAsync };
   });
+
+  const onRestore = (r: Rejection) => {
+    if (!r.restore) return;
+    const { id, title } = r.restore;
+    restore.mutate(
+      { url: restorePath(projectId, id), method: "post", values: {} },
+      {
+        onSuccess: () => {
+          void message.success(`${title} restored`);
+          setRejections((all) => all.filter((x) => x !== r));
+        },
+        onError: (error) => void message.error(restoreErrorMessage(error)),
+        onSettled: () => live.current.onUploaded(), // restored, or gone for good: the lists changed
+      },
+    );
+  };
 
   useEffect(() => {
     if (!target.current) return;
     const uppy: SbamUppy = createUploader({
       projectId,
       getActive: () => live.current.active,
+      getDocuments: () => live.current.documents,
       announce: async (body) =>
         (await live.current.send({ url: uploadsPath(projectId), method: "post", values: body }))
           .data,
@@ -83,22 +106,11 @@ export default function UploadPanel({ projectId, active, onUploaded }: Props) {
           description="Your files are kept. Retry the upload."
         />
       ) : null}
-      {rejections.length > 0 ? (
-        <Alert
-          type="warning"
-          showIcon
-          message="Some files were not uploaded"
-          description={
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {rejections.map((r, i) => (
-                <li key={`${r.name}-${i}`}>
-                  <strong>{r.name}</strong>: {r.reason}
-                </li>
-              ))}
-            </ul>
-          }
-        />
-      ) : null}
+      <RejectionList
+        rejections={rejections}
+        restoring={restore.mutation.isPending}
+        onRestore={onRestore}
+      />
     </Flex>
   );
 }
