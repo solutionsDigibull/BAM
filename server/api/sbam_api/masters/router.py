@@ -8,21 +8,24 @@ import uuid
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Form, Header, Request, Response, UploadFile
 from sbam_contracts.api import Page
 from sbam_contracts.masters import MasterStatus, MasterType, SourceKind
 from sbam_contracts.masters_api import (
+    ImportMode,
+    ImportReport,
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
     MasterVersionCreate,
 )
+from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
 from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser, admin
 from sbam_api.core.conventions import etag
 from sbam_api.db.session import app_sessions
-from sbam_api.masters import models, service
+from sbam_api.masters import importer, models, service
 
 router = APIRouter(tags=["masters"])
 
@@ -73,10 +76,27 @@ def _snapshot(row: models.MasterSnapshot) -> MastersSnapshot:
     )
 
 
-# Declared before `/{master_type}/…` so "snapshots" is never read as a master type.
+# Declared before `/{master_type}/…` so "snapshots" and "import" are never read as a master type.
 @router.get("/admin/masters/snapshots/{snapshot_id}")
 def get_snapshot(snapshot_id: uuid.UUID, user: Admin, session: Db) -> MastersSnapshot:
     return _snapshot(service.get_snapshot(session, user, snapshot_id))
+
+
+@router.post("/admin/masters/import")
+def import_workbook(
+    request: Request,
+    file: UploadFile,
+    user: Admin,
+    session: Db,
+    mode: Annotated[ImportMode, Form()] = ImportMode.VALIDATE_ONLY,
+    project_id: Annotated[uuid.UUID | None, Form()] = None,
+) -> ImportReport:
+    """Validate or upsert the BAM 0.2 masters workbook (E3.3); see `importer`."""
+    data = file.file.read(MAX_WORKBOOK_BYTES + 1)  # one byte over is enough to answer 413
+    settings = request.app.state.settings
+    return importer.import_workbook(
+        session, user, settings, file.filename or "", data, mode, project_id
+    )
 
 
 @router.post("/admin/masters/{master_type}", status_code=201)

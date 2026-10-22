@@ -309,6 +309,9 @@ services:
       TUSD_HOOK_SECRET: ${TUSD_HOOK_SECRET:?is required - set it in compose/.env (copy compose/.env.example)}
       TUSD_PUBLIC_URL: ${TUSD_PUBLIC_URL:-http://localhost:${TUSD_PORT:-1080}/files/}
       MAX_BODY_BYTES: ${MAX_BODY_BYTES:-10485760}
+      # The masters workbook import (#56) scans uploads with clamd; down = the import answers 503.
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes: [storage:/data/storage]
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
