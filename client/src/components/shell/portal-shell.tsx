@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { signOut } from "@/app/(auth)/actions";
-import { NotificationBell } from "@/components/ui-kit";
+import { NotificationCenter } from "@/components/ui-kit";
 
 import { activeHref, type NavItem } from "./nav";
 
@@ -98,7 +98,7 @@ export function PortalShell({
               <Button icon={<SwapOutlined />}>{other.label}</Button>
             </Link>
           )}
-          <NotificationBell />
+          <NotificationCenter />
           <form action={signOut}>
             <Button type="text" htmlType="submit" icon={<LogoutOutlined />}>
               Sign out
