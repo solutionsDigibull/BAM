@@ -36,7 +36,7 @@ from .test_db import url
 
 pytestmark = pytest.mark.integration
 
-REVISION = "0020_code_bundles"
+REVISION = "0022_code_bundles"
 DB = f"sbam_e113_{uuid.uuid4().hex[:10]}"
 TENANT, OTHER, PROJECT = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 
