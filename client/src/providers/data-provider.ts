@@ -57,6 +57,9 @@ const withIfMatch = (k: string, headers?: Record<string, string>) => {
   return { ...(etag ? { "if-match": etag } : {}), ...headers };
 };
 
+/** If-Match for a record read with getOne, for writes that aren't PATCH (e.g. POST .../versions). */
+export const ifMatch = (resource: string, id: string | number) => withIfMatch(key(resource, id));
+
 export const dataProvider: DataProvider = {
   getApiUrl: () => API_BASE,
 
