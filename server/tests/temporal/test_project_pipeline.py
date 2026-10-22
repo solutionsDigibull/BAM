@@ -96,9 +96,17 @@ async def okf_stand_in(inp: StageRef) -> IdResult:
     return IdResult(id=stub_id(inp, "okf"))
 
 
+@activity.defn(name="generate_sow")
+async def sow_stand_in(inp: StageRef) -> IdResult:
+    """The real generation (E6.2) reads the bundle and calls sbam-sow; its tests are
+    tests/unit/test_sow_generate.py."""
+    return IdResult(id=stub_id(inp, "sow"))
+
+
 DEFAULT_OVERRIDES: "Overrides" = {
     "build_knowledge": knowledge_stand_in,
     "build_okf_bundle": okf_stand_in,
+    "generate_sow": sow_stand_in,
 }
 
 
@@ -328,13 +336,15 @@ def test_e10_1_t05_worker_crash_during_extraction_resumes_without_duplicates() -
         others = set(TaskQueue) - {TaskQueue.LLM}
         async with environment(skip={TaskQueue.LLM}) as env:
             # LLM worker A: real stubs, except extract_sub_skills, during which it "dies".
-            async with workers(env.client, {"extract_sub_skills": dying_extract}, others):
+            async with workers(
+                env.client, {**DEFAULT_OVERRIDES, "extract_sub_skills": dying_extract}, others
+            ):
                 handle = await start(env, sessions, project)
                 await until(handle, PipelineStage.WAIT_SOW_APPROVAL)
                 await approve(handle)
                 await asyncio.wait_for(started.wait(), 60)
             # Worker A is gone; worker B (real stubs) picks up the retried activity.
-            async with workers(env.client, {}, others):
+            async with workers(env.client, DEFAULT_OVERRIDES, others):
                 await until(handle, PipelineStage.WAIT_GENERATE)
                 await generate(handle)
                 await finish(handle)

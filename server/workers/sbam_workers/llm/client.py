@@ -26,7 +26,7 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -144,7 +144,12 @@ class LlmClient:
         *,
         prompt_version: str | None = None,
         metadata: Mapping[str, str] | None = None,
+        validate: Callable[[T], tuple[str, ...]] | None = None,
+        manifest_extra: Mapping[str, Any] | None = None,
     ) -> LlmResult[T]:
+        """`validate` adds checks the schema cannot express (e.g. citations resolve); its error
+        lines are re-asked like schema errors, so they hold codes and ids only. `manifest_extra` is
+        stored with the context manifest (how the context was chosen), under `_extra`."""
         if alias not in ALIASES:
             raise UnknownAlias(f"{alias!r} is not an sbam alias; use one of {', '.join(ALIASES)}")
         require_strict_output(output_type)
@@ -152,6 +157,8 @@ class LlmClient:
         if prompt.alias and prompt.alias != alias:
             raise ValueError(f"prompt {prompt_id!r} is written for {prompt.alias}, not {alias}")
         messages, manifest = compose(prompt, output_type, context)
+        if manifest_extra:
+            manifest["_extra"] = dict(manifest_extra)
         tokens = sum(len(m["content"]) for m in messages) // CHARS_PER_TOKEN
         if tokens > self.settings.llm_max_context_tokens:
             raise ContextTooLarge(
@@ -255,7 +262,9 @@ class LlmClient:
         async def on_attempt(attempt: Attempt, reply: Reply) -> None:
             await record(attempt.status, reply, attempt=attempt.number, errors=attempt.errors)
 
-        result = await run_structured(call, messages, output_type, on_attempt=on_attempt)
+        result = await run_structured(
+            call, messages, output_type, on_attempt=on_attempt, validate=validate
+        )
         return LlmResult(result.output, row_ids[-1], trace_id, len(result.attempts))
 
     async def _post(

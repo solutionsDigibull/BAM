@@ -1,11 +1,14 @@
 """document_versions: the detected type and its Filetype row (E4.4)
 
-Revision ID: 0017_document_type_detection
-Revises: 0016_knowledge_versions
+Revision ID: 0018_document_type_detection
+Revises: 0017_code_attempts
 Create Date: 2026-10-22
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
 only your module's tables; downgrade() undoes exactly this revision and nothing older.
+
+Renumbered from 0017 (#285): it was merged next to 0017_code_attempts, which left dev with two
+heads.
 """
 
 from collections.abc import Sequence
@@ -13,8 +16,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0017_document_type_detection"
-down_revision: str | Sequence[str] | None = "0016_knowledge_versions"
+revision: str = "0018_document_type_detection"
+down_revision: str | Sequence[str] | None = "0017_code_attempts"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

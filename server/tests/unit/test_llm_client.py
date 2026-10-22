@@ -123,6 +123,40 @@ def test_e6_1_t03_reask_exhausted_raises_after_one_call_and_three_reasks() -> No
     assert statuses(sessions, sc) == ["SCHEMA_INVALID"] * 4
 
 
+def test_e6_2_extra_validation_errors_are_reasked_as_codes_and_recorded() -> None:
+    bifrost = FakeBifrost([completion(GOOD), completion(json.dumps({"count": 4, "label": "ok"}))])
+    client, sessions = make_client(bifrost)
+    sc = scope()
+
+    def even(answer: Answer) -> tuple[str, ...]:
+        return () if answer.count % 2 == 0 else (f"count: ODD_COUNT {answer.count}",)
+
+    result = run(client, sc, validate=even)
+    assert result.output.count == 4 and result.attempts == 2
+    assert statuses(sessions, sc) == ["SCHEMA_INVALID", "SUCCEEDED"]
+    assert rows(sessions, sc)[0].error == "count: ODD_COUNT 3"
+    feedback = bifrost.requests[1]["messages"][-1]["content"]
+    assert "- count: ODD_COUNT 3" in feedback and "Quote 12 cables" not in feedback
+
+
+def test_e6_2_extra_validation_failing_every_time_ends_non_retryable() -> None:
+    bifrost = FakeBifrost([completion(GOOD)])
+    client, sessions = make_client(bifrost)
+    sc = scope()
+    with pytest.raises(SchemaInvalidAfterRetries):
+        run(client, sc, validate=lambda _a: ("label: REJECTED",))
+    assert statuses(sessions, sc) == ["SCHEMA_INVALID"] * 4
+
+
+def test_e6_2_manifest_extra_is_stored_with_the_context_manifest() -> None:
+    client, sessions = make_client(FakeBifrost([completion(GOOD)]))
+    sc = scope()
+    run(client, sc, manifest_extra={"mode": "RANKED", "sections": {"scope": ["d#c1"]}})
+    [row] = rows(sessions, sc)
+    assert row.context_manifest["_extra"] == {"mode": "RANKED", "sections": {"scope": ["d#c1"]}}
+    assert row.context_manifest["rfq"]["chars"] == len("Quote 12 cables")
+
+
 @pytest.mark.parametrize("alias", ["openai/gpt-4o", "gpt-4o", "sbam-nope", "sbam-sow-primary"])
 def test_e6_1_t04_raw_model_id_is_rejected_before_any_http_call(alias: str) -> None:
     bifrost = FakeBifrost([completion(GOOD)])
@@ -362,7 +396,7 @@ def copy_prompts(tmp_path: Path) -> Path:
 
 def test_e6_1_shipped_prompts_match_their_manifest() -> None:
     registry = PromptRegistry()
-    assert registry.ids() == ["codegen-bodies", "live-smoke", "smoke"]
+    assert registry.ids() == ["codegen-bodies", "live-smoke", "smoke", "sow-generate"]
     assert json.loads((PROMPTS_DIR / "manifest.json").read_text()) == build_manifest()
 
 

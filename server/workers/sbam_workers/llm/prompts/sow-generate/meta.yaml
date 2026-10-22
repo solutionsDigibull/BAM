@@ -1,0 +1,2 @@
+alias: sbam-sow
+description: One-shot SOW generation from the project's OKF bundle (E6.2, TD §10.6). Output SowDocument.
