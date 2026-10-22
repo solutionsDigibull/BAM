@@ -153,7 +153,10 @@ async def run_structured[T: BaseModel](
     *,
     max_reasks: int = MAX_REASKS,
     on_attempt: OnAttempt | None = None,
+    validate: Callable[[T], tuple[str, ...]] | None = None,
 ) -> StructuredResult[T]:
+    """`validate` runs after the schema check and returns error lines (empty = valid). They go back
+    to the model like schema errors, so they must be codes and ids only, never document text."""
     names = schema_names(output_type)
     attempts: list[Attempt] = []
     current = list(messages)
@@ -162,8 +165,10 @@ async def run_structured[T: BaseModel](
         try:
             # strict: the model must send the exact JSON types, no "12" -> 12 coercion.
             output = output_type.model_validate_json(strip_fences(reply.text), strict=True)
+            errors = validate(output) if validate else ()
         except ValidationError as exc:
             errors = error_lines(exc, names)
+        if errors:
             attempt = Attempt(number, "SCHEMA_INVALID", reply.model, errors)
             attempts.append(attempt)
             if on_attempt:
