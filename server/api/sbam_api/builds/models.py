@@ -2,8 +2,9 @@
 
 `(sub_skill_id, build_no, cycle, attempt)` is the build stage's idempotency key (TD §13.4), so a
 retried activity finds its row instead of adding a second one. E11.2 writes the LLM bodies, the
-`llm_calls` ids that produced them and the template used; assembly (E11.3) adds `bundle_key` and
-`files`, the correction loop (E11.4) adds `correction_reason`.
+`llm_calls` ids that produced them and the template used; assembly (E11.3) adds `bundle_key`,
+`files`, `bundle_sha256` and the Black version + config hash that formatted it, the correction
+loop (E11.4) adds `correction_reason`.
 
 `sub_skill_id` and `manifest_id` carry no foreign key yet: `sub_skills` and `sub_skill_manifests`
 arrive with #91.
@@ -25,6 +26,8 @@ Json = JSON().with_variant(JSONB(), "postgresql")
 class CodeAttemptStatus(StrEnum):
     BODIES_GENERATED = "BODIES_GENERATED"  # bodies passed the pre-check, ready to assemble
     PRECHECK_FAILED = "PRECHECK_FAILED"  # bodies rejected before assembly -> correction
+    ASSEMBLED = "ASSEMBLED"  # E11.3: Black-formatted bundle stored, `bundle_key` + `files` set
+    ASSEMBLY_FAILED = "ASSEMBLY_FAILED"  # E11.3: a file did not parse (AST_SYNTAX) -> correction
 
 
 class CodeAttempt(ProjectOwned, Base):
@@ -52,4 +55,7 @@ class CodeAttempt(ProjectOwned, Base):
     findings: Mapped[list[dict[str, Any]]] = mapped_column(Json, default=list)
     bundle_key: Mapped[str | None] = mapped_column(String(1024))  # E11.3
     files: Mapped[dict[str, str] | None] = mapped_column(Json)  # E11.3: path -> sha256
+    bundle_sha256: Mapped[str | None] = mapped_column(String(64))  # E11.3: RFC 8785 of `files`
+    black_version: Mapped[str | None] = mapped_column(String(40))  # E11.3
+    black_config_sha256: Mapped[str | None] = mapped_column(String(64))  # E11.3
     correction_reason: Mapped[str | None] = mapped_column(Text)  # E11.4
