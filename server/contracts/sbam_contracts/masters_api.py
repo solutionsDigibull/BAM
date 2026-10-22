@@ -30,7 +30,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
-from sbam_contracts.masters import MasterStatus, MasterType, SourceKind
+from sbam_contracts.masters import MasterStatus, MasterType, ReadmeTab, SourceKind
 
 RowLabel = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64, pattern=r"^\S.*$")
@@ -191,6 +191,37 @@ class ImportReport(BaseModel):
         return self
 
 
+class MasterColumn(BaseModel):
+    """One frozen workbook column: row-2 header, payload field and row-3 description (tooltip)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    header: str
+    field: str
+    description: str
+
+
+class MasterTypeInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    master_type: MasterType
+    tab: str  # the workbook tab name
+    editable: bool  # admins can add entries and versions (Filetype is frozen)
+    row_label_prefix: str  # `Rule` in `Rule #n`; Tooling labels are their ids (`TOOL-MFG-01`)
+    columns: list[MasterColumn]  # workbook order, after the row label in column A
+    payload_schema: dict[str, Any]  # JSON Schema of the entry payload
+
+
+class MasterTypes(BaseModel):
+    """`GET /admin/master-types` (TD §8.3): the frozen BAM 0.2 layout the masters screen is built
+    from, read from the workbook template, plus the README tab."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    types: list[MasterTypeInfo]
+    readme: ReadmeTab
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/masters/`."""
     models: dict[str, type[BaseModel]] = {
@@ -201,6 +232,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "masters_snapshot": MastersSnapshot,
         "inclusion_report": InclusionReport,
         "import_report": ImportReport,
+        "master_types": MasterTypes,
     }
     return {stem: contract_schema(model, f"masters/{stem}") for stem, model in models.items()}
 

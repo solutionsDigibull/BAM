@@ -54,6 +54,7 @@ from sbam_contracts.masters_api import (
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
+    MasterTypes,
     MasterVersionCreate,
 )
 from sbam_contracts.notifications import Notification
@@ -124,6 +125,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/masters_snapshot", MastersSnapshot),
     ("masters/inclusion_report", InclusionReport),
     ("masters/import_report", ImportReport),
+    ("masters/master_types", MasterTypes),
     ("documents/document", DocumentOut),
     ("documents/purge_target", PurgeTarget),
     ("documents/purge_request", PurgeRequest),

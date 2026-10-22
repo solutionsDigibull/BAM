@@ -17,6 +17,7 @@ from sbam_contracts.masters_api import (
     MasterEntry,
     MasterEntryCreate,
     MastersSnapshot,
+    MasterTypes,
     MasterVersionCreate,
 )
 from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
@@ -98,6 +99,12 @@ def import_workbook(
     return importer.import_workbook(
         session, user, settings, file.filename or "", data, mode, project_id
     )
+
+
+@router.get("/admin/master-types")
+def master_types(user: Admin) -> MasterTypes:
+    """The frozen BAM 0.2 layout: columns with row-3 descriptions, schemas and the README."""
+    return exporter.master_types()
 
 
 @router.get(
