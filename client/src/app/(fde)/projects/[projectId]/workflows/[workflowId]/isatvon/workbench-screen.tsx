@@ -4,8 +4,8 @@
 // approved SOW, in a grid whose columns come only from the published metadata (GET /schemas/isatvon/1.4).
 // The breakdown endpoints are #94's; until they land this screen is built against sbam_contracts.
 
-import { useCustom, useCustomMutation } from "@refinedev/core";
-import { Alert, App, Button, Flex, Spin, Typography } from "antd";
+import { useCustom, useCustomMutation, type BaseRecord } from "@refinedev/core";
+import { Alert, App, Button, Flex, Input, Modal, Spin, Tooltip, Typography } from "antd";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,14 +21,22 @@ import type {
   IsatvonSchemaResponse,
   RuleViolation,
   SubSkillPatch,
+  ValidationReport,
   WorkbenchSubSkill,
   WorkbenchTree,
 } from "@/contracts";
+import { download } from "@/app/(admin)/admin/masters/masters-api";
 import type { ApiError } from "@/providers/data-provider";
 
-import type { EditRequest } from "./isatvon-grid";
+import type { EditRequest, RowAction } from "./isatvon-grid";
 import {
+  applyReport,
+  exportUrl,
+  generateBlocked,
+  generateUrl,
   isEditable,
+  regenerateUrl,
+  validateUrl,
   macroIds,
   metadataColumns,
   parseEdit,
@@ -51,6 +59,7 @@ export const EMPTY_MESSAGE = "No Macro Skills yet";
 const EXTRACT_POLL_MS = 5_000;
 const REVIEW_POLL_MS = 30_000; // notices the Workflow leaving review (e.g. to BUILDING) while open
 export const CONFLICT_TOAST = "Updated elsewhere: the row was reloaded with the latest version.";
+const newKey = () => globalThis.crypto.randomUUID();
 
 export function WorkbenchScreen({
   projectId,
@@ -59,7 +68,7 @@ export function WorkbenchScreen({
   projectId: string;
   workflowId: string;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const schema = useCustom<IsatvonSchemaResponse, ApiError>({ url: SCHEMA_URL, method: "get" });
   const treeQuery = useCustom<WorkbenchTree, ApiError>({
     url: treeUrl(projectId, workflowId),
@@ -76,6 +85,7 @@ export function WorkbenchScreen({
     },
   });
   const { mutateAsync } = useCustomMutation<WorkbenchSubSkill, ApiError>();
+  const command = useCustomMutation<BaseRecord, ApiError>();
   // `useCustom` hands back `{}` while loading and the API may send null: never trust the shape.
   const server = treeQuery.result.data as unknown;
   // PATCH answers replace their row here; any refetch (a new `server`) supersedes them.
@@ -95,9 +105,127 @@ export function WorkbenchScreen({
   const ids = useMemo(() => macroIds(tree), [tree]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set()); // all expanded at first
   const expanded = useMemo(() => new Set(ids.filter((id) => !collapsed.has(id))), [ids, collapsed]);
-  const rows = useMemo(() => toRows(tree, expanded), [tree, expanded]);
+  const canAct = isEditable(state) && !locked;
+  const rows = useMemo(() => toRows(tree, expanded, canAct), [tree, expanded, canAct]);
   const subs = useMemo(() => subSkills(current), [current]);
   const invalid = subs.filter((s) => s.state === "INVALID").length;
+  const blocked = locked ? LOCKED_MESSAGE : generateBlocked(current);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [regen, setRegen] = useState<RowAction | null>(null);
+  const [hint, setHint] = useState("");
+
+  /** The answers every command shares: stale → reload, locked → read-only, else the problem detail. */
+  const failed = async (err: ApiError) => {
+    if (err.statusCode === 412) {
+      message.warning(CONFLICT_TOAST);
+      await treeQuery.query.refetch();
+    } else if (err.statusCode === 423) setLocked(true);
+    else message.error(err.message);
+  };
+
+  const send = async (
+    name: string,
+    url: string,
+    method: "post" | "delete",
+    values: object,
+    headers: Record<string, string>,
+  ) => {
+    setBusy(name);
+    try {
+      return await command.mutateAsync({
+        url,
+        method,
+        values,
+        config: { headers },
+        successNotification: false,
+        errorNotification: false,
+      });
+    } catch (e) {
+      await failed(e as ApiError);
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const validate = async () => {
+    const res = await send("validate", validateUrl(projectId, workflowId), "post", {}, {});
+    if (!res) return;
+    const report = res.data as unknown as ValidationReport;
+    const next = applyReport(latest.current.current, report);
+    latest.current.current = next;
+    setPatched({ base: latest.current.server, tree: next });
+    const bad = (report?.sub_skills ?? []).filter((s) => s.state !== "VALID").length;
+    message.success(`Validated: ${bad} invalid`);
+  };
+
+  const exportExcel = async () => {
+    setBusy("export");
+    try {
+      const name = await download(exportUrl(projectId, workflowId), `isatvon-${workflowId}.xlsx`);
+      message.success(`Downloaded ${name}`);
+    } catch (e) {
+      message.error((e as ApiError).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const generate = async () => {
+    const res = await send(
+      "generate",
+      generateUrl(projectId, workflowId),
+      "post",
+      {},
+      {
+        "idempotency-key": newKey(),
+      },
+    );
+    if (!res) return;
+    message.success("Generation started");
+    await treeQuery.query.refetch();
+  };
+
+  const regenerate = async () => {
+    if (!regen) return;
+    const body = hint.trim() ? { hint: hint.trim() } : {};
+    const res = await send(
+      "regenerate",
+      regenerateUrl(projectId, workflowId, regen.kind, regen.id),
+      "post",
+      body,
+      { "idempotency-key": newKey() },
+    );
+    setRegen(null);
+    setHint("");
+    if (!res) return;
+    message.success(`Regenerating ${regen.label}…`);
+    await treeQuery.query.refetch();
+  };
+
+  const onAction = (a: RowAction) => {
+    if (a.action === "regenerate") return setRegen(a);
+    modal.confirm({
+      title: `Delete ${a.label}?`,
+      content: "The Sub-Skill is removed from this Workflow's breakdown.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const res = await send(
+          "delete",
+          subSkillUrl(projectId, workflowId, a.id),
+          "delete",
+          {},
+          {
+            "if-match": `"${a.row.content_sha256}"`,
+          },
+        );
+        if (!res) return;
+        message.success(`Deleted ${a.label}`);
+        await treeQuery.query.refetch();
+      },
+    });
+  };
 
   /** Set one cell's edit errors; no messages clears them. */
   const mark = (id: string, path: string, messages: string[]) =>
@@ -208,23 +336,72 @@ export function WorkbenchScreen({
             {subs.length === 1 ? "" : "s"}
             {invalid ? ` · ${invalid} invalid` : ""}
           </Meta>
-          <Flex gap={8}>
+          <Flex gap={8} wrap align="center">
             <Button size="small" onClick={() => setCollapsed(new Set())}>
               Expand all
             </Button>
             <Button size="small" onClick={() => setCollapsed(new Set(ids))}>
               Collapse all
             </Button>
+            {canAct && (
+              <Button size="small" loading={busy === "validate"} onClick={validate}>
+                Validate
+              </Button>
+            )}
+            <Button size="small" loading={busy === "export"} onClick={exportExcel}>
+              Export Excel
+            </Button>
+            {/* A disabled button swallows hover, so the reason sits on a wrapper. */}
+            <Tooltip title={blocked ?? "Generate code for every VALID Sub-Skill"}>
+              <span>
+                <Button
+                  type="primary"
+                  size="small"
+                  disabled={!!blocked}
+                  loading={busy === "generate"}
+                  onClick={generate}
+                >
+                  Generate
+                </Button>
+              </span>
+            </Tooltip>
           </Flex>
         </Flex>
+        {blocked && canAct && <Meta>Generate is off: {blocked}.</Meta>}
         <IsatvonGrid
           groups={groups ?? []}
           rows={rows}
           onToggle={toggle}
           onEdit={edit}
+          onAction={onAction}
           state={state}
           locked={locked}
         />
+        <Modal
+          open={!!regen}
+          title={regen ? `Regenerate ${regen.label}` : ""}
+          okText="Regenerate"
+          confirmLoading={busy === "regenerate"}
+          onOk={regenerate}
+          onCancel={() => {
+            setRegen(null);
+            setHint("");
+          }}
+          destroyOnHidden
+        >
+          <Typography.Paragraph type="secondary">
+            SBAM extracts this {regen?.kind === "macro" ? "Macro Skill" : "Sub-Skill"} again from
+            the approved SOW. Edits to it are replaced.
+          </Typography.Paragraph>
+          <Input.TextArea
+            aria-label="Hint"
+            placeholder="Optional hint, e.g. split the approval step out"
+            rows={3}
+            maxLength={2000}
+            value={hint}
+            onChange={(e) => setHint(e.target.value)}
+          />
+        </Modal>
         <Flex justify="space-between" wrap gap={8} style={{ marginTop: 12 }}>
           <Meta>{metadataColumns(groups).length} columns from the ISATVON 1.4 metadata</Meta>
           <Meta>
