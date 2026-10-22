@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sbam_contracts.sow import SowDocument
 from sbam_workers.llm.reask import (
     MAX_REASKS,
@@ -121,7 +121,8 @@ def test_e1_15_reask_carries_validation_errors_only_not_values_or_documents() ->
     assert second[: len(SMOKE)] == SMOKE and len(second) == len(SMOKE) + 2
     feedback = second[-1]["content"]
     assert second[-2] == {"role": "assistant", "content": leaky}
-    assert "count:" in feedback and "extra_field:" in feedback
+    assert "count: int_type" in feedback and "<key>: extra_forbidden" in feedback
+    assert "extra_field" not in feedback  # a field the model invented is model-chosen text (E1.21)
     assert "TOP-SECRET-VALUE" not in feedback  # pydantic's `input` is never echoed
 
 
@@ -207,3 +208,80 @@ def test_e1_15_mock_finds_the_original_prompt_after_reasks() -> None:
     assert srv.original_prompt(after_two) == first
     assert srv.original_prompt(first) == first
     assert json.dumps(srv.original_prompt([])) == "[]"
+
+
+# --- E1.21: no document text in the feedback or in Attempt.errors ---------------------------------
+
+
+class Item(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    n: int
+
+
+class Holder(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    fields: dict[str, Item]
+
+
+class Ident(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    id: str
+
+    @field_validator("id")
+    @classmethod
+    def _unique(cls, value: str) -> str:
+        raise ValueError(f"duplicate id {value}")
+
+
+class Checked(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    a: str
+    b: int
+    c: int = Field(ge=1)
+    d: list[Item]
+
+
+def failing(model: type[BaseModel], answer: str) -> tuple[Any, list[list[Message]]]:
+    call, seen = scripted(answer, answer, answer, answer)
+    with pytest.raises(SchemaInvalidAfterRetries) as caught:
+        asyncio.run(run_structured(call, SMOKE, model))
+    return caught.value, seen
+
+
+def test_e1_21_t01_a_mapping_key_from_a_document_is_not_echoed() -> None:
+    answer = '{"fields": {"sk-secret": {"n": "x"}}}'
+    failure, seen = failing(Holder, answer)
+    every = " ".join(m["content"] for turn in seen for m in turn[len(SMOKE) + 1 :: 2])
+    errors = " ".join(e for a in failure.attempts for e in a.errors)
+    assert "sk-secret" not in every + errors + str(failure)
+    assert failure.attempts[0].errors == ("fields.<key>.n: int_type",)
+
+
+def test_e1_21_t02_a_value_inside_a_validator_message_is_not_echoed() -> None:
+    failure, seen = failing(Ident, '{"id": "ID-SECRET-77"}')
+    every = " ".join(m["content"] for turn in seen for m in turn[len(SMOKE) + 1 :: 2])
+    errors = " ".join(e for a in failure.attempts for e in a.errors)
+    assert "ID-SECRET-77" not in errors + str(failure)
+    assert failure.attempts[0].errors == ("id: value_error",)
+    assert "duplicate id" not in every + errors  # the validator's message is dropped too
+
+
+def test_e1_21_t03_feedback_still_names_path_type_and_limit() -> None:
+    failure, _ = failing(Checked, '{"b": "1", "c": 0, "d": [{"n": 1}, {"n": "x"}]}')
+    assert failure.attempts[0].errors == (
+        "a: missing",
+        "b: int_type",
+        "c: greater_than_equal (ge=1)",
+        "d[1].n: int_type",
+    )
+
+
+def test_e1_21_schema_names_cover_nested_models_and_literals_are_schema_constants() -> None:
+    from sbam_workers.llm.reask import schema_names
+
+    assert {"fields", "n"} <= schema_names(Holder)
+    assert {"a", "b", "c", "d", "n"} <= schema_names(Checked)

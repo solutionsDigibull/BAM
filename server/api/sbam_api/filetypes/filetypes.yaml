@@ -1,0 +1,318 @@
+# Platform configuration for the 43 frozen Filetype master entries (TD §5.2, issue E3.7).
+#
+# The Filetype tab itself is frozen (O-23): this file holds what SBAM adds on top of it and is never
+# written back into the workbook. One entry per row label, validated at API startup
+# (sbam_api.filetypes.config): exactly 43, known row labels, known loaders, enabled => loader.
+#
+#   mvp_enabled    SBAM has an MVP loader for it; only enabled types are accepted for upload
+#   loader         loader id (filetypes.config.LOADERS); null for Future types
+#   extensions     file extensions WITHOUT the dot ("tar.gz" counts as one); empty when the type is
+#                  recognised by content only (OpenAPI, Swagger, FastMCP Spec: detection in E4.4)
+#   magic          MIME / magic types for content detection (E4.4)
+#   intent_class   the master intent class (Manufacturing Masters v0.2 README section 9)
+#   default_route  the master a document of this type lands in by default (a prior only)
+#
+# Future types (CAD, PCB, media, Google, Web, parquet) stay mvp_enabled: false (no loader yet).
+
+filetypes:
+  "Filetype #1":
+    mvp_enabled: true
+    loader: source-code
+    extensions: ["cpp"]
+    magic: ["text/x-c++"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #2":
+    mvp_enabled: true
+    loader: email
+    extensions: ["eml"]
+    magic: ["message/rfc822"]
+    intent_class: "Instruction / workflow step"
+    default_route: Skills
+  "Filetype #3":
+    mvp_enabled: true
+    loader: source-code
+    extensions: ["go"]
+    magic: ["text/x-go"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #4":
+    mvp_enabled: true
+    loader: source-code
+    extensions: ["js"]
+    magic: ["text/javascript"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #5":
+    mvp_enabled: true
+    loader: structured
+    extensions: ["json"]
+    magic: ["application/json"]
+    intent_class: "Rule / policy"
+    default_route: Rules
+  "Filetype #6":
+    mvp_enabled: true
+    loader: text
+    extensions: ["md"]
+    magic: ["text/markdown"]
+    intent_class: "Instruction / workflow step"
+    default_route: Skills
+  "Filetype #7":
+    mvp_enabled: true
+    loader: email
+    extensions: ["msg"]
+    magic: ["application/vnd.ms-outlook"]
+    intent_class: "Instruction / workflow step"
+    default_route: Skills
+  "Filetype #8":
+    mvp_enabled: true
+    loader: source-code
+    extensions: ["py"]
+    magic: ["text/x-python"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #9":
+    mvp_enabled: true
+    loader: source-code
+    extensions: ["sql"]
+    magic: ["application/sql"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #10":
+    mvp_enabled: true
+    loader: text
+    extensions: ["txt"]
+    magic: ["text/plain"]
+    intent_class: "Instruction / workflow step"
+    default_route: Skills
+  "Filetype #11":
+    mvp_enabled: true
+    loader: structured
+    extensions: ["xml"]
+    magic: ["application/xml"]
+    intent_class: "Rule / policy"
+    default_route: Rules
+  "Filetype #12":
+    mvp_enabled: true
+    loader: structured
+    extensions: ["yaml", "yml"]
+    magic: ["application/yaml"]
+    intent_class: "Rule / policy"
+    default_route: Rules
+  "Filetype #13":
+    mvp_enabled: true
+    loader: structured
+    extensions: []
+    magic: ["application/json", "application/yaml"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #14":
+    mvp_enabled: false
+    loader: null
+    extensions: ["tgz"]
+    magic: ["application/x-odb"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #15":
+    mvp_enabled: true
+    loader: structured
+    extensions: []
+    magic: ["application/json", "application/yaml"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #16":
+    mvp_enabled: true
+    loader: structured
+    extensions: []
+    magic: ["application/json", "application/yaml"]
+    intent_class: "Agent / tool definition"
+    default_route: Agents
+  "Filetype #17":
+    mvp_enabled: false
+    loader: null
+    extensions: ["html", "htm"]
+    magic: ["text/html"]
+    intent_class: "Knowledge source"
+    default_route: Organization
+  "Filetype #18":
+    mvp_enabled: true
+    loader: tabular
+    extensions: ["csv"]
+    magic: ["text/csv"]
+    intent_class: "Source data (RFQ / BOM / quote)"
+    default_route: Skills
+  "Filetype #19":
+    mvp_enabled: true
+    loader: docx
+    extensions: ["docx"]
+    magic: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+    intent_class: "Instruction / workflow step"
+    default_route: Skills
+  "Filetype #20":
+    mvp_enabled: false
+    loader: null
+    extensions: ["parquet"]
+    magic: ["application/vnd.apache.parquet"]
+    intent_class: "Source data (RFQ / BOM / quote)"
+    default_route: Skills
+  "Filetype #21":
+    mvp_enabled: true
+    loader: pdf-text
+    extensions: ["pdf"]
+    magic: ["application/pdf"]
+    intent_class: "Instruction / workflow step"
+    default_route: Skills
+  "Filetype #22":
+    mvp_enabled: true
+    loader: archive
+    extensions: ["tar.gz"]
+    magic: ["application/gzip"]
+    intent_class: "Source data (RFQ / BOM / quote)"
+    default_route: Skills
+  "Filetype #23":
+    mvp_enabled: true
+    loader: tabular
+    extensions: ["xlsx"]
+    magic: ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
+    intent_class: "Source data (RFQ / BOM / quote)"
+    default_route: Skills
+  "Filetype #24":
+    mvp_enabled: true
+    loader: archive
+    extensions: ["zip"]
+    magic: ["application/zip"]
+    intent_class: "Source data (RFQ / BOM / quote)"
+    default_route: Skills
+  "Filetype #25":
+    mvp_enabled: false
+    loader: null
+    extensions: []
+    magic: ["application/vnd.google-apps.document"]
+    intent_class: "Instruction / workflow step"
+    default_route: Skills
+  "Filetype #26":
+    mvp_enabled: false
+    loader: null
+    extensions: []
+    magic: ["application/vnd.google-apps.spreadsheet"]
+    intent_class: "Source data (RFQ / BOM / quote)"
+    default_route: Skills
+  "Filetype #27":
+    mvp_enabled: false
+    loader: null
+    extensions: ["dwg"]
+    magic: ["image/vnd.dwg"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #28":
+    mvp_enabled: false
+    loader: null
+    extensions: ["dxf"]
+    magic: ["image/vnd.dxf"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #29":
+    mvp_enabled: false
+    loader: null
+    extensions: ["iges", "igs"]
+    magic: ["model/iges"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #30":
+    mvp_enabled: true
+    loader: ocr
+    extensions: ["jpeg"]
+    magic: ["image/jpeg"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #31":
+    mvp_enabled: true
+    loader: ocr
+    extensions: ["jpg"]
+    magic: ["image/jpeg"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #32":
+    mvp_enabled: false
+    loader: null
+    extensions: ["mp3"]
+    magic: ["audio/mpeg"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #33":
+    mvp_enabled: false
+    loader: null
+    extensions: ["mp4"]
+    magic: ["video/mp4"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #34":
+    mvp_enabled: true
+    loader: ocr
+    extensions: ["pdf"]
+    magic: ["application/pdf"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #35":
+    mvp_enabled: true
+    loader: ocr
+    extensions: ["png"]
+    magic: ["image/png"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #36":
+    mvp_enabled: false
+    loader: null
+    extensions: ["step"]
+    magic: ["model/step"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #37":
+    mvp_enabled: false
+    loader: null
+    extensions: ["stp"]
+    magic: ["model/step"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #38":
+    mvp_enabled: true
+    loader: ocr
+    extensions: ["tiff"]
+    magic: ["image/tiff"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #39":
+    mvp_enabled: false
+    loader: null
+    extensions: ["wav"]
+    magic: ["audio/wav"]
+    intent_class: "Evidence / media"
+    default_route: Organization
+  "Filetype #40":
+    mvp_enabled: false
+    loader: null
+    extensions: ["gbr"]
+    magic: ["application/vnd.gerber"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #41":
+    mvp_enabled: false
+    loader: null
+    extensions: ["gbr"]
+    magic: ["application/vnd.gerber"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #42":
+    mvp_enabled: false
+    loader: null
+    extensions: ["gbr"]
+    magic: ["application/vnd.gerber"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills
+  "Filetype #43":
+    mvp_enabled: false
+    loader: null
+    extensions: ["xml"]
+    magic: ["application/xml"]
+    intent_class: "Design artifact (CAD / PCB)"
+    default_route: Skills

@@ -85,6 +85,21 @@ class MasterEntryRepository(TenantScopedRepository[MasterEntry]):
         )
         return {r.entry_id: r for r in rows if wanted[r.entry_id] == r.version}
 
+    def versions_at(
+        self, pins: Sequence[tuple[uuid.UUID, int]]
+    ) -> dict[uuid.UUID, MasterEntryVersion]:
+        """The exact (entry, version) pairs a snapshot pinned, keyed by entry id."""
+        if not pins:
+            return {}
+        wanted = dict(pins)
+        rows = self.session.scalars(
+            select(MasterEntryVersion).where(
+                MasterEntryVersion.tenant_id == self.ctx.tenant_id,
+                MasterEntryVersion.entry_id.in_(list(wanted)),
+            )
+        )
+        return {r.entry_id: r for r in rows if wanted[r.entry_id] == r.version}
+
     def add_version(self, row: MasterEntryVersion) -> MasterEntryVersion:
         row.tenant_id = self.ctx.tenant_id
         self.session.add(row)

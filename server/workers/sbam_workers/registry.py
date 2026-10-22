@@ -11,6 +11,10 @@ A module that needs something set up in Temporal when its worker starts (a Sched
 registers a startup hook: `@startup_for(TaskQueue.INGEST)` on `async def f(client: Client) -> None`.
 A failing hook is logged and never stops the worker; it runs again on the next start, so it must be
 idempotent.
+
+A module whose queue must not be served with a wrong configuration registers a preflight check:
+`@preflight_for(TaskQueue.KNOWLEDGE)` on `def f() -> None` that raises `PreflightError(code, ...)`.
+Unlike a startup hook, a failing check stops the worker before it polls anything (E5.1-T04).
 """
 
 import importlib
@@ -29,6 +33,7 @@ T = TypeVar("T")
 _WORKFLOWS: dict[TaskQueue, list[type]] = {q: [] for q in TaskQueue}
 _ACTIVITIES: dict[TaskQueue, list[Callable[..., Any]]] = {q: [] for q in TaskQueue}
 _STARTUP: dict[TaskQueue, list[Callable[[Client], Awaitable[None]]]] = {q: [] for q in TaskQueue}
+_PREFLIGHT: dict[TaskQueue, list[Callable[[], None]]] = {q: [] for q in TaskQueue}
 log = logging.getLogger("sbam_workers.registry")
 _SKIP = {"bootstrap", "registry", "settings", "queues", "telemetry"}
 
@@ -81,6 +86,36 @@ def startup_for(
         return fn
 
     return register
+
+
+class PreflightError(RuntimeError):
+    """A served queue's configuration is unsafe; `code` is an `ErrorCode` value."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(f"{code}: {detail}")
+        self.code = code
+
+
+def preflight_for(*queues: TaskQueue) -> Callable[[Callable[[], None]], Callable[[], None]]:
+    queues = _queues(queues)
+
+    def register(fn: Callable[[], None]) -> Callable[[], None]:
+        for q in queues:
+            if all(_key(f) != _key(fn) for f in _PREFLIGHT[q]):
+                _PREFLIGHT[q].append(fn)
+        return fn
+
+    return register
+
+
+def run_preflight(queues: Iterable[TaskQueue]) -> None:
+    """Run the preflight checks of the served queues; the first failure raises `PreflightError`."""
+    done: set[tuple[str, str]] = set()
+    for queue in queues:
+        for check in _PREFLIGHT[queue]:
+            if _key(check) not in done:
+                done.add(_key(check))
+                check()
 
 
 async def run_startup(client: Client, queues: Iterable[TaskQueue]) -> None:

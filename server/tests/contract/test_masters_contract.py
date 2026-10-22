@@ -225,8 +225,10 @@ def test_e0_4_t01_schema_files_are_exactly_the_documented_ones() -> None:
         # masters engine API (E3.2)
         "master_entry_create.schema.json",
         "master_version_create.schema.json",
+        "filetype_info.schema.json",  # E3.7
         "master_entry.schema.json",
         "masters_snapshot.schema.json",
+        "inclusion_report.schema.json",  # E3.6
         "import_report.schema.json",  # workbook import (E3.3)
     }
 

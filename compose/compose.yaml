@@ -340,13 +340,40 @@ services:
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
       CLAMAV_MAX_SIGNATURE_AGE_HOURS: ${CLAMAV_MAX_SIGNATURE_AGE_HOURS:-48}
-    volumes: [storage:/data/storage] # only this worker reads/removes stored files
+    volumes: [storage:/data/storage] # only this worker writes/removes stored files
     depends_on:
       <<: *worker-depends
       clamav: { condition: service_healthy }
   worker-knowledge:
+    # Cognee 1.6.2 runs as a library in this worker (#78, ADR 0001). Its stores live on cognee_data; its
+    # LLM and embedding calls go to Bifrost only. The worker refuses to start (health FAILED) when access
+    # control is off or any of these is missing (E5.1-T04). No OpenRouter key, no internet route.
     <<: *worker
-    environment: { <<: *worker-env, SBAM_QUEUES: sbam-knowledge }
+    environment:
+      <<: *worker-env
+      SBAM_QUEUES: sbam-knowledge
+      STORAGE_ROOT: /data/storage # parsed documents and masters.jsonl, read-only
+      ENABLE_BACKEND_ACCESS_CONTROL: "true"
+      DATA_ROOT_DIRECTORY: /data/cognee/data
+      SYSTEM_ROOT_DIRECTORY: /data/cognee/system
+      # LLM_PROVIDER stays SBAM's mock/bifrost switch; the backend sets Cognee's provider to "custom".
+      LLM_ENDPOINT: http://bifrost:8080/v1
+      LLM_MODEL: ${COGNEE_LLM_MODEL:-openai/sbam-knowledge} # openai/ = OpenAI-compatible, for LiteLLM
+      LLM_API_KEY: ${COGNEE_BIFROST_KEY:-sbam-local}
+      EMBEDDING_PROVIDER: openai_compatible
+      EMBEDDING_ENDPOINT: http://bifrost:8080/v1
+      EMBEDDING_MODEL: ${COGNEE_EMBEDDING_MODEL:-openai/sbam-embed}
+      EMBEDDING_API_KEY: ${COGNEE_BIFROST_KEY:-sbam-local}
+      EMBEDDING_DIMENSIONS: ${COGNEE_EMBEDDING_DIMENSIONS:-1536}
+      COGNEE_USER_SECRET: ${COGNEE_USER_SECRET:-change-me-cognee-user-secret-0000000000}
+      # No internet: never try HuggingFace for a tokenizer and send no telemetry; tiktoken's encoding and the
+      # graph store's JSON extension are baked into the image (#259).
+      HF_HUB_OFFLINE: "1"
+      TELEMETRY_DISABLED: "1"
+    volumes:
+      - cognee_data:/data/cognee
+      - storage:/data/storage:ro
+    mem_limit: 2g # Cognee + LanceDB; 1g is not enough for cognify
   worker-llm:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-llm }

@@ -237,6 +237,14 @@ routes:
       params: {snapshot_id: "@snapshot_a"}
     expect: *tenant_admin_a_resource
 
+  # ---- filetype table (E3.7) --------------------------------------------------------------
+  # The 43 frozen Filetype rows + loader config: platform data, readable by every portal role.
+  list_filetypes_api_v1_admin_filetypes_get:
+    request: {method: GET, path: /api/v1/admin/filetypes}
+    expect:
+      <<: *open
+      anon: "401 UNAUTHENTICATED"
+
   # ---- runtime registry -------------------------------------------------------------------
   admin_registry_api_v1_admin_registry_get:
     request: {method: GET, path: /api/v1/admin/registry}
@@ -300,10 +308,64 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "409 CONFLICT"
 
+  retry_document_api_v1_projects__project_id__documents__document_id__retry_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/documents/{document_id}/retry
+      params: {project_id: "@project_a", document_id: "@doc_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 CONFLICT"  # the seeded document has not failed
+
   start_api_v1_projects__project_id__pipeline_start_post:
     request:
       method: POST
       path: /api/v1/projects/{project_id}/pipeline/start
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "202"
+
+  versions_api_v1_projects__project_id__knowledge_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  graph_page_api_v1_projects__project_id__knowledge__kv_id__graph_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge/{kv_id}/graph
+      params: {project_id: "@project_a", kv_id: "@kv_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  node_api_v1_projects__project_id__knowledge__kv_id__nodes__node_id__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge/{kv_id}/nodes/{node_id}
+      params: {project_id: "@project_a", kv_id: "@kv_a", node_id: n1}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  okf_bundle_api_v1_projects__project_id__knowledge__kv_id__okf_bundle_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge/{kv_id}/okf-bundle
+      params: {project_id: "@project_a", kv_id: "@kv_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"  # the 302 to the signed URL, followed by the test client to the zip
+
+  rebuild_api_v1_projects__project_id__knowledge_rebuild_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/knowledge/rebuild
       params: {project_id: "@project_a"}
     expect:
       <<: *fde_project_resource

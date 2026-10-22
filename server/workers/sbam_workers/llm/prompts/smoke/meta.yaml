@@ -1,0 +1,2 @@
+alias: sbam-sow
+description: Wrapper smoke test (E6.1); the mock provider has a recorded answer for it.

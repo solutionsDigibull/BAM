@@ -22,6 +22,7 @@ REPO = Path(__file__).resolve().parents[3]
 BIFROST_DIR = REPO / "compose/bifrost"
 FIXTURES = REPO / "server/tests/llm-mock"
 ALIASES = ["sbam-ocr", "sbam-sow", "sbam-isatvon", "sbam-codegen", "sbam-testgen", "sbam-corrector"]
+COGNEE_ALIASES = ["sbam-knowledge", "sbam-embed"]  # E5.7: generated answers, no recorded fixtures
 
 
 def load(name: str, path: Path) -> ModuleType:
@@ -54,15 +55,16 @@ def chat(
 
 def test_e1_15_t01_six_aliases_each_with_primary_and_fallback() -> None:
     aliases = gen.load_aliases()
-    assert list(aliases) == ALIASES
+    assert list(aliases) == ALIASES + COGNEE_ALIASES
     for mode in gen.MODES:
         rules = gen.build_config(mode)["governance"]["routing_rules"]
-        assert [r["name"] for r in rules] == ALIASES
+        assert [r["name"] for r in rules] == ALIASES + COGNEE_ALIASES
         assert len({r["priority"] for r in rules}) == len(rules)  # Bifrost: one rule per priority
         for rule in rules:
             alias = rule["name"]
             primary, fallback = gen.model_ids(alias, aliases[alias], mode)
-            assert primary != fallback
+            # One embedding model on both sides: another model would change the vector size.
+            assert primary != fallback or (mode == "bifrost" and alias == "sbam-embed")
             assert rule["cel_expression"] == f'model == "{alias}"'
             assert [t["model"] for t in rule["targets"]] == [primary]
             assert rule["fallbacks"] == [f"openrouter/{fallback}"]
@@ -76,7 +78,8 @@ def test_e1_15_t02_only_alias_models_are_allowed_upstream() -> None:
     for mode in gen.MODES:
         config = gen.build_config(mode)
         (key,) = config["providers"]["openrouter"]["keys"]
-        assert "gpt-4o" not in key["models"] and "openai/gpt-4o" not in key["models"]
+        # a model no alias uses (the aliases map to openai/gpt-4o and openai/gpt-4o-mini since E6.1)
+        assert "mistralai/mistral-large" not in key["models"]
         targets = {t["model"] for r in config["governance"]["routing_rules"] for t in r["targets"]}
         fallbacks = {
             f.removeprefix("openrouter/")

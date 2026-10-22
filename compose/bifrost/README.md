@@ -3,6 +3,11 @@
 Callers send `model: "sbam-sow"` (one of the six aliases in `aliases.json`) to Bifrost at
 `http://bifrost:8080/v1/chat/completions`. Nothing else is accepted.
 
+Cognee, inside `worker-knowledge`, has two aliases of its own (#78, #259): `sbam-knowledge` for graph
+extraction (chat) and `sbam-embed` for embeddings (`/v1/embeddings`). It sends them as `openai/sbam-knowledge`
+and `openai/sbam-embed`; LiteLLM strips the `openai/` prefix, so Bifrost sees the bare alias. `sbam-embed`
+falls back to the same model, because another embedding model would change the vector size.
+
 | `LLM_PROVIDER` | Bifrost config mounted | Upstream |
 |---|---|---|
 | `mock` (default, CI) | `config.mock.json` | `sbam-llm-mock` (internal network, no key) |
@@ -39,6 +44,15 @@ test fails when they drift (`--check`).
 - Callers re-ask with `sbam_workers.llm.reask.run_structured` (E1.15-T05): at most 3 re-asks, errors only in the
   re-ask message, then `SchemaInvalidAfterRetries`. It takes any async caller, so the E6.1 Bifrost client reuses it.
 - It refuses to start with `LLM_PROVIDER=mock` when `SBAM_ENV` is `staging` or `production`.
+- Cognee's aliases need no fixtures (`"mock": "generated"` and `"kind": "embedding"` in `aliases.json`):
+  - `sbam-knowledge` answers an unseen input with JSON built from the schema the caller sends (in
+    `response_format`, or the ```json block LiteLLM puts in the system prompt). A knowledge-graph schema gets the
+    input's capitalised words and codes as nodes, linked in order; no schema gets the plain answer `test`
+    (Cognee's connection check).
+  - `sbam-embed` is served on `/v1/embeddings`: one unit vector per input, hashed from its words (same text, same
+    vector; shared words, close vectors). Size: `dimensions` in the request, else `LLM_MOCK_EMBEDDING_DIMENSIONS`
+    (1536).
+  - The scenarios apply to both. A real Cognee `cognify` therefore runs free in CI and on laptops.
 - `sbam-sow`, `sbam-isatvon` and `sbam-ocr` fixtures are real (the first two validate against `SowDocument` and
   `SubSkill`). `sbam-codegen`, `sbam-testgen` and `sbam-corrector` use a placeholder shape because their output
   contracts are not in `server/contracts` yet. Replace them when the contracts land.

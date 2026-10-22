@@ -76,6 +76,11 @@
       ],
       "title": "Context Notes"
     },
+    "allow_restricted": {
+      "default": false,
+      "title": "Allow Restricted",
+      "type": "boolean"
+    },
     "status": {
       "$ref": "#/$defs/ProjectStatus"
     },

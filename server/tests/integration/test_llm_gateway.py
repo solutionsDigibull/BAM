@@ -52,7 +52,7 @@ def call(body: dict[str, Any]) -> tuple[int, dict[str, str], dict[str, Any]]:
 
 
 def fixture_body(alias: str, **metadata: str) -> dict[str, Any]:
-    path = next((FIXTURES / alias).glob("*.json"))
+    path = next(p for p in sorted((FIXTURES / alias).glob("*.json")) if p.stem != "e6_1_wrapper")
     data = json.loads(Path(path).read_text())
     meta = {"prompt_id": data["prompt_id"], **metadata}
     return {"model": alias, "messages": data["messages"], "metadata": meta}
@@ -67,7 +67,7 @@ def test_e1_15_t01_each_alias_answers_through_bifrost_with_its_model_recorded(al
     assert body["choices"][0]["message"]["content"]
 
 
-@pytest.mark.parametrize("model", ["gpt-4o", "openrouter/openai/gpt-4o", "sbam-nope"])
+@pytest.mark.parametrize("model", ["gpt-4o", "openrouter/mistralai/mistral-large", "sbam-nope"])
 def test_e1_15_t02_models_that_are_not_aliases_are_rejected(model: str) -> None:
     status, headers, body = call({"model": model, "messages": SMOKE})
     assert status == 400

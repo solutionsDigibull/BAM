@@ -33,7 +33,7 @@ from sbam_api.projects.models import Project, ProjectMember
 from sbam_api.projects.repository import MemberRepository, ProjectRepository
 from sbam_api.state_machine import apply_create
 
-FIELDS = ("name", "client_name", "description", "context_notes")
+FIELDS = ("name", "client_name", "description", "context_notes", "allow_restricted")
 
 # Nothing is running in these states.
 # TODO(#91): also refuse while a Workflow is BUILDING or CERTIFYING.
