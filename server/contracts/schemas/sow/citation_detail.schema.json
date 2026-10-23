@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/citation_detail:0.1.0",
+  "additionalProperties": false,
+  "description": "What a citation points at (E6.5 citation panel), read from the version's OKF bundle.",
+  "properties": {
+    "okf_ref_id": {
+      "title": "Okf Ref Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "chunk",
+        "entity"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "document_version_id": {
+      "format": "uuid",
+      "title": "Document Version Id",
+      "type": "string"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    },
+    "location": {
+      "additionalProperties": true,
+      "title": "Location",
+      "type": "object"
+    },
+    "passage": {
+      "title": "Passage",
+      "type": "string"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "source_available": {
+      "title": "Source Available",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "okf_ref_id",
+    "kind",
+    "document_version_id",
+    "location",
+    "passage",
+    "source_available"
+  ],
+  "title": "SowCitationDetail",
+  "type": "object"
+}

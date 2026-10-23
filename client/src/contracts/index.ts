@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:61f92824efcdd99145145a1e8f8f25d66adae3e49341db0adae90416dd7e7ec0
+// source-sha256:60ba4c4e8e167ca918f7b3403f66017fb2351e34ba1edfafee28bdfe62f127d6
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -410,6 +410,7 @@ export interface SbamContracts {
   SowSaveRequest?: SowSaveRequest;
   SowDiff?: SowDiff;
   SowRegenerateRequest?: SowRegenerateRequest;
+  SowCitationDetail?: SowCitationDetail;
   Run?: Run;
   RunAccepted?: RunAccepted;
   RuntimeRegistry?: RuntimeRegistry;
@@ -1937,6 +1938,24 @@ export interface SowDiffItem {
  */
 export interface SowRegenerateRequest {
   hint?: string | null;
+}
+/**
+ * What a citation points at (E6.5 citation panel), read from the version's OKF bundle.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowCitationDetail".
+ */
+export interface SowCitationDetail {
+  okf_ref_id: string;
+  kind: "chunk" | "entity";
+  document_version_id: string;
+  title?: string | null;
+  location: {
+    [k: string]: unknown | undefined;
+  };
+  passage: string;
+  truncated?: boolean;
+  source_available: boolean;
 }
 /**
  * One Temporal execution as the API returns it (mirror of `temporal_runs`).

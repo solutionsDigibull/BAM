@@ -9,6 +9,8 @@
   423 SOW_LOCKED when approved, 413 over 2 MB.
 * `GET P/sow/versions/{v}/diff/{other}`: section by section, what changed from v to other.
 * `POST P/sow/regenerate {hint?}` + `Idempotency-Key`: 202 `{"run": Run}`; see `regenerate.py`.
+* `GET P/sow/versions/{v}/citations/{okf_ref_id}` (+ `/source`): the citation panel
+  (`citations.py`).
 * `GET P/sow/versions/{v}/export?format=pdf|docx|md`: 302 to a signed URL (300 s); see `exports.py`.
 """
 
@@ -20,6 +22,7 @@ from fastapi.responses import RedirectResponse
 from sbam_contracts.runs import RunAccepted
 from sbam_contracts.sow_api import (
     ExportFormat,
+    SowCitationDetail,
     SowDiff,
     SowOverview,
     SowRegenerateRequest,
@@ -35,7 +38,7 @@ from sbam_api.core.conventions import validate_idempotency_key
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
-from sbam_api.sow import versions
+from sbam_api.sow import citations, versions
 from sbam_api.sow.exports import export_key
 from sbam_api.sow.regenerate import start_regenerate
 from sbam_api.storage.router import backend
@@ -163,3 +166,44 @@ async def export_sow_version(
         EXPORT_URL_TTL,
     )
     return RedirectResponse(url, status_code=302)
+
+
+OkfRefId = Annotated[str, Path(min_length=1, max_length=160, pattern=r"^[A-Za-z0-9#:._-]+$")]
+
+
+@router.get("/projects/{project_id}/sow/versions/{version}/citations/{okf_ref_id}")
+def sow_citation(
+    project_id: Project,
+    version: Version,
+    okf_ref_id: OkfRefId,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+) -> SowCitationDetail:
+    with sessions() as session:
+        return citations.detail(session, backend(request), user, project_id, version, okf_ref_id)
+
+
+@router.get(
+    "/projects/{project_id}/sow/versions/{version}/citations/{okf_ref_id}/source",
+    response_class=Response,
+    responses={200: {"content": {"text/markdown": {}}}},
+)
+def sow_citation_source(
+    project_id: Project,
+    version: Version,
+    okf_ref_id: OkfRefId,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+) -> Response:
+    with sessions() as session:
+        found = citations.source(session, backend(request), user, project_id, version, okf_ref_id)
+    return Response(
+        found.text.encode("utf-8"),
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{found.filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

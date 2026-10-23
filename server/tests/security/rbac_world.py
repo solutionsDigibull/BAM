@@ -273,6 +273,7 @@ class World:
         with self.sessions() as s:
             self.runs: dict[str, uuid.UUID] = {}
             self.docs: dict[str, uuid.UUID] = {}
+            self.doc_versions: dict[str, uuid.UUID] = {}
             for name, tenant, project in (
                 ("a", self.tenant_a, self.project_a),
                 ("a2", self.tenant_a, self.project_a2),
@@ -306,6 +307,7 @@ class World:
                 s.add_all([version, run])
                 s.flush()
                 self.docs[name], self.runs[name] = doc.id, run.id
+                self.doc_versions[name] = version.id
             s.commit()
         self.workflow_a, self.sub_a = uuid.uuid4(), uuid.uuid4()
         self.temporal.builds[build_workflow_id(self.sub_a, 1)] = SubSkillBuildStatus(
@@ -411,7 +413,7 @@ class World:
         """A READY knowledge version of project A with a one-entity OKF bundle (E5.4 reads)."""
         storage = LocalDiskBackend(self.tmp)
         where = StorageScope(self.tenant_a, self.project_a)
-        dvid = uuid.uuid4()
+        dvid = self.doc_versions["a"]  # a real document, so SOW citations have a source (E6.5)
         text = "Alpha supplier Mouser."
         doc = okf.Doc(dvid, text, hashlib.sha256(text.encode()).hexdigest())
         nodes = [
@@ -523,6 +525,7 @@ class World:
             "snapshot_a": self.snapshot_a,
             "kv_a": self.kv_a,
             "sow_a": self.sow_a,
+            "sow_a_chunk": f"{self.kv_a_doc}#c0",  # what the seeded SOW cites
         }
         if name in fixed:
             return str(fixed[name])
