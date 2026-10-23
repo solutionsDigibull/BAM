@@ -96,7 +96,7 @@ def read(deps: OcrDeps, data: bytes, kind: str, n: int, run: OcrRun) -> Any:
 def test_e4_8_live_the_model_reads_a_page_image_and_the_call_is_recorded() -> None:
     deps, sessions = make()
     inp = stage()
-    run = OcrRun(f"wf-{uuid.uuid4()}", "act-live", 1)
+    run = OcrRun(f"wf-{uuid.uuid4()}", "act-live", 1, "run-live")
     source = open_source(typed_page(), "png")
     try:
         page = asyncio.run(ocr.read_page(deps, inp, run, source, 1))
@@ -106,7 +106,9 @@ def test_e4_8_live_the_model_reads_a_page_image_and_the_call_is_recorded() -> No
     assert page.readable, page.warning
     text = page.markdown.lower()
     assert "q-1042" in text and "cbl-7731" in text and "march" in text
-    scope = LlmScope(TENANT, PROJECT, "live-ocr", run.workflow_id, "act-live:page-1")
+    scope = LlmScope(
+        TENANT, PROJECT, "live-ocr", f"{run.workflow_id}:{run.run_id}", "act-live:page-1"
+    )
     [row] = [r for r in rows(sessions, scope) if r.status == "SUCCEEDED"]
     print(
         f"model={row.model} in={row.tokens_in} out={row.tokens_out} "
@@ -120,7 +122,9 @@ def test_e4_8_live_a_blank_page_is_reported_unreadable_not_invented() -> None:
     deps, _ = make()
     blank = io.BytesIO()
     Image.new("RGB", (800, 600), "white").save(blank, format="PNG")
-    page = read(deps, blank.getvalue(), "png", 1, OcrRun(f"wf-{uuid.uuid4()}", "act-blank", 1))
+    page = read(
+        deps, blank.getvalue(), "png", 1, OcrRun(f"wf-{uuid.uuid4()}", "act-blank", 1, "run-blank")
+    )
     print(f"\nblank page: readable={page.readable} markdown={page.markdown!r} {page.warning!r}")
     assert not page.readable  # no text may be made up for an empty page
 
@@ -128,7 +132,7 @@ def test_e4_8_live_a_blank_page_is_reported_unreadable_not_invented() -> None:
 def test_e4_8_live_the_golden_scanned_pdf_pages_are_answered_for_the_right_page() -> None:
     deps, _ = make()
     data = fixture_path("documents", "scanned_full.pdf").read_bytes()
-    run = OcrRun(f"wf-{uuid.uuid4()}", "act-golden", 1)
+    run = OcrRun(f"wf-{uuid.uuid4()}", "act-golden", 1, "run-golden")
     for n in (1, 2):
         page = read(deps, data, "pdf", n, run)
         print(f"\npage {n}: readable={page.readable} text={page.markdown[:120]!r} {page.warning!r}")

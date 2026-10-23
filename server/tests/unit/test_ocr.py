@@ -12,9 +12,11 @@ import uuid
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
+import httpx
 import pytest
 from fixtures import fixture_path
 from llm_db import FakeBifrost, completion, make_client
+from pdfs import make_pdf
 from PIL import Image
 from sbam_api.audit.models import AuditLog
 from sbam_api.ingest.models import DocumentVersion
@@ -29,12 +31,11 @@ from sbam_workers.llm.reask import Attempt, SchemaInvalidAfterRetries
 from sbam_workers.llm.store import LlmScope
 from sqlalchemy import select
 from temporalio.exceptions import ApplicationError
-from test_loaders_office import make_pdf
 from test_parsing import Harness, derived, h, root  # noqa: F401 - their fixtures
 
 PDF_ROW = {"detected": "pdf", "filetype_row_label": "Filetype #21"}
 IMG_ROW = {"detected": "jpg", "filetype_row_label": "Filetype #31"}
-RUN = OcrRun("wf-1", "act-1", 1)
+RUN = OcrRun("wf-1", "act-1", 1, "run-1")
 LONG = "This page has a real text layer that is long enough"
 
 
@@ -56,11 +57,13 @@ class FakeReader:
         validate: Callable[[OcrPage], tuple[str, ...]] | None = None,
         images: Sequence[LlmImage] = (),
         subject: Mapping[str, str] | None = None,
+        manifest_extra: Mapping[str, Any] | None = None,
     ) -> LlmResult[OcrPage]:
         page = int(context["page_number"])
         self.calls.append(
             {"alias": alias, "prompt": prompt_id, "page": page, "scope": scope, "images": images}
             | {"subject": dict(subject or {}), "validate": validate, "context": dict(context)}
+            | {"extra": dict(manifest_extra or {})}
         )
         what = self.script.get(page, OcrPage(page=page, markdown=f"Text of page {page}."))
         if isinstance(what, Exception):
@@ -205,7 +208,8 @@ def test_e4_8_one_page_per_call_for_this_project_with_the_document_id(h: Harness
         assert call["subject"] == {"document_version_id": str(ref.ref_id)}
         scope = call["scope"]
         assert (scope.tenant_id, scope.project_id) == (ref.tenant_id, ref.project_id)
-        assert scope.activity_id == f"act-1:page-{n}" and scope.temporal_workflow_id == "wf-1"
+        assert scope.activity_id == f"act-1:page-{n}" and scope.temporal_workflow_id == "wf-1:run-1"
+        assert scope.attempt == 1 and call["extra"] == {"activity_attempt": 1}
     assert len({c["scope"].activity_id for c in reader.calls}) == 2  # the replay cache key differs
 
 
@@ -542,7 +546,7 @@ def test_e4_8_through_the_real_wrapper_the_calls_are_recorded_without_the_image_
     run_ocr(h, ref, client)
     [row] = rows(
         sessions,
-        Scope(ref.tenant_id, ref.project_id, "c", RUN.workflow_id, f"{RUN.activity_id}:page-1"),
+        Scope(ref.tenant_id, ref.project_id, "c", "wf-1:run-1", f"{RUN.activity_id}:page-1"),
     )
     assert row.alias == "sbam-ocr" and row.prompt_id == "ocr-page"
     assert row.context_manifest["_subject"] == {"document_version_id": str(ref.ref_id)}
@@ -559,3 +563,84 @@ def test_e4_8_audit_rows_of_an_ocr_parse_name_the_document_and_hold_no_text(h: H
 
 
 _ = ParsedDocument  # imported for the type of `derived`'s second result
+
+
+# --- R01: a retry of the activity does not pay for the pages it already read --------------------
+
+
+class PagedBifrost(FakeBifrost):
+    """Answers every page it is asked for with that page's text; page `fail_on` fails (503) until
+    `heal()` is called. Records the pages it was asked, in order."""
+
+    def __init__(self, fail_on: int | None = None) -> None:
+        super().__init__([])
+        self.fail_on = fail_on
+        self.asked: list[int] = []
+
+    def heal(self) -> None:
+        self.fail_on = None
+
+    def __call__(self, request: Any) -> Any:
+        body = json.loads(request.content)
+        text = body["messages"][1]["content"][0]["text"]
+        page = int(text.split("\n")[1])
+        self.requests.append(body)
+        self.asked.append(page)
+        if page == self.fail_on:
+            return httpx.Response(503, json={"error": "down"})
+        return httpx.Response(200, json=completion(good(page, f"Real text {page}")))
+
+
+def test_e4_8_r01_a_retry_does_not_ask_the_model_again_for_the_pages_already_read(
+    h: Harness,
+) -> None:
+    from sbam_workers.llm.client import LlmTransportError
+
+    ref = pending(h, "scan.pdf", scanned(6))
+    bifrost = PagedBifrost(fail_on=5)
+    client, _ = real_reader(bifrost)
+    first = OcrRun("wf-r01", "act-1", 1, "run-a")
+    with pytest.raises(LlmTransportError):
+        asyncio.run(ocr.ocr_version(OcrDeps(h.sessions, h.storage, client), ref, first))
+    assert [p for p in bifrost.asked if p != 5] == [1, 2, 3, 4]  # four read, then page 5 failed
+    assert h.version(ref).state == "PARSING"
+
+    bifrost.heal()
+    asked_before = len(bifrost.asked)
+    second = OcrRun("wf-r01", "act-1", 2, "run-a")  # Temporal's second attempt of the same run
+    outcome = asyncio.run(ocr.ocr_version(OcrDeps(h.sessions, h.storage, client), ref, second))
+    assert outcome.parsed
+    assert bifrost.asked[asked_before:] == [5, 6]  # only the pages that were not answered
+    assert blocks(h, ref) == [(n, f"Real text {n}", "llm", False) for n in range(1, 7)]
+
+
+def test_e4_8_r01_a_new_run_of_the_same_workflow_asks_again(h: Harness) -> None:
+    ref = pending(h, "scan.pdf", scanned(2))
+    bifrost = PagedBifrost()
+    client, _ = real_reader(bifrost)
+    run = OcrRun("wf-r01b", "act-1", 1, "run-a")
+    assert asyncio.run(ocr.ocr_version(OcrDeps(h.sessions, h.storage, client), ref, run)).parsed
+    assert bifrost.asked == [1, 2]
+    # an FDE retry after a failure starts a new execution of `ingest-<version>`: a new run id
+    with h.sessions() as s:
+        row = s.get(DocumentVersion, ref.ref_id)
+        assert row is not None
+        row.state, row.parse_code = "PARSING", None
+        s.commit()
+    fresh = OcrRun("wf-r01b", "act-1", 1, "run-b")
+    asyncio.run(ocr.ocr_version(OcrDeps(h.sessions, h.storage, client), ref, fresh))
+    assert bifrost.asked == [1, 2, 1, 2]
+
+
+def test_e4_8_r01_the_temporal_attempt_is_kept_in_the_calls_manifest(h: Harness) -> None:
+    from llm_db import rows
+    from sbam_workers.llm.store import LlmScope as Scope
+
+    ref = pending(h, "scan.pdf", scanned(1))
+    client, sessions = real_reader(PagedBifrost())
+    run = OcrRun("wf-r01c", "act-1", 3, "run-a")  # the third attempt
+    asyncio.run(ocr.ocr_version(OcrDeps(h.sessions, h.storage, client), ref, run))
+    [row] = rows(
+        sessions, Scope(ref.tenant_id, ref.project_id, "c", "wf-r01c:run-a", "act-1:page-1")
+    )
+    assert row.activity_attempt == 1 and row.context_manifest["_extra"] == {"activity_attempt": 3}
