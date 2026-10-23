@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/approval:0.1.0",
+  "$defs": {
+    "SowVersionStatus": {
+      "enum": [
+        "GENERATED",
+        "IN_REVIEW",
+        "APPROVED",
+        "SUPERSEDED",
+        "GENERATION_FAILED"
+      ],
+      "title": "SowVersionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/SowVersionStatus"
+    },
+    "is_locked": {
+      "title": "Is Locked",
+      "type": "boolean"
+    },
+    "approved_at": {
+      "format": "date-time",
+      "title": "Approved At",
+      "type": "string"
+    },
+    "approved_by": {
+      "title": "Approved By",
+      "type": "string"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "status",
+    "is_locked",
+    "approved_at",
+    "approved_by",
+    "sha256"
+  ],
+  "title": "SowApproval",
+  "type": "object"
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/approve_request:0.1.0",
+  "additionalProperties": false,
+  "description": "POST P/sow/versions/{v}/approve (E7.1): the hash of the version the FDE reviewed.",
+  "properties": {
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sha256"
+  ],
+  "title": "SowApproveRequest",
+  "type": "object"
+}

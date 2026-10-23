@@ -53,6 +53,7 @@ KINDS: dict[str, Kind] = {
     "knowledge.rebuild_failed": Kind(T.GENERATION_FAILED, "knowledge rebuild"),
     "sow.regenerated": Kind(T.SOW_READY),  # E6.3, SowRegenerate
     "sow.regeneration_failed": Kind(T.GENERATION_FAILED, "SOW regeneration"),
+    "sow_version.approve": Kind(T.STAGE_COMPLETED, "SOW approval"),  # E7.1
     "pipeline.reminder": Kind(T.REMINDER),
 }
 for _type in T:  # a producer may also notify with a NotificationType value directly

@@ -90,7 +90,8 @@ def test_e1_8_ok_returns_new_state(sessions: sessionmaker[Session]) -> None:
 def test_e1_8_t02_invalid_transition_409(sessions: sessionmaker[Session]) -> None:
     sow = add(sessions, SQLITE_MODELS[MachineName.SOW_VERSION], "GENERATED", TENANT_A, PROJECT)
     problem(
-        post(make_client(sessions), MachineName.SOW_VERSION, sow, "approve"),
+        # edit is IN_REVIEW only (GENERATED -approve-> is allowed since E7.1)
+        post(make_client(sessions), MachineName.SOW_VERSION, sow, "edit"),
         409,
         "INVALID_TRANSITION",
     )

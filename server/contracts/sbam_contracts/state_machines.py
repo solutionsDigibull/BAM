@@ -314,6 +314,7 @@ SOW_VERSION: Final = Machine(
         ),  # scope change: draft copied from the approved version
         (V.GENERATION_FAILED, "regenerate", V.GENERATED, F),
         (V.GENERATED, "open_review", V.IN_REVIEW, S),
+        (V.GENERATED, "approve", V.APPROVED, F),  # E7.1: approved as generated, without edits
         (V.IN_REVIEW, "edit", V.IN_REVIEW, F),
         (V.IN_REVIEW, "approve", V.APPROVED, F),
         (V.APPROVED, "superseded", V.SUPERSEDED, S),  # a newer version was approved

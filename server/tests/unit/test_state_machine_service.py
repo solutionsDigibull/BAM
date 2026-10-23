@@ -89,7 +89,8 @@ def test_e1_8_t01_valid_transition_bumps_version_and_writes_one_audit_row(
 
 def test_e1_8_t02_not_allowed_is_409_and_writes_nothing(sessions: sessionmaker[Session]) -> None:
     sow = add(sessions, SOW, "GENERATED", TENANT_A, PROJECT)
-    err = error_of(sessions, cmd(SOW, sow, "approve", Actor.FDE))  # must open review first
+    # edit is IN_REVIEW only (GENERATED -approve-> is allowed since E7.1)
+    err = error_of(sessions, cmd(SOW, sow, "edit", Actor.FDE))
     assert (err.status, err.code) == (409, "INVALID_TRANSITION")
     assert current(sessions, SOW, sow) == ("GENERATED", 1)
     assert audit_rows(sessions) == [] and outbox_rows(sessions) == []
