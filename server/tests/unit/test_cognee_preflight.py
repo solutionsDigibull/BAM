@@ -60,7 +60,13 @@ def test_e5_1_misconfiguration_names_the_variable_not_its_value(
 def test_e5_1_t04_preflight_is_registered_on_the_knowledge_queue_only() -> None:
     registry.load_all()
     assert [f.__name__ for f in registry._PREFLIGHT[TaskQueue.KNOWLEDGE]] == ["cognee_preflight"]
-    assert all(not registry._PREFLIGHT[q] for q in TaskQueue if q is not TaskQueue.KNOWLEDGE)
+    others = [
+        f.__name__
+        for q in TaskQueue
+        if q is not TaskQueue.KNOWLEDGE
+        for f in registry._PREFLIGHT[q]
+    ]
+    assert "cognee_preflight" not in others
 
 
 def test_e5_1_t04_worker_with_acl_off_exits_before_polling(
@@ -82,4 +88,7 @@ def test_e5_1_t04_worker_with_acl_off_exits_before_polling(
 
 def test_e5_1_other_queues_do_not_need_cognee(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENABLE_BACKEND_ACCESS_CONTROL", "false")
+    # their own (Langfuse) check reads the worker settings
+    monkeypatch.setenv("TEMPORAL_HOST", "temporal:7233")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x@localhost/x")
     registry.run_preflight([TaskQueue.INGEST, TaskQueue.LLM])  # no error
