@@ -133,7 +133,14 @@ def test_e4_8_live_the_golden_scanned_pdf_pages_are_answered_for_the_right_page(
     deps, _ = make()
     data = fixture_path("documents", "scanned_full.pdf").read_bytes()
     run = OcrRun(f"wf-{uuid.uuid4()}", "act-golden", 1, "run-golden")
-    for n in (1, 2):
-        page = read(deps, data, "pdf", n, run)
+
+    async def both() -> list[Any]:  # one event loop: the HTTP client belongs to it
+        source = open_source(data, "pdf")
+        try:
+            return [await ocr.read_page(deps, stage(), run, source, n) for n in (1, 2)]
+        finally:
+            source.close()
+
+    for n, page in zip((1, 2), asyncio.run(both()), strict=True):
         print(f"\npage {n}: readable={page.readable} text={page.markdown[:120]!r} {page.warning!r}")
         assert page.number == n  # an answer for another page would have been re-asked
