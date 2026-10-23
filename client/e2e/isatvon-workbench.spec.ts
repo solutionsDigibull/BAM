@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Request, type Route } from "@playwright/test";
 
 // E8.7 ISATVON workbench. The breakdown endpoints are #94's and not built yet, so the API is faked at the
 // proxy; the grid metadata follows GET /schemas/isatvon/1.4 (#98), trimmed to the columns used here.
@@ -112,6 +112,8 @@ async function open(
   baseURL: string,
   body: unknown,
   patch?: (p: Patch, route: Route) => Promise<void>,
+  // Any other call (validate, export, generate, regenerate, delete): answer it, or return undefined.
+  other?: (req: Request, path: string, route: Route) => Promise<void> | undefined,
 ) {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL }]);
   await page.route("**/api/proxy/api/v1/**", (route) => {
@@ -122,6 +124,8 @@ async function open(
       return json(route, typeof body === "function" ? (body as () => unknown)() : body);
     if (req.method() === "PATCH" && path.includes("/sub-skills/") && patch)
       return patch({ ifMatch: req.headers()["if-match"] ?? null, ...req.postDataJSON() }, route);
+    const handled = other?.(req, path, route);
+    if (handled) return handled;
     return json(route, { type: "about:blank", title: "Not found", status: 404 }, 404);
   });
   const errors: string[] = [];
@@ -422,4 +426,144 @@ test("e8_7_t03 an edit with 500 rows loaded answers within 500 ms", async ({ pag
   samples.sort((a, b) => a - b);
   console.log(`edit -> row replaced (ms): ${samples.map(Math.round).join(", ")}`);
   expect(samples[2]).toBeLessThan(500);
+});
+
+// ---- toolbar and row actions (part 4): Validate, Export, Generate, Regenerate, Delete ----
+
+const generateButton = (page: Page) => page.getByRole("button", { name: "Generate", exact: true });
+const problem = (route: Route, status: number, detail: string) =>
+  json(route, { type: "about:blank", title: "Conflict", status, detail }, status);
+
+test("e8_7_t05 Generate turns on once the last invalid cell is fixed, and starts with an Idempotency-Key", async ({
+  page,
+  baseURL,
+}) => {
+  let key: string | undefined;
+  await open(
+    page,
+    baseURL!,
+    tree([macro(1, [withMax(11, "a".repeat(64), [RULE5]), sub(1, 2)])]),
+    (p, route) => json(route, withMax(p.changes[MAX] as number, "b".repeat(64))),
+    (req, path, route) => {
+      if (req.method() !== "POST" || !path.endsWith("/generate")) return undefined;
+      key = req.headers()["idempotency-key"];
+      return json(route, { runs: [] }, 202);
+    },
+  );
+  await expect(page.getByText("Generate is off: 1 Sub-Skill isn't VALID.")).toBeVisible();
+  await expect(generateButton(page)).toBeDisabled();
+  await typeInto(page, "3");
+  await expect(generateButton(page)).toBeEnabled();
+  await generateButton(page).click();
+  await expect(page.getByText("Generation started")).toBeVisible();
+  expect(key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test("Generate refused by the server (409) shows its reason", async ({ page, baseURL }) => {
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])]), undefined, (req, path, route) =>
+    path.endsWith("/generate")
+      ? problem(route, 409, "Sub-Skills changed: validate again")
+      : undefined,
+  );
+  await generateButton(page).click();
+  await expect(page.getByText("Sub-Skills changed: validate again")).toBeVisible();
+});
+
+test("Validate merges the report: the row turns INVALID with the rule's message", async ({
+  page,
+  baseURL,
+}) => {
+  const s = sub(1, 1);
+  await open(page, baseURL!, tree([macro(1, [s])]), undefined, (req, path, route) =>
+    path.endsWith("/isatvon/validate")
+      ? json(route, { sub_skills: [{ id: s.id, state: "INVALID", validation_errors: [RULE5] }] })
+      : undefined,
+  );
+  await page.getByRole("button", { name: "Validate" }).click();
+  await expect(page.getByText("Validated: 1 invalid")).toBeVisible();
+  await expect(page.getByText("1 Macro Skill · 1 Sub-Skill · 1 invalid")).toBeVisible();
+  await expect(maxCell(page)).toHaveCSS("background-color", "rgb(255, 241, 240)");
+  await expect(generateButton(page)).toBeDisabled();
+});
+
+test("e8_7_t09 Export Excel downloads the server's workbook", async ({ page, baseURL }) => {
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])]), undefined, (req, path, route) =>
+    path.endsWith("/isatvon/export.xlsx")
+      ? route.fulfill({
+          status: 200,
+          contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          headers: { "content-disposition": 'attachment; filename="workflow-isatvon.xlsx"' },
+          body: Buffer.from("PK fake xlsx"),
+        })
+      : undefined,
+  );
+  const [file] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export Excel" }).click(),
+  ]);
+  expect(file.suggestedFilename()).toBe("workflow-isatvon.xlsx");
+});
+
+test("Delete asks first, sends If-Match, and the row is gone after the reload", async ({
+  page,
+  baseURL,
+}) => {
+  let deleted: string | null = null;
+  let ifMatch: string | undefined;
+  await open(
+    page,
+    baseURL!,
+    () => tree([macro(1, deleted ? [sub(1, 1)] : [sub(1, 1), sub(1, 2)])]),
+    undefined,
+    (req, path, route) => {
+      if (req.method() !== "DELETE") return undefined;
+      deleted = path;
+      ifMatch = req.headers()["if-match"];
+      return route.fulfill({ status: 204 });
+    },
+  );
+  await expect(grid(page).getByText("Step 2", { exact: true })).toBeVisible();
+  await grid(page).getByRole("button", { name: "Delete MS01.2_step_2" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+  await expect(grid(page).getByText("Step 2", { exact: true })).toHaveCount(0);
+  expect(deleted).toMatch(/\/sub-skills\/0190f3a2-7b1c-7d4e-8f00-000000001002$/);
+  expect(ifMatch).toBe(`"${"a".repeat(64)}"`);
+});
+
+test("Regenerate a Sub-Skill sends the hint; a busy Macro answers 409", async ({
+  page,
+  baseURL,
+}) => {
+  const sent: { path: string; body: unknown; key?: string }[] = [];
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])]), undefined, (req, path, route) => {
+    if (!path.endsWith("/regenerate")) return undefined;
+    sent.push({ path, body: req.postDataJSON(), key: req.headers()["idempotency-key"] });
+    return path.includes("/macro-skills/")
+      ? problem(route, 409, "The Workflow is building")
+      : json(route, {}, 202);
+  });
+  await grid(page).getByRole("button", { name: "Regenerate MS01.1_step_1" }).click();
+  await page.getByRole("textbox", { name: "Hint" }).fill("split the approval step out");
+  await page.getByRole("dialog").getByRole("button", { name: "Regenerate" }).click();
+  await expect(page.getByText("Regenerating MS01.1_step_1…")).toBeVisible();
+  expect(sent[0]).toMatchObject({ body: { hint: "split the approval step out" } });
+  expect(sent[0]!.path).toContain("/sub-skills/");
+  expect(sent[0]!.key).toBeTruthy();
+
+  await grid(page).getByRole("button", { name: "Regenerate MS01 Macro 1" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Regenerate" }).click();
+  await expect(page.getByText("The Workflow is building")).toBeVisible();
+  expect(sent[1]).toMatchObject({ body: {} });
+});
+
+test("outside review there are no row actions or Validate, and Generate is off", async ({
+  page,
+  baseURL,
+}) => {
+  await open(page, baseURL!, tree([macro(1, [sub(1, 1)])], "BUILDING"));
+  await expect(grid(page).getByText("Step 1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(Regenerate|Delete) / })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Validate" })).toHaveCount(0);
+  await expect(generateButton(page)).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Export Excel" })).toBeEnabled();
 });

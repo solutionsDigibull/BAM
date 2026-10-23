@@ -3,7 +3,13 @@
 // AG Grid Community (MIT). The Macro → Sub-Skill tree is ours (full-width Macro rows that expand), since
 // AG Grid's treeData is Enterprise-only. Loaded with next/dynamic + ssr:false (TD §9.1).
 
-import { DownOutlined, RightOutlined, WarningOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  DownOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  WarningOutlined,
+} from "@ant-design/icons";
 import {
   AllCommunityModule,
   ModuleRegistry,
@@ -16,7 +22,7 @@ import {
   type IsFullWidthRowParams,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
-import { Tag, Typography } from "antd";
+import { Button, Flex, Tag, Tooltip, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type {
@@ -33,8 +39,10 @@ import {
   cellErrors,
   cellText,
   cellValue,
+  isEditable,
   STATE_COLOR,
   toEditText,
+  valueAt,
   type GridRow,
   type MacroRow,
 } from "./workbench-api";
@@ -57,6 +65,44 @@ const CELL_EDITOR: Partial<Record<Editor, string>> = {
 const POPUP: ReadonlySet<Editor> = new Set(["largeText", "json", "expression", "stringList"]);
 
 export type EditRequest = { row: WorkbenchSubSkill; column: GridColumn; value: unknown };
+export type RowAction =
+  | { action: "regenerate"; kind: "macro" | "sub"; id: string; label: string }
+  | { action: "delete"; kind: "sub"; id: string; label: string; row: WorkbenchSubSkill };
+type OnAction = (a: RowAction) => void;
+type GridContext = { onAction: OnAction };
+
+// Row actions are UI chrome, not data: this column is fixed, never built from a row's keys (T06).
+// The handler comes through the grid context (stable), so the column defs never hold a callback.
+function ActionsCell({ data, context }: ICellRendererParams<GridRow, unknown, GridContext>) {
+  if (data?.kind !== "sub") return null;
+  const onAction = context.onAction;
+  const label = String(valueAt(data.row.sub_skill, "skill_metadata.skill_id"));
+  return (
+    <Flex gap={4} align="center" style={{ height: "100%" }}>
+      <Tooltip title="Regenerate with a hint">
+        <Button
+          size="small"
+          type="text"
+          icon={<ReloadOutlined />}
+          aria-label={`Regenerate ${label}`}
+          onClick={() => onAction({ action: "regenerate", kind: "sub", id: data.id, label })}
+        />
+      </Tooltip>
+      <Tooltip title="Delete">
+        <Button
+          size="small"
+          type="text"
+          danger
+          icon={<DeleteOutlined />}
+          aria-label={`Delete ${label}`}
+          onClick={() =>
+            onAction({ action: "delete", kind: "sub", id: data.id, label, row: data.row })
+          }
+        />
+      </Tooltip>
+    </Flex>
+  );
+}
 
 // Text nodes only: a skill_name of '<img src=x onerror=…>' is shown as those characters (E8.7-T07).
 function TextCell({ value }: { value: unknown }) {
@@ -71,7 +117,8 @@ function StateCell({ value }: { value: unknown }) {
 function FullWidthRow({
   data,
   onToggle,
-}: ICellRendererParams<GridRow> & { onToggle: (macroId: string) => void }) {
+  onAction,
+}: ICellRendererParams<GridRow> & { onToggle: (macroId: string) => void; onAction: OnAction }) {
   if (!data) return null;
   if (data.kind === "invalid")
     return (
@@ -86,29 +133,42 @@ function FullWidthRow({
       </div>
     );
   const m = data as MacroRow;
+  const label = `${m.macro.macro_category} ${m.macro.name}`;
   return (
-    <button
-      type="button"
-      aria-expanded={m.expanded}
-      aria-label={`${m.expanded ? "Collapse" : "Expand"} ${m.macro.macro_category} ${m.macro.name}`}
-      onClick={() => onToggle(m.macro.id)}
-      style={{
-        width: "100%",
-        height: "100%",
-        textAlign: "left",
-        padding: "0 12px",
-        border: 0,
-        background: "#f8fafc",
-        cursor: "pointer",
-        fontWeight: 600,
-      }}
-    >
-      {m.expanded ? <DownOutlined /> : <RightOutlined />} <span>{m.macro.macro_category}</span> ·{" "}
-      <span>{m.macro.name}</span>
-      <Typography.Text type="secondary" style={{ fontWeight: 400, marginLeft: 8 }}>
-        {m.count} Sub-Skill{m.count === 1 ? "" : "s"}
-      </Typography.Text>
-    </button>
+    <Flex align="center" style={{ height: "100%", background: "#f8fafc", paddingRight: 12 }}>
+      <button
+        type="button"
+        aria-expanded={m.expanded}
+        aria-label={`${m.expanded ? "Collapse" : "Expand"} ${label}`}
+        onClick={() => onToggle(m.macro.id)}
+        style={{
+          flex: 1,
+          height: "100%",
+          textAlign: "left",
+          padding: "0 12px",
+          border: 0,
+          background: "transparent",
+          cursor: "pointer",
+          fontWeight: 600,
+        }}
+      >
+        {m.expanded ? <DownOutlined /> : <RightOutlined />} <span>{m.macro.macro_category}</span> ·{" "}
+        <span>{m.macro.name}</span>
+        <Typography.Text type="secondary" style={{ fontWeight: 400, marginLeft: 8 }}>
+          {m.count} Sub-Skill{m.count === 1 ? "" : "s"}
+        </Typography.Text>
+      </button>
+      {m.actions && (
+        <Button
+          size="small"
+          icon={<ReloadOutlined />}
+          aria-label={`Regenerate ${label}`}
+          onClick={() => onAction({ action: "regenerate", kind: "macro", id: m.macro.id, label })}
+        >
+          Regenerate
+        </Button>
+      )}
+    </Flex>
   );
 }
 
@@ -118,7 +178,21 @@ function columnDefs(
   state: WorkflowState | undefined,
   locked: boolean,
 ): ColGroupDef<GridRow>[] {
-  return groups.map((g) => ({
+  const actions: ColGroupDef<GridRow> = {
+    headerName: "",
+    groupId: "actions",
+    children: [
+      {
+        colId: "actions",
+        headerName: "Actions",
+        width: 96,
+        pinned: "right",
+        sortable: false,
+        cellRenderer: ActionsCell,
+      },
+    ],
+  };
+  const data = groups.map((g): ColGroupDef<GridRow> => ({
     headerName: g.header,
     headerTooltip: g.description,
     groupId: g.id,
@@ -158,6 +232,7 @@ function columnDefs(
       },
     })),
   }));
+  return isEditable(state) && !locked ? [...data, actions] : data;
 }
 
 const rowId = (p: GetRowIdParams<GridRow>) => p.data.id;
@@ -168,6 +243,7 @@ export default function IsatvonGrid({
   rows,
   onToggle,
   onEdit,
+  onAction,
   state,
   locked = false,
   height = 640,
@@ -176,18 +252,26 @@ export default function IsatvonGrid({
   rows: GridRow[];
   onToggle: (macroId: string) => void;
   onEdit: (edit: EditRequest) => void;
+  onAction: OnAction;
   state: WorkflowState | undefined;
   locked?: boolean;
   height?: number;
 }) {
-  const columns = useMemo(() => columnDefs(groups, state, locked), [groups, state, locked]);
   // Grid options must keep their identity across renders, or AG Grid redraws every row on each edit.
-  const handlers = useRef({ onToggle, onEdit });
+  const handlers = useRef({ onToggle, onEdit, onAction });
   useEffect(() => {
-    handlers.current = { onToggle, onEdit };
-  }, [onToggle, onEdit]);
+    handlers.current = { onToggle, onEdit, onAction };
+  }, [onToggle, onEdit, onAction]);
+  const columns = useMemo(() => columnDefs(groups, state, locked), [groups, state, locked]);
+  const context = useMemo<GridContext>(
+    () => ({ onAction: (a) => handlers.current.onAction(a) }),
+    [],
+  );
   const fullWidthParams = useMemo(
-    () => ({ onToggle: (id: string) => handlers.current.onToggle(id) }),
+    () => ({
+      onToggle: (id: string) => handlers.current.onToggle(id),
+      onAction: (a: RowAction) => handlers.current.onAction(a),
+    }),
     [],
   );
   // readOnlyEdit: the grid never writes the value itself; the row changes only when the server answers.
@@ -216,6 +300,7 @@ export default function IsatvonGrid({
       <style>{`[data-testid="isatvon-grid"] .isatvon-cell-invalid { background-color: ${INVALID_BG}; box-shadow: inset 0 0 0 1px #ff4d4f; }`}</style>
       <AgGridReact<GridRow>
         ref={grid}
+        context={context}
         theme={themeQuartz}
         rowData={rows}
         columnDefs={columns}

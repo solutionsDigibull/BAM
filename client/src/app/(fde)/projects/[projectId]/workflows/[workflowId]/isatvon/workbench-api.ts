@@ -6,8 +6,10 @@ import type {
   GridGroup,
   RuleViolation,
   SubSkillState,
+  ValidationReport,
   WorkbenchMacro,
   WorkbenchSubSkill,
+  WorkbenchTree,
   WorkflowState,
 } from "@/contracts";
 
@@ -16,6 +18,13 @@ export const treeUrl = (projectId: string, workflowId: string) =>
   `projects/${projectId}/workflows/${workflowId}/macro-skills`;
 export const subSkillUrl = (projectId: string, workflowId: string, subId: string) =>
   `projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}`;
+const workflowUrl = (projectId: string, workflowId: string) =>
+  `projects/${projectId}/workflows/${workflowId}`;
+export const validateUrl = (p: string, w: string) => `${workflowUrl(p, w)}/isatvon/validate`;
+export const exportUrl = (p: string, w: string) => `${workflowUrl(p, w)}/isatvon/export.xlsx`;
+export const generateUrl = (p: string, w: string) => `${workflowUrl(p, w)}/generate`;
+export const regenerateUrl = (p: string, w: string, kind: "macro" | "sub", id: string) =>
+  `${workflowUrl(p, w)}/${kind === "macro" ? "macro-skills" : "sub-skills"}/${id}/regenerate`;
 
 export type MacroRow = {
   kind: "macro";
@@ -23,6 +32,7 @@ export type MacroRow = {
   macro: WorkbenchMacro;
   count: number;
   expanded: boolean;
+  actions: boolean; // Regenerate offered (review, not locked)
 };
 export type SubRow = { kind: "sub"; id: string; macroId: string; row: WorkbenchSubSkill };
 export type InvalidRow = { kind: "invalid"; id: string; reason: string };
@@ -80,7 +90,7 @@ const subRows = new WeakMap<WorkbenchSubSkill, SubRow>();
  * The tree as grid rows: each Macro, then (when expanded) its Sub-Skills. Anything the API sends that
  * isn't usable — null, {}, a row without its ISATVON object — becomes an "Invalid data" row, never a crash.
  */
-export function toRows(tree: unknown, expanded: ReadonlySet<string>): GridRow[] {
+export function toRows(tree: unknown, expanded: ReadonlySet<string>, actions = false): GridRow[] {
   const macros = isObject(tree) && Array.isArray(tree.macros) ? (tree.macros as unknown[]) : [];
   const rows: GridRow[] = [];
   macros.forEach((m, i) => {
@@ -97,6 +107,7 @@ export function toRows(tree: unknown, expanded: ReadonlySet<string>): GridRow[] 
       macro,
       count: subs.length,
       expanded: open,
+      actions,
     });
     if (!open) return;
     subs.forEach((s, j) => {
@@ -271,4 +282,36 @@ export function withLocal(tree: unknown, local: LocalErrors): unknown {
       });
   }
   return out;
+}
+
+/** A validation report merged into the tree: each listed Sub-Skill gets its new state and errors. */
+export function applyReport(tree: unknown, report: ValidationReport | null | undefined): unknown {
+  let out = tree;
+  const byId = new Map(subSkills(tree).map((s) => [s.id, s]));
+  for (const r of report?.sub_skills ?? []) {
+    const row = byId.get(r.id);
+    if (row)
+      out = replaceSub(out, {
+        ...row,
+        state: r.state,
+        validation_errors: r.validation_errors ?? [],
+      });
+  }
+  return out;
+}
+
+/** Why Generate is off, or null when it may start; from server data only (the API still answers 409). */
+export function generateBlocked(tree: unknown): string | null {
+  const t = isObject(tree) ? (tree as Partial<WorkbenchTree>) : {};
+  if (!isEditable(t.workflow_state)) return "The Workflow isn't in ISATVON review";
+  if (!t.sow_approved) return "The SOW isn't approved";
+  const subs = subSkills(tree);
+  if (subs.length === 0) return "There are no Sub-Skills";
+  const all = (t.macros ?? []).reduce(
+    (n, m) => n + (isObject(m) && Array.isArray(m.sub_skills) ? m.sub_skills.length : 0),
+    0,
+  );
+  if (all !== subs.length) return "Some rows hold invalid data";
+  const notValid = subs.filter((s) => s.state !== "VALID").length;
+  return notValid ? `${notValid} Sub-Skill${notValid === 1 ? " isn't" : "s aren't"} VALID` : null;
 }

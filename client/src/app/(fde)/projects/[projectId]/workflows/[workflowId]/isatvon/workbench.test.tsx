@@ -5,10 +5,12 @@ import type { GridColumn, WorkbenchSubSkill } from "@/contracts";
 
 import { fakeApi, problem, renderWithRefine } from "@/app/(admin)/admin/projects/test-harness";
 import {
+  applyReport,
   canEdit,
   cellErrors,
   cellText,
   cellValue,
+  generateBlocked,
   isEditable,
   metadataColumns,
   parseEdit,
@@ -222,6 +224,45 @@ describe("workbench edits (E8.7)", () => {
   });
 });
 
+describe("workbench toolbar rules (E8.7)", () => {
+  test("e8_7_t05 Generate only when in review, SOW approved and every Sub-Skill VALID", () => {
+    const ok = tree([macro("m1", [row(), row({ id: "s2" })])]);
+    expect(generateBlocked(ok)).toBeNull();
+    expect(generateBlocked({ ...ok, workflow_state: "BUILDING" })).toBe(
+      "The Workflow isn't in ISATVON review",
+    );
+    expect(generateBlocked({ ...ok, sow_approved: false })).toBe("The SOW isn't approved");
+    expect(generateBlocked(tree([macro("m1", [])]))).toBe("There are no Sub-Skills");
+    expect(generateBlocked(tree([macro("m1", [row(), null])]))).toBe("Some rows hold invalid data");
+    expect(generateBlocked(tree([macro("m1", [row(), row({ id: "s2", state: "INVALID" })])]))).toBe(
+      "1 Sub-Skill isn't VALID",
+    );
+    expect(generateBlocked(null)).toBe("The Workflow isn't in ISATVON review");
+  });
+
+  test("a validation report updates its rows and leaves the others alone", () => {
+    const b = row({ id: "b" });
+    const other = macro("m2", [b]);
+    const t = tree([macro("m1", [row({ id: "a" })]), other]);
+    const v = { rule: 5, path: "isatvon_definition.v_variables.max_iterations", message: "1-10" };
+    const next = applyReport(t, {
+      sub_skills: [
+        { id: "a", state: "INVALID", validation_errors: [v] },
+        { id: "gone", state: "VALID" },
+      ],
+    }) as ReturnType<typeof tree>;
+    expect(subSkills(next)[0]).toMatchObject({ state: "INVALID", validation_errors: [v] });
+    expect(next.macros[1]).toBe(other);
+    expect(applyReport(t, null)).toBe(t);
+  });
+
+  test("macro rows offer Regenerate only when actions are on", () => {
+    const t = tree([macro("m1", [row()])]);
+    expect(toRows(t, new Set(), true)[0]).toMatchObject({ kind: "macro", actions: true });
+    expect(toRows(t, new Set())[0]).toMatchObject({ kind: "macro", actions: false });
+  });
+});
+
 describe("Workbench screen states (E8.7)", () => {
   const schema = { body: { version: "1.4", json_schema: {}, grid: { column_groups: [] } } };
 
@@ -237,6 +278,17 @@ describe("Workbench screen states (E8.7)", () => {
     expect((await screen.findByTestId("grid-stub")).textContent).toBe("macro,sub");
     expect(screen.getByText("Read-only: the Workflow is BUILDING.")).toBeDefined();
     expect(screen.getByText("1 Macro Skill · 1 Sub-Skill")).toBeDefined();
+  });
+
+  test("e8_7_t05 Generate is disabled and says why while a Sub-Skill is INVALID", async () => {
+    fakeApi({
+      [SCHEMA]: schema,
+      [TREE]: { body: tree([macro("m1", [row({ state: "INVALID" })])]) },
+    });
+    renderWithRefine(<WorkbenchScreen projectId={P} workflowId={W} />);
+    expect(await screen.findByText("Generate is off: 1 Sub-Skill isn't VALID.")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Generate" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Validate" })).toBeDefined();
   });
 
   test("an extraction in progress shows progress, not an empty grid", async () => {
