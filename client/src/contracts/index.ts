@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:a4d491c52c1075fc125537d5f1a5ad2c6c41a8d499d95e53fb64f8ca3f091505
+// source-sha256:61f92824efcdd99145145a1e8f8f25d66adae3e49341db0adae90416dd7e7ec0
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -146,6 +146,59 @@ export type SubSkillState =
   | "FROZEN"
   | "INVALIDATED"
   | "SUPERSEDED";
+/**
+ * Where a build is, for the `build_status` query (the activities' names, TD §13.2).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BuildStage".
+ */
+export type BuildStage =
+  | "build_manifest"
+  | "check_libraries"
+  | "render_skeleton"
+  | "generate_bodies"
+  | "assemble"
+  | "ast_gate"
+  | "static_gate"
+  | "generate_tests"
+  | "build_promptfoo_suite"
+  | "run_sandbox_tests"
+  | "certify_sub_skill"
+  | "correct"
+  | "wait_retry"
+  | "done";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GateStatus".
+ */
+export type GateStatus = "PENDING" | "RUNNING" | "PASSED" | "FAILED" | "SKIPPED";
+/**
+ * The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the
+ * dashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GateName".
+ */
+export type GateName =
+  | "ISATVON_CONTRACT"
+  | "LIBRARIES"
+  | "SCHEMA_SQL"
+  | "CODEGEN"
+  | "AST_SYNTAX"
+  | "AST_SKELETON"
+  | "AST_CONFORMANCE"
+  | "AST_DECOUPLING"
+  | "AST_NO_MANUAL_LOOP"
+  | "AST_HANDOFF"
+  | "AST_IMPORTS"
+  | "AST_SQL_SAFETY"
+  | "RUFF"
+  | "BLACK"
+  | "MYPY"
+  | "CLAMAV"
+  | "BANDIT"
+  | "IMPORT_RESOLUTION"
+  | "LOOP_TESTS";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ManifestStatus".
@@ -336,6 +389,8 @@ export interface SbamContracts {
   WorkbenchSubSkill?: WorkbenchSubSkill;
   SubSkillPatch?: SubSkillPatch;
   ValidationReport?: ValidationReport;
+  BuildsResponse?: BuildsResponse;
+  GatesResponse?: GatesResponse;
   Isa14Manifest?: Isa14Manifest;
   SkillManifest?: SkillManifest;
   WorkflowManifest?: WorkflowManifest;
@@ -783,6 +838,72 @@ export interface SubSkillValidation {
   id: string;
   state: SubSkillState;
   validation_errors?: RuleViolation[];
+}
+/**
+ * `GET W/builds`. `active` is true while any Sub-Skill is still building or testing; the UI
+ * polls only then.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BuildsResponse".
+ */
+export interface BuildsResponse {
+  workflow_id: string;
+  workflow_state: WorkflowState;
+  active: boolean;
+  sub_skills: BuildRow[];
+}
+/**
+ * One Sub-Skill's latest build: where it is, which attempt, and every gate's status.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BuildRow".
+ */
+export interface BuildRow {
+  sub_skill_id: string;
+  skill_id: string;
+  skill_name: string;
+  state: SubSkillState;
+  stage: BuildStage;
+  attempt?: number;
+  gates?: {
+    [k: string]: GateStatus | undefined;
+  };
+}
+/**
+ * `GET W/sub-skills/{sub_id}/gates?attempt=`: one attempt's gate results, in GateName order.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GatesResponse".
+ */
+export interface GatesResponse {
+  sub_skill_id: string;
+  attempt: number;
+  gates: GateResult[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GateResult".
+ */
+export interface GateResult {
+  gate: GateName;
+  status: GateStatus;
+  findings?: Finding[];
+  tool_version?: string | null;
+}
+/**
+ * One problem a gate found; the shape the build worker writes into `gate_results.findings`.
+ * `file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Finding".
+ */
+export interface Finding {
+  gate: GateName;
+  code: string;
+  message: string;
+  file?: string | null;
+  line?: number | null;
+  col?: number | null;
 }
 /**
  * The ISA14 Skill Manifest: exactly these five blocks.

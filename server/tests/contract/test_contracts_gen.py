@@ -17,6 +17,7 @@ from jsonschema import Draft202012Validator
 from pydantic import BaseModel
 from sbam_contracts import (
     audit,
+    build_dashboard,
     documents,
     identity,
     isatvon14,
@@ -209,6 +210,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
         f"{folder}/{stem}"
         for folder, module in (
             ("audit", audit),
+            ("build", build_dashboard),
             ("documents", documents),
             ("identity", identity),
             ("isatvon", isatvon14),
