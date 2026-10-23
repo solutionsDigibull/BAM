@@ -50,6 +50,10 @@ class FakeHandle:
             raise RPCError("workflow not found", RPCStatusCode.NOT_FOUND, b"")
         return type("Description", (), {"status": self.status})()
 
+    async def query(self, name: str, **_: Any) -> Any:
+        """No pipeline answers queries here: like Temporal for a workflow that never started."""
+        raise RPCError("workflow not found", RPCStatusCode.NOT_FOUND, b"")
+
 
 @dataclass
 class FakeBuildHandle:
@@ -96,6 +100,9 @@ class FakeClient:
     ) -> FakeHandle | FakeBuildHandle:
         """`run_id` is how run-based callers (pipeline/start) ask; SubSkillBuild callers
         (builds/service.py) never pass it, so that's how a build lookup is told apart."""
+        if run_id is None and workflow_id.startswith("pipeline-"):
+            # Temporal hands out a handle for any id; the query on it is what fails (E7.1).
+            return FakeHandle(workflow_id, "", "", missing=True)
         if run_id is None:
             status = self.builds.get(workflow_id)
             if status is None:
