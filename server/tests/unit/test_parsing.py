@@ -254,7 +254,7 @@ def test_e4_5_a_retry_after_a_failure_repeats_the_answer_and_notifies_once(h: Ha
 
 
 def test_e4_5_a_type_with_no_loader_yet_stays_parsing(h: Harness) -> None:
-    for kind in ("eml", "msg", "json", "py", "zip"):
+    for kind in ("zip", "tar.gz"):
         ref = h.add(f"file.{kind}", b"anything", detected=kind)
         outcome = parse_version(h.deps, ref)
         assert (outcome.parsed, outcome.code, outcome.report) == (False, None, None)
@@ -348,3 +348,25 @@ def test_e4_5_giving_up_never_overwrites_a_parse_that_finished(h: Harness) -> No
     assert parse_version(h.deps, ref).parsed
     outcome = mark_failed(h.deps, ParseFailure(ref=h.ref(ref.ref_id), code=ErrorCode.TIMEOUT))
     assert outcome.parsed and h.version(ref).state == "PARSED"
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "fixture", "expect"),
+    [
+        ("rule.json", "json", "sample.json", "rule: RULE-BOM"),
+        ("bom.xml", "xml", "sample.xml", "bom.@project: NAV-9"),
+        ("spec.yaml", "yaml", "openapi.yaml", "paths./quotes.get.summary: List quotes"),
+        ("cost.py", "py", "sample.py", "- function `extended_cost` (line 4)"),
+        ("rfq.eml", "eml", "with_attachment.eml", "# RFQ ADX-2026-014 with scanned drawing"),
+        ("rfq.msg", "msg", "with_attachment.msg", "- **From:** RFQ Desk <rfq-desk@example.com>"),
+    ],
+)
+def test_e4_6_a_structured_code_or_mail_file_is_parsed_and_stored(
+    h: Harness, name: str, kind: str, fixture: str, expect: str
+) -> None:
+    ref = h.add(name, docs(fixture), detected=kind)
+    outcome = parse_version(h.deps, ref)
+    assert outcome.parsed and outcome.code is None
+    assert h.version(ref).state == "PARSED"
+    md, doc = derived(h, ref)
+    assert expect in md.decode() and doc.blocks

@@ -50,10 +50,13 @@ def valid(parsed: Parsed) -> ParsedDocument:
 # --- the registry ---------------------------------------------------------------------------------
 
 
-def test_e4_5_the_registry_has_the_six_mvp_document_loaders_and_nothing_else_yet() -> None:
-    assert set(LOADERS) == {"md", "txt", "csv", "pdf", "docx", "xlsx", "png", "jpg", "jpeg", "tiff"}
-    for pending in ("eml", "msg", "json", "yaml", "py", "zip", "tar.gz", "bmp", "gif", None, ""):
-        assert loader_for(pending) is None  # e-mail, structured, code, archives: later issues
+def test_e4_5_the_registry_has_every_loader_but_the_archives_yet() -> None:
+    assert set(LOADERS) == {
+        *("md", "txt", "csv", "pdf", "docx", "xlsx", "png", "jpg", "jpeg", "tiff"),
+        *("eml", "msg", "json", "xml", "yaml", "yml", "py", "sql", "js", "go", "cpp"),  # E4.6
+    }
+    for pending in ("zip", "tar.gz", "bmp", "gif", None, ""):
+        assert loader_for(pending) is None  # archives: a later issue
 
 
 # --- Markdown -------------------------------------------------------------------------------------
