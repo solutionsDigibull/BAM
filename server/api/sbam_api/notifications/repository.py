@@ -33,8 +33,9 @@ class NotificationRepository(TenantScopedRepository[Notification]):
             .on_conflict_do_nothing(
                 index_elements=["temporal_workflow_id", "activity_id", "user_id"]
             )
+            .returning(Notification.id)  # `rowcount` is -1 for this insert on psycopg
         )
-        return bool(self.session.execute(stmt).rowcount)  # type: ignore[attr-defined]
+        return self.session.execute(stmt).first() is not None
 
     def _mine(self, user_id: uuid.UUID) -> Any:
         return self._scoped().where(Notification.user_id == user_id)

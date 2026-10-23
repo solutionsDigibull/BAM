@@ -305,3 +305,27 @@ def test_e4_4_a_parse_failure_is_not_looked_up_for_a_reason() -> None:
     )
     [row] = rows(sessions, fde)
     assert "extension" not in row.body
+
+
+def test_e331_insert_if_new_reports_a_repeated_key_as_not_written() -> None:
+    from sbam_api.db.repository import TenantContext
+    from sbam_api.notifications.repository import NotificationRepository
+
+    sessions, fde, _, _ = world()
+
+    def values(activity: str) -> dict[str, Any]:
+        return {
+            "id": uuid.uuid4(),
+            "user_id": fde,
+            "type": NotificationType.SOW_READY.value,
+            "title": "t",
+            "body": "b",
+            "temporal_workflow_id": "wf",
+            "activity_id": activity,
+        }
+
+    with sessions() as session:
+        repo = NotificationRepository(session, TenantContext(TENANT))
+        assert repo.insert_if_new(values("a1")) is True
+        assert repo.insert_if_new(values("a1")) is False  # the retry
+        assert repo.insert_if_new(values("a2")) is True
