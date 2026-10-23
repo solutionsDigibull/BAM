@@ -215,7 +215,7 @@ export default function BuildGrid({
         animateRows={false}
         // render timing for E12.6-T06, readable from the browser's performance timeline
         onFirstDataRendered={() => performance.mark("build-grid:rendered")}
-        rowBuffer={10}
+        rowBuffer={2}
       />
     </div>
   );
