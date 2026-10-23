@@ -147,6 +147,21 @@ class SowCitationDetail(_Dto):
     source_available: bool  # GET .../source serves the document's text
 
 
+class SowApproveRequest(_Dto):
+    """POST P/sow/versions/{v}/approve (E7.1): the hash of the version the FDE reviewed."""
+
+    sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+
+
+class SowApproval(_Dto):
+    version: Annotated[int, Field(ge=1)]
+    status: SowVersionStatus
+    is_locked: bool
+    approved_at: datetime
+    approved_by: str
+    sha256: str
+
+
 class SowOverview(_Dto):
     sow_id: UUID
     current: SowVersionSummary | None = None
@@ -227,5 +242,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "save_request": contract_schema(SowSaveRequest, "sow/save_request"),
         "diff": contract_schema(SowDiff, "sow/diff"),
         "regenerate_request": contract_schema(SowRegenerateRequest, "sow/regenerate_request"),
+        "approve_request": contract_schema(SowApproveRequest, "sow/approve_request"),
+        "approval": contract_schema(SowApproval, "sow/approval"),
         "citation_detail": contract_schema(SowCitationDetail, "sow/citation_detail"),
     }

@@ -9,6 +9,7 @@
   423 SOW_LOCKED when approved, 413 over 2 MB.
 * `GET P/sow/versions/{v}/diff/{other}`: section by section, what changed from v to other.
 * `POST P/sow/regenerate {hint?}` + `Idempotency-Key`: 202 `{"run": Run}`; see `regenerate.py`.
+* `POST P/sow/versions/{v}/approve {sha256}`: the hash-bound approval (`approve.py`, E7.1).
 * `GET P/sow/versions/{v}/citations/{okf_ref_id}` (+ `/source`): the citation panel
   (`citations.py`).
 * `GET P/sow/versions/{v}/export?format=pdf|docx|md`: 302 to a signed URL (300 s); see `exports.py`.
@@ -22,6 +23,8 @@ from fastapi.responses import RedirectResponse
 from sbam_contracts.runs import RunAccepted
 from sbam_contracts.sow_api import (
     ExportFormat,
+    SowApproval,
+    SowApproveRequest,
     SowCitationDetail,
     SowDiff,
     SowOverview,
@@ -39,6 +42,7 @@ from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
 from sbam_api.sow import citations, versions
+from sbam_api.sow.approve import approve_version
 from sbam_api.sow.exports import export_key
 from sbam_api.sow.regenerate import start_regenerate
 from sbam_api.storage.router import backend
@@ -206,4 +210,18 @@ def sow_citation_source(
             "Content-Disposition": f'attachment; filename="{found.filename}"',
             "X-Content-Type-Options": "nosniff",
         },
+    )
+
+
+@router.post("/projects/{project_id}/sow/versions/{version}/approve")
+async def approve_sow_version(
+    project_id: Project,
+    version: Version,
+    body: SowApproveRequest,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+) -> SowApproval:
+    return await approve_version(
+        sessions, lambda: temporal_client(request), user, project_id, version, body
     )

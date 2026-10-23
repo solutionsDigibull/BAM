@@ -504,6 +504,13 @@ class World:
         )
         export_version(ExportDeps(self.sessions, LocalDiskBackend(self.tmp)), inp)
 
+    def _sow_a_sha(self) -> str:
+        with self.sessions() as s:
+            sha = s.scalars(
+                select(SowVersion.sha256).where(SowVersion.sow_id == self.sow_a)
+            ).first()
+            return str(sha)
+
     # -- placeholders (`@name` in the matrix) ----------------------------------------------
     def value(self, name: str) -> str:
         """What `@name` stands for in the matrix."""
@@ -525,6 +532,7 @@ class World:
             "snapshot_a": self.snapshot_a,
             "kv_a": self.kv_a,
             "sow_a": self.sow_a,
+            "sow_a_sha": self._sow_a_sha(),  # what an approval of v1 sends (E7.1)
             "sow_a_chunk": f"{self.kv_a_doc}#c0",  # what the seeded SOW cites
         }
         if name in fixed:
