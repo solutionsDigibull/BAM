@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:0a632ca6ba819f8f5c5b8e6911f54d98b76832860b1abc27ec5b946733d0534c
+// source-sha256:28cea2f8bb13eca329dca953b0c972ad3214e11d29380070408fdb932a2c249a
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -431,6 +431,7 @@ export interface SbamContracts {
   ProjectMembers?: ProjectMembers;
   PipelineTimeline?: PipelineTimeline;
   WorkflowSummary?: WorkflowSummary;
+  WorkflowRename?: WorkflowRename;
   UploadRequest?: UploadRequest;
   UploadToken?: UploadToken;
   ScanOutcome?: ScanOutcome;
@@ -2256,7 +2257,7 @@ export interface PipelineCounts {
   failed: number;
 }
 /**
- * One Workflow SBAM created for an approved SOW version (read-only).
+ * One Workflow SBAM created for an approved SOW version (read-only but for its name).
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "WorkflowSummary".
@@ -2265,9 +2266,27 @@ export interface WorkflowSummary {
   id: string;
   project_id: string;
   sow_version_id: string;
-  version: number;
+  name: string;
+  /**
+   * Pattern: `^[1-9][0-9]*\.0\.[0-9]+$`
+   */
+  version: string;
   state: WorkflowState;
+  created_by: string;
   created_at: string;
+  row_version: number;
+}
+/**
+ * PATCH W (E8.1): the name is the only thing a person may change on a Workflow.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowRename".
+ */
+export interface WorkflowRename {
+  /**
+   * Pattern: `^[^\x00-\x1f\x7f-\x9f]*$`
+   */
+  name: string;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

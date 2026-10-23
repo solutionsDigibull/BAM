@@ -56,6 +56,7 @@ from sbam_api.sow.service import Generation, record_generation
 from sbam_api.storage import Kind, StorageScope, signed_url
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.temporal.models import TemporalRun
+from sbam_api.workflows.models import Workflow
 from sbam_contracts.api import API_BASE
 from sbam_contracts.build import BuildStage, SubSkillBuildStatus
 from sbam_contracts.knowledge import CoverageEntry, GraphEdge, GraphNode, SourceStatus
@@ -345,6 +346,7 @@ class World:
         self.kv_a = self._seed_knowledge()
         self.sow_a, self.sow_a_tiptap = self._seed_sow()
         self._seed_export()
+        self._seed_workflow()
 
     def _create_project(self, role: str, name: str) -> uuid.UUID:
         res = self.call("POST", "/admin/projects", role, json={"name": name})
@@ -504,6 +506,26 @@ class World:
         )
         export_version(ExportDeps(self.sessions, LocalDiskBackend(self.tmp)), inp)
 
+    def _seed_workflow(self) -> None:
+        """Workflow 1.0.0 of project A as SBAM created it from SOW v1 (E8.1), id `@workflow_a`."""
+        with self.sessions() as s:
+            version_id = s.scalars(
+                select(SowVersion.id).where(SowVersion.sow_id == self.sow_a)
+            ).one()
+            row = Workflow(
+                id=self.workflow_a,
+                tenant_id=self.tenant_a,
+                project_id=self.project_a,
+                sow_version_id=version_id,
+                major=1,
+                version="1.0.0",
+                name="Alpha v1",
+                created_by="SYSTEM",
+            )
+            row.state = "ISATVON_REVIEW"
+            s.add(row)
+            s.commit()
+
     def _sow_a_sha(self) -> str:
         with self.sessions() as s:
             sha = s.scalars(
@@ -546,7 +568,7 @@ class World:
         raise KeyError(f"unknown placeholder @{name}")
 
     def version(self, what: str) -> int:
-        """row_version of `tenant_a`, `project_a`, `master_a` or `user_<role>`."""
+        """row_version of `tenant_a`, `project_a`, `master_a`, `workflow_a` or `user_<role>`."""
         with self.sessions() as s:
             if what.startswith("user_"):
                 row: Any = s.get(User, self.actors[what.removeprefix("user_")].id)
@@ -558,6 +580,8 @@ class World:
                 row = s.get(MasterEntry, uuid.UUID(self.value(what)))
             elif what.startswith("sow_"):
                 row = s.get(Sow, uuid.UUID(self.value(what)))
+            elif what.startswith("workflow_"):
+                row = s.get(Workflow, uuid.UUID(self.value(what)))
             else:
                 row = s.get(Project, uuid.UUID(self.value(what)))
             assert row is not None

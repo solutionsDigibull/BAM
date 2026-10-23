@@ -20,7 +20,7 @@
       "type": "string"
     }
   },
-  "description": "One Workflow SBAM created for an approved SOW version (read-only).",
+  "description": "One Workflow SBAM created for an approved SOW version (read-only but for its name).",
   "properties": {
     "id": {
       "format": "uuid",
@@ -37,26 +37,42 @@
       "title": "Sow Version Id",
       "type": "string"
     },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
     "version": {
+      "pattern": "^[1-9][0-9]*\\.0\\.[0-9]+$",
       "title": "Version",
-      "type": "integer"
+      "type": "string"
     },
     "state": {
       "$ref": "#/$defs/WorkflowState"
+    },
+    "created_by": {
+      "title": "Created By",
+      "type": "string"
     },
     "created_at": {
       "format": "date-time",
       "title": "Created At",
       "type": "string"
+    },
+    "row_version": {
+      "title": "Row Version",
+      "type": "integer"
     }
   },
   "required": [
     "id",
     "project_id",
     "sow_version_id",
+    "name",
     "version",
     "state",
-    "created_at"
+    "created_by",
+    "created_at",
+    "row_version"
   ],
   "title": "WorkflowSummary",
   "type": "object"

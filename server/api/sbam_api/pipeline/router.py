@@ -5,16 +5,13 @@
   The documents come from the database, not the request. A repeated `Idempotency-Key` (<= 128
   characters) answers the same run.
 * `GET P/pipeline`: the dashboard's state, step timeline and document counts.
-* `GET P/workflows`: read-only. There is no route to create a Workflow: SBAM creates it when a SOW
-  is approved (#91), so a POST answers 405.
 """
 
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request
-from sbam_contracts.api import Page
-from sbam_contracts.projects import PipelineTimeline, WorkflowSummary
+from sbam_contracts.projects import PipelineTimeline
 from sbam_contracts.runs import RunAccepted
 from sbam_contracts.state_machines import ProjectPipelineState
 from sqlalchemy.orm import Session, sessionmaker
@@ -70,10 +67,3 @@ def pipeline(project_id: Project, user: User, sessions: Sessions) -> PipelineTim
     return PipelineTimeline(
         state=state, steps=build_steps(state, history), counts=build_counts(counts)
     )
-
-
-@router.get("/projects/{project_id}/workflows")
-def workflows(project_id: Project) -> Page[WorkflowSummary]:
-    # TODO(#91): list the project's Workflow rows once the table exists. None can exist before a
-    # SOW is approved, so an empty page is the truthful answer until then.
-    return Page[WorkflowSummary](items=[])
