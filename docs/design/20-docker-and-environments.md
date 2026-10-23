@@ -247,6 +247,7 @@ Deploy = SSH over Netbird → `docker compose pull` (by digest) → `api-migrate
 - **Worker drain:** workers drain on SIGTERM (120 s, `stop_grace_period: 150s`).
 - **Health watch:** health is watched for 5 min, and three bad checks in a row redeploy the previous release, record it in `log.jsonl` and alert. Volumes are never touched.
 - **Migrations are expand/contract,** so rolling back only swaps app images.
+- **Pipeline:** `.github/workflows/deploy.yml` runs it over Netbird SSH. CI's `release-manifest` job writes the digests of a `main` commit; dev gets them automatically, and a `vX.Y.Z` tag of that commit promotes the same file to staging and then, after a `production` environment reviewer approves (no self-review), to prod.
 
 ## 20.5 Netbird (C-47)
 

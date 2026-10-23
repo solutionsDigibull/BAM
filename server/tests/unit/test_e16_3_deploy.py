@@ -544,6 +544,7 @@ def test_e16_3_t07_groups_workers_to_sandbox_and_platform_only_prod_ops() -> Non
         "vm-staging",
         "vm-prod",
         "sandbox-host",
+        "ci-deploy",
     }
     for vm in ("vm-dev", "vm-staging", "vm-prod"):
         assert matrix.is_allowed(policy, vm, "sandbox-host", "sandbox-api")
@@ -552,7 +553,8 @@ def test_e16_3_t07_groups_workers_to_sandbox_and_platform_only_prod_ops() -> Non
         sources = {
             s for s, d, svc in matrix.allowed_pairs(policy) if d == "vm-prod" and svc == service
         }
-        assert sources == {"platform"}, service
+        # deploy jobs (E16.4) SSH to prod's deploy user; no ops UI
+        assert sources == ({"platform", "ci-deploy"} if service == "ssh" else {"platform"}), service
     assert not any(rule.get("bidirectional") for rule in policy["policies"])
 
 

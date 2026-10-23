@@ -1,0 +1,78 @@
+# Deploys (E16.4, TD §20.4, docs/runbooks/deploy.md):
+#   main, CI green  -> dev (automatic)
+#   tag vX.Y.Z      -> staging (automatic, smoke-checked) -> production (waits for a reviewer of the
+#                      GitHub environment `production`; self-review is off in its settings)
+# Every environment gets the release manifest that CI built for the commit on main, so dev, staging
+# and prod run the same digests: a tag never rebuilds, and a tag on a commit without a green main
+# CI run is refused. The VM side (migrate, roll out, health watch, rollback) is scripts/deploy.sh.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  actions: read # the release artifact of the CI run
+
+concurrency:
+  group: deploy-${{ github.event_name == 'push' && 'release' || 'dev' }}
+  cancel-in-progress: false # never cut a deploy (or its rollback) short
+
+jobs:
+  release:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      id: ${{ steps.find.outputs.id }}
+      sha: ${{ steps.find.outputs.sha }}
+    steps:
+      - name: Find the release manifest
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$EVENT" = push ]; then
+            sha="$GITHUB_SHA" id="$GITHUB_REF_NAME"
+            [[ "$id" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::$id is not a vX.Y.Z tag"; exit 1; }
+            run="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci --branch main --event push \
+              --commit "$sha" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            [ -n "$run" ] || { echo "::error::$id ($sha) has no green CI run on main: tag a commit of main"; exit 1; }
+          else
+            sha="$RUN_SHA" run="$RUN_ID" id="main-${RUN_SHA:0:12}"
+          fi
+          gh run download "$run" -R "$GITHUB_REPOSITORY" --name release --dir release
+          cat release/release.env
+          { echo "id=$id"; echo "sha=$sha"; } >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: release-to-deploy, path: release/release.env }
+
+  dev:
+    needs: release
+    if: github.event_name == 'workflow_run'
+    uses: ./.github/workflows/deploy-env.yml
+    with: { environment: dev, env-name: dev, id: "${{ needs.release.outputs.id }}", sha: "${{ needs.release.outputs.sha }}" }
+    secrets: inherit
+
+  staging:
+    needs: release
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/deploy-env.yml
+    with: { environment: staging, env-name: staging, id: "${{ needs.release.outputs.id }}", sha: "${{ needs.release.outputs.sha }}" }
+    secrets: inherit
+
+  production:
+    needs: [release, staging]
+    uses: ./.github/workflows/deploy-env.yml
+    with: { environment: production, env-name: prod, id: "${{ needs.release.outputs.id }}", sha: "${{ needs.release.outputs.sha }}" }
+    secrets: inherit
