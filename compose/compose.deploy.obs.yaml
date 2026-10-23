@@ -13,3 +13,22 @@ services:
   langfuse-web:
     ports: !override
       - ${SBAM_OPS_BIND:?set the VM Netbird address}:${LANGFUSE_PORT:-3001}:3000
+  # LLM traces (E16.2, TD §17.2): the workers that call the gateway send to this environment's Langfuse
+  # project over the internal network; its key pair is a Docker secret per VM (with-secrets.sh turns
+  # *_FILE into the variable, over the empty value of compose.yaml). Without them a staging or prod
+  # worker refuses to start (sbam_workers.llm.preflight).
+  worker-ingest: &langfuse-worker
+    environment:
+      LANGFUSE_HOST: http://langfuse-web:3000
+      LANGFUSE_PUBLIC_KEY_FILE: /run/secrets/langfuse_public_key
+      LANGFUSE_SECRET_KEY_FILE: /run/secrets/langfuse_secret_key
+    secrets:
+      - { source: langfuse_public_key, target: langfuse_public_key, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: langfuse_secret_key, target: langfuse_secret_key, uid: "10001", gid: "10001", mode: 0400 }
+  worker-llm: *langfuse-worker
+  worker-build: *langfuse-worker
+  worker-test: *langfuse-worker
+
+secrets:
+  langfuse_public_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/langfuse_public_key" }
+  langfuse_secret_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/langfuse_secret_key" }

@@ -10,6 +10,7 @@ export const versionPath = (p: string, v: number) => `projects/${p}/sow/versions
 export const diffPath = (p: string, v: number, other: number) =>
   `projects/${p}/sow/versions/${v}/diff/${other}`;
 export const regeneratePath = (p: string) => `projects/${p}/sow/regenerate`;
+export const approvePath = (p: string, v: number) => `projects/${p}/sow/versions/${v}/approve`;
 export const citationPath = (p: string, v: number, ref: string) =>
   `projects/${p}/sow/versions/${v}/citations/${encodeURIComponent(ref)}`;
 /** The browser downloads these itself: the proxy forwards the file (or the 302 to it). */
@@ -75,6 +76,42 @@ function messageOf(error: unknown, table: Record<string, string>, fallback: stri
   const e = error as ApiError | null;
   return (code && table[code]) ?? e?.problem?.detail ?? e?.message ?? fallback;
 }
+
+// --- approval (E7.3, the API is E7.1) ---------------------------------------------------------------
+
+export const APPROVABLE = new Set(["GENERATED", "IN_REVIEW"]);
+export const SAVE_FIRST = "Save your edits first: approval signs off a saved version.";
+export const STALE_TITLE = "A newer version exists";
+export const ORCHESTRATOR_DOWN = "Orchestrator unavailable, try again.";
+
+/** Why Approve is off for this version, or null: only the latest, reviewable, hashed version. */
+export function approveBlocked(
+  version: SowVersionSummary | undefined,
+  latest: number,
+  generating: boolean,
+): string | null {
+  if (!version) return "Open a version first";
+  if (generating) return "A generation is running";
+  if (version.version !== latest) return `Only the latest version (v${latest}) can be approved`;
+  if (!APPROVABLE.has(version.status)) return `A ${version.status} version can't be approved`;
+  if (!version.sha256) return "This version has no hash to approve";
+  return null;
+}
+
+/** How the screen answers a failed approval. A stale one never retries with another hash. */
+export function approveFailure(error: unknown): "stale" | "unavailable" | "other" {
+  const code = problemCode(error);
+  if (code === "SOW_STALE" || code === "SOW_NOT_LATEST") return "stale";
+  if (statusOf(error) === 503 || code === "ORCHESTRATOR_UNAVAILABLE") return "unavailable";
+  return "other";
+}
+
+const APPROVE_MESSAGES: Record<string, string> = {
+  PIPELINE_NOT_WAITING: "The pipeline is not waiting for an SOW approval right now.",
+  ORCHESTRATOR_UNAVAILABLE: ORCHESTRATOR_DOWN,
+};
+export const approveErrorMessage = (error: unknown) =>
+  messageOf(error, APPROVE_MESSAGES, "Could not approve.");
 
 export const saveErrorMessage = (error: unknown) =>
   messageOf(error, SAVE_MESSAGES, "Could not save.");

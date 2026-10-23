@@ -34,6 +34,7 @@ import {
 import type {
   Project,
   RunAccepted,
+  SowApproval,
   SowOverview,
   SowVersionDetail,
   SowVersionList,
@@ -44,13 +45,19 @@ import type { ApiError } from "@/providers/data-provider";
 import { PROJECTS_RESOURCE } from "../../workspace-api";
 import {
   APPROVED_BANNER,
+  approveBlocked,
+  approveErrorMessage,
+  approveFailure,
+  approvePath,
   EMPTY_SOW,
   EXPORT_FORMATS,
   GENERATING,
   MAX_TIPTAP_BYTES,
   NEW_VERSION_SOON,
   NO_CHANGES,
+  ORCHESTRATOR_DOWN,
   POLL_MS,
+  SAVE_FIRST,
   SAVED,
   SUPERSEDED_BANNER,
   exportUrl,
@@ -67,6 +74,7 @@ import {
   versionPath,
   versionsPath,
 } from "./sow-api";
+import { ApprovalDetails, ApproveDialog, StaleApprovalModal } from "./sow-approve";
 import { type StoredDraft, clearDraft, readDraft, writeDraft } from "./sow-draft";
 import type { CiteClick } from "./sow-editor";
 import {
@@ -145,7 +153,12 @@ export function SowScreen({ projectId }: { projectId: string }) {
   const [restoredDoc, setRestoredDoc] = useState<JSONContent | null>(null);
   const save = useCustomMutation<SowVersionSummary, ApiError>();
   const regenerate = useCustomMutation<RunAccepted, ApiError>();
+  const approve = useCustomMutation<SowApproval, ApiError>();
   const saving = useRef(false);
+  const approving = useRef(false); // one approval in flight, however fast the clicks (E7.3-T05)
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [stale, setStale] = useState<number | null>(null);
+  const [approval, setApproval] = useState<SowApproval | null>(null);
 
   // A regeneration is done once a newer version is current (derived while rendering, then announced).
   const [ready, setReady] = useState<number | null>(null);
@@ -293,6 +306,40 @@ export function SowScreen({ projectId }: { projectId: string }) {
     );
   };
 
+  const onApprove = (v: number, sha256: string) => {
+    if (approving.current) return;
+    approving.current = true;
+    approve.mutate(
+      {
+        url: approvePath(projectId, v),
+        method: "post",
+        values: { sha256 }, // the hash shown in the dialog, never a newer one (E7.1 hash binding)
+        successNotification: false,
+        errorNotification: false,
+      },
+      {
+        onSuccess: (res) => {
+          setApproveOpen(false);
+          setApproval(res.data);
+          void message.success(`SOW v${res.data.version} approved.`);
+          refetchAll();
+          void detail.query.refetch();
+          void projects.query.refetch(); // the pipeline moves on to SOW_APPROVED
+        },
+        onError: (error) => {
+          const kind = approveFailure(error);
+          setApproveOpen(false);
+          if (kind === "stale") setStale(v);
+          else if (kind === "unavailable") void message.error(ORCHESTRATOR_DOWN);
+          else void message.error(approveErrorMessage(error));
+        },
+        onSettled: () => {
+          approving.current = false;
+        },
+      },
+    );
+  };
+
   const openVersion = (v: number) =>
     discardFirst(() => {
       setShown(v === current?.version ? undefined : v);
@@ -320,6 +367,8 @@ export function SowScreen({ projectId }: { projectId: string }) {
   const failed = version?.status === "GENERATION_FAILED";
   const editable = Boolean(version) && isCurrent && !locked && !failed && !generating;
   const latestNumber = newest(items)?.version ?? current.version;
+  const approveReason = approveBlocked(version, latestNumber, generating);
+  const shownApproval = approval && approval.version === shownVersion ? approval : null;
 
   const regenerateButton = (
     <Button
@@ -369,6 +418,32 @@ export function SowScreen({ projectId }: { projectId: string }) {
           >
             Save
           </Button>
+          {locked ? null : (
+            <Tooltip
+              title={
+                approveReason ?? "Approve this version: it is locked and the Workflow is generated"
+              }
+            >
+              <span>
+                <Button
+                  type="primary"
+                  disabled={Boolean(approveReason) || approve.mutation.isPending}
+                  onClick={() =>
+                    draft
+                      ? modal.confirm({
+                          title: "Unsaved edits",
+                          content: SAVE_FIRST,
+                          okText: "Save now",
+                          onOk: onSave,
+                        })
+                      : setApproveOpen(true)
+                  }
+                >
+                  Approve
+                </Button>
+              </span>
+            </Tooltip>
+          )}
         </Space>
       </Space>
 
@@ -438,6 +513,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
           data-testid="sow-locked"
           style={{ marginBottom: 12 }}
           message={version?.status === "SUPERSEDED" ? SUPERSEDED_BANNER : APPROVED_BANNER}
+          description={shownApproval ? <ApprovalDetails approval={shownApproval} /> : undefined}
           action={
             <Tooltip title={NEW_VERSION_SOON}>
               <Button size="small" disabled>
@@ -533,6 +609,28 @@ export function SowScreen({ projectId }: { projectId: string }) {
         versions={items}
         open={diffOpen}
         onClose={() => setDiffOpen(false)}
+      />
+      {version?.sha256 ? (
+        <ApproveDialog
+          open={approveOpen}
+          version={version.version}
+          sha256={version.sha256}
+          busy={approve.mutation.isPending}
+          onConfirm={() => onApprove(version.version, version.sha256 ?? "")}
+          onCancel={() => setApproveOpen(false)}
+        />
+      ) : null}
+      <StaleApprovalModal
+        open={stale !== null}
+        version={stale ?? 0}
+        onClose={() => setStale(null)}
+        onReload={() => {
+          setStale(null);
+          setShown(undefined);
+          setReload((n) => n + 1);
+          refetchAll();
+          void detail.query.refetch();
+        }}
       />
       <RegenerateModal
         open={regenOpen}

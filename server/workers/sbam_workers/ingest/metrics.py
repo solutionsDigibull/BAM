@@ -68,7 +68,10 @@ def start(probe: Callable[[], float | None], settings: WorkerSettings) -> None:
         return
     _started = True
     _probe = probe
-    if settings.otel_exporter_otlp_endpoint:
+    # The worker's telemetry may already export metrics (E16.2); a second provider is refused.
+    if settings.otel_exporter_otlp_endpoint and not isinstance(
+        metrics.get_meter_provider(), MeterProvider
+    ):
         endpoint = str(settings.otel_exporter_otlp_endpoint).rstrip("/")
         reader = PeriodicExportingMetricReader(
             OTLPMetricExporter(endpoint=f"{endpoint}/v1/metrics", timeout=2),
