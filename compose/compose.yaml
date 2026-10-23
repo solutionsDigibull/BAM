@@ -27,6 +27,12 @@ x-worker: &worker
     POSTHOG_HOST: ${POSTHOG_HOST:-}
     POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
     POSTHOG_DISTINCT_ID_SALT: ${POSTHOG_DISTINCT_ID_SALT:-}
+    # LLM traces (E16.2): the environment's Langfuse project. Empty = no traces; staging/prod workers
+    # refuse to start without them (sbam_workers.llm.preflight).
+    LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+    LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+    LANGFUSE_LOG_CONTENT: ${LANGFUSE_LOG_CONTENT:-false}
   depends_on: &worker-depends
     api-migrate: { condition: service_completed_successfully } # temporal_runs (run mirror)
     postgres: { condition: service_healthy }

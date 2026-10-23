@@ -41,7 +41,8 @@ class WorkerSettings(BaseSettings):
     llm_transport_attempts: int = Field(default=3, ge=1, le=10)
     llm_backoff_seconds: float = Field(default=1.0, ge=0)
     # Langfuse (E6.1): traces over its REST API. Unset keys = no export; the trace id is still made.
-    langfuse_host: AnyHttpUrl | None = None
+    # One project per environment (E16.2), checked before polling by `llm.preflight`.
+    langfuse_host: str | None = None  # Compose passes "" when unset: a str, not a URL
     langfuse_public_key: str | None = None
     langfuse_secret_key: SecretStr | None = None
     # Redaction policy: prompts and answers hold client documents, so they are exported only as

@@ -36,6 +36,38 @@ Every request, Temporal workflow, activity, LLM call and log line carries `corre
 | Product / eval analytics | PostHog (C-43)                                                                                | Funnel (Workflow created → SOW approved → Generate → Frozen), gate failures, corrections per Sub-Skill, time per stage, FDE edits on SOW/ISATVON |
 | Operations               | Temporal UI                                                                                   | Workflow histories (operators only, via Netbird)                                                                                                    |
 
+### Per environment (E16.2)
+
+**Langfuse.**
+- **Projects:** one project per environment: `sbam-dev`, `sbam-staging`, `sbam-prod`. Each has its own key pair, held as Docker secrets on its VM.
+- **Who sends traces:** the workers that call the gateway (ingest, llm, build, test). Each call creates one trace, and `llm_calls.trace_id` is the Langfuse trace id (the `langfuse_trace_id` of §7). The id is made before the export, so it is stored even while Langfuse is down or lagging.
+- **Preflight** (`sbam_workers.llm.preflight`) runs before a worker polls. In staging or prod it refuses to start (`LANGFUSE_MISCONFIGURED`) when:
+  - the keys or host are missing;
+  - the host is not internal;
+  - the keys belong to another environment's project;
+  - Langfuse rejects the keys.
+- **Outages:** if Langfuse is unreachable at start, the worker only warns. Export failures count `llm_trace_export_failures_total` (Grafana) and never fail the call.
+- **Redaction:** prompts and answers go out as size plus SHA-256 only. `LANGFUSE_LOG_CONTENT=true` sends the text; it is for development only and is refused in production.
+- **Access:** the UI is reachable over Netbird only.
+
+**PostHog.** Events are captured server-side from the notification outbox (`audit.outbox.dispatch_pending`, after commit), so a rolled-back transition sends nothing. Each event's `uuid` is the outbox row id, so PostHog drops re-sends.
+
+| Event | Outbox type (`<machine>.<event>`) |
+|---|---|
+| `workflow_created` | `project_pipeline.workflow_created` |
+| `sow_approved` | `sow_version.approve` |
+| `sow_edited` | `sow_version.new_version`, `sow_version.edit` |
+| `generate_started` | `workflow.generate` |
+| `workflow_frozen` | `workflow.freeze` |
+| `gate_failed` | `sub_skill.gate_failed` (+ `gate`) |
+| `correction_attempted` | `sub_skill.correction_applied` |
+| `sub_skill_certified` | `sub_skill.tests_passed` |
+| `isatvon_edited` | `sub_skill.edit` |
+
+- **Properties:** only `tenant_id`, `project_id`, `workflow_id`, `subject_id`, `sub_skill_id`, `stage`, `duration_ms` (time since the entity's previous transition), `environment` and `gate`.
+- **Person:** `distinct_id` is `sha256(salt:user_id)`.
+- **Failure handling:** capture is fire-and-forget, counted in `posthog_events_sent_total` / `posthog_events_failed_total`.
+
 ## 17.3 Dashboards and alerts
 
 - **Dashboards:** API health, Temporal queues, pipeline throughput, gate pass rate per gate, correction rate, sandbox success rate/latency, LLM latency/cost by alias, ClamAV signature age, disk usage.
