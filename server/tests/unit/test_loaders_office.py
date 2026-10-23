@@ -11,8 +11,8 @@ from datetime import date, datetime
 from typing import Any
 
 import pytest
-from docx import Document
 from fixtures import fixture_path
+from officefiles import docx_bytes, sample_docx, sheet_of, xlsx_bytes
 from openpyxl import Workbook
 from pdfs import encrypted, make_pdf
 from sbam_contracts.api import ErrorCode
@@ -115,30 +115,6 @@ def test_e4_5_control_characters_never_reach_the_text() -> None:
 # --- DOCX -----------------------------------------------------------------------------------------
 
 
-def docx_bytes(build: Any) -> bytes:
-    doc = Document()
-    build(doc)
-    out = io.BytesIO()
-    doc.save(out)
-    return out.getvalue()
-
-
-def sample_docx() -> bytes:
-    def build(doc: Any) -> None:
-        doc.add_heading("Quote terms", 0)
-        doc.add_heading("Scope", 1)
-        doc.add_paragraph("Supply of 2,500 boards.")
-        doc.add_paragraph("IPC Class 3", style="List Bullet")
-        doc.add_paragraph("AS9100D", style="List Bullet")
-        doc.add_heading("Prices", 2)
-        table = doc.add_table(rows=2, cols=2)
-        for cell, text in zip(table._cells, ["MPN", "Qty", "STM32", "12"], strict=True):
-            cell.text = text
-        doc.add_paragraph("Valid for 30 days.")
-
-    return docx_bytes(build)
-
-
 def test_e4_5_t04_a_docx_keeps_its_headings_lists_and_table() -> None:
     parsed = run("docx", sample_docx())
     doc = document(parsed)
@@ -196,19 +172,6 @@ def test_e4_5_a_container_that_unpacks_too_large_is_refused_before_it_is_read(
 
 
 # --- XLSX -----------------------------------------------------------------------------------------
-
-
-def sheet_of(book: Workbook) -> Any:
-    """The active sheet (typed Optional by openpyxl; a new workbook always has one)."""
-    return book.active
-
-
-def xlsx_bytes(build: Any) -> bytes:
-    book = Workbook()
-    build(book)
-    out = io.BytesIO()
-    book.save(out)
-    return out.getvalue()
 
 
 def cells(parsed: Parsed) -> dict[tuple[str, str], str]:

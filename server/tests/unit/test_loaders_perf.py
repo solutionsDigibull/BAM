@@ -4,32 +4,17 @@ Slow (a minute or two to build and parse the file), so it runs only on request:
 `SBAM_PERF=1 pytest tests/unit/test_loaders_perf.py`. Measured results go in the PR.
 """
 
-import io
 import os
-import random
 import sys
 import time
 
 import pytest
-from openpyxl import Workbook
+from bigxlsx import COLUMNS, ROWS, big_workbook
 from sbam_contracts.documents import MAX_FILE_BYTES, PARSE_MEMORY_LIMIT_BYTES, PARSE_TIMEOUT_SECONDS
 from sbam_workers.ingest import parsing
 from test_parsing import Harness, root  # noqa: F401 - the short-path fixture
 
 pytestmark = pytest.mark.skipif(not os.environ.get("SBAM_PERF"), reason="SBAM_PERF=1 to run")
-
-ROWS, COLUMNS = 200_000, 4  # 800,000 cells of unique text: about 15 MB
-
-
-def big_workbook() -> bytes:
-    rng = random.Random(7)  # noqa: S311 - test data, not a secret
-    book = Workbook(write_only=True)
-    sheet = book.create_sheet("Big")
-    for n in range(ROWS):
-        sheet.append([f"{rng.getrandbits(80):020x}-{n}" for _ in range(COLUMNS)])
-    out = io.BytesIO()
-    book.save(out)
-    return out.getvalue()
 
 
 def test_e4_5_t08_a_15_mb_workbook_parses_in_time_and_within_the_memory_cap(
