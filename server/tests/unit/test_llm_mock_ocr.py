@@ -100,3 +100,12 @@ def test_e4_8_other_aliases_still_need_a_recorded_fixture(mock: Any) -> None:
     body["metadata"] = {"prompt_id": "never-recorded"}
     status, reply = mock.chat(body)
     assert status == 422 and reply["error"]["code"] == "MOCK_FIXTURE_MISSING"
+
+
+def test_e4_8_a_request_with_no_image_has_nothing_to_read_so_the_page_is_unreadable(
+    mock: Any,
+) -> None:
+    body = vision_request(2)
+    body["messages"][1]["content"] = [body["messages"][1]["content"][0]]  # the text part only
+    out = answer(mock, body)
+    assert (out.page, out.markdown, out.unreadable) == (2, "", True)

@@ -8,13 +8,13 @@ import random
 
 import pytest
 from fixtures import fixture_path
+from pdfs import make_pdf
 from PIL import Image, ImageFile
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.documents import MAX_OCR_PAGES, OCR_MAX_IMAGE_BYTES, OCR_MAX_SIDE_PX
 from sbam_workers.ingest import rasterize
 from sbam_workers.ingest.loaders import ParseError, loader_for, no_heartbeat
 from sbam_workers.ingest.rasterize import PageUnreadable, fit, open_source
-from test_loaders_office import make_pdf
 
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 

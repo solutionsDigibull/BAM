@@ -29,7 +29,8 @@ Cognee's aliases (E5.7, #259) are marked in `aliases.json` and need no recorded 
                           LLM_MOCK_EMBEDDING_DIMENSIONS (default 1536).
     "mock": "ocr"         (`sbam-ocr`, E4.8) an unseen input is answered with a page of text for the
                           page the request names (`<data name="page_number">N</data>`): the mock cannot
-                          read an image, so the text is always `Mock OCR text of page N.`
+                          read an image, so the text is always `Mock OCR text of page N.`, and a
+                          request with no image part is answered as an unreadable page.
 The scenarios apply to all of them.
 """
 
@@ -304,11 +305,23 @@ def message_text(message: dict[str, Any]) -> str:
     return ""
 
 
+def has_image(messages: list[Any]) -> bool:
+    return any(
+        isinstance(part, dict) and part.get("type") == "image_url"
+        for m in messages
+        if isinstance(m, dict) and isinstance(m.get("content"), list)
+        for part in m["content"]
+    )
+
+
 def ocr_answer(messages: list[Any]) -> str:
-    """The answer of `sbam-ocr` for the page the request names (page 1 when it names none)."""
+    """The answer of `sbam-ocr` for the page the request names (page 1 when it names none). A
+    request that carries no image has nothing to read: the page is unreadable."""
     text = " ".join(message_text(m) for m in messages if isinstance(m, dict) and m.get("role") == "user")
     found = PAGE_NUMBER.search(text)
     page = int(found.group(1)) if found else 1
+    if not has_image(messages):
+        return dump({"page": page, "markdown": "", "unreadable": True})
     return dump({"page": page, "markdown": f"Mock OCR text of page {page}.", "unreadable": False})
 
 

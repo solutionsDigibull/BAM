@@ -11,9 +11,10 @@ from typing import Any
 import pytest
 from fixtures import fixture_path
 from openpyxl import Workbook
+from pdfs import encrypted, make_pdf
 from sbam_contracts.api import ErrorCode
 from sbam_workers.ingest import parsing
-from test_loaders_office import encrypted, make_pdf, sample_docx, sheet_of, xlsx_bytes
+from test_loaders_office import sample_docx, sheet_of, xlsx_bytes
 from test_parsing import Harness, derived, h, root  # noqa: F401 - their fixtures
 
 PDF_ROW = {"detected": "pdf", "filetype_row_label": "Filetype #21"}

@@ -106,6 +106,7 @@ class Reader(Protocol):
         validate: Callable[[OcrPage], tuple[str, ...]] | None = None,
         images: Sequence[LlmImage] = (),
         subject: Mapping[str, str] | None = None,
+        manifest_extra: Mapping[str, Any] | None = None,
     ) -> LlmResult[OcrPage]: ...
 
 
@@ -123,11 +124,15 @@ class OcrDeps:
 
 @dataclass(frozen=True)
 class OcrRun:
-    """Which activity attempt this is: the key of the LLM replay cache."""
+    """Which activity run this is. A page is cached by workflow id, run id and activity id, never by
+    the attempt: the retries of one execution then find the pages already answered and do not pay
+    for them again, while a new execution of the same workflow id (an FDE retry) asks again. The
+    attempt number only goes into the call's manifest."""
 
     workflow_id: str
     activity_id: str
     attempt: int = 1
+    run_id: str = ""  # the Temporal run id of the workflow execution
 
 
 @dataclass(frozen=True)
@@ -159,9 +164,9 @@ def _scope(inp: StageRef, run: OcrRun, number: int) -> LlmScope:
         tenant_id=inp.tenant_id,
         project_id=inp.project_id,
         correlation_id=inp.correlation_id,
-        temporal_workflow_id=run.workflow_id,
+        temporal_workflow_id=f"{run.workflow_id}:{run.run_id}",
         activity_id=f"{run.activity_id}:page-{number}",
-        attempt=run.attempt,
+        attempt=1,  # the replay-cache key stays the same for every attempt of this run
     )
 
 
@@ -186,6 +191,7 @@ async def read_page(deps: OcrDeps, inp: StageRef, run: OcrRun, source: PageSourc
             validate=right_page,
             images=[LlmImage(name=f"page-{n}", media_type="image/png", data=png)],
             subject={"document_version_id": str(inp.ref_id)},
+            manifest_extra={"activity_attempt": run.attempt},
         )
     except SchemaInvalidAfterRetries:
         return Page(n, warning=f"page {n}: the model's answer never matched the schema")
@@ -376,7 +382,7 @@ def _deps() -> OcrDeps:
 @activity.defn(name="ocr_document")
 async def ocr_document(inp: StageRef) -> ParseOutcome:
     info = activity.info()
-    run = OcrRun(info.workflow_id or "", info.activity_id, info.attempt)
+    run = OcrRun(info.workflow_id or "", info.activity_id, info.attempt, info.workflow_run_id or "")
     return await ocr_version(_deps(), inp, run, activity.heartbeat)
 
 
