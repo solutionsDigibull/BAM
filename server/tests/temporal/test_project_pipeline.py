@@ -39,6 +39,7 @@ from sbam_contracts.pipeline import (
     CreateWorkflowResult,
     Generate,
     IdResult,
+    IdsResult,
     PipelineInput,
     PipelineStage,
     PipelineStatus,
@@ -46,6 +47,7 @@ from sbam_contracts.pipeline import (
     SowApproved,
     SowGenerateInput,
     StageRef,
+    WorkflowRef,
 )
 from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_workflow_id
 from sbam_workers import mirror, registry
@@ -113,11 +115,19 @@ async def workflow_stand_in(inp: CreateWorkflowInput) -> CreateWorkflowResult:
     return CreateWorkflowResult(workflow_id=stub_id(inp, f"workflow:{inp.sow_version_id}"))
 
 
+@activity.defn(name="extract_macro_skills")
+async def macros_stand_in(inp: WorkflowRef) -> IdsResult:
+    """The real pass 1 (E8.2) reads the approved SOW and calls sbam-isatvon; its tests are
+    tests/unit/test_extract_macros.py and tests/temporal/test_macro_extraction.py."""
+    return IdsResult(ids=[stub_id(inp, f"macro:{n}") for n in (1, 2)])
+
+
 DEFAULT_OVERRIDES: "Overrides" = {
     "build_knowledge": knowledge_stand_in,
     "build_okf_bundle": okf_stand_in,
     "generate_sow": sow_stand_in,
     "create_workflow": workflow_stand_in,
+    "extract_macro_skills": macros_stand_in,
 }
 
 

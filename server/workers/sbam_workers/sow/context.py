@@ -167,16 +167,25 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 async def build_context(
-    bundle: Bundle, embed: Embed, *, budget_tokens: int, hint: str | None = None
+    bundle: Bundle,
+    embed: Embed,
+    *,
+    budget_tokens: int,
+    hint: str | None = None,
+    queries: Mapping[str, str] | None = None,
 ) -> SowContext:
-    """FULL when the whole bundle fits in `budget_tokens`, else RANKED per section."""
+    """FULL when the whole bundle fits in `budget_tokens`, else RANKED per section: the SOW's
+    sections by default, or the `queries` given (name -> query text, e.g. one per SOW module for
+    ISATVON pass 1); the manifest's `sections` is keyed by those names."""
     chunks = _usable(bundle)
     full = _assemble("FULL", chunks, bundle.entities, bundle, hint, {})
     if full.manifest["tokens"] <= budget_tokens:
         return full
 
-    vectors = await embed([SECTION_QUERIES[s] for s in SECTIONS] + [c.text for c in chunks])
-    queries, chunk_vectors = vectors[: len(SECTIONS)], vectors[len(SECTIONS) :]
+    asked = dict(queries) if queries else {s: SECTION_QUERIES[s] for s in SECTIONS}
+    names = list(asked)
+    vectors = await embed(list(asked.values()) + [c.text for c in chunks])
+    query_vectors, chunk_vectors = vectors[: len(names)], vectors[len(names) :]
     entities_of: dict[str, set[str]] = {}
     chunks_of: dict[str, list[int]] = {}
     index = {c.id: i for i, c in enumerate(chunks)}
@@ -188,13 +197,13 @@ async def build_context(
     mean_len = sum(len(c.text) for c in chunks) / len(chunks)
     # Masters and the hint go whole; a quarter of the rest is for entities, the remainder is
     # shared equally between the sections.
-    room = max(budget_tokens - tokens(full.blocks["masters"]) - tokens(hint or ""), len(SECTIONS))
+    room = max(budget_tokens - tokens(full.blocks["masters"]) - tokens(hint or ""), len(names))
     entity_room = room // 4
-    share = (room - entity_room) // len(SECTIONS)
+    share = (room - entity_room) // len(names)
 
     picked_by_section: dict[str, list[str]] = {}
     picked: set[int] = set()
-    for section, query in zip(SECTIONS, queries, strict=True):
+    for section, query in zip(names, query_vectors, strict=True):
         ids = _pick(chunks, chunk_vectors, query, entities_of, chunks_of, mean_len, share)
         picked_by_section[section] = [chunks[i].id for i in ids]
         picked.update(ids)
