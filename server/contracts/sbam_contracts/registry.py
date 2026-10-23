@@ -88,6 +88,7 @@ from sbam_contracts.projects import (
     ProjectMembers,
     ProjectMembersPut,
     ProjectPatch,
+    WorkflowRename,
     WorkflowSummary,
 )
 from sbam_contracts.runs import Run, RunAccepted
@@ -158,6 +159,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("projects/project_members", ProjectMembers),
     ("projects/pipeline_timeline", PipelineTimeline),
     ("projects/workflow_summary", WorkflowSummary),
+    ("projects/workflow_rename", WorkflowRename),
     ("documents/upload_request", UploadRequest),
     ("documents/upload_token", UploadToken),
     ("documents/scan_outcome", ScanOutcome),

@@ -75,7 +75,7 @@ with workflow.unsafe.imports_passed_through():
         validate_workflow,
     )
     from sbam_workers.ingest.stubs import ingest_documents
-    from sbam_workers.isatvon.stubs import create_workflow, extract_macro_skills, extract_sub_skills
+    from sbam_workers.isatvon.stubs import extract_macro_skills, extract_sub_skills
     from sbam_workers.knowledge.build import build_knowledge
     from sbam_workers.knowledge.bundle import build_okf_bundle
     from sbam_workers.mirror import update_run_mirror
@@ -84,6 +84,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_workers.pipeline_state import apply_pipeline_transition, notify
     from sbam_workers.registry import workflow_for
     from sbam_workers.sow.generate import generate_sow
+    from sbam_workers.workflows.create import create_workflow
 
 SYSTEM = "SYSTEM"
 REMINDER_AFTER = timedelta(days=3)  # TD §13.3 (proposed): remind once, never time out

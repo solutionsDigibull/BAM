@@ -21,7 +21,7 @@ from sbam_api.core.ids import uuid7
 from sbam_api.ingest.models import Document, DocumentVersion
 from sbam_api.pipeline.service import pipeline_status, start_project_pipeline
 from sbam_api.projects.models import Project
-from sbam_api.state_machine.registry import register_entity, unregister_entity
+from sbam_api.state_machine.registry import entity_model, register_entity, unregister_entity
 from sbam_api.temporal.models import TemporalRun
 from sbam_contracts.pipeline import Cancel, PipelineStage, TransitionOutcome, TransitionRequest
 from sbam_contracts.state_machines import MachineName
@@ -84,14 +84,17 @@ def audit_trail(sessions: sessionmaker[Session], project: uuid.UUID) -> list[Aud
 def run(scenario: Callable[[sessionmaker[Session]], Coroutine[Any, Any, Any]]) -> Any:
     sessions = sessions_with_tables()
     mirror.configure(sessions)
-    # Other temporal tests unregister the projects table on exit (their own fake rows); import
-    # registered it, so put it back. The real Workflow table is #91's.
+    # The real projects table; a stand-in Workflow table, since the pipeline here runs the
+    # `create_workflow` stand-in (the real Workflow needs an approved SOW, E8.1). Put it back after.
+    real_workflow = entity_model(MachineName.WORKFLOW)
     register_entity(MachineName.PROJECT_PIPELINE, Project)
     register_entity(MachineName.WORKFLOW, WORKFLOW_ROW)
     try:
         return asyncio.run(scenario(sessions))
     finally:
         unregister_entity(MachineName.WORKFLOW)
+        if real_workflow is not None:
+            register_entity(MachineName.WORKFLOW, real_workflow)
 
 
 def after_commit(committed: threading.Event) -> Callable[..., Any]:

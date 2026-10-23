@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:projects/workflow_rename:0.1.0",
+  "additionalProperties": false,
+  "description": "PATCH W (E8.1): the name is the only thing a person may change on a Workflow.",
+  "properties": {
+    "name": {
+      "maxLength": 160,
+      "minLength": 1,
+      "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$",
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "WorkflowRename",
+  "type": "object"
+}

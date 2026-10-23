@@ -40,9 +40,12 @@ const workflow = (over: Partial<WorkflowSummary> = {}): WorkflowSummary => ({
   id: "0190f3a2-7b1c-7d4e-8f00-0000000000w1".replace("w", "a"),
   project_id: ID,
   sow_version_id: "0190f3a2-7b1c-7d4e-8f00-0000000000b1",
-  version: 1,
+  name: "EMS RFQ costing v1",
+  version: "1.0.0",
   state: "CREATED",
+  created_by: "SYSTEM",
   created_at: "2026-10-12T10:00:00Z",
+  row_version: 1,
   ...over,
 });
 
@@ -59,7 +62,7 @@ describe("Project overview (E4.10)", () => {
   test("e4_10_t06 no create or new Workflow action anywhere", async () => {
     fakeApi(base(timeline("WORKFLOW_CREATED", { parsed: 3 }), [workflow()]));
     renderWithRefine(<OverviewScreen projectId={ID} />);
-    expect(await screen.findByRole("link", { name: "Workflow v1" })).toBeDefined();
+    expect(await screen.findByRole("link", { name: "Workflow v1.0.0" })).toBeDefined();
     for (const control of screen.getAllByRole("button").concat(screen.getAllByRole("link"))) {
       const name = control.textContent ?? "";
       expect(name).not.toMatch(/(create|new|add|generate)\b.*workflow|workflow.*\b(create|new)\b/i);

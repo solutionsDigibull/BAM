@@ -551,6 +551,18 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"
 
+  # Rename only; SBAM creates Workflows, so there is no create route to list here (E8.1).
+  rename_api_v1_projects__project_id__workflows__workflow_id__patch:
+    request:
+      method: PATCH
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      headers: {if-match: "@etag_workflow_a"}
+      json: {name: "Alpha quoting v1"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   # ---- isatvon ------------------------------------------------------------------------------
   # Describes the model, carries no tenant data: any signed-in user may read it (E8.6).
   isatvon_schema_api_v1_schemas_isatvon__version__get:

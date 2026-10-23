@@ -145,15 +145,33 @@ class PipelineTimeline(BaseModel):
     counts: PipelineCounts
 
 
+# "<project name> v<MAJOR>" by default (E8.1): room for the suffix after a 120-character name.
+WorkflowName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160, pattern=_NO_CONTROL)
+]
+WORKFLOW_VERSION = r"^[1-9][0-9]*\.0\.[0-9]+$"  # MAJOR.0.PATCH (TD §7, E8.1)
+
+
 class WorkflowSummary(BaseModel):
-    """One Workflow SBAM created for an approved SOW version (read-only)."""
+    """One Workflow SBAM created for an approved SOW version (read-only but for its name)."""
 
     id: UUID
     project_id: UUID
     sow_version_id: UUID
-    version: int
+    name: str
+    version: Annotated[str, Field(pattern=WORKFLOW_VERSION)]
     state: WorkflowState
+    created_by: str  # always SYSTEM: SBAM creates Workflows, nobody else (E8.1)
     created_at: datetime
+    row_version: int
+
+
+class WorkflowRename(BaseModel):
+    """PATCH W (E8.1): the name is the only thing a person may change on a Workflow."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: WorkflowName
 
 
 def schemas() -> dict[str, dict[str, Any]]:
@@ -166,5 +184,6 @@ def schemas() -> dict[str, dict[str, Any]]:
         "project_members": ProjectMembers,
         "pipeline_timeline": PipelineTimeline,
         "workflow_summary": WorkflowSummary,
+        "workflow_rename": WorkflowRename,
     }
     return {stem: contract_schema(model, f"projects/{stem}") for stem, model in models.items()}

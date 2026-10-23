@@ -21,6 +21,7 @@ from sbam_api.main import create_app
 from sbam_api.projects import service
 from sbam_api.projects.models import Project
 from sbam_api.projects.repository import ProjectRepository
+from sbam_api.workflows.models import Workflow
 from sbam_contracts.api import API_BASE
 from sqlalchemy import Engine, pool, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -63,6 +64,7 @@ def sqlite_engine() -> Engine:
             t["sbam.projects"],
             AuditLog.__table__,  # type: ignore[list-item]
             NotificationOutbox.__table__,  # type: ignore[list-item]
+            Workflow.__table__,  # type: ignore[list-item]  # archive checks for running ones
         ],
     )
     return engine
@@ -245,6 +247,27 @@ def test_e3_1_t05_missing_if_match(h: Harness) -> None:
 def test_e3_1_t06_archive_while_running(h: Harness) -> None:
     p = h.create()
     h.set_state(p["id"], "INGESTING")
+    res = h.call("POST", f"/admin/projects/{p['id']}/archive", h.admin_a())
+    problem(res, 409, "PIPELINE_RUNNING")
+    assert h.projects()[0].status == "ACTIVE"
+
+
+@pytest.mark.parametrize("state", sorted(service.BUSY_WORKFLOW))
+def test_e3_1_archive_while_a_workflow_builds_or_certifies(h: Harness, state: str) -> None:
+    p = h.create()
+    h.set_state(p["id"], "WORKFLOW_CREATED")
+    with h.sessions() as s:
+        workflow = Workflow(
+            tenant_id=TENANT_A,
+            project_id=uuid.UUID(p["id"]),
+            sow_version_id=uuid.uuid4(),
+            major=1,
+            version="1.0.0",
+            name="Bot v1",
+        )
+        workflow.state = state
+        s.add(workflow)
+        s.commit()
     res = h.call("POST", f"/admin/projects/{p['id']}/archive", h.admin_a())
     problem(res, 409, "PIPELINE_RUNNING")
     assert h.projects()[0].status == "ACTIVE"
