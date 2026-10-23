@@ -20,6 +20,7 @@ from sbam_contracts.identity import UserStatus
 from sbam_contracts.projects import ProjectCreate, ProjectMembersPut, ProjectPatch, ProjectStatus
 from sbam_contracts.state_machines import Actor
 from sbam_contracts.state_machines import ProjectPipelineState as P
+from sbam_contracts.state_machines import WorkflowState as W
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -35,8 +36,7 @@ from sbam_api.state_machine import apply_create
 
 FIELDS = ("name", "client_name", "description", "context_notes", "allow_restricted")
 
-# Nothing is running in these states.
-# TODO(#91): also refuse while a Workflow is BUILDING or CERTIFYING.
+# Nothing is running in these states, unless a Workflow is (BUSY_WORKFLOW).
 ARCHIVABLE = frozenset(
     {
         P.IDLE,
@@ -48,6 +48,7 @@ ARCHIVABLE = frozenset(
         P.CANCELLED,
     }
 )
+BUSY_WORKFLOW = frozenset({W.BUILDING.value, W.CERTIFYING.value})
 
 
 def duplicate_name() -> ApiError:
@@ -156,6 +157,12 @@ def archive(session: Session, user: CurrentUser, project_id: uuid.UUID) -> Proje
     if project.status == ProjectStatus.ARCHIVED:
         return project  # archiving twice is a no-op
     if project.state not in ARCHIVABLE:
+        raise pipeline_running()
+    # Here, not at the top: sbam_api.workflows imports the SOW module, which imports this one.
+    from sbam_api.workflows.repository import WorkflowRepository
+
+    workflows = WorkflowRepository(session, user.context(project_id)).of_project()
+    if any(w.state in BUSY_WORKFLOW for w in workflows):
         raise pipeline_running()
     project.status = ProjectStatus.ARCHIVED.value
     repo.update(project, project.row_version)

@@ -3,7 +3,8 @@
 `apply_pipeline_transition` runs one transition through the state-machine service (#41): the row
 lock, can_transition, the audit row and the outbox notification all happen in one DB transaction.
 Its idempotency key ("<run>:<step>") makes an activity retry a no-op. If no table is registered
-for the machine yet (projects #54, workflows #91), it does nothing and says so.
+for the machine yet, it does nothing and says so. A create for a row that already exists is a no-op
+too: the stage activity made it (the Workflow, by `create_workflow`, #91).
 
 `notify` writes a notification that isn't a transition (reminder, failure with next action),
 also through the append-only audit log + outbox, and also idempotent per key.
@@ -11,7 +12,8 @@ also through the append-only audit log + outbox, and also idempotent per key.
 
 import logging
 
-import sbam_api.projects.models  # noqa: F401 - registers Project for entity_model (#54)
+import sbam_api.projects.models  # registers Project for entity_model (#54)
+import sbam_api.workflows.models  # noqa: F401 - registers Workflow for entity_model (#91)
 from sbam_api.audit.outbox import dispatch_pending
 from sbam_api.audit.repository import enqueue, find_by_key, record
 from sbam_api.core.conventions import ApiError
@@ -40,6 +42,9 @@ def apply_pipeline_transition(req: TransitionRequest) -> TransitionOutcome:
     ctx = TenantContext(req.tenant_id, req.project_id)
     with sessions()() as session:
         try:
+            existing = session.get(model, req.entity_id) if req.create else None
+            if existing is not None and existing.tenant_id == req.tenant_id:
+                return TransitionOutcome(applied=False, to_state=existing.state)
             if req.create:
                 result = apply_create(
                     session,

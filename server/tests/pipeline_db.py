@@ -1,5 +1,5 @@
 """Test helpers for E10.1: SQLite with the run mirror, audit/outbox and stand-in project + Workflow
-tables registered for the pipeline (the real tables arrive with #54 and #91)."""
+tables registered for the pipeline, in place of the real ones (#54, #91) for the test's duration."""
 
 import uuid
 from collections.abc import Iterator
@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from typing import Any
 
 from sbam_api.audit.models import AuditLog
-from sbam_api.state_machine.registry import register_entity, unregister_entity
+from sbam_api.state_machine.registry import entity_model, register_entity, unregister_entity
 from sbam_api.temporal.models import TemporalRun
 from sbam_contracts.state_machines import MachineName
 from sqlalchemy import select
@@ -27,13 +27,18 @@ def pipeline_sessions() -> sessionmaker[Session]:
 
 @contextmanager
 def registered_stand_ins() -> Iterator[None]:
+    """Afterwards the real models (if any) are registered again."""
+    machines = (MachineName.PROJECT_PIPELINE, MachineName.WORKFLOW)
+    real = {m: entity_model(m) for m in machines}
     register_entity(MachineName.PROJECT_PIPELINE, PROJECT_ROW)
     register_entity(MachineName.WORKFLOW, WORKFLOW_ROW)
     try:
         yield
     finally:
-        unregister_entity(MachineName.PROJECT_PIPELINE)
-        unregister_entity(MachineName.WORKFLOW)
+        for machine, model in real.items():
+            unregister_entity(machine)
+            if model is not None:
+                register_entity(machine, model)
 
 
 def new_project(

@@ -35,6 +35,8 @@ from sbam_api.pipeline.service import (
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.pipeline import (
     Cancel,
+    CreateWorkflowInput,
+    CreateWorkflowResult,
     Generate,
     IdResult,
     PipelineInput,
@@ -104,10 +106,18 @@ async def sow_stand_in(inp: SowGenerateInput) -> IdResult:
     return IdResult(id=stub_id(inp, "sow"))
 
 
+@activity.defn(name="create_workflow")
+async def workflow_stand_in(inp: CreateWorkflowInput) -> CreateWorkflowResult:
+    """The real one (E8.1) re-reads the approved SOW version; its tests are
+    tests/unit/test_create_workflow.py and tests/temporal/test_workflow_creation.py."""
+    return CreateWorkflowResult(workflow_id=stub_id(inp, f"workflow:{inp.sow_version_id}"))
+
+
 DEFAULT_OVERRIDES: "Overrides" = {
     "build_knowledge": knowledge_stand_in,
     "build_okf_bundle": okf_stand_in,
     "generate_sow": sow_stand_in,
+    "create_workflow": workflow_stand_in,
 }
 
 
