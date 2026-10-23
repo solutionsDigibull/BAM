@@ -247,17 +247,23 @@ test("e8_7_t03 500 Sub-Skills across 40 macros render within 2 s and scroll", as
   );
   expect(macros.reduce((n, m) => n + m.sub_skills.length, 0)).toBe(500);
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL! }]);
-  let served = 0;
   await page.route("**/api/proxy/api/v1/**", (route) => {
     const path = new URL(route.request().url()).pathname.replace("/api/proxy/api/v1", "");
     if (path === "/schemas/isatvon/1.4") return json(route, SCHEMA);
-    served = Date.now();
     return json(route, tree(macros));
   });
   await page.goto(PAGE);
   await expect(page.getByText("40 Macro Skills · 500 Sub-Skills")).toBeVisible();
-  await expect(grid(page).getByText("Step 1", { exact: true }).first()).toBeVisible();
-  const rendered = Date.now() - served;
+  // `next dev` compiles and downloads the grid's chunk on a cold visit: no part of rendering
+  await expect(grid(page).getByText("Step 1", { exact: true }).first()).toBeVisible({
+    timeout: 30_000,
+  });
+  // the grid's own marks: container mounted -> first rows drawn, timed in the page
+  const rendered = await page.evaluate(
+    () =>
+      performance.measure("isatvon-grid", "isatvon-grid:mounted", "isatvon-grid:rendered").duration,
+  );
+  console.log(`500 Sub-Skills rendered in ${Math.round(rendered)} ms`);
   expect(rendered).toBeLessThan(2_000);
   const rows = await grid(page).locator('.ag-center-cols-container [role="row"]').count();
   expect(rows).toBeLessThan(200); // virtualised: only the visible window is in the DOM
