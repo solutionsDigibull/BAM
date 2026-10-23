@@ -58,6 +58,12 @@ const COLOR: Record<string, string> = {
   COVERED: "success",
   CHUNKS_ONLY: "warning",
   ADDED: "processing",
+  // SOW versions (E6.5 / E7.3)
+  GENERATED: "processing",
+  IN_REVIEW: "warning",
+  APPROVED: "success",
+  SUPERSEDED: "default",
+  GENERATION_FAILED: "error",
 };
 
 const label = (status: string) =>

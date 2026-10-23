@@ -68,6 +68,10 @@ type Fake = {
   diff?: unknown;
   afterRegenerate?: () => void;
   sourceDeleted?: boolean;
+  // E7.3: how POST /versions/{v}/approve answers, and what it was sent
+  approve: "ok" | "stale" | "down" | "not_waiting";
+  approvals: { version: number; body: Record<string, unknown> }[];
+  approveDelayMs?: number;
 };
 
 const fake = (versions: Version[], more: Partial<Fake> = {}): Fake => ({
@@ -77,6 +81,8 @@ const fake = (versions: Version[], more: Partial<Fake> = {}): Fake => ({
   save: "ok",
   saves: [],
   regenerates: [],
+  approve: "ok",
+  approvals: [],
   ...more,
 });
 
@@ -116,6 +122,31 @@ async function serve(page: Page, f: Fake) {
       f.regenerates.push(req.postDataJSON() ?? {});
       f.afterRegenerate?.();
       return json(route, { run: { id: "run-1", type: "SowRegenerate", state: "RUNNING" } }, 202);
+    }
+    const approve = /^\/versions\/(\d+)\/approve$/.exec(path);
+    if (approve && req.method() === "POST") {
+      const n = Number(approve[1]);
+      f.approvals.push({ version: n, body: req.postDataJSON() });
+      if (f.approveDelayMs) await new Promise((r) => setTimeout(r, f.approveDelayMs));
+      if (f.approve === "down")
+        return problem(route, 503, "ORCHESTRATOR_UNAVAILABLE", "Temporal is unavailable");
+      if (f.approve === "not_waiting")
+        return problem(route, 409, "PIPELINE_NOT_WAITING", "not waiting for an approval");
+      if (f.approve === "stale") {
+        f.versions.push(summary(current(f).version + 1)); // another session saved first
+        return problem(route, 409, "SOW_STALE", "the SOW changed");
+      }
+      const v = f.versions.find((x) => x.version === n)!;
+      v.status = "APPROVED";
+      f.pipeline = "SOW_APPROVED";
+      return json(route, {
+        version: n,
+        status: "APPROVED",
+        is_locked: true,
+        approved_at: "2026-10-23T09:30:00Z",
+        approved_by: "fde",
+        sha256: v.sha256,
+      });
     }
     const diff = /^\/versions\/(\d+)\/diff\/(\d+)$/.exec(path);
     if (diff) return json(route, f.diff ?? { version: 1, other: 2, sections: [] });
@@ -404,4 +435,131 @@ test("e6_5 a citation whose document was deleted says so", async ({ page, baseUR
   await expect(panel).toContainText("Source deleted");
   await expect(page.getByTestId("citation-passage")).toContainText("approves every quote");
   await expect(panel.getByRole("link", { name: "Open source" })).toHaveCount(0);
+});
+
+// ---- E7.3 approval: POST /versions/{v}/approve {sha256} (E7.1) -------------------------------------
+
+const approveButton = (page: Page) => page.getByRole("button", { name: "Approve", exact: true });
+const confirmButton = (page: Page) => page.getByRole("button", { name: "Confirm approval" });
+
+test("e7_3_t01 approve: the dialog shows the hash, then the banner and a locked editor", async ({
+  page,
+  baseURL,
+}) => {
+  const f = fake([summary(1)]);
+  await open(page, baseURL!, f);
+  await approveButton(page).click();
+  const dialog = page.getByRole("dialog", { name: "Approve SOW v1?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("11111111")).toBeVisible(); // the short hash, with a copy button
+  await confirmButton(page).click();
+  await expect(page.getByText("SOW v1 approved.")).toBeVisible();
+  await expect(page.getByTestId("sow-locked")).toContainText("Approved");
+  await expect(page.getByTestId("sow-approval")).toContainText("v1 approved by fde");
+  await expect(page.getByTestId("sow-screen").locator('[data-status="APPROVED"]')).toHaveText(
+    "Approved",
+  );
+  await expect(editor(page)).toHaveAttribute("contenteditable", "false");
+  await expect(approveButton(page)).toHaveCount(0);
+  expect(f.approvals).toEqual([{ version: 1, body: { sha256: "1".repeat(64) } }]);
+  expect(f.pipeline).toBe("SOW_APPROVED");
+});
+
+test("e7_3_t02 a stale approval asks to reload and approves nothing", async ({ page, baseURL }) => {
+  const f = fake([summary(1)], { approve: "stale" });
+  await open(page, baseURL!, f);
+  await approveButton(page).click();
+  await confirmButton(page).click();
+  const stale = page.getByRole("dialog", { name: "A newer version exists" });
+  await expect(stale).toContainText("v1 was not approved");
+  expect(f.approvals).toHaveLength(1); // never retried with another hash
+  await stale.getByRole("button", { name: "Reload" }).click();
+  await expect(page.getByRole("heading", { name: "SOW v2" })).toBeVisible();
+  await expect(page.getByTestId("sow-locked")).toHaveCount(0);
+  expect(f.approvals).toHaveLength(1);
+});
+
+test("e7_3_t04 cancel sends nothing", async ({ page, baseURL }) => {
+  const f = fake([summary(1)]);
+  const requests: Request[] = [];
+  page.on("request", (r) => requests.push(r));
+  await open(page, baseURL!, f);
+  await approveButton(page).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(mutations(requests)).toEqual([]);
+  await expect(approveButton(page)).toBeEnabled();
+});
+
+test("e7_3_t05 a double click on confirm sends one approval", async ({ page, baseURL }) => {
+  const f = fake([summary(1)], { approveDelayMs: 600 });
+  await open(page, baseURL!, f);
+  await approveButton(page).click();
+  await confirmButton(page).dblclick();
+  await expect(page.getByText("SOW v1 approved.")).toBeVisible();
+  expect(f.approvals).toHaveLength(1);
+});
+
+test("e7_3_t06 orchestrator down: a toast, the version stays in review, Approve comes back", async ({
+  page,
+  baseURL,
+}) => {
+  const f = fake([summary(1)], { approve: "down" });
+  await open(page, baseURL!, f);
+  await approveButton(page).click();
+  await confirmButton(page).click();
+  await expect(page.getByText("Orchestrator unavailable, try again.")).toBeVisible();
+  await expect(page.getByTestId("sow-locked")).toHaveCount(0);
+  await expect(approveButton(page)).toBeEnabled();
+  expect(f.versions[0]!.status).toBe("IN_REVIEW");
+});
+
+test("e7_3_t07 an admin on the FDE route gets the forbidden screen and no Approve", async ({
+  page,
+  baseURL,
+}) => {
+  await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-admin", url: baseURL! }]);
+  await serve(page, fake([summary(1)]));
+  await page.goto(`/projects/${PROJECT}/sow`);
+  await expect(page.getByText(/not allowed|forbidden|403/i).first()).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(approveButton(page)).toHaveCount(0);
+});
+
+test("e7_3 unsaved edits: Approve asks to save first", async ({ page, baseURL }) => {
+  const f = fake([summary(1)]);
+  await open(page, baseURL!, f);
+  await page.getByText("OTP sign-in with device limits").click();
+  await page.keyboard.type(" x");
+  await approveButton(page).click();
+  await expect(
+    page.getByText("Save your edits first: approval signs off a saved version."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Save now" }).click();
+  await expect(page.getByText("Saved as v2")).toBeVisible();
+  expect(f.approvals).toEqual([]);
+});
+
+test("e7_3 only the latest version in review can be approved", async ({ page, baseURL }) => {
+  const f = fake([summary(1), summary(2)]);
+  await open(page, baseURL!, f);
+  await expect(approveButton(page)).toBeEnabled(); // v2, the latest
+  await page.getByRole("tab", { name: "Versions (2)" }).click();
+  await page
+    .getByTestId("sow-versions")
+    .locator(".ant-table-row")
+    .filter({ hasText: "v1" })
+    .click();
+  await expect(page.getByRole("heading", { name: "SOW v1" })).toBeVisible();
+  await expect(approveButton(page)).toBeDisabled();
+});
+
+test("e7_3 a pipeline that isn't waiting says so", async ({ page, baseURL }) => {
+  await open(page, baseURL!, fake([summary(1)], { approve: "not_waiting" }));
+  await approveButton(page).click();
+  await confirmButton(page).click();
+  await expect(
+    page.getByText("The pipeline is not waiting for an SOW approval right now."),
+  ).toBeVisible();
 });
