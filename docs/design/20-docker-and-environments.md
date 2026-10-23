@@ -240,6 +240,14 @@ nightly:      rebuild + rescan images; full E2E on staging; frozen-manifest hash
 
 Deploy = SSH over Netbird → `docker compose pull` (by digest) → `api-migrate` → `up -d` → health check → automatic rollback to previous digests on failure.
 
+`scripts/deploy.sh` (E16.4, [runbook](../runbooks/deploy.md)) does this on the VM:
+- **Release folders:** each release is kept in `/opt/sbam/releases/<id>/` with its own compose files; `current` names the running one.
+- **Re-runs:** the same digests again are a no-op.
+- **Migration first:** a failed migration aborts before any app container changes.
+- **Worker drain:** workers drain on SIGTERM (120 s, `stop_grace_period: 150s`).
+- **Health watch:** health is watched for 5 min, and three bad checks in a row redeploy the previous release, record it in `log.jsonl` and alert. Volumes are never touched.
+- **Migrations are expand/contract,** so rolling back only swaps app images.
+
 ## 20.5 Netbird (C-47)
 
 One Netbird network with groups: `dev-laptops`, `vm-dev`, `vm-staging`, `vm-prod`, `sandbox-host`. Policies: laptops → dev/staging ops ports; workers → sandbox host API; production ops only for the platform group. No database, Temporal or admin UI is exposed publicly.

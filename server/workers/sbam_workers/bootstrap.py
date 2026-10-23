@@ -19,6 +19,7 @@ import signal
 import sys
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -51,6 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# Deploy drain (E16.4-T07): on SIGTERM a worker stops polling and gives running activities this long
+# to finish before cancelling them (a cancelled one is retried by the new worker; activities are
+# idempotent). compose.deploy.yaml's stop_grace_period must be longer.
+DRAIN = timedelta(seconds=120)
+
+
 def build_workers(
     client: Client, queues: Sequence[TaskQueue], executor: ThreadPoolExecutor
 ) -> list[Worker]:
@@ -66,6 +73,7 @@ def build_workers(
                 workflows=workflows,
                 activities=activities,
                 activity_executor=executor,  # sync activities (DB) run on threads
+                graceful_shutdown_timeout=DRAIN,
             )
         )
     return workers
