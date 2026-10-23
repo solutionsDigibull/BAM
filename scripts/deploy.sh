@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploy one release to this VM, with automatic rollback (E16.4, TD §20.4, docs/runbooks/deploy.md).
+# Runs as the VM's deploy user (docker group); .github/workflows/deploy.yml calls it via ci-deploy.sh.
 #
-#   sudo scripts/deploy.sh --env dev|staging|prod --id <release id> --release <release.env> --bundle <dir>
+#   scripts/deploy.sh --env dev|staging|prod --id <release id> --release <release.env> --bundle <dir>
 #
 # <dir> holds the release's compose/ folder (the tagged commit's); <release.env> its image digests
 # (compose/release.env.example). Each release is kept in $SBAM_RELEASES/<id>/ and the file `current`

@@ -1,6 +1,6 @@
 # Deploy and roll back a release (E16.4)
 
-Every environment (dev, staging, prod VM) is deployed by `scripts/deploy.sh`. The deploy workflow runs it over SSH through Netbird; an operator can also run it by hand. A release is one set of image digests (`compose/release.env.example`) plus the `compose/` folder of the same commit. Promotion deploys the same files to the next environment.
+Every environment (dev, staging, prod VM) is deployed by `scripts/deploy.sh`, run as the VM's `deploy` user. The deploy workflow runs it over SSH through Netbird; an operator can also run it by hand. A release is one set of image digests (`compose/release.env.example`) plus the `compose/` folder of the same commit. Promotion deploys the same files to the next environment.
 
 ## On the VM
 
@@ -14,10 +14,49 @@ Every environment (dev, staging, prod VM) is deployed by `scripts/deploy.sh`. Th
 
 The Compose project is always `sbam` (`name:` in `compose.yaml`), so every release uses the same data volumes.
 
+## The pipeline (`.github/workflows/deploy.yml`)
+
+- **`main`, CI green → dev, automatic.** CI's `release-manifest` job writes `release.env`, one digest per image of that commit. The deploy runs with id `main-<sha>`.
+- **Tag `vX.Y.Z` → staging (automatic), then production after approval.** The tag must point at a commit whose CI on `main` is green, and its manifest is promoted unchanged. Every environment runs the same digests, because a tag never rebuilds.
+- **Each deploy job** (`deploy-env.yml` → `scripts/ci-deploy.sh`) runs in the GitHub environment of that name and does this:
+  1. joins Netbird as a throwaway peer of group `ci-deploy`;
+  2. copies `compose/` and `scripts/deploy.sh` of the commit, plus `release.env`, to the VM;
+  3. runs `deploy.sh` there;
+  4. probes `SMOKE_URLS`;
+  5. writes the digests and the result to the job summary.
+
+  Exit codes: 1 = refused or aborted before rollout, 2 = rolled back. Either one fails the job, and GitHub notifies about the failed job.
+
+### One-time GitHub setup (repo admin)
+
+Workflow files can't set these, so they live in **Settings → Environments**:
+
+| Environment | Protection | Secrets | Variables |
+|---|---|---|---|
+| `dev` | none | `NB_SETUP_KEY`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, `SBAM_ALERT_WEBHOOK_URL` | `NB_MANAGEMENT_URL`, `DEPLOY_HOST`, `DEPLOY_USER`, `SBAM_PROFILES`, `SMOKE_URLS` |
+| `staging` | deployment branches/tags: `v*` | same names, staging values | same, staging values |
+| `production` | **required reviewers: the platform team (≥ 1); "Prevent self-review" on**; deployment tags `v*` | same names, prod values | same, prod values |
+
+- **`NB_SETUP_KEY`:** a reusable, **ephemeral** Netbird setup key that auto-assigns the group `ci-deploy`. Ephemeral peers disappear after the job. The policies are in `compose/netbird/policies.json`: SSH to the VMs, and the dev/staging portals for the smoke checks.
+- **`DEPLOY_SSH_KEY`:** a private key used only for deploys, one per environment.
+- **`DEPLOY_KNOWN_HOSTS`:** the VM's `ssh-keyscan` line, taken over Netbird. Host keys are checked strictly.
+- **`SMOKE_URLS`:** for example `https://<portal>/ https://<auth>/realms/bullm/.well-known/openid-configuration`.
+
+Check it by hand once:
+- **T02:** push a tag. The `production` job waits with "Review required".
+- **T05:** the person who pushed the tag gets no approve button. Record both in the release PR.
+
+### One-time VM setup (platform)
+
+- **Deploy user:** a `deploy` user, member of the `docker` group (that is root-equivalent, so only this key logs in as it). Its `authorized_keys` holds only the public half of `DEPLOY_SSH_KEY`.
+- **Releases folder:** `install -d -o deploy -g deploy /opt/sbam/releases`.
+- **Env file:** `/etc/sbam/<env>.env`, readable by `deploy` (mode `0640`, group `deploy`).
+- **SSH:** sshd listens on the Netbird address only (`docs/runbooks/prerequisites.md`).
+
 ## Run it
 
 ```bash
-sudo SBAM_PROFILES=obs SBAM_DEPLOY_ACTOR=<who> SBAM_ALERT_WEBHOOK_URL=<operator webhook> \
+SBAM_PROFILES=obs SBAM_DEPLOY_ACTOR=<who> SBAM_ALERT_WEBHOOK_URL=<operator webhook> \
   scripts/deploy.sh --env staging --id v1.4.0 --release release-v1.4.0.env --bundle <checkout of v1.4.0>
 ```
 

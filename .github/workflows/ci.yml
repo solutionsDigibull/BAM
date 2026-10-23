@@ -157,6 +157,7 @@ jobs:
           - { name: sbam-web, file: web.Dockerfile, target: prod, args: "" }
           - { name: sbam-mock-api, file: mock-api.Dockerfile, target: "", args: "" }
           - { name: skill-runtime, file: skill-runtime.Dockerfile, target: "", args: "" } # #67
+          - { name: sbam-llm-mock, file: llm-mock.Dockerfile, target: "", args: "" } # dev VM only (#143)
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
       PUSH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
@@ -210,6 +211,15 @@ jobs:
           docker tag "$IMAGE:${{ github.sha }}" "$IMAGE:$EXTRA_TAG"
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:$EXTRA_TAG"
+      # The pushed digest, for the release manifest below (E16.4): deploys use digests, never tags.
+      - name: Digest
+        if: env.PUSH == 'true'
+        run: |
+          mkdir -p digest
+          docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE:${{ github.sha }}"             > "digest/${{ matrix.name }}"
+      - if: env.PUSH == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: "digest-${{ matrix.name }}", path: digest/ }
       # Runtime registry (#67): generated INSIDE the image (truth = installed packages), with no network,
       # keyed by the pushed digest (or the local image ID when nothing is pushed). Deploys load it with
       # `python -m sbam_api.registry.sync runtime_registry.json --activate`.
@@ -227,6 +237,32 @@ jobs:
       - if: matrix.name == 'skill-runtime'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: { name: runtime-registry, path: runtime_registry.json }
+
+  # Release manifest (E16.4, TD 20.4): one digest per image of this commit, the file every
+  # environment deploys (compose/release.env.example). The deploy workflow promotes it unchanged.
+  release-manifest:
+    needs: [image-scan]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with: { pattern: "digest-*", path: digest, merge-multiple: true }
+      - name: Write release.env
+        run: |
+          {
+            echo "# release ${{ github.sha }} (${{ github.ref_name }})"
+            for name in sbam-api sbam-worker sbam-web sbam-mock-api sbam-llm-mock; do
+              var="$(echo "${name#sbam-}" | tr 'a-z-' 'A-Z_')"
+              echo "SBAM_${var}_IMAGE=$(cat "digest/$name")"
+            done
+          } > release.env
+          cat release.env
+          python3 scripts/compose_lint.py --release release.env
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: release, path: release.env }
 
   smoke-gate:
     runs-on: ubuntu-latest
