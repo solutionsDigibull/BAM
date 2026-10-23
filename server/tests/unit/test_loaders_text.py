@@ -5,7 +5,7 @@ import uuid
 import pytest
 from fixtures import fixture_path
 from sbam_contracts.api import ErrorCode
-from sbam_contracts.documents import ParsedDocument
+from sbam_contracts.documents import Block, ParsedDocument
 from sbam_workers.ingest.loaders import (
     LOADERS,
     Parsed,
@@ -31,20 +31,29 @@ def refused(kind: str, data: bytes) -> ErrorCode:
     return caught.value.code
 
 
+def blocks_of(parsed: Parsed) -> list[Block]:
+    return list(parsed.blocks)
+
+
+def markdown_of(parsed: Parsed) -> str:
+    assert isinstance(parsed.markdown, str)
+    return parsed.markdown
+
+
 def valid(parsed: Parsed) -> ParsedDocument:
     """What the activity writes as doc.json: it must validate."""
     return ParsedDocument(
-        document_version_id=uuid.uuid4(), loader="x", blocks=parsed.blocks, tables=parsed.tables
+        document_version_id=uuid.uuid4(), loader="x", blocks=blocks_of(parsed), tables=parsed.tables
     )
 
 
 # --- the registry ---------------------------------------------------------------------------------
 
 
-def test_e4_5_part_one_has_text_markdown_and_csv_loaders_only() -> None:
-    assert set(LOADERS) == {"md", "txt", "csv"}
-    for pending in ("pdf", "docx", "xlsx", "eml", "json", "py", "zip", "png", None, ""):
-        assert loader_for(pending) is None
+def test_e4_5_the_registry_has_the_six_mvp_document_loaders_and_nothing_else_yet() -> None:
+    assert set(LOADERS) == {"md", "txt", "csv", "pdf", "docx", "xlsx"}
+    for pending in ("eml", "msg", "json", "yaml", "py", "zip", "tar.gz", "png", "jpg", None, ""):
+        assert loader_for(pending) is None  # e-mail, structured, code, archives: later issues
 
 
 # --- Markdown -------------------------------------------------------------------------------------
@@ -71,12 +80,12 @@ def test_e4_5_a_fenced_code_block_is_one_paragraph_and_hides_its_hashes() -> Non
     parsed = run("md", b"# A\n\n```\n# not a heading\n- not an item\n```\n\nafter\n")
     kinds = [(b.type.value, b.line) for b in parsed.blocks]
     assert kinds == [("heading", 1), ("paragraph", 3), ("paragraph", 8)]
-    assert "# not a heading" in parsed.blocks[1].text
+    assert "# not a heading" in blocks_of(parsed)[1].text
 
 
 def test_e4_5_an_unclosed_fence_runs_to_the_end_without_losing_text() -> None:
-    parsed = run("md", b"```\ncode\nmore\n")
-    assert [b.text for b in parsed.blocks] == ["```\ncode\nmore\n"] or parsed.blocks[0].line == 1
+    [block] = blocks_of(run("md", b"```\ncode\nmore\n"))
+    assert (block.line, block.text) == (1, "```\ncode\nmore\n")
 
 
 @pytest.mark.parametrize(
@@ -105,8 +114,8 @@ def test_e4_5_plain_text_is_paragraphs_separated_by_blank_lines() -> None:
     parsed = run("txt", docs("sample.txt"))
     valid(parsed)
     assert all(b.type.value == "paragraph" for b in parsed.blocks)
-    assert parsed.blocks[0].line == 1
-    assert parsed.markdown.count("\n\n") == len(parsed.blocks) - 1
+    assert blocks_of(parsed)[0].line == 1
+    assert markdown_of(parsed).count("\n\n") == len(blocks_of(parsed)) - 1
 
 
 def test_e4_5_plain_text_does_not_read_markdown_into_the_text() -> None:

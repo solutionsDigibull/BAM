@@ -1,6 +1,8 @@
 """What every loader takes and returns."""
 
-from collections.abc import Callable
+import io
+import zipfile
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
 from sbam_contracts.api import ErrorCode
@@ -24,9 +26,13 @@ class ParseError(Exception):
 
 @dataclass
 class Parsed:
-    blocks: list[Block] = field(default_factory=list)
+    """What a loader returns. `report` is complete when the loader returns. `blocks` and `markdown`
+    may be lazy (a big workbook is written out piece by piece, never held as one string or one list
+    of block objects); the activity iterates them once, in order."""
+
+    blocks: Iterable[Block] = field(default_factory=list)
     tables: list[Table] = field(default_factory=list)
-    markdown: str = ""
+    markdown: str | Iterable[str] = ""
     report: ParseReport = field(default_factory=ParseReport)
 
 
@@ -46,3 +52,38 @@ def decode(data: bytes) -> str:
     if "\x00" in text:
         raise ParseError(ErrorCode.CORRUPT, "the file contains a NUL byte")
     return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+# A ZIP container (DOCX, XLSX) that unpacks to more than this, or into more files than this, is
+# refused before any part of it is read: the memory cap of the worker is 1 GiB.
+MAX_UNPACKED_BYTES = 256 * 1024 * 1024
+MAX_ZIP_ENTRIES = 10_000
+
+
+def check_zip(data: bytes) -> None:
+    """CORRUPT for a file that is not a readable ZIP; PARSE_ERROR for a container that is too big
+    once unpacked (a zip bomb). Only the directory is read, nothing is decompressed."""
+    try:
+        entries = zipfile.ZipFile(io.BytesIO(data)).infolist()
+    except (zipfile.BadZipFile, OSError, ValueError):
+        raise ParseError(ErrorCode.CORRUPT, "the file is not a readable container") from None
+    if len(entries) > MAX_ZIP_ENTRIES:
+        raise ParseError(ErrorCode.PARSE_ERROR, "the container holds too many files")
+    if sum(e.file_size for e in entries) > MAX_UNPACKED_BYTES:
+        raise ParseError(ErrorCode.PARSE_ERROR, "the container is too large once unpacked")
+
+
+def gfm_table(header: list[str], rows: Iterable[list[str]]) -> Iterable[str]:
+    """A table as GitHub-flavoured Markdown, one line at a time."""
+
+    def line(cells: list[str]) -> str:
+        return "| " + " | ".join(_cell(c) for c in cells) + " |\n"
+
+    yield line(header)
+    yield "| " + " | ".join("---" for _ in header) + " |\n"
+    for row in rows:
+        yield line(row)
+
+
+def _cell(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("|", r"\|").replace("\n", " ")

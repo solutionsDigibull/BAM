@@ -6,18 +6,24 @@ tables of `doc.json`, the text of `doc.md` and the report. A file it cannot read
 `ParseError` with the code the version is failed with.
 
 `loader_for(detected_type)` is the registry. A type with no loader yet gives None: the parse step
-leaves such a version in PARSING, as before, until its loader lands (PDF, DOCX and XLSX: E4.5 part
-2; e-mail, structured, source code, archives: later issues).
+leaves such a version in PARSING, as before, until its loader lands (e-mail, structured, source
+code, archives: later issues; images and scanned pages: OCR, E4.8).
 """
 
 from sbam_workers.ingest.loaders.base import Heartbeat, Loader, Parsed, ParseError, no_heartbeat
+from sbam_workers.ingest.loaders.pdf import load_pdf
 from sbam_workers.ingest.loaders.tabular import load_csv
 from sbam_workers.ingest.loaders.text import load_markdown, load_text
+from sbam_workers.ingest.loaders.word import load_docx
+from sbam_workers.ingest.loaders.xlsx import load_xlsx
 
 LOADERS: dict[str, Loader] = {
     "md": load_markdown,
     "txt": load_text,
     "csv": load_csv,
+    "pdf": load_pdf,
+    "docx": load_docx,
+    "xlsx": load_xlsx,
 }
 
 

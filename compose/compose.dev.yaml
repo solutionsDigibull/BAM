@@ -43,7 +43,9 @@ services:
   proxy:
     cpus: 0.25
     mem_limit: 128m
-  worker-ingest: *worker
+  worker-ingest:
+    <<: *worker
+    mem_limit: 1g # the parse cap of E4.5; the other workers keep 512m
   worker-knowledge: *worker
   worker-llm: *worker
   worker-build: *worker

@@ -53,7 +53,9 @@ services:
     cpus: 0.5
     mem_limit: 256m
     ports: !override ["0.0.0.0:80:80", "0.0.0.0:443:443"] # the only public ports of the platform
-  worker-ingest: *worker-real
+  worker-ingest:
+    <<: *worker-real
+    mem_limit: 1g # the parse cap of E4.5 (the other workers keep 2g)
   worker-knowledge: *worker-real
   worker-llm: *worker-real
   worker-build: *worker-real
