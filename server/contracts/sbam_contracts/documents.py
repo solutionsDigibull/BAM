@@ -20,11 +20,19 @@ Rules worth knowing
     block in the document). Every block has at least one of them. A version that cannot be parsed
     is PARSE_FAILED with `parse_code` CORRUPT, ENCRYPTED, EMPTY, TIMEOUT or PARSE_ERROR. CORRUPT,
     ENCRYPTED and EMPTY are final (no retry); a TIMEOUT or an infrastructure error is retried.
+  * OCR (E4.8): a PDF page whose text layer is shorter than `MIN_TEXT_CHARS`, and every frame of an
+    image, is read by the vision model (`sbam-ocr`), one page per call. Such a version stays
+    PARSING until the OCR finishes: `ParseOutcome(parsed=False, code=None)` with pages in
+    `report.ocr_needed_pages` means "OCR still to do". The model's answer is an `OcrPage`; its text
+    is a block with `ocr="llm"`. A page the model cannot read is an empty block with
+    `unreadable=True` and is listed in `report.unreadable_pages`; the document is PARSED when at
+    least one page is readable, else PARSE_FAILED (EMPTY, or OCR_UNAVAILABLE when the provider was
+    down). More than `MAX_OCR_PAGES` pages is PARSE_ERROR.
 """
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Final
+from typing import Annotated, Any, Final, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -57,6 +65,15 @@ MAX_XLSX_CELLS: Final = 1_000_000
 PARSE_TIMEOUT_SECONDS: Final = 10 * 60  # per file
 PARSE_HEARTBEAT_SECONDS: Final = 60
 PARSE_MEMORY_LIMIT_BYTES: Final = 1024 * 1024 * 1024  # the ingest worker container's cap
+# OCR by vision model (E4.8). A PDF page whose text layer is shorter than MIN_TEXT_CHARS is a scan.
+MIN_TEXT_CHARS: Final = 20
+MAX_OCR_PAGES: Final = 200  # pages (or image frames) one document may send to the model
+OCR_DPI: Final = 200
+OCR_MAX_SIDE_PX: Final = 3000  # longest side of a page image
+OCR_MAX_IMAGE_BYTES: Final = 5 * 1024 * 1024  # one page image (PNG)
+OCR_TIMEOUT_SECONDS: Final = 30 * 60  # per document: up to 200 model calls
+OCR_HEARTBEAT_SECONDS: Final = 60
+OCR_PAGE_ATTEMPTS: Final = 3  # a page whose answer never validates is unreadable after this many
 
 _NO_SEPARATORS_OR_CONTROL = r"^[^/\\\x00-\x1f\x7f-\x9f]+$"
 
@@ -145,6 +162,11 @@ class Block(BaseModel):
     cell: str | None = Field(default=None, pattern=r"^[A-Z]{1,3}[1-9][0-9]*$")
     line: int | None = Field(default=None, ge=1)
     table: int | None = Field(default=None, ge=0)
+    # E4.8: the text of this page was read from its image by the vision model, not from the file.
+    ocr: Literal["llm"] | None = None
+    # E4.8: the model could not read this page (the block's text is empty). The page is also in
+    # `ParseReport.unreadable_pages`.
+    unreadable: bool = False
 
     @model_validator(mode="after")
     def _says_where_it_came_from(self) -> "Block":
@@ -154,6 +176,8 @@ class Block(BaseModel):
             raise ValueError("a cell needs its sheet")
         if self.type == BlockType.TABLE and self.table is None:
             raise ValueError("a table block names its table")
+        if self.unreadable and (self.text or self.page is None or self.ocr is None):
+            raise ValueError("an unreadable block is an empty OCR block of a page")
         return self
 
 
@@ -191,7 +215,9 @@ class ParseReport(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     ocr_needed_pages: list[int] = Field(
         default_factory=list
-    )  # PDF pages without a text layer (E4.8)
+    )  # PDF pages without a text layer, and every frame of an image (E4.8)
+    ocr_pages: list[int] = Field(default_factory=list)  # of those, the ones the model read
+    unreadable_pages: list[int] = Field(default_factory=list)  # and the ones it could not read
 
 
 class ParseOutcome(BaseModel):
@@ -201,6 +227,17 @@ class ParseOutcome(BaseModel):
     parsed: bool
     code: ErrorCode | None = None
     report: ParseReport | None = None
+
+
+class OcrPage(BaseModel):
+    """What the vision model answers for one page (`sbam-ocr`). Nothing else is accepted: a model
+    that adds a field (`status`, `approved`, ...) is re-asked and the answer is never stored."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    page: int = Field(ge=1)  # the page that was sent; an answer for another page is invalid
+    markdown: str = Field(max_length=200_000)  # the page's text as Markdown; empty when unreadable
+    unreadable: bool = False  # the page is blank, noise, or too poor to read
 
 
 class DocumentOut(BaseModel):
@@ -271,6 +308,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "parsed_document": ParsedDocument,
         "parse_report": ParseReport,
         "parse_outcome": ParseOutcome,
+        "ocr_page": OcrPage,
         "document": DocumentOut,
         "purge_target": PurgeTarget,
         "purge_request": PurgeRequest,

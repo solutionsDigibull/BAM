@@ -15,6 +15,7 @@ from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
 from sbam_contracts.documents import (
     CleanupResult,
     DocumentOut,
+    OcrPage,
     ParsedDocument,
     ParseOutcome,
     ParseReport,
@@ -159,6 +160,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/parsed_document", ParsedDocument),
     ("documents/parse_report", ParseReport),
     ("documents/parse_outcome", ParseOutcome),
+    ("documents/ocr_page", OcrPage),
     ("masters/master_entry_create", MasterEntryCreate),
     ("masters/master_version_create", MasterVersionCreate),
     ("masters/master_entry", MasterEntry),

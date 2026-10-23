@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/ocr_page:0.1.0",
+  "additionalProperties": false,
+  "description": "What the vision model answers for one page (`sbam-ocr`). Nothing else is accepted: a model\nthat adds a field (`status`, `approved`, ...) is re-asked and the answer is never stored.",
+  "properties": {
+    "page": {
+      "minimum": 1,
+      "title": "Page",
+      "type": "integer"
+    },
+    "markdown": {
+      "maxLength": 200000,
+      "title": "Markdown",
+      "type": "string"
+    },
+    "unreadable": {
+      "default": false,
+      "title": "Unreadable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "page",
+    "markdown"
+  ],
+  "title": "OcrPage",
+  "type": "object"
+}
