@@ -62,11 +62,12 @@ type Fake = {
   versions: Version[];
   etag: number;
   pipeline: string;
-  save: "ok" | "conflict" | "locked";
+  save: "ok" | "conflict" | "locked" | "expired";
   saves: { body: Record<string, unknown>; ifMatch: string | null }[];
   regenerates: Record<string, unknown>[];
   diff?: unknown;
   afterRegenerate?: () => void;
+  sourceDeleted?: boolean;
 };
 
 const fake = (versions: Version[], more: Partial<Fake> = {}): Fake => ({
@@ -100,6 +101,7 @@ async function serve(page: Page, f: Fake) {
     if (path === "/versions" && req.method() === "POST") {
       f.saves.push({ body: req.postDataJSON(), ifMatch: req.headers()["if-match"] ?? null });
       if (f.save === "locked") return problem(route, 423, "SOW_LOCKED", "approved");
+      if (f.save === "expired") return problem(route, 401, "UNAUTHENTICATED", "session expired");
       if (f.save === "conflict") {
         f.versions.push(summary(current(f).version + 1));
         f.etag += 1;
@@ -123,11 +125,11 @@ async function serve(page: Page, f: Fake) {
         okf_ref_id: decodeURIComponent(cite[2]!),
         kind: "chunk",
         document_version_id: "0190f3a2-7b1c-7d4e-8f00-00000000d0c1",
-        title: "RFQ cables.pdf",
+        title: f.sourceDeleted ? null : "RFQ cables.pdf",
         location: { page: 3, line: 12 },
         passage: "The Planner approves every quote above 5000 EUR.",
         truncated: false,
-        source_available: true,
+        source_available: !f.sourceDeleted,
       });
     const one = /^\/versions\/(\d+)$/.exec(path);
     if (one) {
@@ -336,4 +338,68 @@ test("e6_5_t08 compare shows section badges from the API diff", async ({ page, b
   await expect(drawer.locator('[data-section="overview"] [data-change="UNCHANGED"]')).toBeVisible();
   expect(requests.some((r) => r.url().endsWith("/sow/versions/1/diff/3"))).toBe(true);
   expect(mutations(requests)).toEqual([]);
+});
+
+test("e6_5 leaving by an in-app link with unsaved edits asks first", async ({ page, baseURL }) => {
+  await open(page, baseURL!, fake([summary(1)]));
+  await page.getByText("OTP sign-in with device limits").click();
+  await page.keyboard.type("x");
+  const knowledge = page.getByRole("link", { name: "Knowledge" }).first();
+  await knowledge.click();
+  const confirm = page.getByRole("dialog", { name: "Discard unsaved edits?" });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Cancel" }).click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${PROJECT}/sow$`));
+  await expect(page.getByText("Unsaved changes")).toBeVisible();
+  await knowledge.click();
+  await page
+    .getByRole("dialog", { name: "Discard unsaved edits?" })
+    .getByRole("button", { name: "Discard" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${PROJECT}/knowledge$`));
+});
+
+test("e6_5 an expired session keeps the draft: sign in again, restore, save", async ({
+  page,
+  baseURL,
+}) => {
+  const f = fake([summary(1)], { save: "expired" });
+  await open(page, baseURL!, f);
+  await page.getByText("OTP sign-in with device limits").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" kept across sign-in");
+  page.once("dialog", (d) => void d.accept()); // the browser's leave-page prompt, if any
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/\/login-fde/);
+  f.save = "ok";
+  await page.goto(`/projects/${PROJECT}/sow`); // signed in again
+  const banner = page.getByTestId("sow-restore");
+  await expect(banner).toContainText("unsaved edits to v1");
+  await banner.getByRole("button", { name: "Restore my edits" }).click();
+  await expect(editor(page)).toContainText("kept across sign-in");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved as v2")).toBeVisible();
+  expect(JSON.stringify(f.saves.at(-1)?.body.content_tiptap)).toContain("kept across sign-in");
+});
+
+test("e6_5 a list of 150 versions is virtualized", async ({ page, baseURL }) => {
+  const many = Array.from({ length: 150 }, (_, i) =>
+    summary(i + 1, i === 149 ? "IN_REVIEW" : "SUPERSEDED"),
+  );
+  await open(page, baseURL!, fake(many));
+  await page.getByRole("tab", { name: "Versions (150)" }).click();
+  const rows = page.getByTestId("sow-versions").locator(".ant-table-row");
+  await expect(rows.first()).toBeVisible();
+  expect(await rows.count()).toBeLessThan(60); // only what fits on screen is rendered
+  await rows.nth(1).click();
+  await expect(page.getByRole("heading", { name: "SOW v149" })).toBeVisible();
+});
+
+test("e6_5 a citation whose document was deleted says so", async ({ page, baseURL }) => {
+  await open(page, baseURL!, fake([summary(1)], { sourceDeleted: true }));
+  await editor(page).locator(".sow-cite").first().click();
+  const panel = page.getByTestId("citation-detail");
+  await expect(panel).toContainText("Source deleted");
+  await expect(page.getByTestId("citation-passage")).toContainText("approves every quote");
+  await expect(panel.getByRole("link", { name: "Open source" })).toHaveCount(0);
 });

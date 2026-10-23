@@ -4,18 +4,12 @@
 // text under them is editable, citations are numbered chips that open the citation panel. Read-only for an
 // approved, superseded or older version. The parent holds the draft; nothing is saved from here.
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo } from "react";
 
+import { canonical } from "./sow-draft";
 import { sowExtensions } from "./sow-schema";
 
 export type CiteClick = { okfRefId: string; number: number };
-
-/** The document as the server reads it: null attributes and empty `content` arrays carry no meaning, and
- *  TipTap adds or drops them freely, so they must not count as an edit. */
-export const canonical = (doc: JSONContent): string =>
-  JSON.stringify(doc, (_k, v: unknown) =>
-    v === null || (Array.isArray(v) && v.length === 0) ? undefined : v,
-  );
 
 const STYLE = `
 .sow-editor .ProseMirror { counter-reset: cite; outline: none; padding: 8px 4px; line-height: 1.55; }
@@ -38,17 +32,21 @@ const STYLE = `
 
 export function SowEditor({
   content,
+  original,
   editable,
   onChange,
   onCite,
 }: {
+  /** What to show: the version, or a draft restored after a sign-in. */
   content: JSONContent;
+  /** The saved version: an edit is whatever differs from it. */
+  original: JSONContent;
   editable: boolean;
-  /** The edited document, or null when it is back to what was loaded (nothing to save). */
+  /** The edited document, or null when it equals the saved version (nothing to save). */
   onChange: (doc: JSONContent | null) => void;
   onCite: (cite: CiteClick) => void;
 }) {
-  const loaded = useRef<string | null>(null);
+  const saved = useMemo(() => canonical(original), [original]);
   const editor = useEditor({
     extensions: sowExtensions,
     content,
@@ -57,7 +55,7 @@ export function SowEditor({
     // TipTap reports updates that change nothing (e.g. a refused edit of a locked heading): compare.
     onUpdate: ({ editor: e }) => {
       const doc = e.getJSON();
-      onChange(canonical(doc) === loaded.current ? null : doc);
+      onChange(canonical(doc) === saved ? null : doc);
     },
     editorProps: {
       attributes: { "aria-label": "SOW editor", "data-testid": "sow-editor" },
@@ -72,12 +70,6 @@ export function SowEditor({
       },
     },
   });
-
-  // What was loaded, as the editor holds it: the baseline for "unsaved changes". Taken once the editor
-  // exists (TipTap's onCreate can come after the first update).
-  useEffect(() => {
-    if (editor && loaded.current === null) loaded.current = canonical(editor.getJSON());
-  }, [editor]);
 
   useEffect(() => {
     editor?.setEditable(editable);

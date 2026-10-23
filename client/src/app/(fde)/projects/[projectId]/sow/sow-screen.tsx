@@ -2,8 +2,9 @@
 
 // The SOW screen (E6.5, TD §9 "SOW"): review and edit the generated SOW, open citations, browse and compare
 // versions, regenerate, export. Saving is explicit and always creates a new version (If-Match + base
-// version); nothing autosaves. The draft lives in memory: a conflict, a 423 or an expired session never
-// throws it away, and leaving with unsaved edits asks first.
+// version); nothing autosaves. A conflict, a 423 or an expired session never throws the draft away: it is
+// also kept in this tab's sessionStorage (sow-draft.ts) and offered back after a sign-in. Leaving with unsaved
+// edits, by link, tab close or reload, asks first.
 import { useCustom, useCustomMutation, useList } from "@refinedev/core";
 import type { JSONContent } from "@tiptap/react";
 import {
@@ -20,6 +21,7 @@ import {
   Typography,
 } from "antd";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -65,6 +67,7 @@ import {
   versionPath,
   versionsPath,
 } from "./sow-api";
+import { type StoredDraft, clearDraft, readDraft, writeDraft } from "./sow-draft";
 import type { CiteClick } from "./sow-editor";
 import {
   CitationPanel,
@@ -95,6 +98,7 @@ const textOf = (doc: JSONContent | null): string => {
 
 export function SowScreen({ projectId }: { projectId: string }) {
   const { message, modal } = App.useApp();
+  const router = useRouter();
   const projects = useList<Project, ApiError>({
     resource: PROJECTS_RESOURCE,
     pagination: { mode: "off" },
@@ -134,6 +138,11 @@ export function SowScreen({ projectId }: { projectId: string }) {
   const [conflict, setConflict] = useState<{ base: number } | null>(null);
   const [regenOpen, setRegenOpen] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
+  // Unsaved edits from before a sign-in (read once, in the browser; the server render shows the loader).
+  const [stored, setStored] = useState<StoredDraft | null>(() =>
+    typeof window === "undefined" ? null : readDraft(projectId),
+  );
+  const [restoredDoc, setRestoredDoc] = useState<JSONContent | null>(null);
   const save = useCustomMutation<SowVersionSummary, ApiError>();
   const regenerate = useCustomMutation<RunAccepted, ApiError>();
   const saving = useRef(false);
@@ -149,27 +158,60 @@ export function SowScreen({ projectId }: { projectId: string }) {
     if (ready !== null) void message.success(`v${ready} is ready.`);
   }, [ready, message]);
 
-  // Unsaved edits: the browser asks before leaving the page.
+  // Keep the draft for after a sign-in while it is unsaved.
+  const base = current?.version;
   useEffect(() => {
-    if (!draft) return;
-    const guard = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", guard);
-    return () => window.removeEventListener("beforeunload", guard);
-  }, [draft]);
+    if (draft && base !== undefined) writeDraft(projectId, base, draft);
+  }, [draft, base, projectId]);
 
-  const discardFirst = (then: () => void) => {
-    if (!draft) return then();
+  const dropDraft = () => {
+    setDraft(null);
+    setRestoredDoc(null);
+    clearDraft(projectId);
+  };
+
+  const confirmDiscard = (then: () => void) =>
     modal.confirm({
       title: "Discard unsaved edits?",
       content: "Your changes to this version are not saved.",
       okText: "Discard",
       okButtonProps: { danger: true },
       onOk: () => {
-        setDraft(null);
+        dropDraft();
         then();
       },
     });
-  };
+
+  const discardFirst = (then: () => void) => (draft ? confirmDiscard(then) : then());
+
+  // Unsaved edits: closing or reloading the tab asks (the browser's own prompt), and so does an in-app link
+  // (the project tabs, the breadcrumb): App Router has no route-change event, so links are caught on click.
+  useEffect(() => {
+    if (!draft) return;
+    const unload = (e: BeforeUnloadEvent) => e.preventDefault();
+    const click = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.("a[href]");
+      if (!(a instanceof HTMLAnchorElement)) return;
+      const url = new URL(a.href, window.location.href);
+      const leaving =
+        url.origin === window.location.origin &&
+        url.pathname !== window.location.pathname &&
+        !a.hasAttribute("download") &&
+        a.target !== "_blank" &&
+        e.button === 0 &&
+        !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey);
+      if (!leaving) return;
+      e.preventDefault();
+      e.stopPropagation();
+      confirmDiscard(() => router.push(url.pathname + url.search));
+    };
+    window.addEventListener("beforeunload", unload);
+    document.addEventListener("click", click, true);
+    return () => {
+      window.removeEventListener("beforeunload", unload);
+      document.removeEventListener("click", click, true);
+    };
+  }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refetchAll = () => {
     void overview.query.refetch();
@@ -195,7 +237,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
           const saved = res.data;
           if (saved.version === current.version) void message.info(NO_CHANGES);
           else void message.success(SAVED(saved.version));
-          setDraft(null);
+          dropDraft();
           setShown(undefined);
           setReload((n) => n + 1);
           refetchAll();
@@ -241,7 +283,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
       {
         onSuccess: () => {
           setRegenOpen(false);
-          setDraft(null);
+          dropDraft();
           setRegeneratingFrom(current?.version ?? 0);
           void message.success("Regeneration started.");
           refetchAll();
@@ -330,6 +372,56 @@ export function SowScreen({ projectId }: { projectId: string }) {
         </Space>
       </Space>
 
+      {stored && !draft && !generating ? (
+        <Alert
+          type="warning"
+          showIcon
+          data-testid="sow-restore"
+          style={{ marginBottom: 12 }}
+          message={
+            stored.baseVersion === current.version
+              ? `You have unsaved edits to v${stored.baseVersion} from before you signed in again.`
+              : `You have unsaved edits to v${stored.baseVersion}, but v${current.version} is now current.`
+          }
+          action={
+            <Space>
+              {stored.baseVersion === current.version && editable ? (
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    setRestoredDoc(stored.doc);
+                    setDraft(stored.doc);
+                    setStored(null);
+                    setReload((n) => n + 1);
+                  }}
+                >
+                  Restore my edits
+                </Button>
+              ) : (
+                <Button
+                  size="small"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(textOf(stored.doc));
+                    void message.success("Your edits were copied to the clipboard.");
+                  }}
+                >
+                  Copy my edits
+                </Button>
+              )}
+              <Button
+                size="small"
+                onClick={() => {
+                  clearDraft(projectId);
+                  setStored(null);
+                }}
+              >
+                Discard
+              </Button>
+            </Space>
+          }
+        />
+      ) : null}
       {generating ? (
         <Alert
           type="info"
@@ -391,7 +483,8 @@ export function SowScreen({ projectId }: { projectId: string }) {
             ) : version && isSowDoc(version.content_tiptap) ? (
               <SowEditor
                 key={`${shownVersion}-${reload}`}
-                content={version.content_tiptap as JSONContent}
+                content={restoredDoc ?? (version.content_tiptap as JSONContent)}
+                original={version.content_tiptap as JSONContent}
                 editable={editable}
                 onChange={setDraft}
                 onCite={(c) => {
@@ -460,7 +553,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
           }}
           onReload={() => {
             setConflict(null);
-            setDraft(null);
+            dropDraft();
             setShown(undefined);
             setReload((n) => n + 1);
             refetchAll();
