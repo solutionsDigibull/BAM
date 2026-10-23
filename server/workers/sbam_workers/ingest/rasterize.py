@@ -12,10 +12,12 @@ fill the worker's memory.
 """
 
 import io
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Final, Protocol
 
 import pypdfium2 as pdfium  # type: ignore[import-untyped]  # ships no type information
-from PIL import Image, ImageOps
+from PIL import Image, ImageFile, ImageOps
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.documents import OCR_DPI, OCR_MAX_IMAGE_BYTES, OCR_MAX_SIDE_PX
 
@@ -27,6 +29,19 @@ MAX_SHRINKS: Final = 8
 IMAGE_TYPES: Final = frozenset({"png", "jpg", "jpeg", "tiff"})
 
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS  # Pillow raises DecompressionBombError at twice this
+
+
+@contextmanager
+def strict_images() -> Iterator[None]:
+    """Decode images strictly. Pillow's `LOAD_TRUNCATED_IMAGES` is a process-wide switch that
+    WeasyPrint turns on when it is imported (the worker imports every module), which would let a
+    truncated image through half decoded: a half-read scan must be CORRUPT, not silently partial."""
+    before = ImageFile.LOAD_TRUNCATED_IMAGES
+    ImageFile.LOAD_TRUNCATED_IMAGES = False
+    try:
+        yield
+    finally:
+        ImageFile.LOAD_TRUNCATED_IMAGES = before
 
 
 class PageUnreadable(Exception):  # noqa: N818 - the page cannot become a usable image
@@ -99,7 +114,8 @@ class ImageSource:
     def __init__(self, data: bytes) -> None:
         try:
             self._image = Image.open(io.BytesIO(data))
-            self._image.load()  # decodes the first frame: a truncated file fails here
+            with strict_images():
+                self._image.load()  # decodes the first frame: a truncated file fails here
             self.pages = int(getattr(self._image, "n_frames", 1))
         except Image.DecompressionBombError:
             raise ParseError(ErrorCode.PARSE_ERROR, "the image is too large") from None
@@ -108,8 +124,9 @@ class ImageSource:
 
     def render(self, number: int) -> bytes:
         try:
-            self._image.seek(number - 1)
-            frame = ImageOps.exif_transpose(self._image.copy())
+            with strict_images():
+                self._image.seek(number - 1)
+                frame = ImageOps.exif_transpose(self._image.copy())
             return fit(frame)
         except (EOFError, OSError, Image.DecompressionBombError):
             raise PageUnreadable("the frame cannot be read") from None

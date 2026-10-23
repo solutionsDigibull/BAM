@@ -8,7 +8,7 @@ import random
 
 import pytest
 from fixtures import fixture_path
-from PIL import Image
+from PIL import Image, ImageFile
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.documents import MAX_OCR_PAGES, OCR_MAX_IMAGE_BYTES, OCR_MAX_SIDE_PX
 from sbam_workers.ingest import rasterize
@@ -174,6 +174,35 @@ def test_e4_8_a_truncated_image_is_corrupt_not_half_read() -> None:
     with pytest.raises(ParseError) as caught:
         open_source(whole[: len(whole) // 2], "png")
     assert caught.value.code is ErrorCode.CORRUPT
+
+
+def test_e4_8_a_truncated_image_is_corrupt_even_when_something_turned_truncated_loading_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WeasyPrint sets `ImageFile.LOAD_TRUNCATED_IMAGES` when it is imported, and the worker imports
+    every module: the rasteriser must not depend on that process-wide switch (found in CI)."""
+    monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
+    whole = encoded(Image.new("RGB", (300, 300), (9, 9, 9)), "PNG")
+    with pytest.raises(ParseError) as caught:
+        open_source(whole[: len(whole) // 2], "png")
+    assert caught.value.code is ErrorCode.CORRUPT
+    assert ImageFile.LOAD_TRUNCATED_IMAGES is True  # the switch is put back as it was
+
+
+def test_e4_8_a_truncated_later_frame_is_an_unreadable_page_even_with_the_switch_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rng = random.Random(5)  # noqa: S311 - test data
+    frames = [Image.frombytes("RGB", (200, 200), rng.randbytes(200 * 200 * 3)) for _ in range(2)]
+    whole = encoded(frames[0], "TIFF", save_all=True, append_images=frames[1:], compression="raw")
+    monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
+    source = open_source(whole[: int(len(whole) * 0.75)], "tiff")
+    try:
+        assert source.render(1).startswith(PNG_MAGIC)  # the first frame is whole
+        with pytest.raises(PageUnreadable):
+            source.render(2)  # the second one is cut off
+    finally:
+        source.close()
 
 
 def test_e4_8_an_image_with_too_many_pixels_is_refused_not_decoded(
