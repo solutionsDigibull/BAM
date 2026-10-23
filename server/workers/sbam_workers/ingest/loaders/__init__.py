@@ -7,10 +7,11 @@ tables of `doc.json`, the text of `doc.md` and the report. A file it cannot read
 
 `loader_for(detected_type)` is the registry. A type with no loader yet gives None: the parse step
 leaves such a version in PARSING, as before, until its loader lands (e-mail, structured, source
-code, archives: later issues; images and scanned pages: OCR, E4.8).
+code, archives: later issues).
 """
 
 from sbam_workers.ingest.loaders.base import Heartbeat, Loader, Parsed, ParseError, no_heartbeat
+from sbam_workers.ingest.loaders.image import load_image
 from sbam_workers.ingest.loaders.pdf import load_pdf
 from sbam_workers.ingest.loaders.tabular import load_csv
 from sbam_workers.ingest.loaders.text import load_markdown, load_text
@@ -24,6 +25,10 @@ LOADERS: dict[str, Loader] = {
     "pdf": load_pdf,
     "docx": load_docx,
     "xlsx": load_xlsx,
+    "png": load_image,  # images have no text layer: every frame goes to OCR (E4.8)
+    "jpg": load_image,
+    "jpeg": load_image,
+    "tiff": load_image,
 }
 
 

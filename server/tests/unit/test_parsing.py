@@ -254,7 +254,7 @@ def test_e4_5_a_retry_after_a_failure_repeats_the_answer_and_notifies_once(h: Ha
 
 
 def test_e4_5_a_type_with_no_loader_yet_stays_parsing(h: Harness) -> None:
-    for kind in ("eml", "msg", "json", "py", "zip", "png"):
+    for kind in ("eml", "msg", "json", "py", "zip"):
         ref = h.add(f"file.{kind}", b"anything", detected=kind)
         outcome = parse_version(h.deps, ref)
         assert (outcome.parsed, outcome.code, outcome.report) == (False, None, None)

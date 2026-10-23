@@ -93,13 +93,19 @@ def encrypted(pdf: bytes, user: str, owner: str) -> bytes:
 
 
 def test_e4_5_t01_a_ten_page_text_pdf_has_a_block_for_each_page() -> None:
-    pdf = make_pdf([f"Offer line {n}" for n in range(1, 11)])
+    pdf = make_pdf([f"Offer line {n} with the parts and prices" for n in range(1, 11)])
     parsed = run("pdf", pdf)
     doc = document(parsed)
     assert [b.page for b in doc.blocks] == list(range(1, 11))
-    assert [b.text for b in doc.blocks][:2] == ["Offer line 1", "Offer line 2"]
+    texts = [b.text for b in doc.blocks][:2]
+    assert texts == [
+        "Offer line 1 with the parts and prices",
+        "Offer line 2 with the parts and prices",
+    ]
     assert parsed.report.pages == 10 and parsed.report.ocr_needed_pages == []
-    assert markdown(parsed).startswith("<!-- page 1 -->\n\nOffer line 1\n")
+    assert markdown(parsed).startswith(
+        "<!-- page 1 -->\n\nOffer line 1 with the parts and prices\n"
+    )
 
 
 def test_e4_5_the_golden_text_pdf_is_read_page_by_page() -> None:

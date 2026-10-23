@@ -27,7 +27,10 @@ Cognee's aliases (E5.7, #259) are marked in `aliases.json` and need no recorded 
                           hashed from its words, so the same text always gives the same vector and texts
                           that share words are close. Size: `dimensions` in the request, else
                           LLM_MOCK_EMBEDDING_DIMENSIONS (default 1536).
-The scenarios apply to both.
+    "mock": "ocr"         (`sbam-ocr`, E4.8) an unseen input is answered with a page of text for the
+                          page the request names (`<data name="page_number">N</data>`): the mock cannot
+                          read an image, so the text is always `Mock OCR text of page N.`
+The scenarios apply to all of them.
 """
 
 import hashlib
@@ -125,11 +128,13 @@ class Mock:
         aliases: set[str],
         generated: frozenset[str] = frozenset(),
         embedding: frozenset[str] = frozenset(),
+        ocr: frozenset[str] = frozenset(),
     ):
         self.fixtures = fixtures
         self.aliases = aliases
         self.generated = generated  # unseen inputs are answered from the request's schema
         self.embedding = embedding  # served on /v1/embeddings only
+        self.ocr = ocr  # unseen inputs get a page of mock text for the page asked for
         self.scenarios: dict[str, str] = {}
         self.calls: list[dict[str, str]] = []
         self.timeout_s = float(os.environ.get("LLM_MOCK_TIMEOUT_S", "65"))
@@ -195,7 +200,7 @@ class Mock:
             time.sleep(self.timeout_s)
             return error(504, "MOCK_TIMEOUT", f"mock timeout for {model}")
         fixture = self.fixtures.get((alias, prompt_id, digest))
-        if fixture is None and alias not in self.generated:
+        if fixture is None and alias not in self.generated and alias not in self.ocr:
             return error(
                 422,
                 "MOCK_FIXTURE_MISSING",
@@ -205,7 +210,12 @@ class Mock:
             invalid_times is None or reasks < invalid_times
         )
         if fixture is None:
-            content = INVALID_BODY if invalid else generated_answer(body)
+            if invalid:
+                content = INVALID_BODY
+            elif alias in self.ocr:
+                content = ocr_answer(messages)
+            else:
+                content = generated_answer(body)
         else:
             content = fixture_content(fixture, invalid)
         completion = {
@@ -279,6 +289,27 @@ def embed(text: str, size: int) -> list[float]:
         vector[index] += 1.0 if digest[4] % 2 else -1.0
     norm = math.sqrt(sum(v * v for v in vector)) or 1.0
     return [round(v / norm, 6) for v in vector]
+
+
+PAGE_NUMBER = re.compile(r'<data name="page_number">\s*(\d+)\s*</data>')
+
+
+def message_text(message: dict[str, Any]) -> str:
+    """The text of a message; the images of a vision message are not text and are left out."""
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(str(p.get("text", "")) for p in content if isinstance(p, dict))
+    return ""
+
+
+def ocr_answer(messages: list[Any]) -> str:
+    """The answer of `sbam-ocr` for the page the request names (page 1 when it names none)."""
+    text = " ".join(message_text(m) for m in messages if isinstance(m, dict) and m.get("role") == "user")
+    found = PAGE_NUMBER.search(text)
+    page = int(found.group(1)) if found else 1
+    return dump({"page": page, "markdown": f"Mock OCR text of page {page}.", "unreadable": False})
 
 
 def generated_answer(body: dict[str, Any]) -> str:
@@ -514,6 +545,7 @@ def build(fixtures_dir: Path, aliases_file: Path) -> Mock:
         set(specs),
         generated=frozenset(a for a, s in specs.items() if s.get("mock") == "generated"),
         embedding=frozenset(a for a, s in specs.items() if s.get("kind") == "embedding"),
+        ocr=frozenset(a for a, s in specs.items() if s.get("mock") == "ocr"),
     )
 
 

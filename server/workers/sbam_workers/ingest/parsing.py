@@ -130,6 +130,20 @@ def parse_version(deps: ParseDeps, inp: StageRef, beat: Heartbeat = no_heartbeat
     except ParseError as exc:
         return _fail(deps, ctx, inp, exc.code, ParseReport(warnings=[str(exc)[:200]]))
 
+    return store_and_finish(deps, ctx, inp, loader_id, parsed, beat)
+
+
+def store_and_finish(
+    deps: ParseDeps,
+    ctx: TenantContext,
+    inp: StageRef,
+    loader_id: str,
+    parsed: Parsed,
+    beat: Heartbeat = no_heartbeat,
+) -> ParseOutcome:
+    """Write `doc.md` and `doc.json`, then finish the version: PARSED, or (when `parsed.report`
+    lists pages for OCR, E4.8) still PARSING with the derivatives and the report kept for the OCR
+    step. Used by the parse step and, with the pages' text added, by the OCR step."""
     scope = StorageScope(inp.tenant_id, inp.project_id)
     try:
         with _markdown_file(parsed.markdown, beat) as md_file:
@@ -145,7 +159,31 @@ def parse_version(deps: ParseDeps, inp: StageRef, beat: Heartbeat = no_heartbeat
             raise
         report = ParseReport(warnings=["the parsed text is too large to keep"])
         return _fail(deps, ctx, inp, ErrorCode.PARSE_ERROR, report)  # the same file, the same size
+    if (
+        parsed.report.ocr_needed_pages
+        and not parsed.report.ocr_pages + parsed.report.unreadable_pages
+    ):
+        return _pending_ocr(deps, ctx, inp, parsed, md.storage_key, js.storage_key)
     return _complete(deps, ctx, inp, parsed, blocks, md.storage_key, js.storage_key)
+
+
+def _pending_ocr(
+    deps: ParseDeps, ctx: TenantContext, inp: StageRef, parsed: Parsed, md_key: str, json_key: str
+) -> ParseOutcome:
+    """The text of the file is stored; pages (or an image) still need the vision model. The version
+    stays PARSING, and `ParseOutcome(parsed=False, code=None)` with a report that lists pages in
+    `ocr_needed_pages` is how the workflow knows to run the OCR step."""
+    report = parsed.report.model_copy(update={"tables": len(parsed.tables)})
+    with deps.sessions() as session:
+        version = _load(session, ctx, inp.ref_id)
+        if version.state != S.PARSING.value:  # another attempt got here first
+            return _outcome(version)
+        version.derived_md_key, version.derived_json_key = md_key, json_key
+        version.parse_report = report.model_dump(mode="json")
+        version.parse_code = None
+        DocumentVersionRepository(session, ctx).update(version, version.row_version)
+        session.commit()
+        return ParseOutcome(document_version_id=version.id, parsed=False, report=report)
 
 
 def _complete(

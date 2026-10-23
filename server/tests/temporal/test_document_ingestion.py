@@ -56,6 +56,15 @@ class Fakes:
     parse_calls: int = 0
     parse_times: list[datetime] = field(default_factory=list)
     gave_up: list[ErrorCode] = field(default_factory=list)
+    # E4.8: `parse` may be "ocr" (pages wait for the vision model); what `ocr_document` answers
+    # ("parsed" or "failed"), how many attempts raise first, how many hang, what it was asked.
+    ocr: str = "parsed"
+    ocr_fail_first: int = 0
+    ocr_error: Exception = field(default_factory=lambda: ConnectionError("Bifrost is down"))
+    ocr_hang_first: int = 0
+    ocr_calls: int = 0
+    ocr_times: list[datetime] = field(default_factory=list)
+    ocr_gave_up: list[ErrorCode] = field(default_factory=list)
 
 
 def activities(fakes: Fakes) -> list[Callable[..., Any]]:
@@ -92,6 +101,9 @@ def activities(fakes: Fakes) -> list[Callable[..., Any]]:
             )
         if fakes.parse == "no_loader":
             return ParseOutcome(document_version_id=inp.ref_id, parsed=False)
+        if fakes.parse == "ocr":  # the text pass is done; pages wait for the vision model
+            waiting = ParseReport(pages=2, ocr_needed_pages=[1, 2])
+            return ParseOutcome(document_version_id=inp.ref_id, parsed=False, report=waiting)
         return ParseOutcome(document_version_id=inp.ref_id, parsed=True, report=ParseReport())
 
     @activity.defn(name="mark_parse_failed")
@@ -99,7 +111,33 @@ def activities(fakes: Fakes) -> list[Callable[..., Any]]:
         fakes.gave_up.append(failure.code)
         return ParseOutcome(document_version_id=failure.ref.ref_id, parsed=False, code=failure.code)
 
-    return [scan_clamav, mark_scan_failed, detect_type, parse_document, mark_parse_failed]
+    @activity.defn(name="ocr_document")
+    async def ocr_document(inp: StageRef) -> ParseOutcome:
+        fakes.ocr_calls += 1
+        fakes.ocr_times.append(activity.info().started_time)
+        if fakes.ocr_calls <= fakes.ocr_hang_first:
+            await asyncio.sleep(30)  # a worker that died mid-OCR: no heartbeat arrives
+        if fakes.ocr_calls <= fakes.ocr_fail_first:
+            raise fakes.ocr_error
+        if fakes.ocr == "failed":
+            return ParseOutcome(document_version_id=inp.ref_id, parsed=False, code=ErrorCode.EMPTY)
+        done = ParseReport(pages=2, ocr_needed_pages=[1, 2], ocr_pages=[1, 2])
+        return ParseOutcome(document_version_id=inp.ref_id, parsed=True, report=done)
+
+    @activity.defn(name="mark_ocr_failed")
+    async def mark_ocr_failed(failure: ParseFailure) -> ParseOutcome:
+        fakes.ocr_gave_up.append(failure.code)
+        return ParseOutcome(document_version_id=failure.ref.ref_id, parsed=False, code=failure.code)
+
+    return [
+        scan_clamav,
+        mark_scan_failed,
+        detect_type,
+        parse_document,
+        mark_parse_failed,
+        ocr_document,
+        mark_ocr_failed,
+    ]
 
 
 @asynccontextmanager
@@ -325,6 +363,103 @@ def test_e4_5_an_execution_started_before_parsing_existed_still_replays() -> Non
     """Determinism guard (TD §13.4): `before_e4_5` was recorded with the workflow as it was when
     detection was the last step; the `e4-5-parse` patch keeps it replayable."""
     path = Path(__file__).parent / "histories" / "document_ingestion_before_e4_5.json"
+    history = WorkflowHistory.from_json(
+        f"ingest-{uuid.UUID(int=1)}", json.loads(path.read_text("utf-8"))
+    )
+    replayer = Replayer(workflows=[DocumentIngestion], data_converter=pydantic_data_converter)
+    asyncio.run(replayer.replay_workflow(history))
+
+
+# --- E4.8: OCR after a parse that left pages for the vision model ---------------------------------
+
+
+def test_e4_8_pages_waiting_for_the_model_are_read_and_the_version_is_handed_on() -> None:
+    fakes = Fakes(parse="ocr")
+    inp = stage_ref()
+    assert execute(fakes, inp) == [inp.ref_id]
+    assert (fakes.parse_calls, fakes.ocr_calls, fakes.ocr_gave_up) == (1, 1, [])
+
+
+@pytest.mark.parametrize("parse", ["parsed", "failed", "no_loader"])
+def test_e4_8_ocr_only_runs_when_pages_are_waiting(parse: str) -> None:
+    fakes = Fakes(parse=parse)
+    execute(fakes, stage_ref())
+    assert fakes.ocr_calls == 0  # a parsed, failed or loader-less version has nothing to read
+
+
+def test_e4_8_a_document_the_model_cannot_read_ends_the_execution_with_nothing_handed_on() -> None:
+    fakes = Fakes(parse="ocr", ocr="failed")
+    assert execute(fakes, stage_ref()) == []
+    assert fakes.ocr_calls == 1 and fakes.ocr_gave_up == []  # its own verdict: no retry
+
+
+@pytest.mark.parametrize("verdict", [ScanStatus.INFECTED, ScanStatus.SCAN_FAILED])
+def test_e4_8_nothing_is_read_after_a_scan_that_was_not_clean(verdict: ScanStatus) -> None:
+    fakes = Fakes(parse="ocr", verdict=verdict)
+    assert execute(fakes, stage_ref()) == []
+    assert (fakes.parse_calls, fakes.ocr_calls) == (0, 0)
+
+
+@pytest.mark.parametrize("failures", [1, 2])
+def test_e4_8_a_provider_error_is_retried_with_backoff(failures: int) -> None:
+    fakes = Fakes(parse="ocr", ocr_fail_first=failures)
+    inp = stage_ref()
+    assert execute(fakes, inp) == [inp.ref_id]
+    assert fakes.ocr_calls == failures + 1 and fakes.ocr_gave_up == []
+    waits = [b - a for a, b in zip(fakes.ocr_times, fakes.ocr_times[1:], strict=False)]
+    assert waits[0] >= timedelta(seconds=10)
+    if failures == 2:
+        assert waits[1] >= timedelta(seconds=20)
+
+
+def test_e4_8_t05_three_failed_attempts_make_the_pages_unreadable_and_the_run_goes_on() -> None:
+    fakes = Fakes(parse="ocr", ocr_fail_first=99)
+    assert execute(fakes, stage_ref()) == []  # the version is PARSE_FAILED or PARSED, never stuck
+    assert fakes.ocr_calls == 3 and fakes.ocr_gave_up == [ErrorCode.OCR_UNAVAILABLE]
+
+
+@pytest.mark.parametrize("kind", ["NotFound", "NotParseable", "NotScanned"])
+def test_e4_8_a_permanent_problem_is_not_retried_and_not_marked(kind: str) -> None:
+    error = ApplicationError("no", type=kind, non_retryable=True)
+    fakes = Fakes(parse="ocr", ocr_fail_first=99, ocr_error=error)
+    with pytest.raises(WorkflowFailureError):
+        execute(fakes, stage_ref())
+    assert fakes.ocr_calls == 1 and fakes.ocr_gave_up == []
+
+
+def test_e4_8_an_ocr_that_never_beats_its_heart_ends_as_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(document_ingestion, "OCR_HEARTBEAT_SECONDS", 1)
+    fakes = Fakes(parse="ocr", ocr_hang_first=99)
+    assert execute(fakes, stage_ref(), sandbox=False) == []
+    assert fakes.ocr_calls == 3 and fakes.ocr_gave_up == [ErrorCode.TIMEOUT]
+
+
+def test_e4_8_a_worker_that_dies_mid_ocr_is_retried_after_the_heartbeat_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(document_ingestion, "OCR_HEARTBEAT_SECONDS", 1)
+    fakes = Fakes(parse="ocr", ocr_hang_first=1)
+    inp = stage_ref()
+    assert execute(fakes, inp, sandbox=False) == [inp.ref_id]
+    assert fakes.ocr_calls == 2 and fakes.ocr_gave_up == []
+
+
+def test_e4_8_the_ocr_limits_are_the_ones_in_the_contract() -> None:
+    from sbam_contracts import documents
+
+    assert document_ingestion.OCR_RETRY.maximum_attempts == documents.OCR_PAGE_ATTEMPTS == 3
+    assert document_ingestion.OCR_RETRY.initial_interval == timedelta(seconds=10)
+    assert document_ingestion.OCR_RETRY.backoff_coefficient == 2.0
+    assert documents.OCR_TIMEOUT_SECONDS == 1800  # up to 200 pages, one model call each
+    assert documents.OCR_HEARTBEAT_SECONDS == 60
+
+
+def test_e4_8_an_execution_started_before_ocr_existed_still_replays() -> None:
+    """Determinism guard (TD §13.4): `before_e4_8` was recorded with the workflow as it was when
+    parsing was the last step; the `e4-8-ocr` patch is only reached when pages wait for OCR."""
+    path = Path(__file__).parent / "histories" / "document_ingestion_before_e4_8.json"
     history = WorkflowHistory.from_json(
         f"ingest-{uuid.UUID(int=1)}", json.loads(path.read_text("utf-8"))
     )
