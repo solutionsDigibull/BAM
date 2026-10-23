@@ -334,6 +334,8 @@ services:
 
   worker-ingest:
     <<: *worker
+    # The parse cap of E4.5 (PARSE_MEMORY_LIMIT_BYTES): a 15 MB workbook or PDF is read in this worker.
+    mem_limit: 1g
     environment:
       <<: *worker-env
       SBAM_QUEUES: sbam-ingest

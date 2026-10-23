@@ -19,15 +19,21 @@ A retry of the activity finds the answer already stored and repeats it. A versio
 scanned CLEAN raises `NotScanned` (non-retryable). Nothing here logs file names or content.
 """
 
+import json
 import logging
+import tempfile
 import uuid
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import BinaryIO, cast
 
 import sbam_api.ingest.models  # noqa: F401 - registers DocumentVersion for the state machine
 from pydantic import BaseModel
 from sbam_api.audit.outbox import LogSink, dispatch_pending
 from sbam_api.audit.repository import record
+from sbam_api.core.conventions import ApiError
 from sbam_api.db.repository import TenantContext
 from sbam_api.ingest.models import DocumentVersion
 from sbam_api.ingest.repository import DocumentVersionRepository
@@ -36,7 +42,7 @@ from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.storage.factory import make_backend
 from sbam_contracts.api import ErrorCode
-from sbam_contracts.documents import MAX_FILE_BYTES, ParsedDocument, ParseOutcome, ParseReport
+from sbam_contracts.documents import MAX_FILE_BYTES, ParseOutcome, ParseReport
 from sbam_contracts.pipeline import StageRef
 from sbam_contracts.runs import TaskQueue
 from sbam_contracts.state_machines import Actor
@@ -48,6 +54,7 @@ from temporalio.exceptions import ApplicationError
 from sbam_workers import mirror
 from sbam_workers.ingest.guard import require_clean
 from sbam_workers.ingest.loaders import Heartbeat, Parsed, ParseError, loader_for, no_heartbeat
+from sbam_workers.ingest.loaders.base import BEAT_EVERY
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
 
@@ -123,28 +130,32 @@ def parse_version(deps: ParseDeps, inp: StageRef, beat: Heartbeat = no_heartbeat
     except ParseError as exc:
         return _fail(deps, ctx, inp, exc.code, ParseReport(warnings=[str(exc)[:200]]))
 
-    document = ParsedDocument(
-        document_version_id=inp.ref_id,
-        loader=loader_id[:40],
-        blocks=parsed.blocks,
-        tables=parsed.tables,
-    )
     scope = StorageScope(inp.tenant_id, inp.project_id)
-    md = deps.storage.put(
-        parsed.markdown.encode(), scope, Kind.DERIVED, "text/markdown", max_bytes=DERIVED_MAX_BYTES
-    )
-    js = deps.storage.put(
-        document.model_dump_json(exclude_none=True).encode(),
-        scope,
-        Kind.DERIVED,
-        "application/json",
-        max_bytes=DERIVED_MAX_BYTES,
-    )
-    return _complete(deps, ctx, inp, parsed, md.storage_key, js.storage_key)
+    try:
+        with _markdown_file(parsed.markdown, beat) as md_file:
+            md = deps.storage.put(
+                md_file, scope, Kind.DERIVED, "text/markdown", max_bytes=DERIVED_MAX_BYTES
+            )
+        with _json_file(inp.ref_id, loader_id, parsed, beat) as (json_file, blocks):
+            js = deps.storage.put(
+                json_file, scope, Kind.DERIVED, "application/json", max_bytes=DERIVED_MAX_BYTES
+            )
+    except ApiError as exc:
+        if exc.code != ErrorCode.FILE_TOO_LARGE:
+            raise
+        report = ParseReport(warnings=["the parsed text is too large to keep"])
+        return _fail(deps, ctx, inp, ErrorCode.PARSE_ERROR, report)  # the same file, the same size
+    return _complete(deps, ctx, inp, parsed, blocks, md.storage_key, js.storage_key)
 
 
 def _complete(
-    deps: ParseDeps, ctx: TenantContext, inp: StageRef, parsed: Parsed, md_key: str, json_key: str
+    deps: ParseDeps,
+    ctx: TenantContext,
+    inp: StageRef,
+    parsed: Parsed,
+    blocks: int,
+    md_key: str,
+    json_key: str,
 ) -> ParseOutcome:
     report = parsed.report.model_copy(update={"tables": len(parsed.tables)})
     with deps.sessions() as session:
@@ -166,7 +177,7 @@ def _complete(
             entity_id=str(version.id),
             correlation_id=inp.correlation_id,
             after={
-                "blocks": len(parsed.blocks),
+                "blocks": blocks,
                 "tables": len(parsed.tables),
                 "warnings": len(report.warnings),
             },
@@ -192,6 +203,47 @@ def _fail(
         outcome = _outcome(version)
     _dispatch(deps.sessions)
     return outcome
+
+
+# --- the derivatives are written out piece by piece, to a temporary file -------------------------
+
+
+@contextmanager
+def _markdown_file(markdown: str | Iterable[str], beat: Heartbeat) -> Iterator[BinaryIO]:
+    """`doc.md` in a temporary file, from a string or from the chunks a loader yields."""
+    with tempfile.TemporaryFile() as out:
+        chunks: Iterable[str] = [markdown] if isinstance(markdown, str) else markdown
+        for n, chunk in enumerate(chunks, start=1):
+            out.write(chunk.encode())
+            if n % BEAT_EVERY == 0:
+                beat()
+        out.seek(0)
+        yield cast(BinaryIO, out)
+
+
+@contextmanager
+def _json_file(
+    version_id: uuid.UUID, loader_id: str, parsed: Parsed, beat: Heartbeat
+) -> Iterator[tuple[BinaryIO, int]]:
+    """`doc.json` (a `ParsedDocument`) in a temporary file, with the number of blocks written. The
+    blocks are written one at a time, so a workbook of a million cells is never one big string."""
+    head = json.dumps(
+        {"schema_version": 1, "document_version_id": str(version_id), "loader": loader_id[:40]}
+    )
+    with tempfile.TemporaryFile() as out:
+        out.write(head[:-1].encode() + b',"blocks":[')
+        count = 0
+        for block in parsed.blocks:
+            out.write((b"," if count else b"") + block.model_dump_json(exclude_none=True).encode())
+            count += 1
+            if count % BEAT_EVERY == 0:
+                beat()
+        out.write(b'],"tables":[')
+        for n, table in enumerate(parsed.tables):
+            out.write((b"," if n else b"") + table.model_dump_json(exclude_none=True).encode())
+        out.write(b"]}")
+        out.seek(0)
+        yield cast(BinaryIO, out), count
 
 
 def mark_failed(deps: ParseDeps, failure: ParseFailure) -> ParseOutcome:
