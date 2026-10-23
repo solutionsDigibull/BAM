@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/macro_extraction:0.1.0",
+  "$defs": {
+    "MacroProposal": {
+      "additionalProperties": false,
+      "description": "One Macro Skill as the model proposes it (a major module / functional area).",
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "sow_refs": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sow Refs",
+          "type": "array"
+        },
+        "agent_ref": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Ref"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "sow_refs"
+      ],
+      "title": "MacroProposal",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The `sbam-isatvon` answer of pass 1 (prompt `isatvon-macros`).",
+  "properties": {
+    "macros": {
+      "items": {
+        "$ref": "#/$defs/MacroProposal"
+      },
+      "maxItems": 99,
+      "minItems": 1,
+      "title": "Macros",
+      "type": "array"
+    }
+  },
+  "required": [
+    "macros"
+  ],
+  "title": "MacroExtraction",
+  "type": "object"
+}

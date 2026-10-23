@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:7879c24072c96c17ea175e3a64b09f97870543a1782f035c122f86526aa8d846
+// source-sha256:87e78bed0b9319652afb94423afc23ed26186d1d7e8890488b4585119fbf15fb
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -148,6 +148,13 @@ export type SubSkillState =
   | "INVALIDATED"
   | "SUPERSEDED";
 /**
+ * Agent = TD Macro Skill (§14.5).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AgentState".
+ */
+export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
+/**
  * Where a build is, for the `build_status` query (the activities' names, TD §13.2).
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -278,13 +285,6 @@ export type DocumentVersionState =
  */
 export type SowVersionState = "GENERATED" | "IN_REVIEW" | "APPROVED" | "SUPERSEDED" | "GENERATION_FAILED";
 /**
- * Agent = TD Macro Skill (§14.5).
- *
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "AgentState".
- */
-export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
-/**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "KnowledgeVersionState".
  */
@@ -397,6 +397,8 @@ export interface SbamContracts {
   WorkbenchSubSkill?: WorkbenchSubSkill;
   SubSkillPatch?: SubSkillPatch;
   ValidationReport?: ValidationReport;
+  MacroExtraction?: MacroExtraction;
+  MacroSkillOut?: MacroSkillOut;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
   Isa14Manifest?: Isa14Manifest;
@@ -851,6 +853,57 @@ export interface SubSkillValidation {
   id: string;
   state: SubSkillState;
   validation_errors?: RuleViolation[];
+}
+/**
+ * The `sbam-isatvon` answer of pass 1 (prompt `isatvon-macros`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MacroExtraction".
+ */
+export interface MacroExtraction {
+  /**
+   * @minItems 1
+   * @maxItems 99
+   */
+  macros: [MacroProposal, ...MacroProposal[]];
+}
+/**
+ * One Macro Skill as the model proposes it (a major module / functional area).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MacroProposal".
+ */
+export interface MacroProposal {
+  name: string;
+  description: string;
+  /**
+   * @minItems 1
+   */
+  sow_refs: [string, ...string[]];
+  agent_ref?: string | null;
+}
+/**
+ * A stored Macro Skill. `validation_errors` holds warnings SBAM recorded while storing it
+ * (e.g. an `agent_ref` missing from the master snapshot, set to null).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MacroSkillOut".
+ */
+export interface MacroSkillOut {
+  id: string;
+  workflow_id: string;
+  sow_version_id: string;
+  /**
+   * Pattern: `^MS(\d{2})_[A-Za-z0-9_]+$`
+   */
+  macro_category: string;
+  name: string;
+  description: string;
+  order: number;
+  sow_refs: string[];
+  agent_ref: string | null;
+  state: AgentState;
+  validation_errors: string[];
 }
 /**
  * `GET W/builds`. `active` is true while any Sub-Skill is still building or testing; the UI

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/macro_skill:0.1.0",
+  "$defs": {
+    "AgentState": {
+      "description": "Agent = TD Macro Skill (§14.5).",
+      "enum": [
+        "PENDING",
+        "BUILDING",
+        "CERTIFIED",
+        "FROZEN"
+      ],
+      "title": "AgentState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A stored Macro Skill. `validation_errors` holds warnings SBAM recorded while storing it\n(e.g. an `agent_ref` missing from the master snapshot, set to null).",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "sow_version_id": {
+      "format": "uuid",
+      "title": "Sow Version Id",
+      "type": "string"
+    },
+    "macro_category": {
+      "pattern": "^MS(\\d{2})_[A-Za-z0-9_]+$",
+      "title": "Macro Category",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "order": {
+      "maximum": 99,
+      "minimum": 1,
+      "title": "Order",
+      "type": "integer"
+    },
+    "sow_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Sow Refs",
+      "type": "array"
+    },
+    "agent_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Agent Ref"
+    },
+    "state": {
+      "$ref": "#/$defs/AgentState"
+    },
+    "validation_errors": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Validation Errors",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "workflow_id",
+    "sow_version_id",
+    "macro_category",
+    "name",
+    "description",
+    "order",
+    "sow_refs",
+    "agent_ref",
+    "state",
+    "validation_errors"
+  ],
+  "title": "MacroSkillOut",
+  "type": "object"
+}
