@@ -356,7 +356,9 @@ test("e6_5 leaving by an in-app link with unsaved edits asks first", async ({ pa
     .getByRole("dialog", { name: "Discard unsaved edits?" })
     .getByRole("button", { name: "Discard" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/projects/${PROJECT}/knowledge$`));
+  await expect(page).toHaveURL(new RegExp(`/projects/${PROJECT}/knowledge$`), {
+    timeout: 30_000, // the dev server compiles the knowledge page on its first visit
+  });
 });
 
 test("e6_5 an expired session keeps the draft: sign in again, restore, save", async ({
