@@ -53,6 +53,9 @@ class TransitionCommand:
     correlation_id: str
     expected_row_version: int | None = None  # If-Match from the API; activities leave it None
     idempotency_key: str | None = None  # activities: "<run id>:<step>"
+    # Small facts for the outbox payload (e.g. {"gate": "MYPY"} on gate_failed, E16.2). Ids and
+    # codes only, never content: analytics forwards just the keys it whitelists.
+    details: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +221,7 @@ def _finish(
             "project_id": str(ctx.project_id) if ctx.project_id else None,
             "from_state": before["state"] if before else None,
             "to_state": entity.state,
+            **({"details": dict(cmd.details)} if cmd.details else {}),
         },
     )
     return TransitionResult(

@@ -161,3 +161,22 @@ metrics:
     labels: [state, mountpoint]
     owner: "#142 E16.3 environment VMs: run an OTel Collector with the hostmetrics filesystem scraper, OTLP to otel-collector"
     emitter: OTel hostmetrics receiver, system.filesystem.usage
+  # --- E16.2 product analytics and Langfuse delivery (workers export over OTLP when the obs profile runs) ---
+  - name: posthog_events_sent_total
+    type: counter
+    source: sbam-otel-meter
+    status: emitted
+    labels: []
+    evidence: {file: server/api/sbam_api/analytics/posthog.py, contains: '"posthog_events_sent"'}
+  - name: posthog_events_failed_total
+    type: counter
+    source: sbam-otel-meter
+    status: emitted
+    labels: []
+    evidence: {file: server/api/sbam_api/analytics/posthog.py, contains: '"posthog_events_failed"'}
+  - name: llm_trace_export_failures_total
+    type: counter
+    source: sbam-otel-meter
+    status: emitted
+    labels: []
+    evidence: {file: server/workers/sbam_workers/llm/trace.py, contains: '"llm_trace_export_failures_total"'}
