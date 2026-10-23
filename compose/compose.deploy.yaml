@@ -42,6 +42,9 @@ x-worker-deploy: &worker-deploy
   entrypoint: *wrapper
   command: *server-command
   volumes: [*wrapper-mount]
+  # Deploy drain (E16.4): longer than the worker's own drain (bootstrap.DRAIN, 120 s), so running
+  # activities finish before Docker kills the old container.
+  stop_grace_period: 150s
   secrets:
     - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
 
