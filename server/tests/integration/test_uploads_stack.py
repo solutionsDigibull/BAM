@@ -149,9 +149,11 @@ def upload(scope: Scope, name: str, data: bytes) -> None:
 
 
 def test_e4_2_t06_upload_resumes_after_a_dropped_connection(scope: Scope) -> None:
-    data = os.urandom(THREE_MB)
-    token = scope.slot("resume.pdf", len(data))
-    status, headers, _ = create(scope, token, "resume.pdf", len(data))
+    # readable text: random bytes would fail the type check, which is not what this tests
+    line = b"Quote line with the parts and the prices, 0123456789\n"
+    data = (line * (THREE_MB // len(line) + 1))[:THREE_MB]
+    token = scope.slot("resume.txt", len(data))
+    status, headers, _ = create(scope, token, "resume.txt", len(data))
     assert status == 201
     location, cut = headers["Location"], int(len(data) * 0.6)
     assert patch(location, 0, data[:cut]) == 204  # the connection "drops" at 60%
@@ -161,7 +163,7 @@ def test_e4_2_t06_upload_resumes_after_a_dropped_connection(scope: Scope) -> Non
     assert offset == cut
     assert patch(location, offset, data[offset:]) == 204
     (version,) = scope.wait_for_versions(1)
-    assert version.state in ("UPLOADED", "SCANNING", "PARSING")  # the scan may already have run
+    assert version.state in ("UPLOADED", "SCANNING", "PARSING", "PARSED")  # may be done already
     assert version.sha256 == hashlib.sha256(data).hexdigest()  # single version, matching hash
     assert str(version.id) == location.rsplit("/", 1)[1]
 

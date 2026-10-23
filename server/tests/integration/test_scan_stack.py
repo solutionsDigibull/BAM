@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fixtures import eicar_bytes
+from pdfs import make_pdf
 from sbam_api.ingest.models import DocumentVersion
 
 from .conftest import Compose
@@ -62,9 +63,9 @@ def listing(compose: Compose, scope: Scope, kind: str) -> str:
 
 
 def test_e4_3_t01_clean_file_is_scanned_and_moves_on_to_parsing(scope: Scope) -> None:
-    version_id = upload(scope, "clean.pdf", b"%PDF-1.7\n" + os.urandom(4096))
+    version_id = upload(scope, "clean.pdf", make_pdf(["A clean offer"]))  # a real PDF: it parses
     version = settled(scope, version_id)
-    assert version.scan_status == "CLEAN" and version.state == "PARSING"
+    assert version.scan_status == "CLEAN" and version.state in ("PARSING", "PARSED")
     assert version.scan_signature_version and version.scan_signature_version.startswith("ClamAV")
     assert version.scanned_at is not None and version.reject_code is None
 

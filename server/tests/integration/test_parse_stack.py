@@ -8,6 +8,7 @@ worker killed in the middle (T06). The T06 test is last and starts the worker ag
 """
 
 import asyncio
+import os
 import subprocess
 import threading
 import time
@@ -214,6 +215,13 @@ def test_e4_5_t08_a_15_mb_workbook_is_parsed_in_time_and_within_the_memory_limit
         f"\nbig workbook: {len(data) // 1024} KB, parse took {took}, "
         f"worker peak {watch.peak:.0f} MiB"
     )
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")  # kept with the compose-smoke job
+    if summary:
+        with open(summary, "a", encoding="utf-8") as out:
+            out.write(
+                f"E4.5-T08 15 MB workbook: parse {took}, worker peak {watch.peak:.0f} MiB "
+                f"of {PARSE_MEMORY_LIMIT_BYTES // 1048576} MiB\n"
+            )
     assert took < timedelta(seconds=PARSE_TIMEOUT_SECONDS)
     assert 0 < watch.peak < PARSE_MEMORY_LIMIT_BYTES / 1048576  # sampled, and below the 1 GiB limit
     assert oom in ("", "false")  # the kernel did not kill the worker for its memory
