@@ -236,6 +236,11 @@ function columnDefs(
 }
 
 const rowId = (p: GetRowIdParams<GridRow>) => p.data.id;
+// E8.7-T03 timing: the container is committed before AG Grid builds anything; the grid marks the end
+const markMounted = (el: HTMLDivElement | null) => {
+  if (el) performance.mark("isatvon-grid:mounted");
+};
+const markRendered = () => performance.mark("isatvon-grid:rendered");
 const fullWidth = (p: IsFullWidthRowParams<GridRow>) => p.rowNode.data?.kind !== "sub";
 
 export default function IsatvonGrid({
@@ -296,7 +301,7 @@ export default function IsatvonGrid({
     if (nodes.length) api.refreshCells({ rowNodes: nodes, force: true });
   }, [rows]);
   return (
-    <div style={{ height }} data-testid="isatvon-grid">
+    <div style={{ height }} data-testid="isatvon-grid" ref={markMounted}>
       <style>{`[data-testid="isatvon-grid"] .isatvon-cell-invalid { background-color: ${INVALID_BG}; box-shadow: inset 0 0 0 1px #ff4d4f; }`}</style>
       <AgGridReact<GridRow>
         ref={grid}
@@ -316,6 +321,7 @@ export default function IsatvonGrid({
         stopEditingWhenCellsLoseFocus
         rowBuffer={20}
         animateRows={false}
+        onFirstDataRendered={markRendered}
       />
     </div>
   );
