@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:6c90209627b94adef87075e414f895633e4f1e57395f63e2e03824ed0cd68abf
+// source-sha256:0a632ca6ba819f8f5c5b8e6911f54d98b76832860b1abc27ec5b946733d0534c
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -410,6 +410,8 @@ export interface SbamContracts {
   SowSaveRequest?: SowSaveRequest;
   SowDiff?: SowDiff;
   SowRegenerateRequest?: SowRegenerateRequest;
+  SowApproveRequest?: SowApproveRequest;
+  SowApproval?: SowApproval;
   SowCitationDetail?: SowCitationDetail;
   Run?: Run;
   RunAccepted?: RunAccepted;
@@ -1939,6 +1941,30 @@ export interface SowDiffItem {
  */
 export interface SowRegenerateRequest {
   hint?: string | null;
+}
+/**
+ * POST P/sow/versions/{v}/approve (E7.1): the hash of the version the FDE reviewed.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowApproveRequest".
+ */
+export interface SowApproveRequest {
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowApproval".
+ */
+export interface SowApproval {
+  version: number;
+  status: SowVersionStatus;
+  is_locked: boolean;
+  approved_at: string;
+  approved_by: string;
+  sha256: string;
 }
 /**
  * What a citation points at (E6.5 citation panel), read from the version's OKF bundle.

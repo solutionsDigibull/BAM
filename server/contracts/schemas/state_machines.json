@@ -502,6 +502,12 @@
         "actor": "SYSTEM"
       },
       {
+        "from": "GENERATED",
+        "event": "approve",
+        "to": "APPROVED",
+        "actor": "FDE"
+      },
+      {
         "from": "IN_REVIEW",
         "event": "edit",
         "to": "IN_REVIEW",
