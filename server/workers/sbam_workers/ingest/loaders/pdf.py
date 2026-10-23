@@ -1,8 +1,9 @@
 """PDF with a text layer (E4.5): one paragraph block per page, with its page number.
 
 Read with pypdf, which runs nothing in the file: no JavaScript, no launch action, no link followed.
-A page with no text (a scan) is not an error: its number goes into `ocr_needed_pages` for the OCR
-step (E4.8), and a PDF with no text on any page is parsed with no blocks for the same reason.
+A page whose text layer is shorter than 20 characters (a scan) is not an error: its number goes
+into `ocr_needed_pages` and the OCR step (E4.8) reads it with the vision model; a short text is
+kept until the OCR replaces it.
 A password-protected PDF is ENCRYPTED, and no password is ever asked for or tried (a PDF that
 opens with an empty password is not protected from reading, and is read). More than 2000 pages is
 refused. `doc.md` marks each page with `<!-- page N -->`.
@@ -14,7 +15,7 @@ import re
 
 from pypdf import PdfReader
 from sbam_contracts.api import ErrorCode
-from sbam_contracts.documents import MAX_PDF_PAGES, Block, BlockType, ParseReport
+from sbam_contracts.documents import MAX_PDF_PAGES, MIN_TEXT_CHARS, Block, BlockType, ParseReport
 
 from sbam_workers.ingest.loaders.base import Heartbeat, Parsed, ParseError
 
@@ -53,11 +54,11 @@ def load_pdf(data: bytes, beat: Heartbeat) -> Parsed:
             log.info("unreadable PDF page", extra={"exc_type": type(exc).__name__})
             text = ""
             warnings.append(f"page {number} could not be read")
-        if not text:
+        if len(text) < MIN_TEXT_CHARS:  # a scan (a page number or a stamp is not a text layer)
             ocr_needed.append(number)
-            continue
-        blocks.append(Block(type=BlockType.PARAGRAPH, text=text, page=number))
-        markdown.append(f"<!-- page {number} -->\n\n{text}\n")
+        if text:  # a short text is kept: the OCR replaces it when the model reads the page
+            blocks.append(Block(type=BlockType.PARAGRAPH, text=text, page=number))
+            markdown.append(f"<!-- page {number} -->\n\n{text}\n")
     report = ParseReport(pages=count, warnings=warnings, ocr_needed_pages=ocr_needed)
     return Parsed(blocks=blocks, markdown="\n".join(markdown), report=report)
 

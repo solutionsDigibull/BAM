@@ -37,13 +37,17 @@ def two_sheets() -> bytes:
 
 
 def test_e4_5_t01_a_ten_page_pdf_reaches_parsed_with_a_block_for_every_page(h: Harness) -> None:
-    ref = h.add("offer.pdf", make_pdf([f"Line {n}" for n in range(1, 11)]), **PDF_ROW)
+    ref = h.add(
+        "offer.pdf",
+        make_pdf([f"Line {n} with the parts and prices" for n in range(1, 11)]),
+        **PDF_ROW,
+    )
     outcome = parsing.parse_version(h.deps, ref)
     assert outcome.parsed and outcome.report is not None and outcome.report.pages == 10
     assert h.version(ref).state == "PARSED"
     md, doc = derived(h, ref)
     assert [b.page for b in doc.blocks] == list(range(1, 11))
-    assert md.decode().startswith("<!-- page 1 -->\n\nLine 1\n")
+    assert md.decode().startswith("<!-- page 1 -->\n\nLine 1 with the parts and prices\n")
     assert doc.loader == "Filetype #21"
 
 
@@ -77,13 +81,16 @@ def test_e4_5_pages_that_need_ocr_are_kept_in_the_report_for_the_ocr_step(h: Har
         "scan.pdf", fixture_path("documents", "scanned_mixed.pdf").read_bytes(), **PDF_ROW
     )
     outcome = parsing.parse_version(h.deps, mixed)
-    assert outcome.parsed and outcome.report is not None
+    # Not parsed yet: the version waits in PARSING for the OCR step (E4.8)
+    assert (outcome.parsed, outcome.code) == (False, None) and outcome.report is not None
     assert outcome.report.ocr_needed_pages == [2]
-    assert h.version(mixed).parse_report is not None
+    assert h.version(mixed).state == "PARSING" and h.version(mixed).parse_report is not None
     assert h.version(mixed).parse_report["ocr_needed_pages"] == [2]  # type: ignore[index]
     full = h.add("all.pdf", fixture_path("documents", "scanned_full.pdf").read_bytes(), **PDF_ROW)
-    assert parsing.parse_version(h.deps, full).parsed  # parsed with no text: the OCR step follows
-    md, doc = derived(h, full)
+    waiting = parsing.parse_version(h.deps, full)
+    assert not waiting.parsed and waiting.report is not None
+    assert waiting.report.ocr_needed_pages == [1, 2]
+    md, doc = derived(h, full)  # the text pass is stored: nothing to keep yet, the OCR adds to it
     assert md == b"" and doc.blocks == []
 
 

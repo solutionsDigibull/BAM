@@ -2,7 +2,8 @@
   "sbam-ocr": {
     "use": "OCR of scanned pages/images (vision)",
     "primary": "openai/gpt-4o-mini",
-    "fallback": "openai/gpt-4o"
+    "fallback": "openai/gpt-4o",
+    "mock": "ocr"
   },
   "sbam-sow": {
     "use": "One-shot SOW (SowDocument)",

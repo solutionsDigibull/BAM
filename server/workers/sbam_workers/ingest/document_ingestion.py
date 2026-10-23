@@ -12,7 +12,11 @@ One execution per uploaded file, id `ingest-<document_version_id>` on sbam-inges
    would not change). Other errors are retried 3 times (10 s, doubling); after the last attempt, or
    past the 10-minute timeout, `mark_parse_failed` records PARSE_ERROR or TIMEOUT. A type with no
    loader yet stays PARSING.
-4. OCR follows (E4.8). Each step must call `require_clean` first.
+4. OCR (E4.8): when the parse leaves a version PARSING with pages in `ocr_needed_pages` (a scan, an
+   image), `ocr_document` reads those pages with the vision model, 3 attempts (10 s, doubling),
+   30 minutes at most with a 60 s heartbeat. After the last attempt, or at the timeout,
+   `mark_ocr_failed` makes the pages unreadable (OCR_UNAVAILABLE or TIMEOUT). Each step must call
+   `require_clean` first.
 
 Each step keeps this workflow's name and its input and output types.
 """
@@ -27,14 +31,17 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.api import ErrorCode
     from sbam_contracts.documents import (
         DOCUMENT_INGESTION,
+        OCR_HEARTBEAT_SECONDS,
+        OCR_TIMEOUT_SECONDS,
         PARSE_HEARTBEAT_SECONDS,
         PARSE_TIMEOUT_SECONDS,
+        ParseOutcome,
         ScanStatus,
     )
     from sbam_contracts.pipeline import IdsResult, StageRef
     from sbam_contracts.runs import TaskQueue
 
-    from sbam_workers.ingest import parsing, type_detection
+    from sbam_workers.ingest import ocr, parsing, type_detection
     from sbam_workers.ingest.scan import PERMANENT, mark_scan_failed, scan_clamav
     from sbam_workers.registry import workflow_for
 
@@ -44,6 +51,12 @@ DETECT_RETRY = RetryPolicy(
     non_retryable_error_types=[type_detection.NOT_FOUND, type_detection.NOT_DETECTABLE],
 )
 PARSE_RETRY = RetryPolicy(
+    maximum_attempts=3,
+    initial_interval=timedelta(seconds=10),
+    backoff_coefficient=2.0,  # waits of 10 s, then 20 s
+    non_retryable_error_types=sorted(parsing.PERMANENT),
+)
+OCR_RETRY = RetryPolicy(
     maximum_attempts=3,
     initial_interval=timedelta(seconds=10),
     backoff_coefficient=2.0,  # waits of 10 s, then 20 s
@@ -120,5 +133,43 @@ class DocumentIngestion:
                 start_to_close_timeout=timedelta(minutes=1),
                 retry_policy=RetryPolicy(maximum_attempts=5),
             )
+        if _needs_ocr(outcome) and workflow.patched("e4-8-ocr"):  # started before E4.8: no OCR
+            outcome = await self._ocr(inp)
         # Failed: nothing goes on. Parsed, or no loader for the type yet: the version is handed on.
         return IdsResult(ids=[inp.ref_id] if outcome.parsed or outcome.code is None else [])
+
+    async def _ocr(self, inp: StageRef) -> ParseOutcome:
+        try:
+            return await workflow.execute_activity(
+                ocr.ocr_document,
+                inp,
+                task_queue=TaskQueue.INGEST.value,
+                start_to_close_timeout=timedelta(seconds=OCR_TIMEOUT_SECONDS),
+                heartbeat_timeout=timedelta(seconds=OCR_HEARTBEAT_SECONDS),
+                retry_policy=OCR_RETRY,
+            )
+        except ActivityError as exc:
+            if isinstance(exc.cause, ApplicationError) and exc.cause.type in parsing.PERMANENT:
+                raise  # the version or its file is gone, or it was never scanned
+            code = (
+                ErrorCode.TIMEOUT
+                if isinstance(exc.cause, TimeoutError)
+                else ErrorCode.OCR_UNAVAILABLE
+            )
+            return await workflow.execute_activity(
+                ocr.mark_ocr_failed,
+                parsing.ParseFailure(ref=inp, code=code),
+                task_queue=TaskQueue.INGEST.value,
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=RetryPolicy(maximum_attempts=5),
+            )
+
+
+def _needs_ocr(outcome: ParseOutcome) -> bool:
+    """Not parsed, not failed, and pages are waiting for the vision model (E4.8)."""
+    return (
+        not outcome.parsed
+        and outcome.code is None
+        and outcome.report is not None
+        and bool(outcome.report.ocr_needed_pages)
+    )

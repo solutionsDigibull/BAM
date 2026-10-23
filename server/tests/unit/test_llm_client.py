@@ -400,6 +400,7 @@ def test_e6_1_shipped_prompts_match_their_manifest() -> None:
         "codegen-bodies",
         "correct-code",
         "live-smoke",
+        "ocr-page",
         "smoke",
         "sow-generate",
     ]

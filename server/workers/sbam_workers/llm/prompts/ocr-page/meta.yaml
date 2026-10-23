@@ -1,0 +1,2 @@
+alias: sbam-ocr
+description: One scanned page or image to Markdown (E4.8, TD §4 T5). Output OcrPage.
