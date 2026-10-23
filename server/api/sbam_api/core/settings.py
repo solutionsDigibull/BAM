@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # unset LLM_PROVIDER counts as `mock`, so staging/production must set LLM_PROVIDER=bifrost.
     sbam_env: str = Field(default="development", min_length=1)
     llm_provider: Literal["mock", "bifrost"] = "mock"
+    # Product analytics (E16.2): server-side PostHog events from the outbox. Unset host or key = no
+    # events (a laptop without the `analytics` profile). The salt hashes user ids into distinct_ids.
+    posthog_host: str | None = None  # Compose passes "" when unset: a str, not a URL
+    posthog_api_key: SecretStr | None = None
+    posthog_distinct_id_salt: SecretStr | None = None
 
     @model_validator(mode="after")
     def _refuse_mock_provider_outside_dev(self) -> "Settings":
@@ -70,7 +75,25 @@ class Settings(BaseSettings):
                 f"LLM_PROVIDER=mock is forbidden when SBAM_ENV={self.sbam_env}. "
                 "Set LLM_PROVIDER=bifrost."
             )
+        posthog_problem(
+            self.sbam_env, self.posthog_host, self.posthog_api_key, self.posthog_distinct_id_salt
+        )
         return self
+
+
+def _set(value: object) -> bool:
+    """A setting holds something: an empty string or an empty secret counts as unset."""
+    if isinstance(value, SecretStr):
+        value = value.get_secret_value()
+    return bool(str(value).strip()) if value is not None else False
+
+
+def posthog_problem(env: str, host: object, key: object, salt: SecretStr | None) -> None:
+    """Fail fast when PostHog would send outside development without a salt (raw ids at risk)."""
+    if _set(host) and _set(key) and env.lower() in MOCK_FORBIDDEN_ENVS and not _set(salt):
+        raise SettingsError(
+            f"POSTHOG_DISTINCT_ID_SALT is required when PostHog is on and SBAM_ENV={env}."
+        )
 
 
 def jwks_url(settings: Settings) -> str:

@@ -127,3 +127,19 @@ def pending_outbox(session: Session, limit: int) -> list[NotificationOutbox]:
         .with_for_update(skip_locked=True)
     )
     return list(session.scalars(query))
+
+
+def previous_transition_at(session: Session, audit: AuditLog) -> datetime | None:
+    """When the same entity last changed before `audit`: the time it spent in that stage (E16.2)."""
+    query = (
+        select(AuditLog.at)
+        .where(
+            AuditLog.tenant_id == audit.tenant_id,
+            AuditLog.entity_type == audit.entity_type,
+            AuditLog.entity_id == audit.entity_id,
+            AuditLog.at < audit.at,
+        )
+        .order_by(AuditLog.at.desc())
+        .limit(1)
+    )
+    return session.scalar(query)

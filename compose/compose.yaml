@@ -21,6 +21,12 @@ x-worker: &worker
     TEMPORAL_NAMESPACE: sbam
     DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    # Product analytics (E16.2): workers dispatch the outbox, so they send the PostHog events. Empty
+    # host or key = no events (the default; the `analytics` profile is still a stub, #142).
+    SBAM_ENV: ${SBAM_ENV:-development}
+    POSTHOG_HOST: ${POSTHOG_HOST:-}
+    POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
+    POSTHOG_DISTINCT_ID_SALT: ${POSTHOG_DISTINCT_ID_SALT:-}
   depends_on: &worker-depends
     api-migrate: { condition: service_completed_successfully } # temporal_runs (run mirror)
     postgres: { condition: service_healthy }
