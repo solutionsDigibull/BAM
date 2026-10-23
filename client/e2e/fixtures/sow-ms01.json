@@ -1,0 +1,2048 @@
+{
+  "structured": {
+    "overview": {
+      "citations": [
+        {
+          "okf_ref_id": "chunk:text.pdf#c0",
+          "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+          "location": {
+            "page": 1,
+            "line": 1,
+            "sheet": null,
+            "cell": null
+          }
+        }
+      ],
+      "client": "Alpha Dynamics Ltd (synthetic)",
+      "objective": "Let investors sign in to the fund portal securely with an OTP, within device limits, and complete KYC before access.",
+      "background": "Investors share credentials and register too many devices. Support unlocks accounts by hand.",
+      "topic": "Investor registration and access",
+      "history": "Device limits were introduced after credential-sharing incidents."
+    },
+    "users_authority": {
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c1",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "page": null,
+            "line": 3,
+            "sheet": null,
+            "cell": null
+          }
+        }
+      ],
+      "roles": [
+        {
+          "role": "Retail investor",
+          "decision_rights": "May access only their own profile and holdings"
+        },
+        {
+          "role": "Platform operations",
+          "decision_rights": "Unlocks profiles after an escalation"
+        }
+      ]
+    },
+    "scope": {
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c2",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "page": null,
+            "line": 5,
+            "sheet": null,
+            "cell": null
+          }
+        }
+      ],
+      "in_scope": ["OTP sign-in with device limits", "KYC check before first access"],
+      "out_of_scope": ["Password reset", "Portfolio reporting"]
+    },
+    "modules": [
+      {
+        "citations": [
+          {
+            "okf_ref_id": "chunk:text.pdf#c1",
+            "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+            "location": {
+              "page": 1,
+              "line": 3,
+              "sheet": null,
+              "cell": null
+            }
+          }
+        ],
+        "id": "M-ACCESS",
+        "name": "Investor Registration & Access",
+        "purpose": "Authenticate investors and verify them before they reach the portal",
+        "agent_role": "Access agent (AG-AUTH)"
+      }
+    ],
+    "features": [
+      {
+        "citations": [
+          {
+            "okf_ref_id": "chunk:text.pdf#c2",
+            "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+            "location": {
+              "page": 1,
+              "line": 6,
+              "sheet": null,
+              "cell": null
+            }
+          }
+        ],
+        "id": "F-ACCESS-1",
+        "module_id": "M-ACCESS",
+        "name": "Investor OTP & Access Verifier",
+        "trigger": "Investor submits a login request with an OTP",
+        "action": "Validate OTP and enforce RBAC device limits",
+        "check": "Verify OTP matches secure vault and device count is under limit",
+        "bound": {
+          "max_attempts": 3,
+          "on_exhaustion": "lock the profile and alert platform operations"
+        },
+        "inputs_state": [
+          "mobile_number",
+          "otp_payload",
+          "device_fingerprint",
+          "failed_login_attempts",
+          "active_devices"
+        ],
+        "external_data": [],
+        "tools": {
+          "action": ["Auth_MCP"],
+          "check": ["RBAC_MCP"]
+        },
+        "tables": ["investor_profiles", "auth_event_audit_handoff"],
+        "success_criteria": ["OTP matches and no RBAC policy violation within 3 attempts"],
+        "output": "auth_status, user_role and a JWT for the session",
+        "handoff": "Append each attempt with iteration pass, device fingerprint, OTP match evidence and access scope",
+        "notifications": [
+          "Show Looping [Pass x/3] while verifying",
+          "Notify platform ops on account lockout"
+        ]
+      },
+      {
+        "citations": [
+          {
+            "okf_ref_id": "chunk:openapi.yaml#c0",
+            "document_version_id": "a1b49a71-2421-5c5b-9852-4a0d0d61e9b7",
+            "location": {
+              "page": null,
+              "line": 1,
+              "sheet": null,
+              "cell": null
+            }
+          }
+        ],
+        "id": "F-ACCESS-2",
+        "module_id": "M-ACCESS",
+        "name": "Investor KYC Verifier",
+        "trigger": "An authenticated investor has no completed KYC record",
+        "action": "Send the investor's identity documents to the KYC provider",
+        "check": "The provider's decision is APPROVED and the name matches the profile",
+        "bound": {
+          "max_attempts": 2,
+          "on_exhaustion": "send to platform operations for manual review"
+        },
+        "inputs_state": ["investor_id", "identity_documents", "kyc_status"],
+        "external_data": ["KYC provider API"],
+        "tools": {
+          "action": ["KYC_MCP"],
+          "check": ["Profile_Match_MCP"]
+        },
+        "tables": ["investor_profiles", "kyc_event_audit_handoff"],
+        "success_criteria": ["KYC approved and profile name matches"],
+        "output": "kyc_status and the provider reference",
+        "handoff": "Append each submission with provider reference and decision",
+        "notifications": [
+          "Show Looping [Pass x/2] while waiting",
+          "Alert platform ops when KYC is escalated"
+        ]
+      }
+    ],
+    "data_integrations": {
+      "citations": [
+        {
+          "okf_ref_id": "chunk:openapi.yaml#c1",
+          "document_version_id": "a1b49a71-2421-5c5b-9852-4a0d0d61e9b7",
+          "location": {
+            "page": null,
+            "line": 4,
+            "sheet": null,
+            "cell": null
+          }
+        }
+      ],
+      "sources": ["Investor profiles in PostgreSQL", "Secure OTP vault"],
+      "apis": ["KYC provider API (see documents/openapi.yaml)"],
+      "tables": ["investor_profiles", "auth_event_audit_handoff", "kyc_event_audit_handoff"]
+    },
+    "rules_constraints": {
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.docx#c0",
+          "document_version_id": "1f8769d9-6b7f-528b-8389-d8517fc64350",
+          "location": {
+            "page": 1,
+            "line": null,
+            "sheet": null,
+            "cell": null
+          }
+        }
+      ],
+      "rule_refs": ["RULE-AUTH-LOCKOUT"],
+      "constraints": [
+        "At most 3 active devices per investor",
+        "Never store OTP values in audit tables"
+      ]
+    },
+    "deliverables_acceptance": {
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c3",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "page": null,
+            "line": 9,
+            "sheet": null,
+            "cell": null
+          }
+        }
+      ],
+      "deliverables": ["OTP sign-in Sub-Skill", "KYC verification Sub-Skill"],
+      "acceptance_criteria": [
+        "Locked after 3 failed OTP attempts",
+        "No portal access without approved KYC"
+      ]
+    },
+    "assumptions_open_points": {
+      "citations": [
+        {
+          "okf_ref_id": "chunk:sample.md#c3",
+          "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+          "location": {
+            "page": null,
+            "line": 9,
+            "sheet": null,
+            "cell": null
+          }
+        }
+      ],
+      "assumptions": ["The KYC provider answers within 30 seconds"],
+      "open_points": ["Which KYC provider is used in production"]
+    }
+  },
+  "content_tiptap": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "overview"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Overview"
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "client"
+            },
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Alpha Dynamics Ltd (synthetic)"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "objective"
+            },
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Let investors sign in to the fund portal securely with an OTP, within device limits, and complete KYC before access."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "background"
+            },
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Investors share credentials and register too many devices. Support unlocks accounts by hand."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "topic"
+            },
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Investor registration and access"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "history"
+            },
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Device limits were introduced after credential-sharing incidents."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowCitations",
+            "content": [
+              {
+                "type": "citation",
+                "attrs": {
+                  "okf_ref_id": "chunk:text.pdf#c0",
+                  "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+                  "location": {
+                    "page": 1,
+                    "line": 1,
+                    "sheet": null,
+                    "cell": null
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "users_authority"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Users and authority"
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "roles"
+            },
+            "content": [
+              {
+                "type": "sowRecord",
+                "content": [
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "role"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Retail investor"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "decision_rights"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "May access only their own profile and holdings"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowRecord",
+                "content": [
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "role"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Platform operations"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "decision_rights"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Unlocks profiles after an escalation"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowCitations",
+            "content": [
+              {
+                "type": "citation",
+                "attrs": {
+                  "okf_ref_id": "chunk:sample.md#c1",
+                  "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+                  "location": {
+                    "page": null,
+                    "line": 3,
+                    "sheet": null,
+                    "cell": null
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "scope"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Scope"
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "in_scope"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "OTP sign-in with device limits"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "KYC check before first access"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "out_of_scope"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Password reset"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Portfolio reporting"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowCitations",
+            "content": [
+              {
+                "type": "citation",
+                "attrs": {
+                  "okf_ref_id": "chunk:sample.md#c2",
+                  "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+                  "location": {
+                    "page": null,
+                    "line": 5,
+                    "sheet": null,
+                    "cell": null
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "modules"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Modules"
+              }
+            ]
+          },
+          {
+            "type": "sowItem",
+            "attrs": {
+              "id": "M-ACCESS"
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "level": 3
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Investor Registration & Access"
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "purpose"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Authenticate investors and verify them before they reach the portal"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "agent_role"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Access agent (AG-AUTH)"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowCitations",
+                "content": [
+                  {
+                    "type": "citation",
+                    "attrs": {
+                      "okf_ref_id": "chunk:text.pdf#c1",
+                      "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+                      "location": {
+                        "page": 1,
+                        "line": 3,
+                        "sheet": null,
+                        "cell": null
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "features"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Features"
+              }
+            ]
+          },
+          {
+            "type": "sowItem",
+            "attrs": {
+              "id": "F-ACCESS-1",
+              "module_id": "M-ACCESS"
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "level": 3
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Investor OTP & Access Verifier"
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "trigger"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Investor submits a login request with an OTP"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "action"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Validate OTP and enforce RBAC device limits"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "check"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Verify OTP matches secure vault and device count is under limit"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "bound"
+                },
+                "content": [
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "max_attempts"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "3"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "on_exhaustion"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "lock the profile and alert platform operations"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "inputs_state"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "mobile_number"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "otp_payload"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "device_fingerprint"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "failed_login_attempts"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "active_devices"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "external_data"
+                },
+                "content": []
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "tools"
+                },
+                "content": [
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "action"
+                    },
+                    "content": [
+                      {
+                        "type": "bulletList",
+                        "content": [
+                          {
+                            "type": "listItem",
+                            "content": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "Auth_MCP"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "check"
+                    },
+                    "content": [
+                      {
+                        "type": "bulletList",
+                        "content": [
+                          {
+                            "type": "listItem",
+                            "content": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "RBAC_MCP"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "tables"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "investor_profiles"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "auth_event_audit_handoff"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "success_criteria"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "OTP matches and no RBAC policy violation within 3 attempts"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "output"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "auth_status, user_role and a JWT for the session"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "handoff"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Append each attempt with iteration pass, device fingerprint, OTP match evidence and access scope"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "notifications"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Show Looping [Pass x/3] while verifying"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Notify platform ops on account lockout"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowCitations",
+                "content": [
+                  {
+                    "type": "citation",
+                    "attrs": {
+                      "okf_ref_id": "chunk:text.pdf#c2",
+                      "document_version_id": "d8eb987c-16f2-563b-b085-c8f596fccfbe",
+                      "location": {
+                        "page": 1,
+                        "line": 6,
+                        "sheet": null,
+                        "cell": null
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowItem",
+            "attrs": {
+              "id": "F-ACCESS-2",
+              "module_id": "M-ACCESS"
+            },
+            "content": [
+              {
+                "type": "heading",
+                "attrs": {
+                  "level": 3
+                },
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Investor KYC Verifier"
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "trigger"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "An authenticated investor has no completed KYC record"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "action"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Send the investor's identity documents to the KYC provider"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "check"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "The provider's decision is APPROVED and the name matches the profile"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "bound"
+                },
+                "content": [
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "max_attempts"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "2"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "on_exhaustion"
+                    },
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "send to platform operations for manual review"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "inputs_state"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "investor_id"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "identity_documents"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "kyc_status"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "external_data"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "KYC provider API"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "tools"
+                },
+                "content": [
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "action"
+                    },
+                    "content": [
+                      {
+                        "type": "bulletList",
+                        "content": [
+                          {
+                            "type": "listItem",
+                            "content": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "KYC_MCP"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "sowField",
+                    "attrs": {
+                      "field": "check"
+                    },
+                    "content": [
+                      {
+                        "type": "bulletList",
+                        "content": [
+                          {
+                            "type": "listItem",
+                            "content": [
+                              {
+                                "type": "paragraph",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "Profile_Match_MCP"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "tables"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "investor_profiles"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "kyc_event_audit_handoff"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "success_criteria"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "KYC approved and profile name matches"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "output"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "kyc_status and the provider reference"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "handoff"
+                },
+                "content": [
+                  {
+                    "type": "paragraph",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "Append each submission with provider reference and decision"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowField",
+                "attrs": {
+                  "field": "notifications"
+                },
+                "content": [
+                  {
+                    "type": "bulletList",
+                    "content": [
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Show Looping [Pass x/2] while waiting"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "listItem",
+                        "content": [
+                          {
+                            "type": "paragraph",
+                            "content": [
+                              {
+                                "type": "text",
+                                "text": "Alert platform ops when KYC is escalated"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "sowCitations",
+                "content": [
+                  {
+                    "type": "citation",
+                    "attrs": {
+                      "okf_ref_id": "chunk:openapi.yaml#c0",
+                      "document_version_id": "a1b49a71-2421-5c5b-9852-4a0d0d61e9b7",
+                      "location": {
+                        "page": null,
+                        "line": 1,
+                        "sheet": null,
+                        "cell": null
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "data_integrations"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Data and integrations"
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "sources"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Investor profiles in PostgreSQL"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Secure OTP vault"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "apis"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "KYC provider API (see documents/openapi.yaml)"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "tables"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "investor_profiles"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "auth_event_audit_handoff"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "kyc_event_audit_handoff"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowCitations",
+            "content": [
+              {
+                "type": "citation",
+                "attrs": {
+                  "okf_ref_id": "chunk:openapi.yaml#c1",
+                  "document_version_id": "a1b49a71-2421-5c5b-9852-4a0d0d61e9b7",
+                  "location": {
+                    "page": null,
+                    "line": 4,
+                    "sheet": null,
+                    "cell": null
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "rules_constraints"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Rules and constraints"
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "rule_refs"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "RULE-AUTH-LOCKOUT"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "constraints"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "At most 3 active devices per investor"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Never store OTP values in audit tables"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowCitations",
+            "content": [
+              {
+                "type": "citation",
+                "attrs": {
+                  "okf_ref_id": "chunk:sample.docx#c0",
+                  "document_version_id": "1f8769d9-6b7f-528b-8389-d8517fc64350",
+                  "location": {
+                    "page": 1,
+                    "line": null,
+                    "sheet": null,
+                    "cell": null
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "deliverables_acceptance"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Deliverables and acceptance"
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "deliverables"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "OTP sign-in Sub-Skill"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "KYC verification Sub-Skill"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "acceptance_criteria"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Locked after 3 failed OTP attempts"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "No portal access without approved KYC"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowCitations",
+            "content": [
+              {
+                "type": "citation",
+                "attrs": {
+                  "okf_ref_id": "chunk:sample.md#c3",
+                  "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+                  "location": {
+                    "page": null,
+                    "line": 9,
+                    "sheet": null,
+                    "cell": null
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sowSection",
+        "attrs": {
+          "section_id": "assumptions_open_points"
+        },
+        "content": [
+          {
+            "type": "heading",
+            "attrs": {
+              "level": 2
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Assumptions and open points"
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "assumptions"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "The KYC provider answers within 30 seconds"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowField",
+            "attrs": {
+              "field": "open_points"
+            },
+            "content": [
+              {
+                "type": "bulletList",
+                "content": [
+                  {
+                    "type": "listItem",
+                    "content": [
+                      {
+                        "type": "paragraph",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "Which KYC provider is used in production"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "sowCitations",
+            "content": [
+              {
+                "type": "citation",
+                "attrs": {
+                  "okf_ref_id": "chunk:sample.md#c3",
+                  "document_version_id": "ec444458-321e-5e00-bcf5-840e079b0d3f",
+                  "location": {
+                    "page": null,
+                    "line": 9,
+                    "sheet": null,
+                    "cell": null
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "sha256": "e881a5485c59c2919f9a8f216ce69323b1b2ee44ee1bd6e970fb14fb80cb8aea"
+}

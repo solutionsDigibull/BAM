@@ -98,7 +98,13 @@ def test_e4_5_a_spreadsheet_keeps_sheet_and_cell_apart() -> None:
         tables=[Table(header=["a"], rows=[["1"]], sheet="Sheet1", range="A1:A2")],
     )
     dumped = doc.model_dump(mode="json", exclude_none=True)
-    assert dumped["blocks"][0] == {"type": "cell", "text": "42", "sheet": "Sheet1", "cell": "B4"}
+    assert dumped["blocks"][0] == {
+        "type": "cell",
+        "text": "42",
+        "sheet": "Sheet1",
+        "cell": "B4",
+        "unreadable": False,
+    }
     assert dumped["tables"][0]["range"] == "A1:A2"
 
 
@@ -114,6 +120,8 @@ def test_e4_5_the_report_defaults_to_nothing_found() -> None:
         "tables": 0,
         "warnings": [],
         "ocr_needed_pages": [],
+        "ocr_pages": [],
+        "unreadable_pages": [],
     }
     with pytest.raises(ValidationError):
         ParseReport(pages=-1)

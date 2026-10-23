@@ -35,6 +35,20 @@
       },
       "title": "Ocr Needed Pages",
       "type": "array"
+    },
+    "ocr_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Ocr Pages",
+      "type": "array"
+    },
+    "unreadable_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Unreadable Pages",
+      "type": "array"
     }
   },
   "title": "ParseReport",

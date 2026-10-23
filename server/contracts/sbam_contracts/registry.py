@@ -15,6 +15,7 @@ from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
 from sbam_contracts.documents import (
     CleanupResult,
     DocumentOut,
+    OcrPage,
     ParsedDocument,
     ParseOutcome,
     ParseReport,
@@ -93,6 +94,7 @@ from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sow import SowDocument
 from sbam_contracts.sow_api import (
+    SowCitationDetail,
     SowDiff,
     SowOverview,
     SowRegenerateRequest,
@@ -133,6 +135,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sow/save_request", SowSaveRequest),
     ("sow/diff", SowDiff),
     ("sow/regenerate_request", SowRegenerateRequest),
+    ("sow/citation_detail", SowCitationDetail),
     ("runs/run", Run),
     ("runs/run_accepted", RunAccepted),
     ("runtime_registry/runtime_registry", RuntimeRegistry),
@@ -157,6 +160,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("documents/parsed_document", ParsedDocument),
     ("documents/parse_report", ParseReport),
     ("documents/parse_outcome", ParseOutcome),
+    ("documents/ocr_page", OcrPage),
     ("masters/master_entry_create", MasterEntryCreate),
     ("masters/master_version_create", MasterVersionCreate),
     ("masters/master_entry", MasterEntry),

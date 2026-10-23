@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:61f92824efcdd99145145a1e8f8f25d66adae3e49341db0adae90416dd7e7ec0
+// source-sha256:6c90209627b94adef87075e414f895633e4f1e57395f63e2e03824ed0cd68abf
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -410,6 +410,7 @@ export interface SbamContracts {
   SowSaveRequest?: SowSaveRequest;
   SowDiff?: SowDiff;
   SowRegenerateRequest?: SowRegenerateRequest;
+  SowCitationDetail?: SowCitationDetail;
   Run?: Run;
   RunAccepted?: RunAccepted;
   RuntimeRegistry?: RuntimeRegistry;
@@ -434,6 +435,7 @@ export interface SbamContracts {
   ParsedDocument?: ParsedDocument;
   ParseReport?: ParseReport;
   ParseOutcome?: ParseOutcome;
+  OcrPage?: OcrPage;
   MasterEntryCreate?: MasterEntryCreate;
   MasterVersionCreate?: MasterVersionCreate;
   MasterEntry?: MasterEntry;
@@ -1939,6 +1941,24 @@ export interface SowRegenerateRequest {
   hint?: string | null;
 }
 /**
+ * What a citation points at (E6.5 citation panel), read from the version's OKF bundle.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowCitationDetail".
+ */
+export interface SowCitationDetail {
+  okf_ref_id: string;
+  kind: "chunk" | "entity";
+  document_version_id: string;
+  title?: string | null;
+  location: {
+    [k: string]: unknown | undefined;
+  };
+  passage: string;
+  truncated?: boolean;
+  source_available: boolean;
+}
+/**
  * One Temporal execution as the API returns it (mirror of `temporal_runs`).
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -2509,6 +2529,8 @@ export interface Block {
   cell?: string | null;
   line?: number | null;
   table?: number | null;
+  ocr?: "llm" | null;
+  unreadable?: boolean;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -2534,6 +2556,8 @@ export interface ParseReport {
   tables?: number;
   warnings?: string[];
   ocr_needed_pages?: number[];
+  ocr_pages?: number[];
+  unreadable_pages?: number[];
 }
 /**
  * Result of the `parse_document` activity. `code` is set when the version is PARSE_FAILED.
@@ -2546,6 +2570,18 @@ export interface ParseOutcome {
   parsed: boolean;
   code?: ErrorCode | null;
   report?: ParseReport | null;
+}
+/**
+ * What the vision model answers for one page (`sbam-ocr`). Nothing else is accepted: a model
+ * that adds a field (`status`, `approved`, ...) is re-asked and the answer is never stored.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "OcrPage".
+ */
+export interface OcrPage {
+  page: number;
+  markdown: string;
+  unreadable?: boolean;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

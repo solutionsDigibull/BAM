@@ -16,6 +16,7 @@ import hashlib
 import logging
 import uuid
 from collections import deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -70,6 +71,7 @@ class Generation:
     input: Any = None
     output: Any = None
     error: str | None = None
+    subject: Mapping[str, str] = field(default_factory=dict)  # e.g. the document version id
 
 
 @dataclass
@@ -99,7 +101,7 @@ class LangfuseTracer:
                     f"prompt:{g.prompt_id}@{g.prompt_version}",
                     f"tenant:{g.tenant_id}",
                 ],
-                "metadata": {"tenant_id": g.tenant_id, "project_id": g.project_id},
+                "metadata": {"tenant_id": g.tenant_id, "project_id": g.project_id, **g.subject},
             },
         }
         generation = {
@@ -125,6 +127,7 @@ class LangfuseTracer:
                     "attempt": g.attempt,
                     "status": g.status,
                     "cost_usd": g.cost_usd,
+                    **g.subject,
                 },
             },
         }
