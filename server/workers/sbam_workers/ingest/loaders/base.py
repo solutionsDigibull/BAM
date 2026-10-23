@@ -24,6 +24,16 @@ class ParseError(Exception):
         self.code = code
 
 
+@dataclass(frozen=True)
+class Attachment:
+    """A file an e-mail carries (E4.6). The loader only finds it; the parse step does not store it.
+    It becomes a child document with its own scan and type check (later issue)."""
+
+    name: str
+    content_type: str
+    data: bytes
+
+
 @dataclass
 class Parsed:
     """What a loader returns. `report` is complete when the loader returns. `blocks` and `markdown`
@@ -34,6 +44,7 @@ class Parsed:
     tables: list[Table] = field(default_factory=list)
     markdown: str | Iterable[str] = ""
     report: ParseReport = field(default_factory=ParseReport)
+    attachments: list[Attachment] = field(default_factory=list)  # e-mail only
 
 
 Loader = Callable[[bytes, Heartbeat], Parsed]

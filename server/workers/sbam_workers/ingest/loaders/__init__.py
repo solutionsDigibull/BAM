@@ -6,13 +6,28 @@ tables of `doc.json`, the text of `doc.md` and the report. A file it cannot read
 `ParseError` with the code the version is failed with.
 
 `loader_for(detected_type)` is the registry. A type with no loader yet gives None: the parse step
-leaves such a version in PARSING, as before, until its loader lands (e-mail, structured, source
-code, archives: later issues).
+leaves such a version in PARSING, as before, until its loader lands (archives: a later issue).
 """
 
-from sbam_workers.ingest.loaders.base import Heartbeat, Loader, Parsed, ParseError, no_heartbeat
+from sbam_workers.ingest.loaders.base import (
+    Attachment,
+    Heartbeat,
+    Loader,
+    Parsed,
+    ParseError,
+    no_heartbeat,
+)
+from sbam_workers.ingest.loaders.code import (
+    load_cpp,
+    load_go,
+    load_javascript,
+    load_python,
+    load_sql,
+)
+from sbam_workers.ingest.loaders.email import load_eml, load_msg
 from sbam_workers.ingest.loaders.image import load_image
 from sbam_workers.ingest.loaders.pdf import load_pdf
+from sbam_workers.ingest.loaders.structured import load_json, load_xml, load_yaml
 from sbam_workers.ingest.loaders.tabular import load_csv
 from sbam_workers.ingest.loaders.text import load_markdown, load_text
 from sbam_workers.ingest.loaders.word import load_docx
@@ -29,6 +44,17 @@ LOADERS: dict[str, Loader] = {
     "jpg": load_image,
     "jpeg": load_image,
     "tiff": load_image,
+    "eml": load_eml,
+    "msg": load_msg,
+    "json": load_json,
+    "xml": load_xml,
+    "yaml": load_yaml,
+    "yml": load_yaml,
+    "py": load_python,
+    "sql": load_sql,
+    "js": load_javascript,
+    "go": load_go,
+    "cpp": load_cpp,
 }
 
 
@@ -38,6 +64,7 @@ def loader_for(detected_type: str | None) -> Loader | None:
 
 __all__ = [
     "LOADERS",
+    "Attachment",
     "Heartbeat",
     "Loader",
     "ParseError",
