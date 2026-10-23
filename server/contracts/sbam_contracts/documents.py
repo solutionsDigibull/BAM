@@ -50,6 +50,7 @@ from sbam_contracts.state_machines import DocumentVersionState
 
 MAX_FILE_BYTES: Final = 15 * 1024 * 1024  # 15728640
 MAX_ACTIVE_FILES: Final = 20
+MAX_ATTACHMENT_DEPTH: Final = 1  # an attachment of an attachment is not followed (E4.6)
 UPLOAD_TOKEN_TTL_SECONDS: Final = 15 * 60
 DOCUMENT_INGESTION: Final = "DocumentIngestion"  # workflow type; id `ingest-<document_version_id>`
 PURGE_RETENTION_DAYS: Final = 90  # a deleted document is restorable for this long, then purged
@@ -204,6 +205,29 @@ class ParsedDocument(BaseModel):
     tables: list[Table] = Field(default_factory=list)
 
 
+class AttachmentOutcome(StrEnum):
+    """What became of one attachment of an e-mail (E4.6)."""
+
+    REGISTERED = "REGISTERED"  # a child document, scanned and parsed like any upload
+    FILE_LIMIT_REACHED = "FILE_LIMIT_REACHED"  # the project already holds 20 active files
+    TOO_LARGE = "TOO_LARGE"  # over 15 MB: left out
+    TOO_DEEP = "TOO_DEEP"  # an attachment of an attachment: only one level is followed
+
+
+class AttachmentReport(BaseModel):
+    """One attachment of a parsed e-mail, in `ParseReport.attachments` of the parent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(max_length=255)
+    size: int = Field(ge=0)
+    outcome: AttachmentOutcome
+    # The child document (`DocumentOut.parent_document_id` is this version's document). Set for
+    # REGISTERED, and for FILE_LIMIT_REACHED where the child is kept as a REJECTED document.
+    document_id: UUID | None = None
+
+
 class ParseReport(BaseModel):
     """Kept on the document version (`parse_report`) after every parse attempt."""
 
@@ -218,6 +242,7 @@ class ParseReport(BaseModel):
     )  # PDF pages without a text layer, and every frame of an image (E4.8)
     ocr_pages: list[int] = Field(default_factory=list)  # of those, the ones the model read
     unreadable_pages: list[int] = Field(default_factory=list)  # and the ones it could not read
+    attachments: list[AttachmentReport] = Field(default_factory=list)  # e-mail only (E4.6)
 
 
 class ParseOutcome(BaseModel):
@@ -260,6 +285,8 @@ class DocumentOut(BaseModel):
     # the loader found (E4.5). None until a parse attempt has finished.
     parse_code: ErrorCode | None = None
     parse_report: ParseReport | None = None
+    # E4.6: the e-mail this document is an attachment of. None for an upload; one level only.
+    parent_document_id: UUID | None = None
 
 
 class PurgeTarget(BaseModel):

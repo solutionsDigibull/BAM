@@ -2,6 +2,63 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:sbam:contracts:documents/parse_outcome:0.1.0",
   "$defs": {
+    "AttachmentOutcome": {
+      "description": "What became of one attachment of an e-mail (E4.6).",
+      "enum": [
+        "REGISTERED",
+        "FILE_LIMIT_REACHED",
+        "TOO_LARGE",
+        "TOO_DEEP"
+      ],
+      "title": "AttachmentOutcome",
+      "type": "string"
+    },
+    "AttachmentReport": {
+      "additionalProperties": false,
+      "description": "One attachment of a parsed e-mail, in `ParseReport.attachments` of the parent.",
+      "properties": {
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "content_type": {
+          "maxLength": 255,
+          "title": "Content Type",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/AttachmentOutcome"
+        },
+        "document_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Id"
+        }
+      },
+      "required": [
+        "name",
+        "content_type",
+        "size",
+        "outcome"
+      ],
+      "title": "AttachmentReport",
+      "type": "object"
+    },
     "ErrorCode": {
       "description": "Stable machine-readable error codes. Add new codes here; never rename or reuse one.",
       "enum": [
@@ -136,6 +193,13 @@
             "type": "integer"
           },
           "title": "Unreadable Pages",
+          "type": "array"
+        },
+        "attachments": {
+          "items": {
+            "$ref": "#/$defs/AttachmentReport"
+          },
+          "title": "Attachments",
           "type": "array"
         }
       },
