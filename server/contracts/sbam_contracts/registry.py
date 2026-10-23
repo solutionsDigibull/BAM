@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
+from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
 from sbam_contracts.documents import (
     CleanupResult,
     DocumentOut,
@@ -111,6 +112,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/workbench_sub_skill", WorkbenchSubSkill),
     ("isatvon/sub_skill_patch", SubSkillPatch),
     ("isatvon/validation_report", ValidationReport),
+    ("build/builds_response", BuildsResponse),
+    ("build/gates_response", GatesResponse),
     ("manifest/isa14_manifest", Isa14Manifest),
     ("manifest/skill_manifest", SkillManifest),
     ("manifest/workflow_manifest", WorkflowManifest),

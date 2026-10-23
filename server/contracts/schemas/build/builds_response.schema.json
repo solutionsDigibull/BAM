@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:build/builds_response:0.1.0",
+  "$defs": {
+    "BuildRow": {
+      "additionalProperties": false,
+      "description": "One Sub-Skill's latest build: where it is, which attempt, and every gate's status.",
+      "properties": {
+        "sub_skill_id": {
+          "format": "uuid",
+          "title": "Sub Skill Id",
+          "type": "string"
+        },
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "skill_name": {
+          "title": "Skill Name",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SubSkillState"
+        },
+        "stage": {
+          "$ref": "#/$defs/BuildStage"
+        },
+        "attempt": {
+          "default": 0,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "gates": {
+          "additionalProperties": {
+            "$ref": "#/$defs/GateStatus"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/GateName"
+          },
+          "title": "Gates",
+          "type": "object"
+        }
+      },
+      "required": [
+        "sub_skill_id",
+        "skill_id",
+        "skill_name",
+        "state",
+        "stage"
+      ],
+      "title": "BuildRow",
+      "type": "object"
+    },
+    "BuildStage": {
+      "description": "Where a build is, for the `build_status` query (the activities' names, TD §13.2).",
+      "enum": [
+        "build_manifest",
+        "check_libraries",
+        "render_skeleton",
+        "generate_bodies",
+        "assemble",
+        "ast_gate",
+        "static_gate",
+        "generate_tests",
+        "build_promptfoo_suite",
+        "run_sandbox_tests",
+        "certify_sub_skill",
+        "correct",
+        "wait_retry",
+        "done"
+      ],
+      "title": "BuildStage",
+      "type": "string"
+    },
+    "GateName": {
+      "description": "The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the\ndashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).",
+      "enum": [
+        "ISATVON_CONTRACT",
+        "LIBRARIES",
+        "SCHEMA_SQL",
+        "CODEGEN",
+        "AST_SYNTAX",
+        "AST_SKELETON",
+        "AST_CONFORMANCE",
+        "AST_DECOUPLING",
+        "AST_NO_MANUAL_LOOP",
+        "AST_HANDOFF",
+        "AST_IMPORTS",
+        "AST_SQL_SAFETY",
+        "RUFF",
+        "BLACK",
+        "MYPY",
+        "CLAMAV",
+        "BANDIT",
+        "IMPORT_RESOLUTION",
+        "LOOP_TESTS"
+      ],
+      "title": "GateName",
+      "type": "string"
+    },
+    "GateStatus": {
+      "enum": [
+        "PENDING",
+        "RUNNING",
+        "PASSED",
+        "FAILED",
+        "SKIPPED"
+      ],
+      "title": "GateStatus",
+      "type": "string"
+    },
+    "SubSkillState": {
+      "enum": [
+        "DRAFT",
+        "VALID",
+        "INVALID",
+        "BUILDING",
+        "CORRECTING",
+        "TESTING",
+        "TESTING_BLOCKED",
+        "NEEDS_FDE_REVIEW",
+        "DEPENDENCY_FAILED",
+        "BUILD_ERROR",
+        "CERTIFIED",
+        "FROZEN",
+        "INVALIDATED",
+        "SUPERSEDED"
+      ],
+      "title": "SubSkillState",
+      "type": "string"
+    },
+    "WorkflowState": {
+      "enum": [
+        "CREATED",
+        "ISATVON_EXTRACTING",
+        "ISATVON_REVIEW",
+        "BUILDING",
+        "CERTIFYING",
+        "CERTIFIED",
+        "FROZEN",
+        "EXTRACTION_FAILED",
+        "NEEDS_FDE_REVIEW",
+        "WORKFLOW_VALIDATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "WorkflowState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET W/builds`. `active` is true while any Sub-Skill is still building or testing; the UI\npolls only then.",
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "workflow_state": {
+      "$ref": "#/$defs/WorkflowState"
+    },
+    "active": {
+      "title": "Active",
+      "type": "boolean"
+    },
+    "sub_skills": {
+      "items": {
+        "$ref": "#/$defs/BuildRow"
+      },
+      "title": "Sub Skills",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "workflow_state",
+    "active",
+    "sub_skills"
+  ],
+  "title": "BuildsResponse",
+  "type": "object"
+}

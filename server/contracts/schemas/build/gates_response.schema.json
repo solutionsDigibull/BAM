@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:build/gates_response:0.1.0",
+  "$defs": {
+    "Finding": {
+      "additionalProperties": false,
+      "description": "One problem a gate found; the shape the build worker writes into `gate_results.findings`.\n`file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.",
+      "properties": {
+        "gate": {
+          "$ref": "#/$defs/GateName"
+        },
+        "code": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 10000,
+          "title": "Message",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "col": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Col"
+        }
+      },
+      "required": [
+        "gate",
+        "code",
+        "message"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "GateName": {
+      "description": "The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the\ndashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).",
+      "enum": [
+        "ISATVON_CONTRACT",
+        "LIBRARIES",
+        "SCHEMA_SQL",
+        "CODEGEN",
+        "AST_SYNTAX",
+        "AST_SKELETON",
+        "AST_CONFORMANCE",
+        "AST_DECOUPLING",
+        "AST_NO_MANUAL_LOOP",
+        "AST_HANDOFF",
+        "AST_IMPORTS",
+        "AST_SQL_SAFETY",
+        "RUFF",
+        "BLACK",
+        "MYPY",
+        "CLAMAV",
+        "BANDIT",
+        "IMPORT_RESOLUTION",
+        "LOOP_TESTS"
+      ],
+      "title": "GateName",
+      "type": "string"
+    },
+    "GateResult": {
+      "additionalProperties": false,
+      "properties": {
+        "gate": {
+          "$ref": "#/$defs/GateName"
+        },
+        "status": {
+          "$ref": "#/$defs/GateStatus"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "tool_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Version"
+        }
+      },
+      "required": [
+        "gate",
+        "status"
+      ],
+      "title": "GateResult",
+      "type": "object"
+    },
+    "GateStatus": {
+      "enum": [
+        "PENDING",
+        "RUNNING",
+        "PASSED",
+        "FAILED",
+        "SKIPPED"
+      ],
+      "title": "GateStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET W/sub-skills/{sub_id}/gates?attempt=`: one attempt's gate results, in GateName order.",
+  "properties": {
+    "sub_skill_id": {
+      "format": "uuid",
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "attempt": {
+      "maximum": 2,
+      "minimum": 0,
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "gates": {
+      "items": {
+        "$ref": "#/$defs/GateResult"
+      },
+      "title": "Gates",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sub_skill_id",
+    "attempt",
+    "gates"
+  ],
+  "title": "GatesResponse",
+  "type": "object"
+}
