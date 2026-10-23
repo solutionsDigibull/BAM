@@ -11,7 +11,7 @@ from enum import StrEnum
 
 from sbam_contracts.documents import ScanStatus
 from sbam_contracts.state_machines import MachineName
-from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Index, String, Uuid
+from sqlalchemy import JSON, BigInteger, CheckConstraint, DateTime, ForeignKey, Index, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,8 +31,18 @@ class ReservationStatus(StrEnum):
 
 class Document(ProjectOwned, Base):
     __tablename__ = "documents"
+    __table_args__ = (
+        CheckConstraint(
+            "parent_document_id IS NULL OR parent_document_id <> id", name="parent_not_self"
+        ),
+    )
 
     title: Mapped[str] = mapped_column(String(255))  # the uploaded file's name
+    # E4.6: an e-mail attachment points at the e-mail's document (same tenant and project, one
+    # level; the service enforces both, the table only forbids being its own parent).
+    parent_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("sbam.documents.id"), index=True
+    )
     # Soft delete (E4.9): `deleted_at` + `deleted_by` say when and by whom, `purge_after` is
     # deleted_at + 90 days, when the daily PurgeDeleted job removes the stored bytes.
     deleted_by: Mapped[str | None] = mapped_column(String(255))

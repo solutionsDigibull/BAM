@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:28cea2f8bb13eca329dca953b0c972ad3214e11d29380070408fdb932a2c249a
+// source-sha256:4dd424f48cdc0e32beb0047a66f335668d8c782457e37122437c4182b5db5bbe
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -318,6 +318,13 @@ export type ScanStatus = "CLEAN" | "INFECTED" | "SCAN_FAILED";
  * via the `definition` "BlockType".
  */
 export type BlockType = "heading" | "paragraph" | "list_item" | "row" | "cell" | "table";
+/**
+ * What became of one attachment of an e-mail (E4.6).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AttachmentOutcome".
+ */
+export type AttachmentOutcome = "REGISTERED" | "FILE_LIMIT_REACHED" | "TOO_LARGE" | "TOO_DEEP";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterType".
@@ -2603,6 +2610,20 @@ export interface ParseReport {
   ocr_needed_pages?: number[];
   ocr_pages?: number[];
   unreadable_pages?: number[];
+  attachments?: AttachmentReport[];
+}
+/**
+ * One attachment of a parsed e-mail, in `ParseReport.attachments` of the parent.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AttachmentReport".
+ */
+export interface AttachmentReport {
+  name: string;
+  content_type: string;
+  size: number;
+  outcome: AttachmentOutcome;
+  document_id?: string | null;
 }
 /**
  * Result of the `parse_document` activity. `code` is set when the version is PARSE_FAILED.
@@ -2886,6 +2907,7 @@ export interface DocumentOut {
   reject_code?: ErrorCode | null;
   parse_code?: ErrorCode | null;
   parse_report?: ParseReport | null;
+  parent_document_id?: string | null;
 }
 /**
  * One deleted document that is due for purging (IDs only, like every workflow input).
