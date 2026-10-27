@@ -102,7 +102,7 @@ class InAppSink:
         }
         with self.sessions() as session:
             if item.type in REJECTIONS and entity_id is not None and not params["error"]:
-                params["error"] = self._reject_reason(session, item, entity_id)
+                params["error"] = self._reject_reason(session, item, project_id, entity_id)
             service.notify_project(
                 session,
                 item.tenant_id,
@@ -115,7 +115,11 @@ class InAppSink:
             session.commit()
 
     @staticmethod
-    def _reject_reason(session: Session, item: OutboxItem, version_id: uuid.UUID) -> str:
-        """The reason on the rejected version (`reject_code`); empty if it has none."""
-        version = DocumentVersionRepository(session, TenantContext(item.tenant_id)).get(version_id)
+    def _reject_reason(
+        session: Session, item: OutboxItem, project_id: uuid.UUID, version_id: uuid.UUID
+    ) -> str:
+        """The reason on the rejected version (`reject_code`); empty if it has none. Scoped to the
+        row's tenant AND project, like every other repository call (E15.6)."""
+        ctx = TenantContext(item.tenant_id, project_id)
+        version = DocumentVersionRepository(session, ctx).get(version_id)
         return REJECT_REASONS.get(version.reject_code or "", "") if version is not None else ""
