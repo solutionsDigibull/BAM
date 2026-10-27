@@ -2,7 +2,8 @@
 
 Same stand-ins as the masters import tests: SQLite with schema `sbam` mapped away, a temp-dir
 storage root and a fake clamd on a real socket. Parsing and Cognee are a later issue, so every
-document here stays `parse_status = PENDING`.
+document here stays `parse_status = PENDING` (the parse runs in the ingest worker; the
+Temporal client is a fake that records what the API starts).
 """
 
 import hashlib
@@ -15,6 +16,7 @@ import pytest
 import test_projects
 from clamd_fake import FakeClamd
 from fixtures import eicar_bytes, fixture_path
+from runs_db import FakeClient
 from sbam_api.audit.models import AuditLog
 from sbam_api.filetypes.config import enabled_rows
 from sbam_api.masters import documents
@@ -43,6 +45,8 @@ class DocsHarness(MastersHarness):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
         self.tmp = tmp_path
+        self.temporal = FakeClient()
+        self.client.app.state.temporal = self.temporal  # type: ignore[attr-defined]
 
     def attach(
         self,
@@ -451,3 +455,99 @@ def test_e3_8_a_missing_document_is_not_found(h: DocsHarness) -> None:
 def test_e3_8_a_file_is_a_required_part(h: DocsHarness) -> None:
     res = h.call("POST", "/admin/master-documents", h.admin_a(), data={"master_type": "RULES"})
     assert res.status_code == 422
+
+
+# --- E3.8b: a CLEAN document is handed to Temporal for parsing ------------------------------------
+
+
+def started(h: DocsHarness) -> list[tuple[str, str, str]]:
+    """(workflow, workflow id, project id) of every start the API asked Temporal for."""
+    return [(c["workflow"], c["id"], str(c["arg"].project_id)) for c in h.temporal.calls]
+
+
+def test_e3_8b_attaching_a_clean_document_starts_its_parse_workflow(h: DocsHarness) -> None:
+    body = h.attach("policy.yaml", POLICY).json()
+    assert body["parse_status"] == "PENDING"  # the workflow sets PARSING
+    assert started(h) == [("MasterDocumentIngestion", f"master-doc-{body['id']}", str(ZERO))]
+    [call] = h.temporal.calls
+    arg = call["arg"]
+    assert str(arg.tenant_id) == str(TENANT_A) and str(arg.ref_id) == body["id"]
+    assert call["task_queue"] == "sbam-ingest"
+
+
+def test_e3_8b_a_project_document_starts_with_its_project(h: DocsHarness) -> None:
+    project = h.create("Quote Bot")["id"]
+    body = h.attach("policy.yaml", POLICY, project_id=project).json()
+    assert started(h) == [("MasterDocumentIngestion", f"master-doc-{body['id']}", project)]
+
+
+def test_e3_8b_attaching_the_same_file_again_names_the_same_workflow(h: DocsHarness) -> None:
+    first = h.attach("policy.yaml", POLICY)
+    second = h.attach("policy.yaml", POLICY)
+    assert (first.status_code, second.status_code) == (201, 200)
+    ids = {wid for _, wid, _ in started(h)}
+    assert ids == {f"master-doc-{first.json()['id']}"}  # Temporal finds the one execution
+
+
+def test_e3_8b_an_infected_file_is_never_started(h: DocsHarness) -> None:
+    assert h.attach("eicar.txt", eicar_bytes()).status_code == 422
+    assert h.temporal.calls == []
+
+
+def test_e3_8b_a_document_with_no_scan_verdict_is_never_started(
+    h: DocsHarness, clamd: FakeClamd
+) -> None:
+    clamd.behaviour = "drop"  # clamd gives no answer: SCAN_FAILED
+    body = h.attach("policy.yaml", POLICY).json()
+    assert body["scan_status"] == "SCAN_FAILED" and h.temporal.calls == []
+
+
+def test_e3_8b_when_temporal_is_down_the_attach_stands_and_the_document_waits(
+    h: DocsHarness,
+) -> None:
+    h.temporal.down = True
+    res = h.attach("policy.yaml", POLICY)
+    assert res.status_code == 201 and res.json()["parse_status"] == "PENDING"
+    h.temporal.down = False
+    other = h.attach("other.yaml", b"approved_suppliers:\n  - Mouser\n").json()
+    ids = {wid for _, wid, _ in started(h)}
+    assert {f"master-doc-{res.json()['id']}", f"master-doc-{other['id']}"} <= ids  # both started
+
+
+def test_e3_8b_a_parsed_or_failed_document_is_not_started_again(h: DocsHarness) -> None:
+    first = h.attach("policy.yaml", POLICY).json()
+    with h.sessions() as s:
+        row = s.get(MasterDocument, uuid.UUID(first["id"]))
+        assert row is not None
+        row.parse_status = "PARSED"
+        s.commit()
+    h.temporal.calls.clear()
+    other = h.attach("other.yaml", b"approved_suppliers:\n  - Mouser\n").json()
+    assert [wid for _, wid, _ in started(h)] == [f"master-doc-{other['id']}"]
+
+
+def test_e3_8b_only_the_callers_tenant_is_swept(h: DocsHarness) -> None:
+    mine = h.attach("policy.yaml", POLICY).json()
+    with h.sessions() as s:  # a clean, pending document of another tenant
+        other_tenant = uuid.uuid4()
+        s.add(
+            MasterDocument(
+                tenant_id=other_tenant,
+                title="x.yaml",
+                filetype_row_label="Filetype #12",
+                intent_class="Policy",
+                master_type="RULES",
+                route_source="DEFAULT_BY_FILETYPE",
+                storage_key="k",
+                sha256="e" * 64,
+                size=1,
+                mime="text/yaml",
+                scan_status="CLEAN",
+                parse_status="PENDING",
+            )
+        )
+        s.commit()
+    h.temporal.calls.clear()
+    h.attach("other.yaml", b"approved_suppliers:\n  - Mouser\n")
+    assert all(str(c["arg"].tenant_id) == str(TENANT_A) for c in h.temporal.calls)
+    assert f"master-doc-{mine['id']}" in {wid for _, wid, _ in started(h)}

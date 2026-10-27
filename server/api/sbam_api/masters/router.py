@@ -5,6 +5,7 @@ Snapshots are made by the modules that use the masters (SOW generation, knowledg
 `service.create_snapshot`; the API only reads them.
 """
 
+import asyncio
 import uuid
 from collections.abc import Iterator
 from typing import Annotated
@@ -30,10 +31,13 @@ from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
 from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser, admin
-from sbam_api.core.conventions import content_disposition, etag
+from sbam_api.core.conventions import ApiError, content_disposition, etag
+from sbam_api.core.ids import uuid7
+from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.session import app_sessions
-from sbam_api.masters import documents, exporter, importer, models, service
+from sbam_api.masters import documents, exporter, importer, ingestion, models, service
 from sbam_api.storage.router import backend
+from sbam_api.temporal.deps import temporal_client
 
 router = APIRouter(tags=["masters"])
 
@@ -196,7 +200,7 @@ def _document(row: models.MasterDocument, response: Response | None = None) -> M
 
 
 @router.post("/admin/master-documents", status_code=201)
-def attach_document(
+async def attach_document(
     request: Request,
     file: UploadFile,
     user: Admin,
@@ -206,8 +210,9 @@ def attach_document(
     master_type: Annotated[RoutedMasterType | None, Form()] = None,
 ) -> MasterDocumentOut:
     """Attach a context file: scan, route by its Filetype, 201 (or 200 for a file already there)."""
-    data = file.file.read(MAX_FILE_BYTES + 1)  # one byte over is enough to answer 413
-    done = documents.attach(
+    data = await file.read(MAX_FILE_BYTES + 1)  # one byte over is enough to answer 413
+    done = await asyncio.to_thread(
+        documents.attach,
         session,
         user,
         request.app.state.settings,
@@ -219,7 +224,22 @@ def attach_document(
     )
     if not done.created:
         response.status_code = 200
-    return _document(done.document, response)
+    out = _document(done.document, response)
+    await _start_parsing(request, session, user)
+    return out
+
+
+async def _start_parsing(request: Request, session: Session, user: CurrentUser) -> None:
+    """Hand the tenant's scanned, unparsed master documents to Temporal. Best effort, like an
+    upload: if Temporal is down they stay PENDING and the next attach starts them."""
+    pending = await asyncio.to_thread(documents.pending_parse, session, user)
+    if not pending:
+        return
+    try:
+        client = await temporal_client(request)
+    except ApiError:
+        return
+    await ingestion.start_all(client, pending, correlation_id_var.get() or str(uuid7()))
 
 
 @router.get("/admin/master-documents")
