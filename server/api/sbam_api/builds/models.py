@@ -6,6 +6,9 @@ retried activity finds its row instead of adding a second one. E11.2 writes the 
 `files`, `bundle_sha256` and the Black version + config hash that formatted it, the correction
 loop (E11.4) adds `correction_reason`.
 
+`gate_results` (E12.2, TD §7.7) holds one row per gate check of one attempt's bundle, keyed to the
+`bundle_sha256` it judged, so a result for another bundle is never reused.
+
 `sub_skill_id` and `manifest_id` carry no foreign key yet: `sub_skills` and `sub_skill_manifests`
 arrive with #91.
 """
@@ -14,6 +17,7 @@ import uuid
 from enum import StrEnum
 from typing import Any
 
+from sbam_contracts.build_dashboard import GateName, GateStatus
 from sqlalchemy import JSON, CheckConstraint, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -59,3 +63,22 @@ class CodeAttempt(ProjectOwned, Base):
     black_version: Mapped[str | None] = mapped_column(String(40))  # E11.3
     black_config_sha256: Mapped[str | None] = mapped_column(String(64))  # E11.3
     correction_reason: Mapped[str | None] = mapped_column(Text)  # E11.4
+
+
+class GateResult(ProjectOwned, Base):
+    """One gate check of one code attempt (AST_SYNTAX, AST_SKELETON, ...); #119 reuses the table."""
+
+    __tablename__ = "gate_results"
+    __table_args__ = (
+        status_check(GateStatus),
+        status_check(GateName, column="gate"),
+        UniqueConstraint("tenant_id", "code_attempt_id", "gate", "bundle_sha256"),
+    )
+
+    code_attempt_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
+    gate: Mapped[str] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(20))
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(Json, default=list)
+    tool_version: Mapped[str] = mapped_column(String(60))  # the gate's own version
+    config_sha256: Mapped[str] = mapped_column(String(64))  # RFC 8785 of the gate's rule set
+    bundle_sha256: Mapped[str] = mapped_column(String(64))  # the bundle the verdict is about

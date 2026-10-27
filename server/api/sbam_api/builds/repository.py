@@ -3,7 +3,7 @@
 import uuid
 from typing import Any
 
-from sbam_api.builds.models import CodeAttempt
+from sbam_api.builds.models import CodeAttempt, GateResult
 from sbam_api.db.repository import TenantScopedRepository
 
 
@@ -30,3 +30,23 @@ class CodeAttemptRepository(TenantScopedRepository[CodeAttempt]):
         if found is not None:
             return found
         return self.add(CodeAttempt(**values))
+
+
+class GateResultRepository(TenantScopedRepository[GateResult]):
+    model = GateResult
+
+    def find(self, code_attempt_id: uuid.UUID, gate: str, bundle_sha256: str) -> GateResult | None:
+        """The verdict on this exact bundle; another bundle's verdict is never returned."""
+        query = self._scoped().where(
+            GateResult.code_attempt_id == code_attempt_id,
+            GateResult.gate == gate,
+            GateResult.bundle_sha256 == bundle_sha256,
+        )
+        return self.session.scalars(query).one_or_none()
+
+    def record(self, values: dict[str, Any]) -> GateResult:
+        """Insert once per (attempt, gate, bundle); a retried activity gets the row it wrote."""
+        found = self.find(values["code_attempt_id"], values["gate"], values["bundle_sha256"])
+        if found is not None:
+            return found
+        return self.add(GateResult(**values))
