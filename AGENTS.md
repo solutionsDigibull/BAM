@@ -58,6 +58,8 @@ These targets are **created by the M0 issues with exactly these names**: #32 E1.
 - **Labels:** `phase:NN` (plan phase 00–16), `area:<module>`, `stream:*`, `priority:P0|P1|P2`,
   `size:S|M|L`, `type:story|spike|chore|epic`.
 - **Status labels:** `status:in-progress`, `status:in-review`. `blocked` = waiting on a dependency or decision.
+- **Closing:** PRs merge into `dev`, where GitHub's own `Closes #N` doesn't fire. `.github/workflows/close-issues.yml`
+  closes the issues a merged PR names with `Closes`/`Fixes`/`Resolves #N` and comments the PR. `Part of #N` closes nothing.
 - **Dependency** = the `Blocked by: #12 (`E1.6`), #15 …` line in the issue body, or GitHub's native
   "Blocked by" relationship. Treat both the same.
 - **Epics** (`type:epic`) are never implemented directly. They close when their sub-issues close.
