@@ -1,0 +1,14 @@
+# Nightly SBAM backup (E16.5): install on each VM as /etc/systemd/system/sbam-backup.service, with
+# sbam-backup.timer. Settings come from the environment file (BACKUP_ENV, BACKUP_HOST, BACKUP_USER,
+# BACKUP_CACERT, SBAM_ALERT_WEBHOOK_URL); secrets from /etc/sbam/secrets/backup_*.
+[Unit]
+Description=SBAM nightly backup (pg_dump + volume snapshots to the backup host)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/sbam/backup.env
+ExecStart=/opt/sbam/bin/backup.sh --env ${BACKUP_ENV}
+Nice=10
+IOSchedulingClass=idle

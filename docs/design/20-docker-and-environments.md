@@ -257,5 +257,11 @@ One Netbird network with groups: `dev-laptops`, `vm-dev`, `vm-staging`, `vm-prod
 
 Nightly `pg_dump` of all databases + snapshots of the `storage` and `cognee_data` volumes → off-host backup location (S3 later). Retention 30 days *(proposed)*. A monthly restore drill re-verifies all frozen manifest hashes.
 
+As built (E16.5, [runbook](../runbooks/backup-restore.md)):
+- **Nightly set:** `scripts/backup.sh` (systemd timer) dumps the 5 databases (`pg_dump -Fc`) and tars both volumes into one **set** with a sha256 manifest.
+- **Upload:** it goes to the environment's restic repository on a separate backup host (rest-server `--append-only --private-repos`, TLS over Netbird): encrypted, and the VM can't delete it. Every file is then re-hashed from the repository.
+- **All or nothing:** any failure fails the whole set, keeps the previous ones and alerts.
+- **Retention** (`--keep-within 30d --keep-last 1`) runs on the backup host only.
+
 ---
 [← §19](19-testing-strategy.md)   [Design index](README.md)

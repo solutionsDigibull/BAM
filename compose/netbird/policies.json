@@ -7,6 +7,7 @@
     "vm-staging": "staging VM",
     "vm-prod": "production VM(s)",
     "sandbox-host": "KVM server running CubeSandbox",
+    "backup-host": "off-host backup server (E16.5): restic rest-server, append-only for the VMs",
     "ci-deploy": "GitHub Actions deploy jobs (E16.4): ephemeral peers, one per job, from a reusable setup key"
   },
   "services": {
@@ -17,6 +18,7 @@
     "grafana": { "proto": "tcp", "port": 3002, "note": "GRAFANA_PORT, obs profile" },
     "langfuse": { "proto": "tcp", "port": 3001, "note": "LANGFUSE_PORT, obs profile" },
     "posthog": { "proto": "tcp", "port": 8010, "note": "POSTHOG_PORT, analytics profile" },
+    "backup": { "proto": "tcp", "port": 8000, "note": "restic rest-server on the backup host (compose/backup/compose.backup-host.yaml)" },
     "sandbox-api": { "proto": "tcp", "port": 3000, "note": "CubeSandbox API on the sandbox host. Port is the assumed default: confirm with the CubeSandbox install issue (#123) before applying" }
   },
   "ops_services": ["portal", "temporal-ui", "keycloak-admin", "grafana", "langfuse", "posthog"],
@@ -48,6 +50,20 @@
       "sources": ["vm-dev", "vm-staging", "vm-prod"],
       "destinations": ["sandbox-host"],
       "services": ["sandbox-api"]
+    },
+    {
+      "name": "vms-to-backup-host",
+      "description": "Each VM's nightly backup uploads to its own append-only repository. The backup host initiates nothing.",
+      "sources": ["vm-dev", "vm-staging", "vm-prod"],
+      "destinations": ["backup-host"],
+      "services": ["backup"]
+    },
+    {
+      "name": "platform-to-backup-host-ssh",
+      "description": "Platform developers administer the backup host (retention, restore keys).",
+      "sources": ["platform"],
+      "destinations": ["backup-host"],
+      "services": ["ssh"]
     },
     {
       "name": "ci-deploy-to-vms",

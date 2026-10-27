@@ -1,0 +1,11 @@
+# Runs sbam-backup.service every night; Persistent catches up a run missed while the VM was off.
+[Unit]
+Description=SBAM nightly backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

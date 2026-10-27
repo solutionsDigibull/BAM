@@ -545,6 +545,7 @@ def test_e16_3_t07_groups_workers_to_sandbox_and_platform_only_prod_ops() -> Non
         "vm-prod",
         "sandbox-host",
         "ci-deploy",
+        "backup-host",
     }
     for vm in ("vm-dev", "vm-staging", "vm-prod"):
         assert matrix.is_allowed(policy, vm, "sandbox-host", "sandbox-api")
