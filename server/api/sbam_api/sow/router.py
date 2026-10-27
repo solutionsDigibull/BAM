@@ -37,7 +37,7 @@ from sbam_contracts.sow_api import (
 from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.core.auth import CurrentUser, fde, project_access
-from sbam_api.core.conventions import validate_idempotency_key
+from sbam_api.core.conventions import content_disposition, validate_idempotency_key
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
@@ -207,7 +207,7 @@ def sow_citation_source(
         found.text.encode("utf-8"),
         media_type="text/markdown; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="{found.filename}"',
+            "Content-Disposition": content_disposition(found.filename),
             "X-Content-Type-Options": "nosniff",
         },
     )

@@ -8,6 +8,7 @@ from sbam_api.core.conventions import (
     InMemoryIdempotencyStore,
     body_hash,
     check_if_match,
+    content_disposition,
     decode_cursor,
     encode_cursor,
     etag,
@@ -157,3 +158,19 @@ def test_e0_7_not_found_is_identical_for_every_cause() -> None:
     other_tenant = not_found().to_problem("c2").model_dump(exclude={"correlation_id"})
     assert missing == other_tenant
     assert missing["status"] == 404 and missing["code"] == ErrorCode.NOT_FOUND
+
+
+@pytest.mark.parametrize(
+    ("name", "header"),
+    [
+        ("plain.xlsx", "filename=\"plain.xlsx\"; filename*=UTF-8''plain.xlsx"),
+        ('a"b.md', "filename=\"a_b.md\"; filename*=UTF-8''a%22b.md"),
+        ("x\r\ny.md", "filename=\"x__y.md\"; filename*=UTF-8''x%0D%0Ay.md"),
+        ("back\\slash.md", "filename=\"back_slash.md\"; filename*=UTF-8''back%5Cslash.md"),
+        ("résumé.md", "filename=\"resume.md\"; filename*=UTF-8''r%C3%A9sum%C3%A9.md"),
+        ("", "filename=\"download\"; filename*=UTF-8''download"),
+    ],
+)
+def test_e15_7_content_disposition_is_rfc6266(name: str, header: str) -> None:
+    assert content_disposition(name) == f"attachment; {header}"
+    header.encode("latin-1")  # always a valid HTTP header value

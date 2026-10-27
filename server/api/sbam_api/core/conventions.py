@@ -11,9 +11,11 @@ import hmac
 import json
 import re
 import time
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
+from urllib.parse import quote
 
 from sbam_contracts.api import (
     PAGE_LIMIT_DEFAULT,
@@ -68,6 +70,23 @@ def _invalid(path: str, message: str, code: ErrorCode = ErrorCode.VALIDATION_ERR
 
 
 # --- Concurrency: ETag = row_version, writes need If-Match ---------------------------------
+
+
+def content_disposition(filename: str) -> str:
+    """`attachment` with a stored (user-supplied) file name, RFC 6266 / RFC 5987 (E15.7).
+
+    The quoted `filename` is a plain-ASCII fallback: accents folded, anything else (quotes,
+    backslashes, control characters, other scripts) replaced by `_`, so it can never break out of
+    the quotes. `filename*` carries the real name percent-encoded as UTF-8, which browsers prefer.
+    """
+    kept = []
+    for ch in unicodedata.normalize("NFKD", filename):
+        if unicodedata.combining(ch):
+            continue  # the accent of a folded letter: "é" -> "e"
+        kept.append(ch if ch.isascii() and ch.isprintable() and ch not in '"\\' else "_")
+    ascii_name = "".join(kept).strip() or "download"
+    real = quote(filename.strip() or ascii_name, safe="")
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{real}"
 
 
 def etag(row_version: int) -> str:
