@@ -36,6 +36,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
+from sbam_contracts.api import ErrorCode
 from sbam_contracts.documents import ScanStatus
 from sbam_contracts.masters import MasterStatus, MasterType, ReadmeTab, SourceKind
 
@@ -145,11 +146,25 @@ class InclusionReport(BaseModel):
     warnings: list[str]
 
 
+class SnapshotDocument(BaseModel):
+    """One parsed master document pinned by a snapshot (E3.8b): the file's content hash and the key
+    of its `doc.md`, so a build reads exactly what was pinned. The Admin attached it as context for
+    one master; it never counts as an FDE source (C3)."""
+
+    document_id: UUID
+    title: str
+    master_type: MasterType
+    intent_class: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")  # of the file
+    derived_md_key: str  # `<tenant>/<project>/derived/<sha256>`
+
+
 class MastersSnapshot(BaseModel):
     id: UUID
     tenant_id: UUID
     project_id: UUID
     entries: list[SnapshotEntry]
+    documents: list[SnapshotDocument] = Field(default_factory=list)  # parsed master documents
     sha256: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     created_at: datetime
 
@@ -275,6 +290,7 @@ class MasterDocumentOut(BaseModel):
     size: int
     scan_status: ScanStatus | None = None  # None while the scan has not finished
     parse_status: ParseStatus
+    parse_code: ErrorCode | None = None  # why a FAILED document failed (E3.8b)
     created_at: datetime
 
 
@@ -301,10 +317,20 @@ def schemas() -> dict[str, dict[str, Any]]:
     return {stem: contract_schema(model, f"masters/{stem}") for stem, model in models.items()}
 
 
-def snapshot_document(project_id: UUID, entries: list[SnapshotEntry]) -> dict[str, Any]:
-    """What `MastersSnapshot.sha256` hashes: the project and its pinned entries, sorted."""
+def snapshot_document(
+    project_id: UUID,
+    entries: list[SnapshotEntry],
+    documents: list[SnapshotDocument] | None = None,
+) -> dict[str, Any]:
+    """What `MastersSnapshot.sha256` hashes: the project, its pinned entries and its pinned master
+    documents, sorted. The `documents` key is only there when there are some, so a snapshot taken
+    before master documents were pinned keeps the hash it was given."""
     ordered = sorted(entries, key=lambda e: (e.master_type.value, e.stable_id, str(e.entry_id)))
-    return {
+    out: dict[str, Any] = {
         "project_id": str(project_id),
         "entries": [e.model_dump(mode="json") for e in ordered],
     }
+    if documents:
+        pinned = sorted(documents, key=lambda d: str(d.document_id))
+        out["documents"] = [d.model_dump(mode="json") for d in pinned]
+    return out

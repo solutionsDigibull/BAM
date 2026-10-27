@@ -25,6 +25,7 @@ from sbam_contracts.masters_api import (
     InclusionReport,
     MasterEntryCreate,
     MasterVersionCreate,
+    SnapshotDocument,
     SnapshotEntry,
 )
 from sbam_contracts.masters_workbook import PAYLOAD_MODELS, ROW_LABEL_PREFIX, TOOLING_LABEL
@@ -344,7 +345,8 @@ def export_master_context(
     if project is None:
         raise not_found()
     entries = [SnapshotEntry.model_validate(e) for e in snapshot.entries]
-    if snapshot_hash(project_id, entries) != snapshot.sha256:
+    pinned_documents = [SnapshotDocument.model_validate(d) for d in snapshot.documents or []]
+    if snapshot_hash(project_id, entries, pinned_documents) != snapshot.sha256:
         raise ApiError(
             409, ErrorCode.CONFLICT, "Snapshot failed its integrity check", "Take a new snapshot."
         )

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:c5f839cbed4b343beceb8b88398ac0477e145cb87e6e71d4bc5bbc057bf2af11
+// source-sha256:3924bbaf9d861d0462c8741ee38b34363b301fab8199904118fd6690465c79e5
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -2744,6 +2744,7 @@ export interface MastersSnapshot {
   tenant_id: string;
   project_id: string;
   entries: SnapshotEntry[];
+  documents?: SnapshotDocument[];
   /**
    * Pattern: `^sha256:[0-9a-f]{64}$`
    */
@@ -2765,6 +2766,25 @@ export interface SnapshotEntry {
   version: number;
   status: MasterStatus;
   restricted?: boolean;
+}
+/**
+ * One parsed master document pinned by a snapshot (E3.8b): the file's content hash and the key
+ * of its `doc.md`, so a build reads exactly what was pinned. The Admin attached it as context for
+ * one master; it never counts as an FDE source (C3).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SnapshotDocument".
+ */
+export interface SnapshotDocument {
+  document_id: string;
+  title: string;
+  master_type: MasterType;
+  intent_class: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+  derived_md_key: string;
 }
 /**
  * What went into masters.jsonl and what didn't; included + excluded = snapshot size.
@@ -2903,6 +2923,7 @@ export interface MasterDocumentOut {
   size: number;
   scan_status?: ScanStatus | null;
   parse_status: ParseStatus;
+  parse_code?: ErrorCode | null;
   created_at: string;
 }
 /**

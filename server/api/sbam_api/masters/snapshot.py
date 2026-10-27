@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from sbam_contracts.canonical import sha256_of
 from sbam_contracts.masters import MasterStatus, MasterType, is_restricted
-from sbam_contracts.masters_api import SnapshotEntry, snapshot_document
+from sbam_contracts.masters_api import SnapshotDocument, SnapshotEntry, snapshot_document
 from sbam_contracts.masters_workbook import PAYLOAD_MODELS
 
 # Never part of an authoritative context, whoever consumes the snapshot (O-24).
@@ -65,5 +65,9 @@ def resolve(project_id: uuid.UUID, candidates: Iterable[Candidate]) -> list[Snap
     return sorted(pinned, key=lambda e: (e.master_type.value, e.stable_id))
 
 
-def snapshot_hash(project_id: uuid.UUID, entries: list[SnapshotEntry]) -> str:
-    return sha256_of(snapshot_document(project_id, entries))
+def snapshot_hash(
+    project_id: uuid.UUID,
+    entries: list[SnapshotEntry],
+    documents: list[SnapshotDocument] | None = None,
+) -> str:
+    return sha256_of(snapshot_document(project_id, entries, documents))
