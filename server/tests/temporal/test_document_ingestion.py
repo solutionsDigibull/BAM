@@ -5,6 +5,7 @@ The activities are fakes with the real names; the real ones are in tests/unit.
 
 import asyncio
 import json
+import os
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -65,12 +66,20 @@ class Fakes:
     ocr_calls: int = 0
     ocr_times: list[datetime] = field(default_factory=list)
     ocr_gave_up: list[ErrorCode] = field(default_factory=list)
+    # E4.6: the child documents `register_attachments` makes for the first version it is asked
+    # about (a child's own call finds none), which children's scan fails for good, and the calls.
+    child_ids: list[uuid.UUID] = field(default_factory=list)
+    failing_children: set[uuid.UUID] = field(default_factory=set)
+    register_calls: list[uuid.UUID] = field(default_factory=list)
+    finish_calls: int = 0
 
 
 def activities(fakes: Fakes) -> list[Callable[..., Any]]:
     @activity.defn(name="scan_clamav")
     async def scan_clamav(inp: StageRef) -> ScanOutcome:
         fakes.scan_times.append(activity.info().started_time)  # test-server time, skipped ahead
+        if inp.ref_id in fakes.failing_children:
+            raise ApplicationError("gone", type="NotFound", non_retryable=True)
         if len(fakes.scan_times) <= fakes.fail_first:
             raise fakes.error
         return ScanOutcome(document_version_id=inp.ref_id, verdict=fakes.verdict)
@@ -129,7 +138,21 @@ def activities(fakes: Fakes) -> list[Callable[..., Any]]:
         fakes.ocr_gave_up.append(failure.code)
         return ParseOutcome(document_version_id=failure.ref.ref_id, parsed=False, code=failure.code)
 
+    @activity.defn(name="register_attachments")
+    async def register_attachments(inp: StageRef) -> IdsResult:
+        fakes.register_calls.append(inp.ref_id)
+        if len(fakes.register_calls) > 1:  # a child e-mail is not asked again in these tests
+            return IdsResult(ids=[])
+        return IdsResult(ids=fakes.child_ids)
+
+    @activity.defn(name="finish_attachments")
+    async def finish_attachments(inp: StageRef) -> IdsResult:
+        fakes.finish_calls += 1
+        return IdsResult(ids=fakes.child_ids)
+
     return [
+        register_attachments,
+        finish_attachments,
         scan_clamav,
         mark_scan_failed,
         detect_type,
@@ -465,3 +488,70 @@ def test_e4_8_an_execution_started_before_ocr_existed_still_replays() -> None:
     )
     replayer = Replayer(workflows=[DocumentIngestion], data_converter=pydantic_data_converter)
     asyncio.run(replayer.replay_workflow(history))
+
+
+# --- E4.6: attachments of a parsed e-mail ---------------------------------------------------------
+
+
+def test_e4_6_every_attachment_gets_its_own_ingestion_and_the_parent_is_handed_on() -> None:
+    fakes = Fakes(child_ids=[uuid7(), uuid7()])
+    inp = stage_ref()
+    assert execute(fakes, inp) == [inp.ref_id]
+    assert fakes.register_calls[0] == inp.ref_id and fakes.finish_calls == 1
+    assert len(fakes.scan_times) == 3  # the e-mail and its two attachments are each scanned
+    assert fakes.detect_calls == 3 and fakes.parse_calls == 3
+
+
+def test_e4_6_a_child_that_fails_does_not_fail_the_parent() -> None:
+    first, second = uuid7(), uuid7()
+    fakes = Fakes(child_ids=[first, second], failing_children={first})
+    inp = stage_ref()
+    assert execute(fakes, inp) == [inp.ref_id]  # the first child's workflow failed: still handed on
+    assert fakes.finish_calls == 1  # and what became of the children is still written
+    assert fakes.parse_calls == 2  # the e-mail and the second child; the first never got that far
+
+
+def test_e4_6_an_email_without_attachments_runs_no_child_and_no_finish() -> None:
+    fakes = Fakes()
+    inp = stage_ref()
+    assert execute(fakes, inp) == [inp.ref_id]
+    assert len(fakes.register_calls) == 1 and fakes.finish_calls == 0
+    assert len(fakes.scan_times) == 1
+
+
+@pytest.mark.parametrize("parse", ["failed"])
+def test_e4_6_attachments_are_only_looked_for_after_a_successful_parse(parse: str) -> None:
+    fakes = Fakes(parse=parse, child_ids=[uuid7(), uuid7()])
+    assert execute(fakes, stage_ref()) == []
+    assert fakes.register_calls == []
+
+
+def test_e4_6_an_execution_started_before_attachments_existed_still_replays() -> None:
+    """The same recorded history as `before_e4_8` (parse is the last step): the `e4-6-attachments`
+    patch is not in it, so the replay skips the new step."""
+    path = Path(__file__).parent / "histories" / "document_ingestion_before_e4_8.json"
+    history = WorkflowHistory.from_json(
+        f"ingest-{uuid.UUID(int=1)}", json.loads(path.read_text("utf-8"))
+    )
+    replayer = Replayer(workflows=[DocumentIngestion], data_converter=pydantic_data_converter)
+    asyncio.run(replayer.replay_workflow(history))
+
+
+@pytest.mark.skipif(not os.environ.get("RECORD_HISTORY"), reason="RECORD_HISTORY=1 to re-record")
+def test_record_document_ingestion_with_attachments_history() -> None:  # pragma: no cover
+    """Maintenance helper (`make record-histories`): an e-mail with one attachment, the path of
+    the `e4-6-attachments` patch. `test_replay_histories.py` replays it."""
+    fakes = Fakes(child_ids=[uuid.UUID(int=2)])
+    inp = stage_ref()
+
+    async def scenario() -> dict[str, Any]:
+        async with running(fakes) as env:
+            handle = await env.client.start_workflow(
+                DocumentIngestion.run, inp, id=f"ingest-{inp.ref_id}", task_queue=QUEUE
+            )
+            await handle.result()
+            data: dict[str, Any] = json.loads((await handle.fetch_history()).to_json())
+            return data
+
+    out = Path(__file__).parent / "histories" / "document_ingestion_with_attachments.json"
+    out.write_text(json.dumps(asyncio.run(scenario()), indent=1) + "\n", encoding="utf-8")
