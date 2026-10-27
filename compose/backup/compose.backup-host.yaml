@@ -1,0 +1,34 @@
+# Backup host (E16.5, TD §20.6, docs/runbooks/backup-restore.md): NOT part of the SBAM stack, it runs on
+# a separate machine (off-host). One restic rest-server holds one encrypted restic repository per
+# environment (sbam-dev, sbam-staging, sbam-prod: the login name is the repo path, --private-repos).
+#   --append-only  a VM's login can add snapshots and read them, but never forget, prune or delete
+#                  (E16.5-T07). Retention runs here only: scripts/backup-prune.sh.
+#   TLS            the VMs reach it over Netbird (group backup-host, compose/netbird/policies.json).
+#   docker compose -f compose/backup/compose.backup-host.yaml up -d
+name: sbam-backup
+
+services:
+  rest-server:
+    image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
+    command:
+      - rest-server
+      - --path=/data
+      - --listen=:8000
+      - --append-only
+      - --private-repos
+      - --htpasswd-file=/etc/rest-server/htpasswd # htpasswd -B: one user per environment
+      - --tls
+      - --tls-cert=/etc/rest-server/tls/cert.pem
+      - --tls-key=/etc/rest-server/tls/key.pem
+    environment:
+      DISABLE_AUTHENTICATION: "" # never: every environment logs in
+    volumes:
+      - ${BACKUP_DATA_DIR:-/srv/sbam-backup}:/data
+      - ${BACKUP_CONFIG_DIR:-/etc/sbam-backup}:/etc/rest-server:ro
+    # The Netbird address of this host only: not reachable from the internet.
+    ports: ["${BACKUP_BIND:?set the backup host's Netbird address}:8000:8000"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    restart: unless-stopped

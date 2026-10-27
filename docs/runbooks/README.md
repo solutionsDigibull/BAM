@@ -4,5 +4,6 @@ Operational procedures, written by issue E16.6. Planned runbooks: stuck Temporal
 
 - [Prerequisites: access and hosts](prerequisites.md) (E0.14): GHCR, OpenRouter key, KVM host, dev VM, Netbird, plus the team access checklist.
 - [Deploy and roll back a release](deploy.md) (E16.4): `scripts/deploy.sh`, the release folders and log, the rollback drill.
+- [Backups and restore](backup-restore.md) (E16.5): nightly encrypted, append-only backups, the backup host, failed backups, the restore drill.
 
 Runbook structure: **Symptoms** · **Impact** · **Diagnosis** (commands, dashboards) · **Fix** · **Verification** · **Escalation**.
