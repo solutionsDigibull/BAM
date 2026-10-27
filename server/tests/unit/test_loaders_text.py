@@ -50,13 +50,14 @@ def valid(parsed: Parsed) -> ParsedDocument:
 # --- the registry ---------------------------------------------------------------------------------
 
 
-def test_e4_5_the_registry_has_every_loader_but_the_archives_yet() -> None:
+def test_e4_5_the_registry_has_a_loader_for_every_allowed_type() -> None:
     assert set(LOADERS) == {
         *("md", "txt", "csv", "pdf", "docx", "xlsx", "png", "jpg", "jpeg", "tiff"),
         *("eml", "msg", "json", "xml", "yaml", "yml", "py", "sql", "js", "go", "cpp"),  # E4.6
+        *("zip", "tar.gz"),  # E4.7
     }
-    for pending in ("zip", "tar.gz", "bmp", "gif", None, ""):
-        assert loader_for(pending) is None  # archives: a later issue
+    for pending in ("bmp", "gif", "tgz", None, ""):
+        assert loader_for(pending) is None  # not allowed types
 
 
 # --- Markdown -------------------------------------------------------------------------------------

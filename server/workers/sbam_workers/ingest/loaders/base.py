@@ -26,12 +26,14 @@ class ParseError(Exception):
 
 @dataclass(frozen=True)
 class Attachment:
-    """A file an e-mail carries (E4.6). The loader only finds it; the parse step does not store it.
-    It becomes a child document with its own scan and type check (later issue)."""
+    """A file an e-mail carries (E4.6) or a member of an archive (E4.7). The loader only finds it;
+    the parse step does not store it. It becomes a child document with its own scan and type
+    check. `path` is the member's path inside its archive (empty for an e-mail attachment)."""
 
     name: str
     content_type: str
     data: bytes
+    path: str = ""
 
 
 @dataclass

@@ -258,7 +258,7 @@ def test_e4_5_a_retry_after_a_failure_repeats_the_answer_and_notifies_once(h: Ha
 
 
 def test_e4_5_a_type_with_no_loader_yet_stays_parsing(h: Harness) -> None:
-    for kind in ("zip", "tar.gz"):
+    for kind in ("bmp", "gif"):
         ref = h.add(f"file.{kind}", b"anything", detected=kind)
         outcome = parse_version(h.deps, ref)
         assert (outcome.parsed, outcome.code, outcome.report) == (False, None, None)
@@ -374,3 +374,51 @@ def test_e4_6_a_structured_code_or_mail_file_is_parsed_and_stored(
     assert h.version(ref).state == "PARSED"
     md, doc = derived(h, ref)
     assert expect in md.decode() and doc.blocks
+
+
+@pytest.mark.parametrize(
+    ("name", "kind", "fixture"),
+    [("files.zip", "zip", "sample.zip"), ("files.tar.gz", "tar.gz", "sample.tar.gz")],
+)
+def test_e4_7_an_archive_is_parsed_and_its_report_lists_the_members(
+    h: Harness, name: str, kind: str, fixture: str
+) -> None:
+    ref = h.add(name, docs(fixture), detected=kind)
+    outcome = parse_version(h.deps, ref)
+    assert outcome.parsed and outcome.code is None
+    version = h.version(ref)
+    assert version.state == "PARSED"
+    md, doc = derived(h, ref)
+    assert "- rfq_summary.md (233 bytes)" in md.decode() and doc.blocks
+    assert version.parse_report is not None
+    assert version.parse_report["archive"] == {
+        "members_total": 2,
+        "accepted": 2,
+        "rejected": [],
+    }
+
+
+def test_e4_7_an_archive_with_nothing_to_take_is_parse_failed_empty(h: Harness) -> None:
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as archive:
+        archive.writestr("setup.exe", "MZ")
+    ref = h.add("files.zip", out.getvalue(), detected="zip")
+    outcome = parse_version(h.deps, ref)
+    assert not outcome.parsed and outcome.code == ErrorCode.EMPTY
+    assert h.version(ref).state == "PARSE_FAILED" and h.version(ref).parse_code == "EMPTY"
+
+
+def test_e4_7_a_zip_bomb_is_parse_failed_archive_limit(h: Harness) -> None:
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("zeros.md", b"\0" * (120 * 1024 * 1024))
+    ref = h.add("bomb.zip", out.getvalue(), detected="zip")
+    outcome = parse_version(h.deps, ref)
+    assert not outcome.parsed and outcome.code == ErrorCode.ARCHIVE_LIMIT
+    assert h.version(ref).state == "PARSE_FAILED" and h.version(ref).parse_code == "ARCHIVE_LIMIT"
