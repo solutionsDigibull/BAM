@@ -99,7 +99,8 @@ def test_e3_4_export_is_audited_and_named_after_the_tenant(h: ImportHarness) -> 
     res = export(h)
     disposition = res.headers["content-disposition"]
     assert disposition.startswith('attachment; filename="BAM_masters_Tenant-A_')
-    assert disposition.endswith('.xlsx"') and res.headers["cache-control"] == "no-store"
+    assert ".xlsx\"; filename*=UTF-8''BAM_masters_Tenant-A_" in disposition  # RFC 6266, E15.7
+    assert disposition.endswith(".xlsx") and res.headers["cache-control"] == "no-store"
     [audit] = h.actions("MASTERS_EXPORTED")
     assert (
         audit.after is not None

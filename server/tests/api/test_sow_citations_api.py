@@ -64,6 +64,28 @@ def test_e6_5_t05_source_serves_the_document_text_as_markdown(h: Harness) -> Non
     assert res.text == "Acme quotes cables. Scope: quoting only."
 
 
+@pytest.mark.parametrize(
+    ("title", "fallback", "real"),
+    [
+        ('Q3 "final" offer.pdf', "Q3--final--offer.md", "Q3--final--offer.md"),
+        ("Angebot über Kabel.pdf", "Angebot-uber-Kabel.md", "Angebot-%C3%BCber-Kabel.md"),
+        ("見積書.pdf", "___.md", "%E8%A6%8B%E7%A9%8D%E6%9B%B8.md"),
+    ],
+)
+def test_e15_7_source_filename_is_rfc6266_encoded(
+    h: Harness, title: str, fallback: str, real: str
+) -> None:
+    with h.sessions() as s:
+        doc_id = s.scalar(select(DocumentVersion.document_id).where(DocumentVersion.id == h.dvid))
+        s.execute(update(Document).where(Document.id == doc_id).values(title=title))
+        s.commit()
+    res = h.cite(h.chunk, source=True)
+    assert res.status_code == 200, res.text  # a non-ASCII title is not a 500
+    header = res.headers["content-disposition"]
+    assert header == f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{real}"
+    assert header.count('"') == 2  # nothing breaks out of the quoted value
+
+
 def test_e6_5_an_entity_citation_gives_its_source_passage(h: Harness) -> None:
     dvid, entity = h.with_entity()
     body = h.cite(entity, version=2).json()

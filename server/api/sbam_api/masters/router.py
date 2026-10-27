@@ -30,7 +30,7 @@ from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
 from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser, admin
-from sbam_api.core.conventions import etag
+from sbam_api.core.conventions import content_disposition, etag
 from sbam_api.db.session import app_sessions
 from sbam_api.masters import documents, exporter, importer, models, service
 from sbam_api.storage.router import backend
@@ -137,7 +137,7 @@ def workbook_template(user: Admin) -> Response:
 
 def _xlsx(name: str, data: bytes) -> Response:
     headers = {
-        "Content-Disposition": f'attachment; filename="{name}"',
+        "Content-Disposition": content_disposition(name),
         "Cache-Control": "no-store",
     }
     return Response(content=data, media_type=exporter.XLSX, headers=headers)
