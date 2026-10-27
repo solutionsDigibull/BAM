@@ -296,6 +296,18 @@ def test_e4_4_another_tenants_version_gives_no_reason() -> None:
     assert "extension" not in row.body  # the lookup is tenant-scoped: it found nothing
 
 
+def test_e15_6_another_projects_version_of_the_same_tenant_gives_no_reason() -> None:
+    sessions, fde, project, _ = world()
+    other_project = add_project(sessions, TENANT, members=[], name="Other project")
+    version = rejected_version(sessions, other_project, "TYPE_MISMATCH")
+    payload = {"project_id": str(project), "entity_id": str(version)}
+    InAppSink(sessions).send(
+        OutboxItem(uuid.uuid4(), TENANT, "document_version.type_rejected", payload)
+    )
+    [row] = rows(sessions, fde)
+    assert "extension" not in row.body  # the lookup is project-scoped too: it found nothing
+
+
 def test_e4_4_a_parse_failure_is_not_looked_up_for_a_reason() -> None:
     sessions, fde, project, _ = world()
     version = rejected_version(sessions, project, "TYPE_MISMATCH")
