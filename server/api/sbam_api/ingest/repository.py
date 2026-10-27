@@ -20,6 +20,11 @@ _INACTIVE = (S.REJECTED.value, S.DELETED.value, S.PURGED.value)
 class DocumentRepository(TenantScopedRepository[Document]):
     model = Document
 
+    def children(self, parent_document_id: uuid.UUID) -> list[Document]:
+        """The documents made from an e-mail's attachments or an archive's members."""
+        query = self._scoped().where(Document.parent_document_id == parent_document_id)
+        return list(self.session.scalars(query.order_by(Document.id)))
+
     def get_for_update(self, id: uuid.UUID) -> Document | None:
         """Like `get(include_deleted=True)`, with the row locked: delete, restore and purge of the
         same document run one after another, never at the same time."""

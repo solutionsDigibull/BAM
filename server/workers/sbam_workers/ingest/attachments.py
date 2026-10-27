@@ -14,6 +14,11 @@ What became of each attachment is written to the parent's `parse_report.attachme
 is derived from the parent's version and the attachment (position and content), so a retried
 activity finds the children it created.
 
+The same two activities serve archives (E4.7): the members a `.zip` or `.tar.gz` loader accepted
+become child documents (with `archive_path`), and the archive's `parse_report.archive` says how many
+were taken and which were not (the loader's refusals, plus NESTED_ARCHIVE when the archive is itself
+a child and FILE_LIMIT_REACHED past the 20 files).
+
 `finish_attachments_for` runs when the children's workflows have ended and adds a warning to the
 parent's report for each child that was rejected, failed to parse or could not be scanned. The
 parent's state is never changed by a child.
@@ -27,6 +32,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 import sbam_api.ingest.models  # noqa: F401 - registers DocumentVersion for the state machine
 from sbam_api.audit.repository import record
@@ -37,13 +43,16 @@ from sbam_api.state_machine import apply_create
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.storage.factory import make_backend
+from sbam_contracts.api import ErrorCode
 from sbam_contracts.documents import (
     MAX_ACTIVE_FILES,
     MAX_ATTACHMENT_DEPTH,
     MAX_FILE_BYTES,
+    ArchiveReport,
     AttachmentOutcome,
     AttachmentReport,
     ParseReport,
+    RejectedMember,
 )
 from sbam_contracts.pipeline import IdsResult, StageRef
 from sbam_contracts.runs import TaskQueue
@@ -55,7 +64,8 @@ from temporalio.exceptions import ApplicationError
 
 from sbam_workers import mirror
 from sbam_workers.ingest.guard import require_clean
-from sbam_workers.ingest.loaders import Attachment, loader_for, no_heartbeat
+from sbam_workers.ingest.loaders import Attachment, ParseError, loader_for, no_heartbeat
+from sbam_workers.ingest.loaders.archive import shown
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
 
@@ -63,7 +73,10 @@ log = logging.getLogger("sbam_workers.ingest.attachments")
 
 NOT_FOUND = "NotFound"  # the version or its file is gone: retrying cannot help
 MAIL_TYPES = frozenset({"eml", "msg"})
-_RESULT = "Attachment "  # the warnings of `finish_attachments`; the loader's start with lower case
+ARCHIVE_TYPES = frozenset({"zip", "tar.gz"})
+# The warnings of `finish_attachments` start with these; the loaders' start with lower case.
+_RESULT = "Attachment "
+_MEMBER = "Member "
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -74,9 +87,11 @@ class AttachmentDeps:
 
 
 def child_id(parent_version: uuid.UUID, position: int, attachment: Attachment) -> uuid.UUID:
-    """The id of the child version for this attachment of this e-mail (stable across retries)."""
+    """The id of the child version for this attachment (or archive member) of this parent, stable
+    across retries. An e-mail attachment keeps the id it has always had."""
     digest = hashlib.sha256(attachment.data).hexdigest()
-    return uuid.uuid5(parent_version, f"{position}:{digest}")
+    key = f"{position}:{attachment.path}:{digest}" if attachment.path else f"{position}:{digest}"
+    return uuid.uuid5(parent_version, key)
 
 
 def safe_name(name: str, position: int) -> str:
@@ -86,15 +101,15 @@ def safe_name(name: str, position: int) -> str:
 
 
 def register_attachments_for(deps: AttachmentDeps, inp: StageRef) -> IdsResult:
-    """The ids of the child versions to ingest (new and already existing), in the e-mail's order.
-    Empty for a version that is not a PARSED e-mail."""
+    """The ids of the child versions to ingest (new and already existing), in the parent's order.
+    Empty for a version that is not a PARSED e-mail or archive."""
     ctx = TenantContext(inp.tenant_id, inp.project_id)
     with deps.sessions() as session:
         parent = DocumentVersionRepository(session, ctx).get(inp.ref_id)
         if parent is None:
             raise ApplicationError("document version not found", type=NOT_FOUND, non_retryable=True)
         require_clean(parent)
-        if parent.state != S.PARSED.value or parent.detected_type not in MAIL_TYPES:
+        if parent.state != S.PARSED.value or parent.detected_type not in MAIL_TYPES | ARCHIVE_TYPES:
             return IdsResult(ids=[])
         key, kind = parent.storage_key, parent.detected_type
     try:
@@ -106,18 +121,29 @@ def register_attachments_for(deps: AttachmentDeps, inp: StageRef) -> IdsResult:
     loader = loader_for(kind)
     if loader is None:
         return IdsResult(ids=[])
-    attachments = loader(data, no_heartbeat).attachments  # the same bytes parsed before
-    if not attachments:
+    try:
+        parsed = loader(data, no_heartbeat)  # the same bytes parsed before
+    except ParseError:
         return IdsResult(ids=[])
-    return _register(deps, ctx, inp, attachments)
+    if not parsed.attachments:
+        return IdsResult(ids=[])
+    archive = parsed.report.archive if kind in ARCHIVE_TYPES else None
+    return _register(deps, ctx, inp, parsed.attachments, archive)
 
 
 def _register(
-    deps: AttachmentDeps, ctx: TenantContext, inp: StageRef, attachments: list[Attachment]
+    deps: AttachmentDeps,
+    ctx: TenantContext,
+    inp: StageRef,
+    attachments: list[Attachment],
+    archive: ArchiveReport | None,
 ) -> IdsResult:
+    """Make the child documents. `archive` is the loader's report when the parent is an archive:
+    its members then go to `ParseReport.archive`, an e-mail's to `ParseReport.attachments`."""
     scope = StorageScope(inp.tenant_id, inp.project_id)
     ids: list[uuid.UUID] = []
     reports: list[AttachmentReport] = []
+    refused: list[RejectedMember] = list(archive.rejected) if archive else []
     with deps.sessions() as session:
         versions = DocumentVersionRepository(session, ctx)
         documents = DocumentRepository(session, ctx)
@@ -125,7 +151,7 @@ def _register(
         parent_doc = documents.get(parent.document_id) if parent else None
         if parent is None or parent_doc is None:
             raise ApplicationError("document not found", type=NOT_FOUND, non_retryable=True)
-        depth = 1 if parent_doc.parent_document_id is not None else 0  # the e-mail's own depth
+        depth = 1 if parent_doc.parent_document_id is not None else 0  # the parent's own depth
         for position, attachment in enumerate(attachments):
             name = safe_name(attachment.name, position)
             base = AttachmentReport(
@@ -136,16 +162,20 @@ def _register(
             )
             vid = child_id(parent.id, position, attachment)
             existing = versions.get(vid)
+            where = shown(attachment.path or name)
             if existing is not None:  # a retry: the child was made the first time
                 ids.append(vid)
                 reports.append(base.model_copy(update={"document_id": existing.document_id}))
             elif depth + 1 > MAX_ATTACHMENT_DEPTH:
                 reports.append(base.model_copy(update={"outcome": AttachmentOutcome.TOO_DEEP}))
+                refused.append(RejectedMember(path=where, code=ErrorCode.NESTED_ARCHIVE))
             elif len(attachment.data) > MAX_FILE_BYTES:
                 reports.append(base.model_copy(update={"outcome": AttachmentOutcome.TOO_LARGE}))
+                refused.append(RejectedMember(path=where, code=ErrorCode.ARCHIVE_LIMIT))
             elif versions.active_count() >= MAX_ACTIVE_FILES:
                 outcome = AttachmentOutcome.FILE_LIMIT_REACHED
                 reports.append(base.model_copy(update={"outcome": outcome}))
+                refused.append(RejectedMember(path=where, code=ErrorCode.FILE_LIMIT_REACHED))
             else:
                 stored = deps.storage.put(
                     io.BytesIO(attachment.data),
@@ -158,6 +188,7 @@ def _register(
                     Document(
                         title=name,
                         parent_document_id=parent_doc.id,
+                        archive_path=attachment.path[:1024] or None,
                         created_by=parent_doc.created_by,
                     )
                 )
@@ -190,17 +221,24 @@ def _register(
                     correlation_id=inp.correlation_id,
                     after={"parent": str(parent.id), "size": stored.size},
                 )
-                session.flush()  # the next attachment counts this one toward the 20 files
+                session.flush()  # the next one counts this one toward the 20 files
                 ids.append(vid)
                 reports.append(base.model_copy(update={"document_id": document.id}))
-        _write_report(session, ctx, parent, reports, [])
+        if archive is not None:
+            members = ArchiveReport(
+                members_total=archive.members_total, accepted=len(ids), rejected=refused
+            )
+            _write_report(session, ctx, parent, {"archive": members}, [])
+        else:
+            _write_report(session, ctx, parent, {"attachments": reports}, [])
         session.commit()
     return IdsResult(ids=ids)
 
 
 def finish_attachments_for(deps: AttachmentDeps, inp: StageRef) -> IdsResult:
     """Once the children have been ingested: one warning on the parent's report for each child that
-    did not end PARSED. Idempotent: the warnings of an earlier run are replaced."""
+    did not end PARSED, and for each attachment or member that was not added. Idempotent: the
+    warnings of an earlier run are replaced."""
     ctx = TenantContext(inp.tenant_id, inp.project_id)
     with deps.sessions() as session:
         versions = DocumentVersionRepository(session, ctx)
@@ -215,10 +253,19 @@ def finish_attachments_for(deps: AttachmentDeps, inp: StageRef) -> IdsResult:
                 child = versions.latest_for_document(item.document_id)
                 if child is not None:
                     children.append(child.id)
-                    warnings.extend(_problem(item.name, child))
+                    warnings.extend(_problem(_RESULT, item.name, child))
             elif item.outcome is not AttachmentOutcome.REGISTERED:
                 warnings.append(f"{_RESULT}{item.name!r} was not added: {_WHY[item.outcome]}")
-        _write_report(session, ctx, parent, report.attachments, warnings)
+        if report.archive is not None:
+            for member in report.archive.rejected:
+                warnings.append(f"{_MEMBER}{member.path!r} was not taken: {member.code.value}")
+            for document in DocumentRepository(session, ctx).children(parent.document_id):
+                child = versions.latest_for_document(document.id)
+                if child is not None:
+                    children.append(child.id)
+                    label = document.archive_path or document.title
+                    warnings.extend(_problem(_MEMBER, label, child))
+        _write_report(session, ctx, parent, {}, warnings)
         session.commit()
     return IdsResult(ids=children)
 
@@ -230,13 +277,13 @@ _WHY = {
 }
 
 
-def _problem(name: str, child: DocumentVersion) -> list[str]:
+def _problem(prefix: str, name: str, child: DocumentVersion) -> list[str]:
     if child.state == S.REJECTED.value:
-        return [f"{_RESULT}{name!r} was rejected: {child.reject_code or 'REJECTED'}"]
+        return [f"{prefix}{name!r} was rejected: {child.reject_code or 'REJECTED'}"]
     if child.state == S.PARSE_FAILED.value:
-        return [f"{_RESULT}{name!r} could not be read: {child.parse_code or 'PARSE_ERROR'}"]
+        return [f"{prefix}{name!r} could not be read: {child.parse_code or 'PARSE_ERROR'}"]
     if child.state == S.SCAN_FAILED.value:
-        return [f"{_RESULT}{name!r} could not be scanned"]
+        return [f"{prefix}{name!r} could not be scanned"]
     return []
 
 
@@ -244,16 +291,14 @@ def _write_report(
     session: Session,
     ctx: TenantContext,
     parent: DocumentVersion,
-    attachments: list[AttachmentReport],
+    changes: dict[str, Any],
     result_warnings: list[str],
 ) -> None:
-    """The parent's report with its attachments, and with `result_warnings` in place of any earlier
-    ones from this step. The e-mail's other warnings are kept."""
+    """The parent's report with `changes` (its attachments, or its archive) and with
+    `result_warnings` in place of any earlier ones from this step. Its other warnings are kept."""
     current = ParseReport.model_validate(parent.parse_report or {})
-    kept = [w for w in current.warnings if not w.startswith(_RESULT)]
-    updated = current.model_copy(
-        update={"attachments": attachments, "warnings": [*kept, *result_warnings]}
-    )
+    kept = [w for w in current.warnings if not w.startswith((_RESULT, _MEMBER))]
+    updated = current.model_copy(update={**changes, "warnings": [*kept, *result_warnings]})
     parent.parse_report = updated.model_dump(mode="json")
     DocumentVersionRepository(session, ctx).update(parent, parent.row_version)
 
