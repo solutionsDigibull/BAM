@@ -16,6 +16,7 @@ import test_projects
 from clamd_fake import FakeClamd
 from fixtures import eicar_bytes, fixture_path
 from sbam_api.audit.models import AuditLog
+from sbam_api.filetypes.config import enabled_rows
 from sbam_api.masters import documents
 from sbam_api.masters.models import MasterDocument
 from sbam_api.projects.models import Project
@@ -148,6 +149,61 @@ def test_e3_8_the_route_follows_the_filetype_row(
 ) -> None:
     body = h.attach(name, data).json()
     assert (body["master_type"], body["filetype_row_label"]) == (master, row)
+
+
+# A plain fixture for every MVP-enabled extension (README §9 / filetypes.yaml). "Plain" means it
+# does not trigger the OpenAPI/Swagger/FastMCP spec override, so it routes to its extension's
+# default row; those overrides get their own cases in the route-follows-the-filetype-row test above.
+# `jpeg`/`yml` share their bytes with `jpg`/`yaml`; routing is by extension, so the name decides.
+_T09_FIXTURES: dict[str, str] = {
+    "cpp": "sample.cpp",
+    "csv": "sample.csv",
+    "docx": "sample.docx",
+    "eml": "with_attachment.eml",
+    "go": "sample.go",
+    "jpeg": "photo.jpg",
+    "jpg": "photo.jpg",
+    "js": "sample.js",
+    "json": "sample.json",
+    "md": "sample.md",
+    "msg": "with_attachment.msg",
+    "pdf": "text.pdf",
+    "png": "scan.png",
+    "py": "sample.py",
+    "sql": "sample.sql",
+    "tar.gz": "sample.tar.gz",
+    "tiff": "scan.tiff",
+    "txt": "sample.txt",
+    "xlsx": "multi_sheet.xlsx",
+    "xml": "sample.xml",
+    "yaml": "sample.yaml",
+    "yml": "sample.yaml",
+    "zip": "sample.zip",
+}
+
+
+def test_e3_8_t09_every_enabled_type_has_a_routing_case() -> None:
+    """The §9 routing coverage is complete: enable a new MVP type without adding a fixture case
+    here (and in `_T09_FIXTURES`) and this fails, so the coverage below can never silently drift."""
+    assert set(enabled_rows()) == set(
+        _T09_FIXTURES
+    ), "MVP-enabled extensions changed; update _T09_FIXTURES to match filetypes.yaml / README §9"
+
+
+@pytest.mark.parametrize("ext", sorted(_T09_FIXTURES))
+def test_e3_8_t09_routing_matches_the_filetype_config(h: DocsHarness, ext: str) -> None:
+    """One upload of every MVP-enabled type: master_type, intent_class and the filetype row label
+    all equal the §9 configuration (the frozen Filetype row joined with filetypes.yaml)."""
+    row = enabled_rows()[ext]
+    data = fixture_path("documents", _T09_FIXTURES[ext]).read_bytes()
+    res = h.attach(f"sample.{ext}", data)
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["filetype_row_label"] == row.row_label
+    assert body["master_type"] == row.config.default_route.upper()
+    assert body["intent_class"] == row.config.intent_class
+    assert body["route_source"] == "DEFAULT_BY_FILETYPE"
+    assert (body["scan_status"], body["parse_status"]) == ("CLEAN", "PENDING")
 
 
 def test_e3_8_the_admin_can_choose_the_master_at_upload(h: DocsHarness) -> None:
