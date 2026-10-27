@@ -1,4 +1,4 @@
-"""E4.6 against the Compose Postgres: migration 0026 and the parent of a document.
+"""E4.6 and E4.7 against the Compose Postgres: migrations 0026 and 0027, the parent of a document.
 
 A scratch database is created and dropped. The FK keeps a parent real; the CHECK keeps a document
 from being its own parent. Same tenant, same project and one level are the service's job."""
@@ -86,6 +86,46 @@ def test_e4_6_migration_0026_goes_down_and_up_again(engine: Engine) -> None:
                 text(
                     "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'sbam'"
                     " AND table_name = 'documents' AND column_name = 'parent_document_id'"
+                )
+            ).scalar()
+        assert gone == 0
+        command.upgrade(config(), "head")
+    insert(engine)  # the table works again
+
+
+def test_e4_7_a_member_document_keeps_its_path_in_the_archive(engine: Engine) -> None:
+    archive = insert(engine)
+    member = uuid.uuid4()
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO sbam.documents (id, tenant_id, project_id, title, parent_document_id,"
+                " archive_path, row_version, created_at, updated_at)"
+                " VALUES (:id, :tenant, :project, 'q3.csv', :parent, :path, 1, now(), now())"
+            ),
+            {
+                "id": member,
+                "tenant": TENANT,
+                "project": PROJECT,
+                "parent": archive,
+                "path": "reports/q3.csv",
+            },
+        )
+        found = conn.execute(
+            text("SELECT archive_path FROM sbam.documents WHERE id = :id"), {"id": member}
+        ).scalar()
+    assert found == "reports/q3.csv"
+
+
+def test_e4_7_migration_0027_goes_down_and_up_again(engine: Engine) -> None:
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("DATABASE_URL", url(database=DB))
+        command.downgrade(config(), "0026_document_parent")
+        with engine.connect() as conn:
+            gone = conn.execute(
+                text(
+                    "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'sbam'"
+                    " AND table_name = 'documents' AND column_name = 'archive_path'"
                 )
             ).scalar()
         assert gone == 0

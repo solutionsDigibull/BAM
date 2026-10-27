@@ -43,6 +43,8 @@ class Document(ProjectOwned, Base):
     parent_document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("sbam.documents.id"), index=True
     )
+    # E4.7: the member's path inside the parent archive; NULL for an upload or an attachment.
+    archive_path: Mapped[str | None] = mapped_column(String(1024))
     # Soft delete (E4.9): `deleted_at` + `deleted_by` say when and by whom, `purge_after` is
     # deleted_at + 90 days, when the daily PurgeDeleted job removes the stored bytes.
     deleted_by: Mapped[str | None] = mapped_column(String(255))

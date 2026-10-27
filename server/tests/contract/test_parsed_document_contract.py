@@ -122,7 +122,8 @@ def test_e4_5_the_report_defaults_to_nothing_found() -> None:
         "ocr_needed_pages": [],
         "ocr_pages": [],
         "unreadable_pages": [],
-        "attachments": [],  # E4.6
+        "attachments": [],
+        "archive": None,
     }
     with pytest.raises(ValidationError):
         ParseReport(pages=-1)

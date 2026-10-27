@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:4dd424f48cdc0e32beb0047a66f335668d8c782457e37122437c4182b5db5bbe
+// source-sha256:c5f839cbed4b343beceb8b88398ac0477e145cb87e6e71d4bc5bbc057bf2af11
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -47,6 +47,7 @@ export type ErrorCode =
   | "INVALID_ENCODING"
   | "NESTED_ARCHIVE"
   | "ARCHIVE_LIMIT"
+  | "PATH_UNSAFE"
   | "HASH_MISMATCH"
   | "NO_DOCUMENTS"
   | "PARSE_ERROR"
@@ -2611,6 +2612,7 @@ export interface ParseReport {
   ocr_pages?: number[];
   unreadable_pages?: number[];
   attachments?: AttachmentReport[];
+  archive?: ArchiveReport | null;
 }
 /**
  * One attachment of a parsed e-mail, in `ParseReport.attachments` of the parent.
@@ -2624,6 +2626,29 @@ export interface AttachmentReport {
   size: number;
   outcome: AttachmentOutcome;
   document_id?: string | null;
+}
+/**
+ * What became of the members of a `.zip` or `.tar.gz`, in `ParseReport.archive` (E4.7). Each
+ * accepted member is a child document (`DocumentOut.archive_path` is its path in the archive).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ArchiveReport".
+ */
+export interface ArchiveReport {
+  members_total?: number;
+  accepted?: number;
+  rejected?: RejectedMember[];
+}
+/**
+ * An archive member that was not taken, and why: `PATH_UNSAFE`, `NESTED_ARCHIVE`, `ENCRYPTED`,
+ * `UNSUPPORTED_TYPE`, `ARCHIVE_LIMIT` or `FILE_LIMIT_REACHED`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RejectedMember".
+ */
+export interface RejectedMember {
+  path: string;
+  code: ErrorCode;
 }
 /**
  * Result of the `parse_document` activity. `code` is set when the version is PARSE_FAILED.
@@ -2908,6 +2933,7 @@ export interface DocumentOut {
   parse_code?: ErrorCode | null;
   parse_report?: ParseReport | null;
   parent_document_id?: string | null;
+  archive_path?: string | null;
 }
 /**
  * One deleted document that is due for purging (IDs only, like every workflow input).
