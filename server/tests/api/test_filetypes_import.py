@@ -160,3 +160,20 @@ def test_e3_13_versions_are_append_only(h: FiletypeHarness) -> None:
         with h.sessions() as s, pytest.raises(DatabaseError):
             s.execute(statement)
     assert len(h.versions()) == 1
+
+
+def test_e3_13_format_change_on_an_enabled_row_is_applied_with_a_warning(
+    h: FiletypeHarness,
+) -> None:
+    def reformat(book: Workbook) -> None:  # Filetype #1 (.cpp) is enabled for loading
+        book["Filetype"].cell(4, column(book, "Filetype", "File Format")).value = ".cc"
+
+    res = h.platform(workbook(reformat))
+    assert res.status_code == 200, res.text
+    [audit] = h.actions("FILETYPE_VERSION_IMPORTED")
+    assert audit.after is not None
+    assert audit.after["warnings"] == [
+        "Filetype #1 is enabled for loading and its file format changed"
+    ]
+    res = h.call("GET", "/admin/filetypes", h.root())
+    assert (res.json()[0]["file_format"], res.json()[0]["loader"]) == (".cc", "source-code")
