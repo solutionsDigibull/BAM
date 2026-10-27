@@ -12,8 +12,9 @@ Not registered yet, like `Assemble`: whoever wires the build stages (#107) regis
 `AstGate(...).run`; `stubs.ast_gate` stays registered meanwhile.
 """
 
+import ast
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 
 from sbam_api.builds.models import CodeAttemptStatus
 from sbam_api.builds.repository import CodeAttemptRepository, GateResultRepository
@@ -33,14 +34,23 @@ from sbam_workers.build.gates.ast_checks import (
     BundleError,
     CheckResult,
     HashMismatchError,
+    parse_file,
     read_bundle,
     run_ast_checks,
 )
+from sbam_workers.build.gates.ast_rules import run_rule_checks
 
 STAGE = "ast_gate"
 INPUT_MISMATCH = "AST_GATE_INPUT_MISMATCH"
 BUNDLE_TAMPERED = "BUNDLE_TAMPERED"
-GATES = (GateName.AST_SYNTAX, GateName.AST_SKELETON, GateName.AST_CONFORMANCE)
+RULE_GATES = (
+    GateName.AST_DECOUPLING,
+    GateName.AST_NO_MANUAL_LOOP,
+    GateName.AST_HANDOFF,
+    GateName.AST_IMPORTS,
+    GateName.AST_SQL_SAFETY,
+)
+GATES = (GateName.AST_SYNTAX, GateName.AST_SKELETON, GateName.AST_CONFORMANCE, *RULE_GATES)
 
 
 def _fail(message: str, attempt_id: uuid.UUID, code: str) -> ApplicationError:
@@ -93,6 +103,20 @@ class AstGate:
             session.commit()
             return [GateStatus(row.status) for row in stored]
 
+    def _rules(
+        self, files: Mapping[str, bytes], given: AssembleInputs, syntax: CheckResult
+    ) -> list[CheckResult]:
+        """E12.3: the five rule gates; SKIPPED when a file does not parse (no tree to judge)."""
+        if syntax.status is not GateStatus.PASSED:
+            return [CheckResult(g, GateStatus.SKIPPED) for g in RULE_GATES]
+        trees: dict[str, ast.Module] = {}
+        for name in sorted(files):
+            if name.endswith(".py"):
+                tree, _ = parse_file(name, files[name])
+                if tree is not None:
+                    trees[name] = tree
+        return list(run_rule_checks(trees, given.params, given.template, given.modules))
+
     @activity.defn(name=STAGE)
     async def run(self, inp: BuildStageInput) -> IdResult:
         with self.sessions() as session:
@@ -129,8 +153,9 @@ class AstGate:
             raise _fail(str(exc), attempt_id, BUNDLE_TAMPERED) from exc
         except BundleError as exc:
             raise _fail(str(exc), attempt_id, INPUT_MISMATCH) from exc
-        results = run_ast_checks(files, given.skeleton, given.template, given.params)
-        recorded = self._record(inp, attempt_id, bundle_sha, list(results))
+        results = list(run_ast_checks(files, given.skeleton, given.template, given.params))
+        results += self._rules(files, given, results[0])
+        recorded = self._record(inp, attempt_id, bundle_sha, results)
         if any(s is not GateStatus.PASSED for s in recorded):
             failed = zip(GATES, recorded, strict=True)
             bad = [g.value for g, s in failed if s is not GateStatus.PASSED]

@@ -66,6 +66,7 @@ class AssembleInputs:
     skeleton: RenderedSkeleton
     loop_spec: bytes  # RFC 8785 canonical loop_spec.json (E8.x)
     manifest_id: uuid.UUID | None = None
+    modules: tuple[str, ...] = ()  # top-level modules of the registry-resolved libraries (E9.3)
 
 
 @dataclass(frozen=True)

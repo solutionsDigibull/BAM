@@ -26,6 +26,7 @@ from sbam_workers.build.codegen.bundle import deterministic_tar
 from sbam_workers.build.gates.ast_checks import CONFIG_SHA256, GATE_VERSION
 from sbam_workers.build.gates.ast_gate import (
     BUNDLE_TAMPERED,
+    GATES,
     INPUT_MISMATCH,
     AstGate,
 )
@@ -35,7 +36,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.testing import ActivityEnvironment
 from test_codegen_assemble import ctx, seed, stage_input
 
-ALL_GATES = {"AST_SYNTAX", "AST_SKELETON", "AST_CONFORMANCE"}
+ALL_GATES = {g.value for g in GATES}
 
 
 @pytest.fixture(scope="module")
@@ -124,7 +125,7 @@ def test_e12_2_stage_retry_is_idempotent(template: LoadedTemplate, tmp_path: Pat
     run(stage, inp)
     first = [(r.id, r.status) for r in results(sessions, inp)]
     run(stage, inp)
-    assert [(r.id, r.status) for r in results(sessions, inp)] == first and len(first) == 3
+    assert [(r.id, r.status) for r in results(sessions, inp)] == first and len(first) == 8
 
 
 def test_e12_2_stage_failing_bundle_raises_gate_failed_and_keeps_findings(
@@ -147,7 +148,7 @@ def test_e12_2_stage_failing_bundle_raises_gate_failed_and_keeps_findings(
     assert by_gate[GateName.AST_SKELETON.value].findings
     with pytest.raises(ApplicationError) as again:  # the same bundle gives the same answer
         run(stage, inp)
-    assert again.value.type == GATE_FAILED and len(results(sessions, inp)) == 3
+    assert again.value.type == GATE_FAILED and len(results(sessions, inp)) == 8
 
 
 def test_e12_2_stage_stored_bundle_changed_after_assembly_is_tampering(
