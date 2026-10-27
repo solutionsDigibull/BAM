@@ -18,7 +18,7 @@ from collections.abc import Awaitable, Callable
 from sbam_api.builds.models import CodeAttemptStatus
 from sbam_api.builds.repository import CodeAttemptRepository, GateResultRepository
 from sbam_api.db.repository import TenantContext
-from sbam_api.storage.base import StorageBackend
+from sbam_api.storage.base import StorageBackend, StorageIntegrityError
 from sbam_contracts.build import GATE_FAILED, BuildStageInput
 from sbam_contracts.build_dashboard import GateName, GateStatus
 from sbam_contracts.pipeline import IdResult
@@ -118,7 +118,11 @@ class AstGate:
         t = given.template
         if template_ref != (t.name, t.version, t.sha256) or manifest_id != given.manifest_id:
             raise _fail("skeleton does not match the code attempt", attempt_id, INPUT_MISMATCH)
-        tar = self.storage.get(bundle_key, verify=True)  # read failure: retryable, no verdict
+        try:  # a read failure is retryable and gives no verdict; a corrupt object never will pass
+            tar = self.storage.get(bundle_key, verify=True)
+        except StorageIntegrityError as exc:
+            message = "stored bundle fails its content hash"
+            raise _fail(message, attempt_id, BUNDLE_TAMPERED) from exc
         try:
             files = read_bundle(tar, hashes, bundle_sha)
         except HashMismatchError as exc:
