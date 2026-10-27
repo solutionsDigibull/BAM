@@ -24,8 +24,8 @@ class FakeClamd:
     """Use as a context manager; `host` and `port` say where it listens.
 
     `behaviour` is how INSTREAM ends: `normal`, `drop` (close mid-stream), `garbage` (a reply that
-    is not a verdict) or `limit` (the size-limit ERROR a real clamd sends). `version` is the VERSION
-    reply.
+    is not a verdict), `limit` (the size-limit ERROR a real clamd sends) or `infected` (every file
+    is FOUND, so a test can quarantine bytes it can read back). `version` is the VERSION reply.
     """
 
     def __init__(
@@ -113,7 +113,8 @@ class FakeClamd:
             conn.sendall(b"stream: something odd\0")
         elif self.behaviour == "limit":
             conn.sendall(b"INSTREAM size limit exceeded. ERROR\0")
-        elif body.startswith(eicar_bytes()):  # like the real signature: the file starts with it
+        # like the real signature, a file is infected when it starts with EICAR
+        elif self.behaviour == "infected" or body.startswith(eicar_bytes()):
             conn.sendall(b"stream: Win.Test.EICAR_HDB-1 FOUND\0")
         else:
             conn.sendall(b"stream: OK\0")

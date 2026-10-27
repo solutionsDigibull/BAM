@@ -1,6 +1,7 @@
 """E3.13 super-admin Filetype import through the real app and auth chain, on SQLite, with a fake
 clamd. Platform rows change only through POST /admin/filetypes/import (ADR 0020)."""
 
+import hashlib
 import uuid
 from pathlib import Path
 from typing import Any
@@ -177,3 +178,19 @@ def test_e3_13_format_change_on_an_enabled_row_is_applied_with_a_warning(
     ]
     res = h.call("GET", "/admin/filetypes", h.root())
     assert (res.json()[0]["file_format"], res.json()[0]["loader"]) == (".cc", "source-code")
+
+
+def test_e3_13_infected_workbook_is_quarantined_under_the_platform_scope(
+    h: FiletypeHarness, clamd: FakeClamd
+) -> None:
+    clamd.behaviour = "infected"
+    data = workbook(retier)
+    problem(h.platform(data), 422, "MALWARE")
+    zero = "00000000-0000-0000-0000-000000000000"
+    key = f"{zero}/{zero}/quarantine/{hashlib.sha256(data).hexdigest()}"
+    root: Path = h.client.app.state.settings.storage_root  # type: ignore[attr-defined]
+    assert (root / key).read_bytes() == data
+    [audit] = h.actions("MASTERS_IMPORT_REJECTED")
+    assert audit.tenant_id is None and audit.after is not None
+    assert audit.after["quarantine_key"] == key
+    assert h.versions() == []

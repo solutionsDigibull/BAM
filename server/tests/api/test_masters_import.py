@@ -4,6 +4,7 @@ The consolidated BAM 0.2 workbook from the fixture pack is the valid upload; the
 from it with openpyxl (or by rewriting its zip) in the test.
 """
 
+import hashlib
 import io
 import json
 import zipfile
@@ -22,7 +23,7 @@ from sbam_api.audit.models import AuditLog
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion
 from sqlalchemy import func, select
-from test_auth import problem
+from test_auth import TENANT_A, problem
 from test_masters_api import MastersHarness, engine_with_masters
 
 WORKBOOK = fixture_path("masters", "BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx")
@@ -287,11 +288,40 @@ def test_e3_3_t10_clamav_down_is_503_and_nothing_is_imported(
     assert h.counts() == (0, 0) and h.actions("MASTERS_IMPORTED") == []
 
 
-def test_e3_3_eicar_is_422_malware_and_audited(h: ImportHarness, clamd: FakeClamd) -> None:
+ZERO = "00000000-0000-0000-0000-000000000000"  # the tenant-wide project id in storage keys
+
+
+def quarantine_key(data: bytes) -> str:
+    return f"{TENANT_A}/{ZERO}/quarantine/{hashlib.sha256(data).hexdigest()}"
+
+
+def storage_root(h: ImportHarness) -> Path:
+    root: Path = h.client.app.state.settings.storage_root  # type: ignore[attr-defined]
+    return root
+
+
+def test_e3_3_eicar_is_422_malware_quarantined_and_audited(
+    h: ImportHarness, clamd: FakeClamd
+) -> None:
     problem(h.upload(eicar_bytes()), 422, "MALWARE")
     [audit] = h.actions("MASTERS_IMPORT_REJECTED")
     assert audit.after is not None and audit.after["signature"] == "Win.Test.EICAR_HDB-1"
+    assert audit.after["quarantine_key"] == quarantine_key(eicar_bytes())
     assert clamd.scans == 1 and h.counts() == (0, 0)
+
+
+def test_e3_3_infected_workbook_is_quarantined_and_never_parsed(
+    h: ImportHarness, clamd: FakeClamd
+) -> None:
+    clamd.behaviour = "infected"  # a real workbook, so the stored bytes can be read on any OS
+    data = workbook()
+    with mock.patch("sbam_api.masters.importer.parse_workbook") as parse:
+        problem(h.upload(data), 422, "MALWARE")
+    parse.assert_not_called()
+    assert (storage_root(h) / quarantine_key(data)).read_bytes() == data
+    [audit] = h.actions("MASTERS_IMPORT_REJECTED")
+    assert audit.after is not None and audit.after["quarantine_key"] == quarantine_key(data)
+    assert h.counts() == (0, 0)
 
 
 def test_e3_3_not_a_zip_is_415(h: ImportHarness) -> None:

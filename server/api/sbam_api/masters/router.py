@@ -108,7 +108,7 @@ def import_workbook(
     data = file.file.read(MAX_WORKBOOK_BYTES + 1)  # one byte over is enough to answer 413
     settings = request.app.state.settings
     return importer.import_workbook(
-        session, user, settings, file.filename or "", data, mode, project_id
+        session, user, settings, backend(request), file.filename or "", data, mode, project_id
     )
 
 
