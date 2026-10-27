@@ -294,6 +294,12 @@ routes:
       <<: *open
       anon: "401 UNAUTHENTICATED"
 
+  import_filetypes_api_v1_admin_filetypes_import_post:  # E3.13; no file = 422 once the role passes
+    request: {method: POST, path: /api/v1/admin/filetypes/import}
+    expect:
+      <<: *super_admin_only
+      super_admin: "422 VALIDATION_ERROR"
+
   # ---- runtime registry -------------------------------------------------------------------
   admin_registry_api_v1_admin_registry_get:
     request: {method: GET, path: /api/v1/admin/registry}

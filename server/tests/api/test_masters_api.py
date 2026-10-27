@@ -39,6 +39,7 @@ def engine_with_masters() -> Engine:
             t["sbam.master_entries"],
             t["sbam.master_entry_versions"],
             t["sbam.master_snapshots"],
+            t["sbam.filetype_row_versions"],  # the platform rows every import compares to
         ],
     )
     return engine
