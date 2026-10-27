@@ -71,6 +71,14 @@ _SPEC_ROWS: Final = {
 
 
 class MasterDocumentRepository(TenantScopedRepository[MasterDocument]):
+    def pending_parse(self) -> list[MasterDocument]:
+        """Scanned CLEAN and not parsed yet, oldest first (E3.8b: handed to Temporal)."""
+        query = self._scoped().where(
+            MasterDocument.scan_status == ScanStatus.CLEAN.value,
+            MasterDocument.parse_status == ParseStatus.PENDING.value,
+        )
+        return list(self.session.scalars(query.order_by(MasterDocument.id)))
+
     model = MasterDocument
 
     def in_scope(self, project_id: uuid.UUID | None, sha256: str) -> MasterDocument | None:
@@ -296,6 +304,10 @@ def listing(
     project_id: uuid.UUID | None,
 ) -> list[MasterDocument]:
     return _repo(session, user).listing(master_type, project_id)
+
+
+def pending_parse(session: Session, user: CurrentUser) -> list[MasterDocument]:
+    return _repo(session, user).pending_parse()
 
 
 def get(session: Session, user: CurrentUser, document_id: uuid.UUID) -> MasterDocument:

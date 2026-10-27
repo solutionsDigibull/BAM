@@ -76,6 +76,10 @@ def ingest_workflow_id(document_version_id: UUID) -> str:
     return f"ingest-{document_version_id}"
 
 
+def master_document_workflow_id(master_document_id: UUID) -> str:
+    return f"master-doc-{master_document_id}"
+
+
 def build_workflow_id(sub_skill_id: UUID, build_no: int) -> str:
     if build_no < 1:
         raise ValueError("build_no starts at 1")

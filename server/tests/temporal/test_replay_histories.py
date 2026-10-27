@@ -26,7 +26,7 @@ from uuid import UUID
 
 import pytest
 from sbam_contracts.build import BuildStage, BuildStageInput
-from sbam_contracts.documents import DOCUMENT_INGESTION
+from sbam_contracts.documents import DOCUMENT_INGESTION, MASTER_DOCUMENT_INGESTION
 from sbam_contracts.pipeline import (
     PROJECT_PIPELINE,
     SUB_SKILL_BUILD,
@@ -38,6 +38,7 @@ from sbam_contracts.runs import (
     TaskQueue,
     build_workflow_id,
     ingest_workflow_id,
+    master_document_workflow_id,
     ping_workflow_id,
     pipeline_workflow_id,
 )
@@ -77,6 +78,7 @@ def workflow_id(path: Path) -> str:
         PROJECT_PIPELINE: lambda: pipeline_workflow_id(anyone),
         SUB_SKILL_BUILD: lambda: build_workflow_id(anyone, 1),
         DOCUMENT_INGESTION: lambda: ingest_workflow_id(anyone),
+        MASTER_DOCUMENT_INGESTION: lambda: master_document_workflow_id(anyone),
         "PingWorkflow": lambda: ping_workflow_id(
             TaskQueue(started(path)["taskQueue"]["name"]), anyone
         ),

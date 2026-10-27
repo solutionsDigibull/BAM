@@ -53,6 +53,8 @@ MAX_ACTIVE_FILES: Final = 20
 MAX_ATTACHMENT_DEPTH: Final = 1  # an attachment of an attachment is not followed (E4.6)
 UPLOAD_TOKEN_TTL_SECONDS: Final = 15 * 60
 DOCUMENT_INGESTION: Final = "DocumentIngestion"  # workflow type; id `ingest-<document_version_id>`
+# E3.8b: parses one master document; id `master-doc-<master_document_id>` (`runs.py`)
+MASTER_DOCUMENT_INGESTION: Final = "MasterDocumentIngestion"
 PURGE_RETENTION_DAYS: Final = 90  # a deleted document is restorable for this long, then purged
 PURGE_DELETED: Final = "PurgeDeleted"  # workflow type of the daily purge (E4.9)
 PURGE_SCHEDULE_ID: Final = "purge-deleted"  # Temporal Schedule id (and the workflow id prefix)
