@@ -4,6 +4,9 @@ import uuid
 from typing import Any
 
 from sbam_api.masters.snapshot import Candidate, resolve, snapshot_hash
+from sbam_contracts.canonical import sha256_of
+from sbam_contracts.masters import MasterType
+from sbam_contracts.masters_api import SnapshotDocument
 
 PROJECT, OTHER = uuid.uuid4(), uuid.uuid4()
 
@@ -85,3 +88,49 @@ def test_e3_2_every_entry_is_pinned_with_its_status_and_restricted_flag() -> Non
 def test_e3_2_empty_snapshot_is_valid_and_hashed() -> None:
     assert resolve(PROJECT, []) == []
     assert snapshot_hash(PROJECT, []).startswith("sha256:")
+
+
+# --- E3.8b: parsed master documents pinned with the entries ---------------------------------
+
+
+def pinned_document(title: str = "costing.pdf", sha: str = "b" * 64) -> SnapshotDocument:
+    return SnapshotDocument(
+        document_id=uuid.uuid4(),
+        title=title,
+        master_type=MasterType.RULES,
+        intent_class="Policy / rules",
+        sha256=sha,
+        derived_md_key=f"t/p/derived/{sha}",
+    )
+
+
+def test_e3_8b_a_snapshot_without_documents_keeps_the_hash_it_always_had() -> None:
+    """The `documents` key is only hashed when there are some, so a snapshot taken before master
+    documents were pinned still passes its integrity check."""
+    pinned = resolve(PROJECT, [entry("RULE-BOM", 2), entry("SK-BOM", master_type="SKILLS")])
+    legacy = sha256_of(
+        {
+            "project_id": str(PROJECT),
+            "entries": [e.model_dump(mode="json") for e in pinned],
+        }
+    )
+    assert snapshot_hash(PROJECT, pinned) == legacy
+    assert snapshot_hash(PROJECT, pinned, []) == legacy
+    assert snapshot_hash(PROJECT, pinned, None) == legacy
+
+
+def test_e3_8b_pinning_a_document_changes_the_hash_and_the_order_does_not() -> None:
+    pinned = resolve(PROJECT, [entry("RULE-BOM")])
+    one, two = pinned_document("a.pdf"), pinned_document("b.pdf", "c" * 64)
+    plain = snapshot_hash(PROJECT, pinned)
+    assert snapshot_hash(PROJECT, pinned, [one]) != plain
+    assert snapshot_hash(PROJECT, pinned, [one]) != snapshot_hash(PROJECT, pinned, [two])
+    assert snapshot_hash(PROJECT, pinned, [one, two]) == snapshot_hash(PROJECT, pinned, [two, one])
+
+
+def test_e3_8b_a_changed_document_changes_the_hash() -> None:
+    pinned = resolve(PROJECT, [entry("RULE-BOM")])
+    doc = pinned_document()
+    key = f"t/p/derived/{'d' * 64}"
+    changed = doc.model_copy(update={"sha256": "d" * 64, "derived_md_key": key})
+    assert snapshot_hash(PROJECT, pinned, [doc]) != snapshot_hash(PROJECT, pinned, [changed])

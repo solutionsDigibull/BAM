@@ -111,6 +111,7 @@ def to_out(row: MasterDocument) -> MasterDocumentOut:
         size=row.size,
         scan_status=ScanStatus(row.scan_status) if row.scan_status else None,
         parse_status=ParseStatus(row.parse_status),
+        parse_code=ErrorCode(row.parse_code) if row.parse_code else None,
         created_at=row.created_at,
     )
 

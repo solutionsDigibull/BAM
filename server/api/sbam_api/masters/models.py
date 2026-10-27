@@ -108,6 +108,10 @@ class MasterSnapshot(Base):
         Uuid, ForeignKey(f"{SCHEMA}.projects.id"), index=True
     )
     entries: Mapped[list[dict[str, object]]] = mapped_column(Json)
+    # E3.8b: the parsed master documents pinned with the entries (`SnapshotDocument`s).
+    documents: Mapped[list[dict[str, object]]] = mapped_column(
+        Json, default=list, server_default="[]"
+    )
     sha256: Mapped[str] = mapped_column(String(71))  # "sha256:" + 64 hex
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, server_default=func.now()
@@ -148,6 +152,11 @@ class MasterDocument(TenantOwned, Base):
     scan_signature_version: Mapped[str | None] = mapped_column(String(100))
     scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     parse_status: Mapped[str] = mapped_column(String(20), default=ParseStatus.PENDING.value)
+    # E3.8b: why a FAILED parse failed, the loader's report and the derivatives (own content hash).
+    parse_code: Mapped[str | None] = mapped_column(String(40))
+    parse_report: Mapped[dict[str, object] | None] = mapped_column(Json)
+    derived_md_key: Mapped[str | None] = mapped_column(String(512))  # doc.md
+    derived_json_key: Mapped[str | None] = mapped_column(String(512))  # doc.json
 
 
 # The same bytes are attached once per scope: the tenant's own, and each project's (a plain unique

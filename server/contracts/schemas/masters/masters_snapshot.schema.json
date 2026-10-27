@@ -24,6 +24,46 @@
       "title": "MasterType",
       "type": "string"
     },
+    "SnapshotDocument": {
+      "description": "One parsed master document pinned by a snapshot (E3.8b): the file's content hash and the key\nof its `doc.md`, so a build reads exactly what was pinned. The Admin attached it as context for\none master; it never counts as an FDE source (C3).",
+      "properties": {
+        "document_id": {
+          "format": "uuid",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "master_type": {
+          "$ref": "#/$defs/MasterType"
+        },
+        "intent_class": {
+          "title": "Intent Class",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "derived_md_key": {
+          "title": "Derived Md Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_id",
+        "title",
+        "master_type",
+        "intent_class",
+        "sha256",
+        "derived_md_key"
+      ],
+      "title": "SnapshotDocument",
+      "type": "object"
+    },
     "SnapshotEntry": {
       "description": "One pinned entry. The snapshot pins every live entry of the project; whoever uses it decides\ninclusion from `status` and `restricted` (E3.6: ILLUSTRATIVE / RETIRED never, Restricted only\nwhen the project allows it).",
       "properties": {
@@ -85,6 +125,13 @@
         "$ref": "#/$defs/SnapshotEntry"
       },
       "title": "Entries",
+      "type": "array"
+    },
+    "documents": {
+      "items": {
+        "$ref": "#/$defs/SnapshotDocument"
+      },
+      "title": "Documents",
       "type": "array"
     },
     "sha256": {

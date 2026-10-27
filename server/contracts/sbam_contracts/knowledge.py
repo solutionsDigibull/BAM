@@ -48,11 +48,14 @@ class ProjectScope(_Dto):
 class ItemSource(StrEnum):
     DOCUMENT = "DOCUMENT"  # a parsed document version (doc.md / doc.json)
     MASTERS = "MASTERS"  # the project's master context, masters.jsonl (E3.6)
+    MASTER_DOCUMENT = "MASTER_DOCUMENT"  # a parsed master document's doc.md (E3.8b)
 
 
 class KnowledgeItem(_Dto):
-    """One file to add to the project's dataset. `source_id` is the document version id, or the
-    master snapshot id for MASTERS. `source_id` + `sha256` is the idempotency key (E5.1-T08)."""
+    """One file to add to the project's dataset. `source_id` is the document version id, the
+    master snapshot id for MASTERS, or the master document id for MASTER_DOCUMENT. `source_id` +
+    `sha256` is the idempotency key (E5.1-T08).
+    """
 
     source: ItemSource
     source_id: UUID
