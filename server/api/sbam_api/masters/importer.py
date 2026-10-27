@@ -26,7 +26,7 @@ from typing import Any
 
 import openpyxl
 from sbam_contracts.api import ErrorCode, FieldError
-from sbam_contracts.masters import MasterType
+from sbam_contracts.masters import FiletypePayload, MasterType
 from sbam_contracts.masters_api import ImportMode, ImportReport, ImportRowError, ImportTabReport
 from sbam_contracts.masters_workbook import (
     COLUMN_NUMBER_START,
@@ -35,10 +35,10 @@ from sbam_contracts.masters_workbook import (
     TABS,
     Grid,
     MasterRow,
+    WorkbookReport,
     check_archive,
     check_content_types,
     check_workbook_container,
-    frozen_filetype,
     parse_workbook,
 )
 from sqlalchemy.exc import IntegrityError
@@ -49,6 +49,7 @@ from sbam_api.core.auth import CurrentUser
 from sbam_api.core.conventions import ApiError
 from sbam_api.core.settings import Settings
 from sbam_api.db.repository import StaleRowVersion
+from sbam_api.filetypes.repository import current_payloads
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion
 from sbam_api.masters.repository import MasterEntryRepository
 from sbam_api.masters.service import _active_project, _audit, _correlation, _repo, version_conflict
@@ -69,21 +70,8 @@ def import_workbook(
 ) -> ImportReport:
     if project_id is not None:
         _active_project(session, user, project_id)
-    if len(data) > MAX_WORKBOOK_BYTES:
-        raise ApiError(413, ErrorCode.FILE_TOO_LARGE, "The workbook is larger than 15 MB")
-    sha256 = f"sha256:{hashlib.sha256(data).hexdigest()}"
-    _scan(session, user, settings, sha256, data)
-    sheets = _read(filename, data)
-    parsed = parse_workbook(sheets)
-    if parsed.code == ErrorCode.STRUCTURE_MISMATCH:
-        raise ApiError(
-            422,
-            ErrorCode.STRUCTURE_MISMATCH,
-            "The workbook does not have the BAM 0.2 structure",
-            "Use the published template; columns and tabs are never mapped automatically.",
-            errors=parsed.errors,
-        )
-    _require_frozen_filetype(parsed.rows, parsed.errors)
+    sha256, parsed = read_workbook(session, user, settings, filename, data)
+    _require_frozen_filetype(parsed.rows, parsed.errors, current_payloads(session))
 
     errors = [_row_error(e) for e in parsed.errors]
     write = mode == ImportMode.UPSERT and not errors
@@ -113,6 +101,27 @@ def import_workbook(
 
 
 # --- file checks ----------------------------------------------------------------------------
+
+
+def read_workbook(
+    session: Session, user: CurrentUser, settings: Settings, filename: str, data: bytes
+) -> tuple[str, WorkbookReport]:
+    """Size, scan, container and structure checks shared by the masters and Filetype imports:
+    (sha256 of the file, the parsed workbook). Raises 413/415/422/503 like the import."""
+    if len(data) > MAX_WORKBOOK_BYTES:
+        raise ApiError(413, ErrorCode.FILE_TOO_LARGE, "The workbook is larger than 15 MB")
+    sha256 = f"sha256:{hashlib.sha256(data).hexdigest()}"
+    _scan(session, user, settings, sha256, data)
+    parsed = parse_workbook(_read(filename, data))
+    if parsed.code == ErrorCode.STRUCTURE_MISMATCH:
+        raise ApiError(
+            422,
+            ErrorCode.STRUCTURE_MISMATCH,
+            "The workbook does not have the BAM 0.2 structure",
+            "Use the published template; columns and tabs are never mapped automatically.",
+            errors=parsed.errors,
+        )
+    return sha256, parsed
 
 
 def _scan(
@@ -182,11 +191,14 @@ def _read(filename: str, data: bytes) -> dict[str, Grid]:
         book.close()
 
 
-def _require_frozen_filetype(rows: list[MasterRow], errors: list[FieldError]) -> None:
+def _require_frozen_filetype(
+    rows: list[MasterRow], errors: list[FieldError], frozen: list[FiletypePayload]
+) -> None:
+    """A tenant import must carry the platform's current Filetype rows (E3.13: the shipped rows or
+    a super-admin's newer version); only POST /admin/filetypes/import changes them."""
     if any(e.path.startswith(f"{TABS[MasterType.FILETYPE]}!") for e in errors):
         return  # its row errors are reported like any other tab's
     got = [r for r in rows if r.master_type == MasterType.FILETYPE]
-    frozen = frozen_filetype()
     changed = [
         FieldError(
             path=f"Filetype!row{row.sheet_row}:colA",

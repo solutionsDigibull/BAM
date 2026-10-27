@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from sbam_api.audit.models import AuditLog, NotificationOutbox
 from sbam_api.core.auth import Auth, TokenVerifier
 from sbam_api.db.session import make_engine, make_sessionmaker
+from sbam_api.filetypes.models import FiletypeRowVersion
 from sbam_api.identity.models import Tenant
 from sbam_api.identity.service import SqlUserDirectory
 from sbam_api.main import create_app
@@ -65,6 +66,7 @@ def sqlite_engine() -> Engine:
             AuditLog.__table__,  # type: ignore[list-item]
             NotificationOutbox.__table__,  # type: ignore[list-item]
             Workflow.__table__,  # type: ignore[list-item]  # archive checks for running ones
+            FiletypeRowVersion.__table__,  # type: ignore[list-item]  # GET /admin/filetypes
         ],
     )
     return engine
