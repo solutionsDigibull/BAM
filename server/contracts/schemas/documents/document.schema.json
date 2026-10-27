@@ -2,6 +2,33 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:sbam:contracts:documents/document:0.1.0",
   "$defs": {
+    "ArchiveReport": {
+      "additionalProperties": false,
+      "description": "What became of the members of a `.zip` or `.tar.gz`, in `ParseReport.archive` (E4.7). Each\naccepted member is a child document (`DocumentOut.archive_path` is its path in the archive).",
+      "properties": {
+        "members_total": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Members Total",
+          "type": "integer"
+        },
+        "accepted": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Accepted",
+          "type": "integer"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/$defs/RejectedMember"
+          },
+          "title": "Rejected",
+          "type": "array"
+        }
+      },
+      "title": "ArchiveReport",
+      "type": "object"
+    },
     "AttachmentOutcome": {
       "description": "What became of one attachment of an e-mail (E4.6).",
       "enum": [
@@ -115,6 +142,7 @@
         "INVALID_ENCODING",
         "NESTED_ARCHIVE",
         "ARCHIVE_LIMIT",
+        "PATH_UNSAFE",
         "HASH_MISMATCH",
         "NO_DOCUMENTS",
         "PARSE_ERROR",
@@ -216,9 +244,41 @@
           },
           "title": "Attachments",
           "type": "array"
+        },
+        "archive": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "title": "ParseReport",
+      "type": "object"
+    },
+    "RejectedMember": {
+      "additionalProperties": false,
+      "description": "An archive member that was not taken, and why: `PATH_UNSAFE`, `NESTED_ARCHIVE`, `ENCRYPTED`,\n`UNSUPPORTED_TYPE`, `ARCHIVE_LIMIT` or `FILE_LIMIT_REACHED`.",
+      "properties": {
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        }
+      },
+      "required": [
+        "path",
+        "code"
+      ],
+      "title": "RejectedMember",
       "type": "object"
     }
   },
@@ -336,6 +396,18 @@
       ],
       "default": null,
       "title": "Parent Document Id"
+    },
+    "archive_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Archive Path"
     }
   },
   "required": [

@@ -134,6 +134,7 @@ def to_out(document: Document, version: DocumentVersion) -> DocumentOut:
         sha256=version.sha256,
         created_at=document.created_at,
         parent_document_id=document.parent_document_id,
+        archive_path=document.archive_path,
         deleted_at=document.deleted_at,
         deleted_by=document.deleted_by,
         purge_after=document.purge_after,

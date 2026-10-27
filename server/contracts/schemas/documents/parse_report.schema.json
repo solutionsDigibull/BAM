@@ -2,6 +2,33 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:sbam:contracts:documents/parse_report:0.1.0",
   "$defs": {
+    "ArchiveReport": {
+      "additionalProperties": false,
+      "description": "What became of the members of a `.zip` or `.tar.gz`, in `ParseReport.archive` (E4.7). Each\naccepted member is a child document (`DocumentOut.archive_path` is its path in the archive).",
+      "properties": {
+        "members_total": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Members Total",
+          "type": "integer"
+        },
+        "accepted": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Accepted",
+          "type": "integer"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/$defs/RejectedMember"
+          },
+          "title": "Rejected",
+          "type": "array"
+        }
+      },
+      "title": "ArchiveReport",
+      "type": "object"
+    },
     "AttachmentOutcome": {
       "description": "What became of one attachment of an e-mail (E4.6).",
       "enum": [
@@ -57,6 +84,114 @@
         "outcome"
       ],
       "title": "AttachmentReport",
+      "type": "object"
+    },
+    "ErrorCode": {
+      "description": "Stable machine-readable error codes. Add new codes here; never rename or reuse one.",
+      "enum": [
+        "VALIDATION_ERROR",
+        "UNAUTHENTICATED",
+        "FORBIDDEN",
+        "WRONG_PORTAL",
+        "NOT_FOUND",
+        "CONFLICT",
+        "PRECONDITION_FAILED",
+        "PRECONDITION_REQUIRED",
+        "PAYLOAD_TOO_LARGE",
+        "UNSUPPORTED_MEDIA_TYPE",
+        "RESOURCE_LOCKED",
+        "RATE_LIMITED",
+        "SERVICE_UNAVAILABLE",
+        "INTERNAL_ERROR",
+        "IDEMPOTENCY_KEY_REUSED",
+        "INVALID_CURSOR",
+        "VERSION_CONFLICT",
+        "INVALID_TRANSITION",
+        "READ_ONLY",
+        "GONE",
+        "TENANT_MISMATCH",
+        "TENANT_SUSPENDED",
+        "IDP_UNAVAILABLE",
+        "LAST_ADMIN",
+        "USER_EXISTS",
+        "DUPLICATE_NAME",
+        "PROJECT_ARCHIVED",
+        "DRAFT_EXISTS",
+        "STRUCTURE_MISMATCH",
+        "FILETYPE_FROZEN",
+        "SNAPSHOT_PROJECT_MISMATCH",
+        "SECRET_VALUE_NOT_ALLOWED",
+        "FILE_TOO_LARGE",
+        "FILE_LIMIT_REACHED",
+        "UNSUPPORTED_TYPE",
+        "INVALID_ENCODING",
+        "NESTED_ARCHIVE",
+        "ARCHIVE_LIMIT",
+        "PATH_UNSAFE",
+        "HASH_MISMATCH",
+        "NO_DOCUMENTS",
+        "PARSE_ERROR",
+        "CORRUPT",
+        "ENCRYPTED",
+        "EMPTY",
+        "TIMEOUT",
+        "SCAN_UNAVAILABLE",
+        "OCR_UNAVAILABLE",
+        "MALWARE",
+        "KNOWLEDGE_BUILDING",
+        "KNOWLEDGE_NOT_READY",
+        "COGNEE_ACL_DISABLED",
+        "SOW_STALE",
+        "SOW_LOCKED",
+        "SOW_APPROVED",
+        "SOW_NOT_APPROVED",
+        "SOW_NOT_LATEST",
+        "SOW_VERSION_CONFLICT",
+        "SOW_GENERATING",
+        "EXPORT_TIMEOUT",
+        "NO_APPROVED_SOW",
+        "NOT_IN_REVIEW",
+        "PIPELINE_RUNNING",
+        "PIPELINE_NOT_WAITING",
+        "TEMPORAL_UNAVAILABLE",
+        "ORCHESTRATOR_UNAVAILABLE",
+        "ISATVON_CONTRACT",
+        "SKILL_ID_PREFIX_MISMATCH",
+        "MACRO_REQUIRES_SUB_SKILL",
+        "GATE_PARSE_ERROR",
+        "UNRESOLVED_IDENTIFIER",
+        "TYPE_MISMATCH",
+        "SCHEMA_PARSE_ERROR",
+        "LIBRARY_NOT_IN_REGISTRY",
+        "TOOLS_NOT_DECOUPLED",
+        "WORKFLOW_BUILDING",
+        "MIN_TEST_CASES",
+        "MOCK_UNMATCHED",
+        "WORKFLOW_FROZEN",
+        "NOT_FROZEN"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
+    "RejectedMember": {
+      "additionalProperties": false,
+      "description": "An archive member that was not taken, and why: `PATH_UNSAFE`, `NESTED_ARCHIVE`, `ENCRYPTED`,\n`UNSUPPORTED_TYPE`, `ARCHIVE_LIMIT` or `FILE_LIMIT_REACHED`.",
+      "properties": {
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        }
+      },
+      "required": [
+        "path",
+        "code"
+      ],
+      "title": "RejectedMember",
       "type": "object"
     }
   },
@@ -115,6 +250,17 @@
       },
       "title": "Attachments",
       "type": "array"
+    },
+    "archive": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArchiveReport"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "title": "ParseReport",

@@ -61,6 +61,9 @@ class ErrorCode(StrEnum):
     INVALID_ENCODING = "INVALID_ENCODING"
     NESTED_ARCHIVE = "NESTED_ARCHIVE"
     ARCHIVE_LIMIT = "ARCHIVE_LIMIT"
+    PATH_UNSAFE = (
+        "PATH_UNSAFE"  # an archive member with an absolute or `..` path, a link or a device
+    )
     HASH_MISMATCH = "HASH_MISMATCH"
     NO_DOCUMENTS = "NO_DOCUMENTS"
     PARSE_ERROR = "PARSE_ERROR"

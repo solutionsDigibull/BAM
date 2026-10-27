@@ -53,6 +53,7 @@
         "INVALID_ENCODING",
         "NESTED_ARCHIVE",
         "ARCHIVE_LIMIT",
+        "PATH_UNSAFE",
         "HASH_MISMATCH",
         "NO_DOCUMENTS",
         "PARSE_ERROR",

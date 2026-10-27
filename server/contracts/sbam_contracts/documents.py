@@ -228,6 +228,32 @@ class AttachmentReport(BaseModel):
     document_id: UUID | None = None
 
 
+MAX_ARCHIVE_MEMBERS: Final = MAX_ACTIVE_FILES  # members that may be taken from one archive (E4.7)
+MAX_ARCHIVE_UNPACKED_BYTES: Final = 100 * 1024 * 1024  # all members together, uncompressed
+MAX_ARCHIVE_RATIO: Final = 100  # uncompressed size over compressed size
+
+
+class RejectedMember(BaseModel):
+    """An archive member that was not taken, and why: `PATH_UNSAFE`, `NESTED_ARCHIVE`, `ENCRYPTED`,
+    `UNSUPPORTED_TYPE`, `ARCHIVE_LIMIT` or `FILE_LIMIT_REACHED`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1, max_length=1024)
+    code: ErrorCode
+
+
+class ArchiveReport(BaseModel):
+    """What became of the members of a `.zip` or `.tar.gz`, in `ParseReport.archive` (E4.7). Each
+    accepted member is a child document (`DocumentOut.archive_path` is its path in the archive)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    members_total: int = Field(default=0, ge=0)
+    accepted: int = Field(default=0, ge=0)
+    rejected: list[RejectedMember] = Field(default_factory=list)
+
+
 class ParseReport(BaseModel):
     """Kept on the document version (`parse_report`) after every parse attempt."""
 
@@ -243,6 +269,7 @@ class ParseReport(BaseModel):
     ocr_pages: list[int] = Field(default_factory=list)  # of those, the ones the model read
     unreadable_pages: list[int] = Field(default_factory=list)  # and the ones it could not read
     attachments: list[AttachmentReport] = Field(default_factory=list)  # e-mail only (E4.6)
+    archive: ArchiveReport | None = None  # .zip and .tar.gz only (E4.7)
 
 
 class ParseOutcome(BaseModel):
@@ -287,6 +314,8 @@ class DocumentOut(BaseModel):
     parse_report: ParseReport | None = None
     # E4.6: the e-mail this document is an attachment of. None for an upload; one level only.
     parent_document_id: UUID | None = None
+    # E4.7: where this document sits inside its parent archive (`reports/q3.csv`). None otherwise.
+    archive_path: str | None = None
 
 
 class PurgeTarget(BaseModel):

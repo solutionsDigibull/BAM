@@ -164,6 +164,7 @@ def test_e4_5_a_markdown_file_is_parsed_and_its_derivatives_are_stored(h: Harnes
         "ocr_pages": [],
         "unreadable_pages": [],
         "attachments": [],
+        "archive": None,
     }
     assert h.audit().count("DOCUMENT_PARSED") == 1 and "parse_completed" in h.audit()
 
@@ -183,6 +184,7 @@ def test_e4_5_t03_a_semicolon_csv_with_a_bom_gets_its_table_in_doc_json(h: Harne
         "ocr_pages": [],
         "unreadable_pages": [],
         "attachments": [],
+        "archive": None,
     }
 
 
