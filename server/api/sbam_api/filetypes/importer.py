@@ -10,6 +10,7 @@ default_route, ...) is never read from or written by the workbook.
 """
 
 import logging
+import uuid
 from collections import Counter
 
 from sbam_contracts.masters import FiletypePayload, MasterType
@@ -26,21 +27,25 @@ from sbam_api.filetypes.models import FiletypeRowVersion
 from sbam_api.filetypes.repository import current_payloads, label, latest_versions
 from sbam_api.masters.importer import _row_error, read_workbook
 from sbam_api.masters.service import _correlation, version_conflict
+from sbam_api.storage import StorageBackend, StorageScope
 
 log = logging.getLogger("sbam_api.filetypes")
 TAB = TABS[MasterType.FILETYPE]
+# An infected platform workbook has no tenant to be quarantined under: the all-zero one stands in.
+PLATFORM_SCOPE = StorageScope(uuid.UUID(int=0), uuid.UUID(int=0))
 
 
 def import_filetypes(
     session: Session,
     user: CurrentUser,
     settings: Settings,
+    storage: StorageBackend,
     filename: str,
     data: bytes,
     mode: ImportMode,
     version_label: str | None,
 ) -> ImportReport:
-    sha256, parsed = read_workbook(session, user, settings, filename, data)
+    sha256, parsed = read_workbook(session, user, settings, storage, PLATFORM_SCOPE, filename, data)
     rows = [r for r in parsed.rows if r.master_type == MasterType.FILETYPE]
     errors = [_row_error(e) for e in parsed.errors if e.path.startswith(f"{TAB}!")]
     # by row label, not position: a row with an error is not in `rows`

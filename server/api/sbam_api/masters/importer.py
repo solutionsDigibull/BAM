@@ -2,8 +2,9 @@
 
 The steps, each one before anything later can run:
   1. at most 15 MB (413 FILE_TOO_LARGE), sha256 of the bytes;
-  2. ClamAV scan of the raw bytes: infected = 422 MALWARE (audited with the signature, the bytes are
-     never stored), no verdict = 503 SCAN_UNAVAILABLE;
+  2. ClamAV scan of the raw bytes: infected = 422 MALWARE (the bytes go to `quarantine/` through
+     StorageBackend, audited with the signature and the key, never parsed), no verdict = 503
+     SCAN_UNAVAILABLE;
   3. container checks from the zip directory alone: a real .xlsx (415 UNSUPPORTED_TYPE, macros
      included) and the zip-bomb limits (422 ARCHIVE_LIMIT);
   4. openpyxl in read-only, values-only mode (formulas are never evaluated, links never followed);
@@ -50,11 +51,14 @@ from sbam_api.core.conventions import ApiError
 from sbam_api.core.settings import Settings
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.filetypes.repository import current_payloads
+from sbam_api.masters.documents import TENANT_SCOPE_PROJECT
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion
 from sbam_api.masters.repository import MasterEntryRepository
 from sbam_api.masters.service import _active_project, _audit, _correlation, _repo, version_conflict
 from sbam_api.scan.clamd import ClamdClient, ClamdError
+from sbam_api.storage import Kind, StorageBackend, StorageScope
 
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _PATH = re.compile(r"^(?P<tab>[^!]+)!row(?P<row>\d+):col(?P<col>\w+)$")
 _TAB_TYPES = {tab: master_type for master_type, tab in TABS.items()}
 
@@ -63,6 +67,7 @@ def import_workbook(
     session: Session,
     user: CurrentUser,
     settings: Settings,
+    storage: StorageBackend,
     filename: str,
     data: bytes,
     mode: ImportMode,
@@ -70,7 +75,8 @@ def import_workbook(
 ) -> ImportReport:
     if project_id is not None:
         _active_project(session, user, project_id)
-    sha256, parsed = read_workbook(session, user, settings, filename, data)
+    scope = StorageScope(user.context().tenant_id, project_id or TENANT_SCOPE_PROJECT)
+    sha256, parsed = read_workbook(session, user, settings, storage, scope, filename, data)
     _require_frozen_filetype(parsed.rows, parsed.errors, current_payloads(session))
 
     errors = [_row_error(e) for e in parsed.errors]
@@ -104,14 +110,21 @@ def import_workbook(
 
 
 def read_workbook(
-    session: Session, user: CurrentUser, settings: Settings, filename: str, data: bytes
+    session: Session,
+    user: CurrentUser,
+    settings: Settings,
+    storage: StorageBackend,
+    scope: StorageScope,
+    filename: str,
+    data: bytes,
 ) -> tuple[str, WorkbookReport]:
     """Size, scan, container and structure checks shared by the masters and Filetype imports:
-    (sha256 of the file, the parsed workbook). Raises 413/415/422/503 like the import."""
+    (sha256 of the file, the parsed workbook). Raises 413/415/422/503 like the import; an
+    infected workbook is quarantined under `scope`."""
     if len(data) > MAX_WORKBOOK_BYTES:
         raise ApiError(413, ErrorCode.FILE_TOO_LARGE, "The workbook is larger than 15 MB")
     sha256 = f"sha256:{hashlib.sha256(data).hexdigest()}"
-    _scan(session, user, settings, sha256, data)
+    _scan(session, user, settings, storage, scope, sha256, data)
     parsed = parse_workbook(_read(filename, data))
     if parsed.code == ErrorCode.STRUCTURE_MISMATCH:
         raise ApiError(
@@ -125,7 +138,13 @@ def read_workbook(
 
 
 def _scan(
-    session: Session, user: CurrentUser, settings: Settings, sha256: str, data: bytes
+    session: Session,
+    user: CurrentUser,
+    settings: Settings,
+    storage: StorageBackend,
+    scope: StorageScope,
+    sha256: str,
+    data: bytes,
 ) -> None:
     clamd = ClamdClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout)
     try:
@@ -138,6 +157,7 @@ def _scan(
             "Nothing was imported. Try again in a few minutes.",
         ) from None
     if verdict.infected:
+        stored = storage.put(data, scope, Kind.QUARANTINE, XLSX, max_bytes=MAX_WORKBOOK_BYTES)
         record(
             session,
             tenant_id=user.tenant_id,
@@ -145,11 +165,16 @@ def _scan(
             action="MASTERS_IMPORT_REJECTED",
             entity_type="masters_import",
             entity_id=sha256,
-            after={"sha256": sha256, "signature": verdict.signature, "reason": "MALWARE"},
+            after={
+                "sha256": sha256,
+                "signature": verdict.signature,
+                "reason": "MALWARE",
+                "quarantine_key": stored.storage_key,
+            },
             correlation_id=_correlation(),
         )
         session.commit()
-        raise ApiError(422, ErrorCode.MALWARE, "The workbook contains malware and was discarded")
+        raise ApiError(422, ErrorCode.MALWARE, "The workbook contains malware and was quarantined")
 
 
 def _unsupported(errors: list[FieldError]) -> ApiError:

@@ -18,6 +18,7 @@ from sbam_api.core.auth import CurrentUser, authenticated, super_admin
 from sbam_api.db.session import app_sessions
 from sbam_api.filetypes.config import Filetype, load
 from sbam_api.filetypes.repository import current_payloads
+from sbam_api.storage.router import backend
 
 router = APIRouter(tags=["filetypes"])
 
@@ -73,6 +74,7 @@ def import_filetypes(
     from sbam_api.filetypes import importer
 
     data = file.file.read(MAX_WORKBOOK_BYTES + 1)  # one byte over is enough to answer 413
+    settings = request.app.state.settings
     return importer.import_filetypes(
-        session, user, request.app.state.settings, file.filename or "", data, mode, version_label
+        session, user, settings, backend(request), file.filename or "", data, mode, version_label
     )
