@@ -91,14 +91,23 @@ const Citation = Node.create({
   atom: true,
   selectable: true,
   addAttributes: () => ({
+    kind: { default: null }, // "fde" for a citation the FDE wrote; absent for an OKF source
     okf_ref_id: { default: null },
     document_version_id: { default: null },
     location: { default: {} },
+    author: { default: null },
+    date: { default: null },
+    note: { default: null },
   }),
   parseHTML: () => [{ tag: "span[data-cite]" }],
   renderHTML: ({ node }) => [
     "span",
-    { "data-cite": node.attrs.okf_ref_id, class: "sow-cite", role: "button", tabindex: "0" },
+    {
+      "data-cite": node.attrs.kind === "fde" ? "fde" : node.attrs.okf_ref_id,
+      class: node.attrs.kind === "fde" ? "sow-cite sow-cite-fde" : "sow-cite",
+      role: "button",
+      tabindex: "0",
+    },
   ],
 });
 
