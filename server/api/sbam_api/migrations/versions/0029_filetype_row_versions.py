@@ -1,7 +1,7 @@
 """filetype_row_versions: super-admin versions of the 43 platform Filetype rows (E3.13, ADR 0020)
 
-Revision ID: 0028_filetype_row_versions
-Revises: 0027_document_archive_path
+Revision ID: 0029_filetype_row_versions
+Revises: 0028_master_document_parse
 Create Date: 2026-10-27
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0028_filetype_row_versions"
-down_revision: str | Sequence[str] | None = "0027_document_archive_path"
+revision: str = "0029_filetype_row_versions"
+down_revision: str | Sequence[str] | None = "0028_master_document_parse"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
