@@ -12,6 +12,9 @@ One execution per uploaded file, id `ingest-<document_version_id>` on sbam-inges
    would not change). Other errors are retried 3 times (10 s, doubling); after the last attempt, or
    past the 10-minute timeout, `mark_parse_failed` records PARSE_ERROR or TIMEOUT. A type with no
    loader yet stays PARSING.
+5. Attachments (E4.6): after a PARSED e-mail, `register_attachments` makes a child document for each
+   attachment and a child `DocumentIngestion` runs for each; `finish_attachments` then notes on the
+   e-mail's report any child that was rejected or failed. The e-mail stays PARSED.
 4. OCR (E4.8): when the parse leaves a version PARSING with pages in `ocr_needed_pages` (a scan, an
    image), `ocr_document` reads those pages with the vision model, 3 attempts (10 s, doubling),
    30 minutes at most with a 60 s heartbeat. After the last attempt, or at the timeout,
@@ -21,11 +24,13 @@ One execution per uploaded file, id `ingest-<document_version_id>` on sbam-inges
 Each step keeps this workflow's name and its input and output types.
 """
 
+import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError, TimeoutError
+from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     from sbam_contracts.api import ErrorCode
@@ -39,9 +44,9 @@ with workflow.unsafe.imports_passed_through():
         ScanStatus,
     )
     from sbam_contracts.pipeline import IdsResult, StageRef
-    from sbam_contracts.runs import TaskQueue
+    from sbam_contracts.runs import TaskQueue, ingest_workflow_id
 
-    from sbam_workers.ingest import ocr, parsing, type_detection
+    from sbam_workers.ingest import attachments, ocr, parsing, type_detection
     from sbam_workers.ingest.scan import PERMANENT, mark_scan_failed, scan_clamav
     from sbam_workers.registry import workflow_for
 
@@ -61,6 +66,11 @@ OCR_RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=10),
     backoff_coefficient=2.0,  # waits of 10 s, then 20 s
     non_retryable_error_types=sorted(parsing.PERMANENT),
+)
+ATTACHMENT_RETRY = RetryPolicy(
+    maximum_attempts=3,
+    initial_interval=timedelta(seconds=5),
+    non_retryable_error_types=[attachments.NOT_FOUND, "NotScanned"],
 )
 SCAN_ATTEMPTS = 3
 SCAN_TIMEOUT = timedelta(minutes=2)
@@ -107,7 +117,10 @@ class DocumentIngestion:
             )
             if not detected.ids or not workflow.patched("e4-5-parse"):  # started before E4.5
                 return detected
-            return await self._parse(inp)
+            result = await self._parse(inp)
+            if result.ids and workflow.patched("e4-6-attachments"):  # started before E4.6
+                await self._attachments(inp)
+            return result
         return IdsResult(ids=[inp.ref_id])  # CLEAN: parse follows (#71, ...)
 
     async def _parse(self, inp: StageRef) -> IdsResult:
@@ -137,6 +150,46 @@ class DocumentIngestion:
             outcome = await self._ocr(inp)
         # Failed: nothing goes on. Parsed, or no loader for the type yet: the version is handed on.
         return IdsResult(ids=[inp.ref_id] if outcome.parsed or outcome.code is None else [])
+
+    async def _attachments(self, inp: StageRef) -> None:
+        """E-mail attachments (E4.6): each becomes a child document with its own `DocumentIngestion`
+        (scan, type check, parse). The parent is already PARSED and stays so: this only waits for
+        the children, then writes what became of them on the parent's report."""
+        children = await workflow.execute_activity(
+            attachments.register_attachments,
+            inp,
+            task_queue=TaskQueue.INGEST.value,
+            start_to_close_timeout=timedelta(minutes=2),
+            retry_policy=ATTACHMENT_RETRY,
+        )
+        if not children.ids:
+            return
+        await asyncio.gather(
+            *(
+                workflow.execute_child_workflow(
+                    DocumentIngestion.run,
+                    StageRef(
+                        tenant_id=inp.tenant_id,
+                        project_id=inp.project_id,
+                        run_id=workflow.uuid4(),
+                        correlation_id=inp.correlation_id,
+                        ref_id=child,
+                    ),
+                    id=ingest_workflow_id(child),
+                    task_queue=TaskQueue.INGEST.value,
+                    parent_close_policy=ParentClosePolicy.ABANDON,
+                )
+                for child in children.ids
+            ),
+            return_exceptions=True,  # a child that fails is the child's; the parent stays PARSED
+        )
+        await workflow.execute_activity(
+            attachments.finish_attachments,
+            inp,
+            task_queue=TaskQueue.INGEST.value,
+            start_to_close_timeout=timedelta(minutes=2),
+            retry_policy=ATTACHMENT_RETRY,
+        )
 
     async def _ocr(self, inp: StageRef) -> ParseOutcome:
         try:

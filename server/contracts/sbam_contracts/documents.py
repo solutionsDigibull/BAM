@@ -223,8 +223,8 @@ class AttachmentReport(BaseModel):
     content_type: str = Field(max_length=255)
     size: int = Field(ge=0)
     outcome: AttachmentOutcome
-    # The child document (`DocumentOut.parent_document_id` is this version's document). Set for
-    # REGISTERED, and for FILE_LIMIT_REACHED where the child is kept as a REJECTED document.
+    # The child document (its `DocumentOut.parent_document_id` is this version's document). Set
+    # for REGISTERED only: an attachment that is not added makes no document.
     document_id: UUID | None = None
 
 

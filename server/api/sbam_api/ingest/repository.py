@@ -57,6 +57,11 @@ class DocumentVersionRepository(StatefulRepository):
         )
         return {state: n for state, n in self.session.execute(query)}
 
+    def latest_for_document(self, document_id: uuid.UUID) -> DocumentVersion | None:
+        """The newest version of a document (E4.6: the state of an e-mail attachment)."""
+        query = self._scoped().where(DocumentVersion.document_id == document_id)
+        return self.session.scalars(query.order_by(DocumentVersion.id.desc()).limit(1)).first()
+
     def by_sha256(self, sha256: str) -> DocumentVersion | None:
         query = self._scoped().where(
             DocumentVersion.sha256 == sha256, DocumentVersion.state.not_in(_INACTIVE)
