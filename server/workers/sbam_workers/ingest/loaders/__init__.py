@@ -6,9 +6,10 @@ tables of `doc.json`, the text of `doc.md` and the report. A file it cannot read
 `ParseError` with the code the version is failed with.
 
 `loader_for(detected_type)` is the registry. A type with no loader yet gives None: the parse step
-leaves such a version in PARSING, as before, until its loader lands (archives: a later issue).
+leaves such a version in PARSING, as before, until its loader lands.
 """
 
+from sbam_workers.ingest.loaders.archive import load_targz, load_zip
 from sbam_workers.ingest.loaders.base import (
     Attachment,
     Heartbeat,
@@ -55,6 +56,8 @@ LOADERS: dict[str, Loader] = {
     "js": load_javascript,
     "go": load_go,
     "cpp": load_cpp,
+    "zip": load_zip,
+    "tar.gz": load_targz,
 }
 
 
