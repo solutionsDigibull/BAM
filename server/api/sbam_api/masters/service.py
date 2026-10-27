@@ -40,6 +40,7 @@ from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.masters.context import Version, build_master_context
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion, MasterSnapshot
+from sbam_api.masters.pins import pinned_documents
 from sbam_api.masters.repository import MasterEntryRepository
 from sbam_api.masters.snapshot import Candidate, resolve, snapshot_hash
 from sbam_api.projects.models import Project
@@ -276,15 +277,18 @@ def _resolve(repo: MasterEntryRepository, project_id: uuid.UUID) -> list[Snapsho
 
 
 def create_snapshot(session: Session, user: CurrentUser, project_id: uuid.UUID) -> MasterSnapshot:
-    """Pin the project's current master versions (callers: SOW generation, knowledge builds)."""
+    """Pin the project's current master versions and its parsed master documents (callers: SOW
+    generation, knowledge builds)."""
     _active_project(session, user, project_id)
     repo = _repo(session, user)
     pinned = _resolve(repo, project_id)
+    documents = pinned_documents(session, user.context().tenant_id, project_id)
     snapshot = repo.add_snapshot(
         MasterSnapshot(
             project_id=project_id,
             entries=[e.model_dump(mode="json") for e in pinned],
-            sha256=snapshot_hash(project_id, pinned),
+            documents=[d.model_dump(mode="json") for d in documents],
+            sha256=snapshot_hash(project_id, pinned, documents),
             created_by=user.keycloak_sub,
         )
     )
@@ -299,6 +303,16 @@ def get_snapshot(session: Session, user: CurrentUser, snapshot_id: uuid.UUID) ->
     return snapshot
 
 
+def snapshot_documents(
+    session: Session, user: CurrentUser, snapshot_id: uuid.UUID
+) -> list[SnapshotDocument]:
+    """The parsed master documents `snapshot_id` pinned (the caller's tenant's, else 404)."""
+    snapshot = _repo(session, user).snapshot(snapshot_id)
+    if snapshot is None:
+        raise not_found()
+    return [SnapshotDocument.model_validate(d) for d in snapshot.documents or []]
+
+
 def context_outdated(session: Session, user: CurrentUser, snapshot_id: uuid.UUID) -> bool:
     """True when the masters changed since `snapshot_id` was pinned (T07). Starts nothing."""
     repo = _repo(session, user)
@@ -306,7 +320,8 @@ def context_outdated(session: Session, user: CurrentUser, snapshot_id: uuid.UUID
     if snapshot is None:
         raise not_found()
     now = _resolve(repo, snapshot.project_id)
-    return snapshot_hash(snapshot.project_id, now) != snapshot.sha256
+    now_documents = pinned_documents(session, user.context().tenant_id, snapshot.project_id)
+    return snapshot_hash(snapshot.project_id, now, now_documents) != snapshot.sha256
 
 
 # --- master context for Cognee (E3.6) -------------------------------------------------------

@@ -82,6 +82,7 @@ def _snapshot(row: models.MasterSnapshot) -> MastersSnapshot:
             "tenant_id": row.tenant_id,
             "project_id": row.project_id,
             "entries": row.entries,
+            "documents": row.documents or [],
             "sha256": row.sha256,
             "created_at": row.created_at,
         }

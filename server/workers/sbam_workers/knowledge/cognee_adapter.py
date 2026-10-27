@@ -24,7 +24,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from sbam_api.storage.base import StorageBackend
+from sbam_api.storage.base import Kind, StorageBackend
 from sbam_contracts.knowledge import (
     DATASET_PATTERN,
     MAX_GRAPH_PAGE,
@@ -94,6 +94,11 @@ class ScopeGuard(Protocol):
 
     def eligible_versions(self, scope: ProjectScope, ids: set[uuid.UUID]) -> set[uuid.UUID]:
         """The ids among `ids` that are document versions of this project, CLEAN and PARSED."""
+        ...
+
+    def eligible_master_documents(self, scope: ProjectScope, ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        """The ids among `ids` that are master documents the project may use: the tenant's own or
+        the project's, CLEAN and PARSED (E3.8b)."""
         ...
 
 
@@ -276,17 +281,30 @@ class CogneeAdapter:
 
     async def _check_items(self, scope: ProjectScope, items: Iterable[KnowledgeItem]) -> None:
         prefix = f"{scope.tenant_id}/{scope.project_id}/"
+        # A tenant-wide master document's derivative is stored under the tenant's all-zero project.
+        tenant_derived = f"{scope.tenant_id}/{uuid.UUID(int=0)}/{Kind.DERIVED.value}/"
         documents: set[uuid.UUID] = set()
+        master_documents: set[uuid.UUID] = set()
         for item in items:
             key = item.storage_key
-            if not key.startswith(prefix) or ".." in key.split("/"):
+            master = item.source is ItemSource.MASTER_DOCUMENT
+            under = key.startswith(prefix) or (master and key.startswith(tenant_derived))
+            if not under or ".." in key.split("/"):
                 raise ItemRejected(f"item {item.source_id} is not stored under this project")
             if item.source is ItemSource.DOCUMENT:
                 documents.add(item.source_id)
+            if master:
+                master_documents.add(item.source_id)
         if documents:
             ok = await asyncio.to_thread(self._guard.eligible_versions, scope, documents)
             if missing := documents - ok:
                 raise ItemRejected(f"{len(missing)} document version(s) are not CLEAN and PARSED")
+        if master_documents:
+            ok = await asyncio.to_thread(
+                self._guard.eligible_master_documents, scope, master_documents
+            )
+            if missing := master_documents - ok:
+                raise ItemRejected(f"{len(missing)} master document(s) are not CLEAN and PARSED")
 
     @staticmethod
     def _log(event: str, scope: ProjectScope, **counts: int) -> None:

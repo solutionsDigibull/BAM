@@ -121,6 +121,7 @@ class CoverageEntry(_Dto):
 class KnowledgeCoverage(_Dto):
     documents: list[CoverageEntry] = Field(default_factory=list)
     masters_included: int = 0  # master entries in masters.jsonl (E3.6)
+    master_documents: int = 0  # parsed master documents added as master context (E3.8b)
     entities: int = 0  # graph nodes after cognify
     relations: int = 0  # in the OKF bundle (E5.3)
     chunks: int = 0  # in the OKF bundle (E5.3)

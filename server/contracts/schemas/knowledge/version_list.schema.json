@@ -218,6 +218,11 @@
           "title": "Masters Included",
           "type": "integer"
         },
+        "master_documents": {
+          "default": 0,
+          "title": "Master Documents",
+          "type": "integer"
+        },
         "entities": {
           "default": 0,
           "title": "Entities",
