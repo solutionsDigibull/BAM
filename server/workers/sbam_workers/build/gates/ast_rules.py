@@ -68,18 +68,20 @@ _WRITES: Final = re.compile(r"\b(update|delete|truncate|drop|alter|replace|merge
 HANDOFF_MODULE: Final = "state_handoff"
 
 CODES: Final = {
-    GateName.AST_DECOUPLING: ["TOOL_COUPLED"],
+    GateName.AST_DECOUPLING: ["CROSS_IMPORT"],
     GateName.AST_NO_MANUAL_LOOP: [
+        "WHILE_LOOP",
         "MANUAL_LOOP",
         "RECURSION",
         "RETRY_CONSTRUCT",
+        "RETRY_DECORATOR",
         "UNBOUNDED_ITERATION",
     ],
     GateName.AST_HANDOFF: [
         "HANDOFF_FIELD_MISSING",
-        "HANDOFF_NOT_CALLED",
+        "APPEND_MISSING",
         "HANDOFF_PRIVATE_ACCESS",
-        "HANDOFF_WRITE",
+        "HANDOFF_MUTATION",
     ],
     GateName.AST_IMPORTS: [
         "DYNAMIC_ACCESS",
@@ -87,14 +89,22 @@ CODES: Final = {
         "FORBIDDEN_IMPORT",
         "IMPORT_NOT_ALLOWED",
     ],
-    GateName.AST_SQL_SAFETY: ["SQL_NOT_LITERAL", "SQL_UNSAFE"],
+    GateName.AST_SQL_SAFETY: ["SQL_NOT_LITERAL", "DYNAMIC_SQL"],
 }
 
 
+def _snippet(node: ast.AST) -> str | None:
+    """The offending code, first line only and at most 200 chars (the issue's `snippet`)."""
+    try:
+        lines = ast.unparse(node).splitlines()
+    except (ValueError, RecursionError):
+        return None
+    return lines[0][:200] if lines else None
+
+
 def _at(gate: GateName, code: str, message: str, file: str, node: ast.AST) -> Finding:
-    return Finding(
-        gate, code, message, file, getattr(node, "lineno", 1), getattr(node, "col_offset", 0)
-    )
+    line, col = getattr(node, "lineno", 1), getattr(node, "col_offset", 0)
+    return Finding(gate, code, message, file, line, col, actual=_snippet(node))
 
 
 def _top(name: str | None) -> str:
@@ -166,7 +176,7 @@ def check_decoupling(trees: Mapping[str, ast.Module], params: Mapping[str, Any])
                 problem = f"names {node.value!r} as a string"
             if problem:
                 message = f"{file} {problem}: the action and check tools must stay independent"
-                findings.append(_at(gate, "TOOL_COUPLED", message, file, node))
+                findings.append(_at(gate, "CROSS_IMPORT", message, file, node))
     return findings
 
 
@@ -225,14 +235,14 @@ def check_no_manual_loop(trees: Mapping[str, ast.Module]) -> list[Finding]:
             for deco in fn.decorator_list:
                 if _retry_decorator(deco):
                     message = f"{fn.name!r} is wrapped in a retry decorator; retries are Temporal's"
-                    findings.append(_at(gate, "RETRY_CONSTRUCT", message, file, deco))
+                    findings.append(_at(gate, "RETRY_DECORATOR", message, file, deco))
         for fn in _recursive(tree):
             message = f"{fn.name!r} calls itself, directly or through others: that is a manual loop"
             findings.append(_at(gate, "RECURSION", message, file, fn))
         for node in ast.walk(tree):
             if isinstance(node, ast.While):
                 message = "`while` is a manual loop; iterate declaratively over data"
-                findings.append(_at(gate, "MANUAL_LOOP", message, file, node))
+                findings.append(_at(gate, "WHILE_LOOP", message, file, node))
             elif isinstance(node, ast.For | ast.AsyncFor):
                 if isinstance(node, ast.AsyncFor):
                     message = "`async for` may never end; iterate declaratively over data"
@@ -330,7 +340,7 @@ def check_handoff(trees: Mapping[str, ast.Module], params: Mapping[str, Any]) ->
             calls = _handoff_calls(fn)
             if not calls:
                 message = f"{name!r} never calls state_handoff.append(...)"
-                findings.append(_at(gate, "HANDOFF_NOT_CALLED", message, ACTION_FILE, fn))
+                findings.append(_at(gate, "APPEND_MISSING", message, ACTION_FILE, fn))
             for call in calls:
                 if call.args or any(k.arg is None for k in call.keywords):
                     message = "state_handoff.append takes explicit keywords only (no * or **)"
@@ -357,7 +367,7 @@ def check_handoff(trees: Mapping[str, ast.Module], params: Mapping[str, Any]) ->
                 text = node.value
                 if table.lower() in text.lower() and _WRITES.search(text):
                     message = f"SQL that changes or drops {table!r}: the handoff is append-only"
-                    findings.append(_at(gate, "HANDOFF_WRITE", message, file, node))
+                    findings.append(_at(gate, "HANDOFF_MUTATION", message, file, node))
     return findings
 
 
@@ -518,7 +528,7 @@ def check_sql_safety(trees: Mapping[str, ast.Module]) -> list[Finding]:
                 or any(isinstance(n, ast.Name) and n.id in sql_names for n in ast.walk(built))
             ):
                 message = "SQL text is built at runtime; use a literal with %s placeholders"
-                findings.append(_at(gate, "SQL_UNSAFE", message, file, built))
+                findings.append(_at(gate, "DYNAMIC_SQL", message, file, built))
             if (
                 file in TOOL_FILES
                 and isinstance(node, ast.Call)

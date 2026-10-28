@@ -1,9 +1,9 @@
 """E12.3 unit tests: AST_DECOUPLING, AST_NO_MANUAL_LOOP, AST_HANDOFF, AST_IMPORTS, AST_SQL_SAFETY.
 
 The bundle is the real assembled MS01.1 output; each negative test inserts one construct into the
-action body or a helper slot, the way a wrong (or hostile) LLM answer could. Test names carry the
-rule they exercise; the issue's own test-case IDs are to be matched against these when the issue
-body is at hand. Nothing here imports or executes generated code.
+action body or a helper slot, the way a wrong (or hostile) LLM answer could. `t01`..`t10` are the
+issue's own test cases; the other tests cover the same rules more widely. The inserted code (even
+`eval` or `os.system`) is only ever parsed: nothing here imports or executes generated code.
 """
 
 import ast
@@ -78,7 +78,7 @@ def only_failed(results: dict[GateName, CheckResult]) -> set[GateName]:
 # --- the good bundle -----
 
 
-def test_e12_3_good_bundle_passes_all_five(
+def test_e12_3_t10_good_bundle_passes_all_five(
     template: LoadedTemplate, good: dict[str, bytes]
 ) -> None:
     results = rules(template, good)
@@ -86,7 +86,7 @@ def test_e12_3_good_bundle_passes_all_five(
     assert {r.status for r in results.values()} == {GateStatus.PASSED}
 
 
-def test_e12_3_bounded_for_over_data_is_allowed(
+def test_e12_3_t09_bounded_for_over_data_is_allowed(
     template: LoadedTemplate, good: dict[str, bytes]
 ) -> None:
     files = in_action(good, "    total = 0\n    for d in range(3):\n        total += d\n")
@@ -114,16 +114,16 @@ def test_e12_3_decoupling_action_may_not_reach_the_check_tool(
     template: LoadedTemplate, good: dict[str, bytes], code: str
 ) -> None:
     results = rules(template, in_action(good, code))
-    assert "TOOL_COUPLED" in codes(results, GateName.AST_DECOUPLING)
+    assert "CROSS_IMPORT" in codes(results, GateName.AST_DECOUPLING)
 
 
 def test_e12_3_decoupling_check_may_not_reach_the_action_tool(
     template: LoadedTemplate, good: dict[str, bytes]
 ) -> None:
     files = in_helpers(good, "from . import action_tool\n", "check_tool.py")
-    assert "TOOL_COUPLED" in codes(rules(template, files), GateName.AST_DECOUPLING)
+    assert "CROSS_IMPORT" in codes(rules(template, files), GateName.AST_DECOUPLING)
     files = in_action(good, "    " + ACTION + "(1, 2, 3)\n", "check_tool.py")
-    assert "TOOL_COUPLED" in codes(rules(template, files), GateName.AST_DECOUPLING)
+    assert "CROSS_IMPORT" in codes(rules(template, files), GateName.AST_DECOUPLING)
 
 
 def test_e12_3_decoupling_shared_modules_are_fine(
@@ -139,8 +139,8 @@ def test_e12_3_decoupling_shared_modules_are_fine(
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
-        ("    while True:\n        break\n", "MANUAL_LOOP"),
-        ("    while current:\n        current = None\n", "MANUAL_LOOP"),
+        ("    while True:\n        break\n", "WHILE_LOOP"),
+        ("    while current:\n        current = None\n", "WHILE_LOOP"),
         (
             "    for _ in range(3):\n        try:\n            pass\n        except Exception:\n"
             "            continue\n",
@@ -168,7 +168,7 @@ def test_e12_3_no_manual_loop_nested_while_in_a_helper(
         "def _h():\n    def _inner():\n        while True:\n            pass\n    return _inner\n"
     )
     results = rules(template, in_helpers(good, helper))
-    assert "MANUAL_LOOP" in codes(results, GateName.AST_NO_MANUAL_LOOP)
+    assert "WHILE_LOOP" in codes(results, GateName.AST_NO_MANUAL_LOOP)
 
 
 def test_e12_3_no_manual_loop_retry_decorator_and_library(
@@ -176,10 +176,10 @@ def test_e12_3_no_manual_loop_retry_decorator_and_library(
 ) -> None:
     helper = "from tenacity import retry\n\n\n@retry(stop=3)\ndef _h() -> None:\n    pass\n"
     results = rules(template, in_helpers(good, helper), modules=("tenacity",))
-    assert "RETRY_CONSTRUCT" in codes(results, GateName.AST_NO_MANUAL_LOOP)
+    assert "RETRY_DECORATOR" in codes(results, GateName.AST_NO_MANUAL_LOOP)
     helper = "def retry(f):\n    return f\n\n\n@retry\ndef _h() -> None:\n    pass\n"
     results = rules(template, in_helpers(good, helper))
-    assert "RETRY_CONSTRUCT" in codes(results, GateName.AST_NO_MANUAL_LOOP)
+    assert "RETRY_DECORATOR" in codes(results, GateName.AST_NO_MANUAL_LOOP)
 
 
 def test_e12_3_no_manual_loop_recursion(template: LoadedTemplate, good: dict[str, bytes]) -> None:
@@ -202,7 +202,7 @@ def test_e12_3_handoff_action_must_append(template: LoadedTemplate, good: dict[s
     start = text.index("    state_handoff.append(")
     end = text.index("    )\n", start) + len("    )\n")
     files = {**good, "action_tool.py": (text[:start] + text[end:]).encode()}
-    assert "HANDOFF_NOT_CALLED" in codes(rules(template, files), GateName.AST_HANDOFF)
+    assert "APPEND_MISSING" in codes(rules(template, files), GateName.AST_HANDOFF)
 
 
 def test_e12_3_handoff_every_required_field(
@@ -237,7 +237,7 @@ def test_e12_3_handoff_call_in_a_nested_function_does_not_count(
     block = text[start:end]
     nested = "    def never():\n" + "".join("    " + ln + "\n" for ln in block.splitlines())
     files = {**good, "action_tool.py": (text[:start] + nested + text[end:]).encode()}
-    assert "HANDOFF_NOT_CALLED" in codes(rules(template, files), GateName.AST_HANDOFF)
+    assert "APPEND_MISSING" in codes(rules(template, files), GateName.AST_HANDOFF)
 
 
 @pytest.mark.parametrize(
@@ -253,7 +253,7 @@ def test_e12_3_handoff_table_is_append_only(
     template: LoadedTemplate, good: dict[str, bytes], code: str
 ) -> None:
     results = rules(template, in_action(good, code))
-    assert "HANDOFF_WRITE" in codes(results, GateName.AST_HANDOFF)
+    assert "HANDOFF_MUTATION" in codes(results, GateName.AST_HANDOFF)
 
 
 def test_e12_3_handoff_writer_private_state_is_off_limits(
@@ -343,7 +343,7 @@ def test_e12_3_sql_built_at_runtime_is_unsafe(
     template: LoadedTemplate, good: dict[str, bytes], code: str
 ) -> None:
     results = rules(template, in_action(good, code))
-    assert "SQL_UNSAFE" in codes(results, GateName.AST_SQL_SAFETY)
+    assert "DYNAMIC_SQL" in codes(results, GateName.AST_SQL_SAFETY)
 
 
 @pytest.mark.parametrize(
@@ -400,7 +400,7 @@ def test_e12_3_attack_handoff_in_dead_branch_does_not_count(
     head, block, tail = _without_append(good)
     dead = guard + "".join("    " + ln + "\n" for ln in block.splitlines())
     files = {**good, "action_tool.py": (head + dead + tail).encode()}
-    assert "HANDOFF_NOT_CALLED" in codes(rules(template, files), GateName.AST_HANDOFF)
+    assert "APPEND_MISSING" in codes(rules(template, files), GateName.AST_HANDOFF)
 
 
 def test_e12_3_attack_handoff_after_return_does_not_count(
@@ -408,7 +408,7 @@ def test_e12_3_attack_handoff_after_return_does_not_count(
 ) -> None:
     head, block, tail = _without_append(good)
     files = {**good, "action_tool.py": (head + "    return {}\n" + block + tail).encode()}
-    assert "HANDOFF_NOT_CALLED" in codes(rules(template, files), GateName.AST_HANDOFF)
+    assert "APPEND_MISSING" in codes(rules(template, files), GateName.AST_HANDOFF)
 
 
 def test_e12_3_attack_handoff_inside_a_live_branch_counts(
@@ -461,7 +461,7 @@ def test_e12_3_attack_sql_built_through_a_variable(
     template: LoadedTemplate, good: dict[str, bytes], code: str
 ) -> None:
     results = rules(template, in_action(good, code))
-    assert "SQL_UNSAFE" in codes(results, GateName.AST_SQL_SAFETY)
+    assert "DYNAMIC_SQL" in codes(results, GateName.AST_SQL_SAFETY)
 
 
 # --- determinism -----
@@ -472,3 +472,77 @@ def test_e12_3_findings_are_deterministic(template: LoadedTemplate, good: dict[s
     first = [(g, [f.as_dict() for f in r.findings]) for g, r in rules(template, files).items()]
     second = [(g, [f.as_dict() for f in r.findings]) for g, r in rules(template, files).items()]
     assert first == second
+
+
+# --- the issue's own scenarios (E12.3-T01 .. T08), with the exact inputs from the issue -----------
+
+
+def failed_codes(results: dict[GateName, CheckResult], gate: GateName) -> set[str]:
+    assert results[gate].status is GateStatus.FAILED
+    return codes(results, gate)
+
+
+def test_e12_3_t01_check_tool_imports_the_action_tool(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    files = in_helpers(good, "from .action_tool import verify_otp\n", "check_tool.py")
+    results = rules(template, files)
+    assert failed_codes(results, GateName.AST_DECOUPLING) == {"CROSS_IMPORT"}
+    [finding] = results[GateName.AST_DECOUPLING].findings
+    assert finding.actual == "from .action_tool import verify_otp"  # the snippet, <= 200 chars
+
+
+def test_e12_3_t02_while_retry_loop_in_the_action(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    files = in_action(good, "    ok = False\n    while not ok:\n        ok = try_once()\n")
+    found = failed_codes(rules(template, files), GateName.AST_NO_MANUAL_LOOP)
+    assert "WHILE_LOOP" in found
+
+
+def test_e12_3_t03_tenacity_retry_decorator(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    helper = "import tenacity\n\n\n@tenacity.retry\ndef _h() -> None:\n    pass\n"
+    results = rules(template, in_helpers(good, helper), modules=("tenacity",))
+    assert "RETRY_DECORATOR" in failed_codes(results, GateName.AST_NO_MANUAL_LOOP)
+
+
+def test_e12_3_t04_action_never_appends_to_the_handoff(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    text = good["action_tool.py"].decode()
+    start = text.index("    state_handoff.append(")
+    end = text.index("    )\n", start) + len("    )\n")
+    files = {**good, "action_tool.py": (text[:start] + text[end:]).encode()}
+    assert "APPEND_MISSING" in failed_codes(rules(template, files), GateName.AST_HANDOFF)
+
+
+def test_e12_3_t05_update_on_the_handoff_table(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    code = "    state.x.execute('UPDATE auth_event_audit_handoff SET payload = 1')\n"
+    found = failed_codes(rules(template, in_action(good, code)), GateName.AST_HANDOFF)
+    assert "HANDOFF_MUTATION" in found
+
+
+def test_e12_3_t06_f_string_sql(template: LoadedTemplate, good: dict[str, bytes]) -> None:
+    code = '    state.x.execute(f"SELECT * FROM t WHERE id={mobile_number}")\n'
+    found = failed_codes(rules(template, in_action(good, code)), GateName.AST_SQL_SAFETY)
+    assert "DYNAMIC_SQL" in found
+
+
+def test_e12_3_t07_forbidden_import_and_call(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    files = in_action(good, "    import pickle\n    eval(otp_payload)\n")
+    found = failed_codes(rules(template, files), GateName.AST_IMPORTS)
+    assert {"FORBIDDEN_IMPORT", "FORBIDDEN_CALL"} <= found
+
+
+def test_e12_3_t08_injection_derived_import_is_rejected(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    files = in_action(good, "    import os\n    os.system(otp_payload)\n")
+    found = failed_codes(rules(template, files), GateName.AST_IMPORTS)
+    assert found & {"FORBIDDEN_IMPORT", "FORBIDDEN_CALL", "IMPORT_NOT_ALLOWED"}
