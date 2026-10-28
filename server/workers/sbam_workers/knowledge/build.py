@@ -41,7 +41,7 @@ from sbam_api.knowledge.service import (
     finish_version,
     record_source,
 )
-from sbam_api.masters.service import create_snapshot, export_master_context
+from sbam_api.masters.service import create_snapshot, export_master_context, snapshot_documents
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.factory import make_backend
@@ -137,8 +137,11 @@ def _allocate(deps: BuildDeps, inp: RunInput) -> _Version:
         )
 
 
-def _pin_masters(deps: BuildDeps, inp: RunInput, version: _Version) -> tuple[KnowledgeItem, int]:
-    """The version's snapshot (pinned once, kept on retries) as a MASTERS item."""
+def _pin_masters(
+    deps: BuildDeps, inp: RunInput, version: _Version
+) -> tuple[KnowledgeItem, int, list[KnowledgeItem]]:
+    """The version's snapshot (pinned once, kept on retries) as a MASTERS item, the number of
+    master entries in it, and a MASTER_DOCUMENT item for each parsed master document it pinned."""
     user = _system_user(inp)
     with deps.sessions() as session:
         snapshot_id = version.snapshot_id
@@ -152,13 +155,23 @@ def _pin_masters(deps: BuildDeps, inp: RunInput, version: _Version) -> tuple[Kno
         report = export_master_context(
             session, user, snapshot_id, inp.project_id, deps.storage, deps.clock()
         )
+        pinned = snapshot_documents(session, user, snapshot_id)
     item = KnowledgeItem(
         source=ItemSource.MASTERS,
         source_id=snapshot_id,
         sha256=report.sha256,
         storage_key=report.storage_key,
     )
-    return item, len(report.included)
+    documents = [
+        KnowledgeItem(
+            source=ItemSource.MASTER_DOCUMENT,
+            source_id=doc.document_id,
+            sha256=doc.derived_md_key.rsplit("/", 1)[-1],  # derivatives are named by their hash
+            storage_key=doc.derived_md_key,
+        )
+        for doc in pinned
+    ]
+    return item, len(report.included), documents
 
 
 def _documents(deps: BuildDeps, inp: RunInput) -> tuple[list[KnowledgeItem], list[CoverageEntry]]:
@@ -273,7 +286,7 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
     scope = ProjectScope(tenant_id=inp.tenant_id, project_id=inp.project_id)
     coverage = KnowledgeCoverage()
     try:
-        masters, included = await asyncio.to_thread(_pin_masters, deps, inp, version)
+        masters, included, master_docs = await asyncio.to_thread(_pin_masters, deps, inp, version)
         items, entries = await asyncio.to_thread(_documents, deps, inp)
         sha = {item.source_id: item.sha256 for item in items}
         await deps.adapter.ensure_dataset(scope)
@@ -281,7 +294,12 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
             entries.append(await _add_one(deps.adapter, scope, item))
         if included and not await _add_masters(deps.adapter, scope, masters):
             included = 0
-        coverage = KnowledgeCoverage(documents=_sorted(entries), masters_included=included)
+        added_docs = 0
+        for master_doc in master_docs:  # context only: never an FDE source (C3)
+            added_docs += await _add_masters(deps.adapter, scope, master_doc)
+        coverage = KnowledgeCoverage(
+            documents=_sorted(entries), masters_included=included, master_documents=added_docs
+        )
         await asyncio.to_thread(_record, deps, inp, version.id, coverage.documents, sha)
         if not any(e.status is SourceStatus.ADDED for e in entries):
             raise EmptyCorpus("no document could be added")
@@ -328,7 +346,8 @@ async def _add_one(
 
 
 async def _add_masters(adapter: CogneeAdapter, scope: ProjectScope, item: KnowledgeItem) -> bool:
-    """The masters context helps but is not required: a refusal is logged, the build goes on."""
+    """The masters context (masters.jsonl, or a parsed master document) helps but is not
+    required: a refusal is logged, the build goes on."""
     try:
         await adapter.add(scope, [item])
     except CogneeUnavailable:

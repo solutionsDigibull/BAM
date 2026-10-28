@@ -6,6 +6,8 @@ A scratch database migrated to head; dropped at the end.
 import threading
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -14,11 +16,13 @@ from sbam_api.core.conventions import ApiError
 from sbam_api.db.migrate import config
 from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.masters import service
-from sbam_api.masters.models import MasterEntryVersion
+from sbam_api.masters.models import MasterDocument, MasterEntryVersion
+from sbam_api.masters.snapshot import snapshot_hash
 from sbam_api.masters.sql import APPEND_ONLY_SQLSTATE
 from sbam_api.projects.models import Project
+from sbam_api.storage.local import LocalDiskBackend
 from sbam_contracts.masters import MasterType
-from sbam_contracts.masters_api import MasterEntryCreate, MasterVersionCreate
+from sbam_contracts.masters_api import MasterEntryCreate, MasterVersionCreate, SnapshotEntry
 from sqlalchemy import pool, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
@@ -138,3 +142,45 @@ def test_e3_2_migration_downgrades_and_upgrades_cleanly(
     command.upgrade(config(), "head")
     with sessions() as s:
         assert s.execute(text("SELECT to_regclass('sbam.master_entries')")).scalar() is not None
+
+
+def test_e3_8b_a_snapshot_pins_a_parsed_master_document_on_postgres(
+    sessions: sessionmaker[Session], tmp_path: Path
+) -> None:
+    """The JSONB `documents` column round-trips, the hash covers it and the export verifies."""
+    with sessions() as s:
+        project = Project(tenant_id=TENANT, name="E3.8b", status="ACTIVE", state="IDLE")
+        s.add(project)
+        s.commit()
+        sha = "c" * 64
+        s.add(
+            MasterDocument(
+                tenant_id=TENANT,
+                project_id=None,
+                title="standard.pdf",
+                filetype_row_label="Filetype #21",
+                intent_class="Policy / rules",
+                master_type="RULES",
+                route_source="DEFAULT_BY_FILETYPE",
+                storage_key=f"{TENANT}/{uuid.UUID(int=0)}/uploads/{sha}",
+                sha256=sha,
+                size=10,
+                mime="application/pdf",
+                scan_status="CLEAN",
+                parse_status="PARSED",
+                derived_md_key=f"{TENANT}/{uuid.UUID(int=0)}/derived/{'d' * 64}",
+            )
+        )
+        s.commit()
+        snap = service.create_snapshot(s, ADMIN, project.id)
+        s.expire_all()
+        pinned = service.snapshot_documents(s, ADMIN, snap.id)
+        assert [d.title for d in pinned] == ["standard.pdf"] and pinned[0].sha256 == sha
+        entries = [SnapshotEntry.model_validate(e) for e in snap.entries]
+        assert snap.sha256 == snapshot_hash(project.id, entries, pinned)
+        now = datetime(2026, 10, 27, tzinfo=UTC)
+        report = service.export_master_context(
+            s, ADMIN, snap.id, project.id, LocalDiskBackend(tmp_path), now
+        )
+        assert report.snapshot_id == snap.id
+        assert service.context_outdated(s, ADMIN, snap.id) is False
