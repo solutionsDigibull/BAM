@@ -1,8 +1,8 @@
 """macro_skills
 
-Revision ID: 0026_macro_skills
-Revises: 0025_workflows
-Create Date: 2026-10-23
+Revision ID: 0030_macro_skills
+Revises: 0029_filetype_row_versions
+Create Date: 2026-10-28
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
 only your module's tables; downgrade() undoes exactly this revision and nothing older.
@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0026_macro_skills"
-down_revision: str | Sequence[str] | None = "0025_workflows"
+revision: str = "0030_macro_skills"
+down_revision: str | Sequence[str] | None = "0029_filetype_row_versions"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
