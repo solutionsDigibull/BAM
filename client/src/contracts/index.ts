@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:9d947db426dd373291aff61456ac171795ef1c47d12925aefbf54d2ffb6056b2
+// source-sha256:695c039e77b26c8028e5b9d15a7ccdd44211e2b3139a2f8d5b1ea93a426d7bcb
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -428,6 +428,8 @@ export interface SbamContracts {
   SowApproveRequest?: SowApproveRequest;
   SowApproval?: SowApproval;
   SowCitationDetail?: SowCitationDetail;
+  SowNewVersionRequest?: SowNewVersionRequest;
+  SowImpact?: SowImpact;
   Run?: Run;
   RunAccepted?: RunAccepted;
   RuntimeRegistry?: RuntimeRegistry;
@@ -2175,6 +2177,55 @@ export interface SowCitationDetail {
   passage: string;
   truncated?: boolean;
   source_available: boolean;
+}
+/**
+ * `POST P/sow/new-version` (E7.2): start a scope change from the approved version. The
+ * answer is the new IN_REVIEW draft (`SowVersionSummary`), a copy of the approved content.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowNewVersionRequest".
+ */
+export interface SowNewVersionRequest {
+  reason: string;
+}
+/**
+ * `GET P/sow/versions/{v}/impact` (E7.2): what approving draft `version` would invalidate in
+ * the Workflow of the approved `base_version`. Computed on the server only; the same function
+ * runs at approval and its result is stored (`sow_impacts`), so the preview is what happens.
+ * Sub-Skills not listed keep their state (`reused_sub_skills_count`). `added_modules` will get
+ * new Macro Skills.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowImpact".
+ */
+export interface SowImpact {
+  version: number;
+  base_version: number;
+  changed_sections: SowSectionDiff[];
+  affected_macro_skills: SowImpactMacroSkill[];
+  affected_sub_skills: SowImpactSubSkill[];
+  added_modules: string[];
+  reused_sub_skills_count: number;
+}
+/**
+ * A Macro Skill of the current Workflow whose SOW sections changed.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowImpactMacroSkill".
+ */
+export interface SowImpactMacroSkill {
+  macro_category: string;
+  reason: string;
+}
+/**
+ * A Sub-Skill that cites a changed or removed feature: it is invalidated and rebuilt.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SowImpactSubSkill".
+ */
+export interface SowImpactSubSkill {
+  skill_id: string;
+  reason: string;
 }
 /**
  * One Temporal execution as the API returns it (mirror of `temporal_runs`).
