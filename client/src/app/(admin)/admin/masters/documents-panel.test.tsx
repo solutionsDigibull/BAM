@@ -29,7 +29,13 @@ const doc = (over: Partial<MasterDocumentOut> = {}): MasterDocumentOut => ({
   ...over,
 });
 
-const pdf = { extensions: [".pdf", ".png"], mvp_enabled: true } as unknown as FiletypeInfo;
+// The API lists extensions without the dot, as `filetypes.yaml` does.
+const pdf = { extensions: ["pdf", "png"], mvp_enabled: true } as unknown as FiletypeInfo;
+const more = {
+  extensions: ["txt", "tar.gz"],
+  mvp_enabled: true,
+} as unknown as FiletypeInfo;
+const future = { extensions: ["step"], mvp_enabled: false } as unknown as FiletypeInfo;
 
 function drop(name: string, size = 2048) {
   const input = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -80,6 +86,46 @@ describe("Master documents panel (E3.11)", () => {
     drop("scan.pdf", 15 * 1024 * 1024 + 1);
     expect(await screen.findByText("Larger than 15 MB")).toBeDefined();
     expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  test("e3_389 a file whose extension the API lists without a dot is sent, whatever its case", async () => {
+    const { calls } = fakeApi({
+      [LIST]: { body: { items: [] } },
+      [FILETYPES]: { body: [pdf, more, future] },
+      "POST /admin/master-documents": { status: 201, body: doc() },
+    });
+    renderWithRefine(<DocumentsPanel />);
+    await screen.findByText(/No master documents yet/);
+    await waitFor(() => expect(calls.some((c) => c.path === "/admin/filetypes")).toBe(true));
+    for (const name of ["kiwi.txt", "SCAN.PDF", "bundle.TAR.GZ"]) drop(name);
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST")).toHaveLength(3));
+    expect(screen.queryByText("File type not supported yet")).toBeNull();
+  });
+
+  test("e3_389 a type the API does not enable, or a bare .gz, is still turned away", async () => {
+    const { calls } = fakeApi({
+      [LIST]: { body: { items: [] } },
+      [FILETYPES]: { body: [pdf, more, future] },
+    });
+    renderWithRefine(<DocumentsPanel />);
+    await screen.findByText(/No master documents yet/);
+    await waitFor(() => expect(calls.some((c) => c.path === "/admin/filetypes")).toBe(true));
+    drop("part.step");
+    drop("logs.gz");
+    await waitFor(() => expect(screen.getAllByText("File type not supported yet")).toHaveLength(2));
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  test("e3_389 the file picker is offered dotted extensions", async () => {
+    const { calls } = fakeApi({
+      [LIST]: { body: { items: [] } },
+      [FILETYPES]: { body: [pdf, more, future] },
+    });
+    renderWithRefine(<DocumentsPanel />);
+    await screen.findByText(/No master documents yet/);
+    await waitFor(() => expect(calls.some((c) => c.path === "/admin/filetypes")).toBe(true));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await waitFor(() => expect(input.getAttribute("accept")).toBe(".pdf,.png,.txt,.tar.gz"));
   });
 
   test("upload is scanned and routed by the server", async () => {
