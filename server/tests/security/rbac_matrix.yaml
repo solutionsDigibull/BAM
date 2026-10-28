@@ -465,6 +465,26 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"  # the same content as v1: answered, nothing written
 
+  # E7.2: project A's v1 is not approved, so an allowed caller gets 409 NO_APPROVED_SOW.
+  sow_new_version_api_v1_projects__project_id__sow_new_version_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/sow/new-version
+      params: {project_id: "@project_a"}
+      json: {reason: "RBAC suite scope change"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 NO_APPROVED_SOW"
+
+  sow_impact_api_v1_projects__project_id__sow_versions__version__impact_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/sow/versions/{version}/impact
+      params: {project_id: "@project_a", version: 1}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 NO_APPROVED_SOW"
+
   sow_diff_api_v1_projects__project_id__sow_versions__version__diff__other__get:
     request:
       method: GET

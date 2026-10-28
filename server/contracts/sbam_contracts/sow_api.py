@@ -63,6 +63,9 @@ def sow_workflow_id(project_id: UUID) -> str:
     return f"sow-{project_id}"
 
 
+MAX_REASON_CHARS: Final = 500  # why a scope change was started (E7.2)
+
+
 class _Dto(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -218,6 +221,43 @@ class SowDiff(_Dto):
     sections: list[SowSectionDiff]  # all nine, in `SECTIONS` order
 
 
+class SowNewVersionRequest(_Dto):
+    """`POST P/sow/new-version` (E7.2): start a scope change from the approved version. The
+    answer is the new IN_REVIEW draft (`SowVersionSummary`), a copy of the approved content."""
+
+    reason: Annotated[str, Field(min_length=1, max_length=MAX_REASON_CHARS)]
+
+
+class SowImpactMacroSkill(_Dto):
+    """A Macro Skill of the current Workflow whose SOW sections changed."""
+
+    macro_category: str
+    reason: str  # the changed ids, e.g. "M-QUOTING MODIFIED"
+
+
+class SowImpactSubSkill(_Dto):
+    """A Sub-Skill that cites a changed or removed feature: it is invalidated and rebuilt."""
+
+    skill_id: str
+    reason: str  # e.g. "F-QUOTING-1 MODIFIED"
+
+
+class SowImpact(_Dto):
+    """`GET P/sow/versions/{v}/impact` (E7.2): what approving draft `version` would invalidate in
+    the Workflow of the approved `base_version`. Computed on the server only; the same function
+    runs at approval and its result is stored (`sow_impacts`), so the preview is what happens.
+    Sub-Skills not listed keep their state (`reused_sub_skills_count`). `added_modules` will get
+    new Macro Skills."""
+
+    version: int
+    base_version: int
+    changed_sections: list[SowSectionDiff]  # only the changed ones, in `SECTIONS` order
+    affected_macro_skills: list[SowImpactMacroSkill]
+    affected_sub_skills: list[SowImpactSubSkill]
+    added_modules: list[str]
+    reused_sub_skills_count: Annotated[int, Field(ge=0)]
+
+
 class ExportFormat(StrEnum):
     PDF = "pdf"
     DOCX = "docx"
@@ -249,4 +289,6 @@ def schemas() -> dict[str, dict[str, Any]]:
         "approve_request": contract_schema(SowApproveRequest, "sow/approve_request"),
         "approval": contract_schema(SowApproval, "sow/approval"),
         "citation_detail": contract_schema(SowCitationDetail, "sow/citation_detail"),
+        "new_version_request": contract_schema(SowNewVersionRequest, "sow/new_version_request"),
+        "impact": contract_schema(SowImpact, "sow/impact"),
     }

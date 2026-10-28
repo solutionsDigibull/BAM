@@ -7,7 +7,7 @@ import Keycloak from "next-auth/providers/keycloak";
 
 import { landing, type Portal } from "@/lib/landing";
 import { isAdmin, isFde, parseRoles, type Role } from "@/lib/roles";
-import { needsRefresh, refresh, type KeycloakTokens } from "@/lib/token-refresh";
+import { needsRefresh, refreshShared, type KeycloakTokens } from "@/lib/token-refresh";
 
 export type { Portal };
 
@@ -86,8 +86,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const now = Math.floor(Date.now() / 1000);
       if (!needsRefresh(token as KeycloakTokens, now)) return token;
       const portal = (token.portal as Portal | undefined) ?? "fde";
-      const next = await refresh(token as KeycloakTokens, PORTAL_CLIENT[portal], now, (body) =>
-        fetch(tokenEndpoint(), { method: "POST", body }),
+      const next = await refreshShared(
+        token as KeycloakTokens,
+        PORTAL_CLIENT[portal],
+        now,
+        (body) => fetch(tokenEndpoint(), { method: "POST", body }),
       );
       // Roles can change in Keycloak; they take effect at the next refresh (<= 300 s).
       return next.error ? next : { ...next, roles: rolesOf(next.accessToken) };

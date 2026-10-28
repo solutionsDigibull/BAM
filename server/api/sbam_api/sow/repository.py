@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import func
 
 from sbam_api.db.repository import TenantScopedRepository
-from sbam_api.sow.models import Sow, SowExport, SowVersion
+from sbam_api.sow.models import Sow, SowExport, SowImpactRecord, SowVersion
 from sbam_api.state_machine.repository import StatefulRepository
 
 
@@ -64,4 +64,15 @@ class SowExportRepository(TenantScopedRepository[SowExport]):
             SowExport.template_version == template_version,
         )
         found: SowExport | None = self.session.scalars(query).one_or_none()
+        return found
+
+
+class SowImpactRepository(TenantScopedRepository[SowImpactRecord]):
+    """The impact stored at the approval of a scope-change version (E7.2)."""
+
+    model = SowImpactRecord
+
+    def of_version(self, sow_version_id: uuid.UUID) -> SowImpactRecord | None:
+        query = self._scoped().where(SowImpactRecord.sow_version_id == sow_version_id)
+        found: SowImpactRecord | None = self.session.scalars(query).one_or_none()
         return found

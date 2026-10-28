@@ -354,12 +354,8 @@ def _items(old: Any, new: Any, key: str | None) -> list[SowDiffItem]:
     return out
 
 
-def diff(
-    session: Session, user: CurrentUser, project_id: uuid.UUID, number: int, other: int
-) -> SowDiff:
-    """What changed from version `number` to version `other`, section by section."""
-    a = _version(session, user, project_id, number).structured or {}
-    b = _version(session, user, project_id, other).structured or {}
+def section_diffs(a: dict[str, Any], b: dict[str, Any]) -> list[SowSectionDiff]:
+    """All nine sections from structured SOW `a` to `b` (also the scope-change impact's input)."""
     sections = []
     for section in SECTION_TITLES:
         old, new = a.get(section), b.get(section)
@@ -367,4 +363,13 @@ def diff(
         items = _items(old, new, key)
         change = _change(old, new)
         sections.append(SowSectionDiff(section_id=section, change=change, items=items))  # type: ignore[arg-type]
-    return SowDiff(version=number, other=other, sections=sections)
+    return sections
+
+
+def diff(
+    session: Session, user: CurrentUser, project_id: uuid.UUID, number: int, other: int
+) -> SowDiff:
+    """What changed from version `number` to version `other`, section by section."""
+    a = _version(session, user, project_id, number).structured or {}
+    b = _version(session, user, project_id, other).structured or {}
+    return SowDiff(version=number, other=other, sections=section_diffs(a, b))
