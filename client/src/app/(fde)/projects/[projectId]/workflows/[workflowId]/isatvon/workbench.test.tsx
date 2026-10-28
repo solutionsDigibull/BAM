@@ -188,11 +188,14 @@ describe("workbench edits (E8.7)", () => {
     expect(parseEdit(ed("select", { enum: ["A", "B"] }), "C")).toEqual({
       error: "X must be one of A, B",
     });
-    expect(parseEdit(ed("expression"), "len(items[0]) > 2")).toEqual({
-      value: "len(items[0]) > 2",
+    expect(parseEdit(ed("expression"), "count > 2 AND NOT done")).toEqual({
+      value: "count > 2 AND NOT done",
     });
-    expect(parseEdit(ed("expression"), "len(items[0) > 2")).toEqual({
-      error: "X has unbalanced brackets",
+    expect(parseEdit(ed("expression"), "count >")).toEqual({
+      error: "X: SYNTAX unexpected 'end of expression' at 7 (line 1, col 8)",
+    });
+    expect(parseEdit(ed("expression"), "len(items[0]) > 2")).toEqual({
+      error: "X: GRAMMAR_FORBIDDEN call of 'len' at 0 (line 1, col 1)",
     });
     expect(parseEdit(ed("stringList"), " a \n\n b ")).toEqual({ value: ["a", "b"] });
     expect(parseEdit(ed("boolean"), false)).toEqual({ value: false });

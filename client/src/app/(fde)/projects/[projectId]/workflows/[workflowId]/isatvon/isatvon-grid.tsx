@@ -6,6 +6,7 @@
 import {
   DeleteOutlined,
   DownOutlined,
+  ProfileOutlined,
   ReloadOutlined,
   RightOutlined,
   WarningOutlined,
@@ -66,6 +67,7 @@ const POPUP: ReadonlySet<Editor> = new Set(["largeText", "json", "expression", "
 
 export type EditRequest = { row: WorkbenchSubSkill; column: GridColumn; value: unknown };
 export type RowAction =
+  | { action: "details"; kind: "sub"; id: string; label: string }
   | { action: "regenerate"; kind: "macro" | "sub"; id: string; label: string }
   | { action: "delete"; kind: "sub"; id: string; label: string; row: WorkbenchSubSkill };
 type OnAction = (a: RowAction) => void;
@@ -73,33 +75,51 @@ type GridContext = { onAction: OnAction };
 
 // Row actions are UI chrome, not data: this column is fixed, never built from a row's keys (T06).
 // The handler comes through the grid context (stable), so the column defs never hold a callback.
-function ActionsCell({ data, context }: ICellRendererParams<GridRow, unknown, GridContext>) {
+// Details (the E8.8 drawer) is always there; regenerate and delete only while the breakdown is editable.
+function ActionsCell({
+  data,
+  context,
+  editable,
+}: ICellRendererParams<GridRow, unknown, GridContext> & { editable: boolean }) {
   if (data?.kind !== "sub") return null;
   const onAction = context.onAction;
   const label = String(valueAt(data.row.sub_skill, "skill_metadata.skill_id"));
   return (
     <Flex gap={4} align="center" style={{ height: "100%" }}>
-      <Tooltip title="Regenerate with a hint">
+      <Tooltip title="Details: full ISATVON, gates, citations, history">
         <Button
           size="small"
           type="text"
-          icon={<ReloadOutlined />}
-          aria-label={`Regenerate ${label}`}
-          onClick={() => onAction({ action: "regenerate", kind: "sub", id: data.id, label })}
+          icon={<ProfileOutlined />}
+          aria-label={`Details of ${label}`}
+          onClick={() => onAction({ action: "details", kind: "sub", id: data.id, label })}
         />
       </Tooltip>
-      <Tooltip title="Delete">
-        <Button
-          size="small"
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          aria-label={`Delete ${label}`}
-          onClick={() =>
-            onAction({ action: "delete", kind: "sub", id: data.id, label, row: data.row })
-          }
-        />
-      </Tooltip>
+      {editable && (
+        <>
+          <Tooltip title="Regenerate with a hint">
+            <Button
+              size="small"
+              type="text"
+              icon={<ReloadOutlined />}
+              aria-label={`Regenerate ${label}`}
+              onClick={() => onAction({ action: "regenerate", kind: "sub", id: data.id, label })}
+            />
+          </Tooltip>
+          <Tooltip title="Delete">
+            <Button
+              size="small"
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              aria-label={`Delete ${label}`}
+              onClick={() =>
+                onAction({ action: "delete", kind: "sub", id: data.id, label, row: data.row })
+              }
+            />
+          </Tooltip>
+        </>
+      )}
     </Flex>
   );
 }
@@ -180,15 +200,16 @@ function columnDefs(
 ): ColGroupDef<GridRow>[] {
   const actions: ColGroupDef<GridRow> = {
     headerName: "",
-    groupId: "actions",
+    groupId: "actions-group",
     children: [
       {
         colId: "actions",
         headerName: "Actions",
-        width: 96,
+        width: 128,
         pinned: "right",
         sortable: false,
         cellRenderer: ActionsCell,
+        cellRendererParams: { editable: isEditable(state) && !locked },
       },
     ],
   };
@@ -232,7 +253,7 @@ function columnDefs(
       },
     })),
   }));
-  return isEditable(state) && !locked ? [...data, actions] : data;
+  return [...data, actions];
 }
 
 const rowId = (p: GetRowIdParams<GridRow>) => p.data.id;

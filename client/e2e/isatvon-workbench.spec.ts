@@ -573,3 +573,146 @@ test("outside review there are no row actions or Validate, and Generate is off",
   await expect(generateButton(page)).toBeDisabled();
   await expect(page.getByRole("button", { name: "Export Excel" })).toBeEnabled();
 });
+
+// E8.8: the Sub-Skill drawer (gates in CodeMirror, citations, history) and the I/O dependency view.
+const GATE = "isatvon_definition.v_variables.success_gate";
+const io = (n: number, inputs: string[], outputs: Record<string, string>, gate = "ok == True") => {
+  const s = sub(1, n, { sow_refs: ["F-ACCESS-1"] });
+  Object.assign(s.sub_skill.isatvon_definition, {
+    s_source: { required_inputs: inputs, fresh_state_parameters: [] },
+    o_outcome: { json_schema: { ok: "boolean", ...outputs } },
+  });
+  (s.sub_skill.isatvon_definition.v_variables as Record<string, unknown>).success_gate = gate;
+  return s;
+};
+const details = (page: Page, n: number) =>
+  page.getByRole("button", { name: `Details of MS01.${n}_step_${n}` }).click();
+
+async function typeGate(page: Page, text: string) {
+  await page.getByRole("tab", { name: "Gates" }).click();
+  const editor = page.getByRole("textbox", { name: "success_gate" });
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type(text);
+}
+
+test("e8_8_t05 an unknown name is flagged inline, then the server's UNRESOLVED_IDENTIFIER", async ({
+  page,
+  baseURL,
+}) => {
+  const sent: Patch[] = [];
+  await open(page, baseURL!, tree([macro(1, [io(1, [], {})])]), async (p, route) => {
+    sent.push(p);
+    const bad = io(1, [], {}, String(p.changes[GATE]));
+    await json(route, {
+      ...bad,
+      state: "INVALID",
+      content_sha256: "b".repeat(64),
+      validation_errors: [
+        {
+          rule: 5,
+          path: GATE,
+          message: "unresolved identifier 'foo'",
+          code: "UNRESOLVED_IDENTIFIER",
+        },
+      ],
+    });
+  });
+  await details(page, 1);
+  await typeGate(page, "foo == 1");
+  await expect(page.getByTestId("gate-problems-success_gate")).toHaveText("Unknown identifier foo");
+  await expect(page.locator(".cm-lintRange-warning")).toBeVisible();
+  await page.getByRole("button", { name: "Save success_gate" }).click();
+  await expect(page.getByTestId("drawer-errors")).toContainText("UNRESOLVED_IDENTIFIER");
+  expect(sent[0]).toEqual({ ifMatch: `"${"a".repeat(64)}"`, changes: { [GATE]: "foo == 1" } });
+
+  await typeGate(page, "ok == ");
+  await expect(page.getByTestId("gate-problems-success_gate")).toContainText("SYNTAX");
+  await expect(page.getByRole("button", { name: "Save success_gate" })).toBeDisabled();
+});
+
+test("e8_8_t06 the drawer shows every ISATVON block, the citations and the history", async ({
+  page,
+  baseURL,
+}) => {
+  await open(
+    page,
+    baseURL!,
+    tree([macro(1, [io(1, ["mobile"], {})])]),
+    undefined,
+    (_req, path, route) =>
+      path.endsWith("/edits")
+        ? json(route, {
+            sub_skill_id: "x",
+            edits: [
+              { id: "e1", path: GATE, old: "a", new: "b", by: "fde-1", at: "2026-10-28T10:00:00Z" },
+            ],
+          })
+        : undefined,
+  );
+  await details(page, 1);
+  for (const letter of ["I", "S", "A", "T", "V", "O", "N"])
+    await expect(page.getByTestId(`block-${letter}`)).toBeVisible();
+  await expect(page.getByTestId("block-S")).toContainText("mobile");
+  await page.getByRole("tab", { name: "Citations (1)" }).click();
+  await expect(page.getByRole("link", { name: "F-ACCESS-1" })).toHaveAttribute(
+    "href",
+    `/projects/${PROJECT}/sow#F-ACCESS-1`,
+  );
+  await page.getByRole("tab", { name: "History" }).click();
+  await expect(page.getByTestId("drawer-history")).toContainText("fde-1");
+});
+
+test("e8_8_t07 a cycle MS01.2 -> MS01.3 -> MS01.2 is red in the graph and an error in the drawer", async ({
+  page,
+  baseURL,
+}) => {
+  await open(
+    page,
+    baseURL!,
+    tree([
+      macro(1, [
+        io(1, [], { a: "string" }),
+        io(2, ["a", "c"], { b: "string" }),
+        io(3, ["b"], { c: "string" }),
+      ]),
+    ]),
+  );
+  await page.getByRole("button", { name: "Dependencies" }).click();
+  await expect(page.getByTestId("io-cycle")).toBeVisible();
+  await expect(page.locator(".react-flow__edge.io-edge-cycle")).toHaveCount(2);
+  await expect(page.locator(".react-flow__edge:not(.io-edge-cycle)")).toHaveCount(1);
+  await page.locator(".react-flow__node", { hasText: "MS01.3_step_3" }).click();
+  await expect(page.getByTestId("drawer-cycle")).toHaveText(
+    "Dependency cycle: MS01.2_step_2 → MS01.3_step_3 → MS01.2_step_2",
+  );
+});
+
+test("e8_8_t08 a 412 on a gate reloads and keeps the user's edit beside the latest", async ({
+  page,
+  baseURL,
+}) => {
+  let reloaded = false;
+  await open(
+    page,
+    baseURL!,
+    () =>
+      tree([
+        macro(1, [
+          reloaded
+            ? { ...io(1, [], {}, "ok == False"), content_sha256: "c".repeat(64) }
+            : io(1, [], {}),
+        ]),
+      ]),
+    async (_p, route) => {
+      reloaded = true;
+      await json(route, { type: "about:blank", title: "Stale", status: 412 }, 412);
+    },
+  );
+  await details(page, 1);
+  await typeGate(page, "ok != True");
+  await page.getByRole("button", { name: "Save success_gate" }).click();
+  await expect(page.getByTestId("drawer-conflict")).toContainText("It is kept here");
+  await expect(page.getByTestId("conflict-mine")).toHaveText("ok != True");
+  await expect(page.getByTestId("conflict-theirs")).toHaveText("ok == False");
+});

@@ -1,0 +1,869 @@
+[
+ {
+  "expr": "retries >= max_iterations OR status == \"FAILED\"",
+  "ok": true,
+  "identifiers": [
+   "max_iterations",
+   "retries",
+   "status"
+  ]
+ },
+ {
+  "expr": "otp_match == True AND policy_violation == False",
+  "ok": true,
+  "identifiers": [
+   "otp_match",
+   "policy_violation"
+  ]
+ },
+ {
+  "expr": "failed_login_attempts >= max_iterations",
+  "ok": true,
+  "identifiers": [
+   "failed_login_attempts",
+   "max_iterations"
+  ]
+ },
+ {
+  "expr": "user_status is 'LOCKED'",
+  "ok": true,
+  "identifiers": [
+   "user_status"
+  ]
+ },
+ {
+  "expr": "user_status is not 'LOCKED'",
+  "ok": true,
+  "identifiers": [
+   "user_status"
+  ]
+ },
+ {
+  "expr": "a == 1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a != 1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a < 1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a <= 1.5",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a > -2",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a >= -2.25",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "NOT done",
+  "ok": true,
+  "identifiers": [
+   "done"
+  ]
+ },
+ {
+  "expr": "NOT NOT done",
+  "ok": true,
+  "identifiers": [
+   "done"
+  ]
+ },
+ {
+  "expr": "NOT (a == 1)",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "(a == 1)",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "((a))",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a AND b",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b"
+  ]
+ },
+ {
+  "expr": "a OR b",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b"
+  ]
+ },
+ {
+  "expr": "a AND b OR c",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b",
+   "c"
+  ]
+ },
+ {
+  "expr": "a OR b AND c",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b",
+   "c"
+  ]
+ },
+ {
+  "expr": "NOT a AND b",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b"
+  ]
+ },
+ {
+  "expr": "(a OR b) AND (c OR d)",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b",
+   "c",
+   "d"
+  ]
+ },
+ {
+  "expr": "x == None",
+  "ok": true,
+  "identifiers": [
+   "x"
+  ]
+ },
+ {
+  "expr": "x is None",
+  "ok": true,
+  "identifiers": [
+   "x"
+  ]
+ },
+ {
+  "expr": "x is not None",
+  "ok": true,
+  "identifiers": [
+   "x"
+  ]
+ },
+ {
+  "expr": "flag == True",
+  "ok": true,
+  "identifiers": [
+   "flag"
+  ]
+ },
+ {
+  "expr": "flag",
+  "ok": true,
+  "identifiers": [
+   "flag"
+  ]
+ },
+ {
+  "expr": "True",
+  "ok": true,
+  "identifiers": []
+ },
+ {
+  "expr": "False",
+  "ok": true,
+  "identifiers": []
+ },
+ {
+  "expr": "None",
+  "ok": true,
+  "identifiers": []
+ },
+ {
+  "expr": "1",
+  "ok": true,
+  "identifiers": []
+ },
+ {
+  "expr": "'text'",
+  "ok": true,
+  "identifiers": []
+ },
+ {
+  "expr": "\"text\"",
+  "ok": true,
+  "identifiers": []
+ },
+ {
+  "expr": "count == 0",
+  "ok": true,
+  "identifiers": [
+   "count"
+  ]
+ },
+ {
+  "expr": "count == 10",
+  "ok": true,
+  "identifiers": [
+   "count"
+  ]
+ },
+ {
+  "expr": "ratio == 0.5",
+  "ok": true,
+  "identifiers": [
+   "ratio"
+  ]
+ },
+ {
+  "expr": "name == ''",
+  "ok": true,
+  "identifiers": [
+   "name"
+  ]
+ },
+ {
+  "expr": "name == \"it's\"",
+  "ok": true,
+  "identifiers": [
+   "name"
+  ]
+ },
+ {
+  "expr": "name == 'say \"hi\"'",
+  "ok": true,
+  "identifiers": [
+   "name"
+  ]
+ },
+ {
+  "expr": "_private == 1",
+  "ok": true,
+  "identifiers": [
+   "_private"
+  ]
+ },
+ {
+  "expr": "a_b_c == x1",
+  "ok": true,
+  "identifiers": [
+   "a_b_c",
+   "x1"
+  ]
+ },
+ {
+  "expr": "snake_case_name >= other_name",
+  "ok": true,
+  "identifiers": [
+   "other_name",
+   "snake_case_name"
+  ]
+ },
+ {
+  "expr": "  a == 1  ",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a==1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a\t==\t1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a ==\n1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a == 1 AND\nb == 2",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b"
+  ]
+ },
+ {
+  "expr": "status == 'DONE' OR status == 'SKIPPED' OR status == 'FAILED'",
+  "ok": true,
+  "identifiers": [
+   "status"
+  ]
+ },
+ {
+  "expr": "elapsed_ms < budget_ms AND NOT timed_out",
+  "ok": true,
+  "identifiers": [
+   "budget_ms",
+   "elapsed_ms",
+   "timed_out"
+  ]
+ },
+ {
+  "expr": "a == 1 AND b == 2 AND c == 3 AND d == 4",
+  "ok": true,
+  "identifiers": [
+   "a",
+   "b",
+   "c",
+   "d"
+  ]
+ },
+ {
+  "expr": "status == ",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'end of expression' at 10"
+ },
+ {
+  "expr": "",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "empty expression"
+ },
+ {
+  "expr": "   ",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "empty expression"
+ },
+ {
+  "expr": "a ==",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'end of expression' at 4"
+ },
+ {
+  "expr": "== 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected '==' at 0"
+ },
+ {
+  "expr": "a == == 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected '==' at 5"
+ },
+ {
+  "expr": "a == 1 ==",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected '==' at 7"
+ },
+ {
+  "expr": "a == b == c",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected '==' at 7"
+ },
+ {
+  "expr": "(a == 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "expected ')' at 7"
+ },
+ {
+  "expr": "a == 1)",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected ')' at 6"
+ },
+ {
+  "expr": "()",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected ')' at 1"
+ },
+ {
+  "expr": "a AND",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'end of expression' at 5"
+ },
+ {
+  "expr": "OR b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'OR' at 0"
+ },
+ {
+  "expr": "a AND OR b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'OR' at 6"
+ },
+ {
+  "expr": "NOT",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'end of expression' at 3"
+ },
+ {
+  "expr": "a b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'b' at 2"
+ },
+ {
+  "expr": "user_status is already 'LOCKED'",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected \"'LOCKED'\" at 23"
+ },
+ {
+  "expr": "a is",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'end of expression' at 4"
+ },
+ {
+  "expr": "a is not",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'end of expression' at 8"
+ },
+ {
+  "expr": "a not b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'not' at 2"
+ },
+ {
+  "expr": "and == 1",
+  "ok": true,
+  "identifiers": [
+   "and"
+  ]
+ },
+ {
+  "expr": "AND == 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'AND' at 0"
+ },
+ {
+  "expr": "is == 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'is' at 0"
+ },
+ {
+  "expr": "x == true",
+  "ok": true,
+  "identifiers": [
+   "true",
+   "x"
+  ]
+ },
+ {
+  "expr": "x == TRUE",
+  "ok": true,
+  "identifiers": [
+   "TRUE",
+   "x"
+  ]
+ },
+ {
+  "expr": "a & b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '&' at 2"
+ },
+ {
+  "expr": "a && b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '&' at 2"
+ },
+ {
+  "expr": "a || b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '|' at 2"
+ },
+ {
+  "expr": "!a",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '!' at 0"
+ },
+ {
+  "expr": "a = 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '=' at 2"
+ },
+ {
+  "expr": "a == 1;",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character ';' at 6"
+ },
+ {
+  "expr": "a == 'unterminated",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character \"'\" at 5"
+ },
+ {
+  "expr": "a == \"unterminated",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '\"' at 5"
+ },
+ {
+  "expr": "a == 'line\nbreak'",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character \"'\" at 5"
+ },
+ {
+  "expr": "a == 'back\\slash'",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character \"'\" at 5"
+ },
+ {
+  "expr": "a == 1.",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '1' at 5"
+ },
+ {
+  "expr": "a == .5",
+  "ok": false,
+  "code": "ATTRIBUTE_NOT_ALLOWED",
+  "message": "attribute access at 5"
+ },
+ {
+  "expr": "a == 1e3",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '1' at 5"
+ },
+ {
+  "expr": "a == 0x10",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '0' at 5"
+ },
+ {
+  "expr": "a == 1_000",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '1' at 5"
+ },
+ {
+  "expr": "1abc == 2",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '1' at 0"
+ },
+ {
+  "expr": "a == -",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '-' at 5"
+ },
+ {
+  "expr": "a == - 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '-' at 5"
+ },
+ {
+  "expr": "a == +1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '+' at 5"
+ },
+ {
+  "expr": "x == 1 % 2",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '%' at 7"
+ },
+ {
+  "expr": "x == 1 + 2",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '+' at 7"
+ },
+ {
+  "expr": "#comment",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '#' at 0"
+ },
+ {
+  "expr": "a == `b`",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '`' at 5"
+ },
+ {
+  "expr": "a == $b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '$' at 5"
+ },
+ {
+  "expr": "a == @b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '@' at 5"
+ },
+ {
+  "expr": "a == 1 b",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected 'b' at 7"
+ },
+ {
+  "expr": "__import__(\"os\").system(\"x\")",
+  "ok": false,
+  "code": "CALL_NOT_ALLOWED",
+  "message": "call of '__import__' at 0"
+ },
+ {
+  "expr": "a.b()",
+  "ok": false,
+  "code": "ATTRIBUTE_NOT_ALLOWED",
+  "message": "attribute access at 1"
+ },
+ {
+  "expr": "a.b",
+  "ok": false,
+  "code": "ATTRIBUTE_NOT_ALLOWED",
+  "message": "attribute access at 1"
+ },
+ {
+  "expr": "os.system",
+  "ok": false,
+  "code": "ATTRIBUTE_NOT_ALLOWED",
+  "message": "attribute access at 2"
+ },
+ {
+  "expr": "f(x)",
+  "ok": false,
+  "code": "CALL_NOT_ALLOWED",
+  "message": "call of 'f' at 0"
+ },
+ {
+  "expr": "len (x)",
+  "ok": false,
+  "code": "CALL_NOT_ALLOWED",
+  "message": "call of 'len' at 0"
+ },
+ {
+  "expr": "a == f(1)",
+  "ok": false,
+  "code": "CALL_NOT_ALLOWED",
+  "message": "call of 'f' at 5"
+ },
+ {
+  "expr": "a[0]",
+  "ok": false,
+  "code": "SUBSCRIPT_NOT_ALLOWED",
+  "message": "subscript at 1"
+ },
+ {
+  "expr": "a == b[1]",
+  "ok": false,
+  "code": "SUBSCRIPT_NOT_ALLOWED",
+  "message": "subscript at 6"
+ },
+ {
+  "expr": "__class__ == 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "dunder name '__class__' at 0"
+ },
+ {
+  "expr": "__dunder",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "dunder name '__dunder' at 0"
+ },
+ {
+  "expr": "x == __y",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "dunder name '__y' at 5"
+ },
+ {
+  "expr": "status == 'done' AND __import__('os')",
+  "ok": false,
+  "code": "CALL_NOT_ALLOWED",
+  "message": "call of '__import__' at 21"
+ },
+ {
+  "expr": "eval('1')",
+  "ok": false,
+  "code": "CALL_NOT_ALLOWED",
+  "message": "call of 'eval' at 0"
+ },
+ {
+  "expr": "exec",
+  "ok": true,
+  "identifiers": [
+   "exec"
+  ]
+ },
+ {
+  "expr": "(((((((((((((((((((((((((((((((((a)))))))))))))))))))))))))))))))))",
+  "ok": false,
+  "code": "TOO_DEEP",
+  "message": "nesting deeper than 32"
+ },
+ {
+  "expr": "((((((((((((((((((((((((((((((((a))))))))))))))))))))))))))))))))",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT a",
+  "ok": false,
+  "code": "TOO_DEEP",
+  "message": "nesting deeper than 32"
+ },
+ {
+  "expr": "NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT NOT a",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1 OR a == 1",
+  "ok": false,
+  "code": "TOO_LONG",
+  "message": "longer than 2000 characters"
+ },
+ {
+  "expr": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "ok": false,
+  "code": "TOO_LONG",
+  "message": "longer than 2000 characters"
+ },
+ {
+  "expr": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "ok": true,
+  "identifiers": [
+   "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ]
+ },
+ {
+  "expr": "café == 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character 'é' at 3"
+ },
+ {
+  "expr": "a == ١",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a == 1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a　== 1",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "a﻿== 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character '\\ufeff' at 1"
+ },
+ {
+  "expr": "a == 1 ",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ },
+ {
+  "expr": "état == 1",
+  "ok": false,
+  "code": "SYNTAX",
+  "message": "unexpected character 'é' at 0"
+ },
+ {
+  "expr": "a == 'été'",
+  "ok": true,
+  "identifiers": [
+   "a"
+  ]
+ }
+]
