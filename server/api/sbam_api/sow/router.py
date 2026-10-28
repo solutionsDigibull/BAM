@@ -251,6 +251,13 @@ async def approve_sow_version(
     user: User,
     sessions: Sessions,
 ) -> SowApproval:
+    settings: Settings = request.app.state.settings
     return await approve_version(
-        sessions, lambda: temporal_client(request), user, project_id, version, body
+        sessions,
+        lambda: temporal_client(request),
+        user,
+        project_id,
+        version,
+        body,
+        with_search_attributes=settings.temporal_search_attributes,
     )

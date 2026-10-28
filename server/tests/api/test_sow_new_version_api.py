@@ -18,6 +18,7 @@ from sbam_api.projects.models import Project
 from sbam_api.sow.models import SowImpactRecord, SowVersion
 from sbam_api.sow.tiptap import to_tiptap
 from sbam_api.workflows.models import Workflow
+from sbam_contracts.pipeline import PipelineStage
 from sqlalchemy import select
 from test_auth import TENANT_A, TENANT_B, problem
 from test_workflows_api import Harness as WorkflowsHarness
@@ -325,3 +326,49 @@ def test_e7_2_a_new_module_is_reported_for_a_new_macro_skill(h: Harness) -> None
     report = h.impact(h.save_doc(doc)).json()
     assert report["added_modules"] == ["M-REFUNDS"]
     assert report["affected_sub_skills"] == [] and report["reused_sub_skills_count"] == 3
+
+
+# --- 2a: a scope-change approval replaces the pipeline run --------------------------------------
+
+
+def scope_change(h: Harness) -> int:
+    h.approved_v1()
+    h.new_version()
+    return h.save_doc(h.doc(features__0__name="Investor OTP & refunds"))
+
+
+def test_e7_2_a_waiting_run_is_replaced_by_one_carrying_the_approval(h: Harness) -> None:
+    v3 = scope_change(h)
+    h.pipeline.stage = PipelineStage.WAIT_GENERATE  # v1's Workflow waits for Generate
+    signals = len(h.pipeline.signals)
+    assert h.approve(h.sha(v3), version=v3).status_code == 200
+    assert len(h.pipeline.terminated) == 1
+    (started,) = h.pipeline.started
+    assert started.resume.stage is PipelineStage.WAIT_SOW_APPROVAL
+    assert started.resume.sow_approved.sow_version_id == h.version_row(v3).id
+    assert started.resume.sow_approved.sha256 == h.sha(v3)
+    assert len(h.pipeline.signals) == signals  # nothing signalled to the old run
+
+
+def test_e7_2_an_ended_run_is_not_terminated_just_replaced(h: Harness) -> None:
+    v3 = scope_change(h)
+    h.pipeline.stage, h.pipeline.open = PipelineStage.DONE, False
+    assert h.approve(h.sha(v3), version=v3).status_code == 200
+    assert h.pipeline.terminated == [] and len(h.pipeline.started) == 1
+
+
+def test_e7_2_a_working_run_is_409_and_nothing_is_approved(h: Harness) -> None:
+    v3 = scope_change(h)
+    h.pipeline.stage = PipelineStage.EXTRACT_SUB_SKILLS
+    problem(h.approve(h.sha(v3), version=v3), 409, "PIPELINE_RUNNING")
+    assert h.version_row(v3).state == "IN_REVIEW" and h.version_row(1).state == "APPROVED"
+    assert h.stored_impact(h.version_row(v3).id) is None
+    assert h.pipeline.terminated == [] and h.pipeline.started == []
+
+
+def test_e7_2_temporal_down_at_the_restart_is_503_and_nothing_is_approved(h: Harness) -> None:
+    v3 = scope_change(h)
+    h.pipeline.down = True
+    problem(h.approve(h.sha(v3), version=v3), 503, "ORCHESTRATOR_UNAVAILABLE")
+    assert h.version_row(v3).state == "IN_REVIEW"
+    assert h.stored_impact(h.version_row(v3).id) is None

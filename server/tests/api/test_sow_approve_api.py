@@ -12,6 +12,7 @@ from sbam_api.audit.models import AuditLog, NotificationOutbox
 from sbam_api.sow.models import Sow, SowVersion
 from sbam_contracts.pipeline import PipelineStage, PipelineStatus
 from sqlalchemy import select, update
+from temporalio.client import WorkflowExecutionStatus
 from temporalio.service import RPCError, RPCStatusCode
 from test_auth import ADMIN_A, FDE_A1, TENANT_B, problem
 from test_sow_api import Harness as SowHarness
@@ -31,15 +32,35 @@ class Handle:
             raise RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
         self.client.signals.append((name, payload))
 
+    async def describe(self, **_: Any) -> Any:
+        status = WorkflowExecutionStatus.RUNNING if self.client.open else None
+        return type("Description", (), {"status": status})()
+
+    async def terminate(self, reason: str | None = None, **_: Any) -> None:
+        self.client.terminated.append(reason or "")
+        self.client.open = False
+
 
 class PipelineClient:
+    """The project's pipeline as `signal_pipeline` / `restart_pipeline` see it (E7.1, E7.2)."""
+
     def __init__(self) -> None:
         self.stage = PipelineStage.WAIT_SOW_APPROVAL
         self.down = False
+        self.open = True  # the run is still running (waiting)
         self.signals: list[tuple[str, Any]] = []
+        self.terminated: list[str] = []
+        self.started: list[Any] = []  # PipelineInput of each new run
 
     def get_workflow_handle(self, workflow_id: str, **_: Any) -> Handle:
         return Handle(self)
+
+    async def start_workflow(self, workflow: str, arg: Any, **_: Any) -> Any:
+        if self.down:
+            raise RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
+        self.started.append(arg)
+        self.open = True
+        return type("Started", (), {"result_run_id": f"run-{len(self.started)}"})()
 
 
 class Harness(SowHarness):
@@ -184,4 +205,5 @@ def test_e7_1_a_newer_approval_supersedes_the_previous_one(h: Harness) -> None:
     assert (h.row(1).state, h.row(2).state) == ("SUPERSEDED", "APPROVED")
     with h.sessions() as s:
         assert s.scalars(select(Sow.approved_version_id)).one() == h.row(2).id
-    assert len(h.pipeline.signals) == 2
+    # The second is a scope change (E7.2): a new run carries it instead of a signal.
+    assert len(h.pipeline.signals) == 1 and len(h.pipeline.started) == 1
