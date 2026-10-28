@@ -51,6 +51,7 @@ import {
   approvePath,
   EMPTY_SOW,
   EXPORT_FORMATS,
+  FAILED_NO_VERSION,
   GENERATING,
   MAX_TIPTAP_BYTES,
   NEW_VERSION_SOON,
@@ -110,6 +111,13 @@ export function SowScreen({ projectId }: { projectId: string }) {
   const projects = useList<Project, ApiError>({
     resource: PROJECTS_RESOURCE,
     pagination: { mode: "off" },
+    // While the SOW stage runs, so a generation that fails before writing a version shows as failed (#376).
+    queryOptions: {
+      refetchInterval: (q) =>
+        q.state.data?.data.find((p) => p.id === projectId)?.pipeline_state === "SOW_GENERATING"
+          ? POLL_MS
+          : false,
+    },
   });
   const project = projects.result.data?.find((p) => p.id === projectId);
 
@@ -297,9 +305,11 @@ export function SowScreen({ projectId }: { projectId: string }) {
         onSuccess: () => {
           setRegenOpen(false);
           dropDraft();
-          setRegeneratingFrom(current?.version ?? 0);
+          // With no version yet, the project's state (SOW_GENERATING, then a version or FAILED) drives the screen.
+          if (current) setRegeneratingFrom(current.version);
           void message.success("Regeneration started.");
           refetchAll();
+          void projects.query.refetch();
         },
         onError: (error) => void message.error(regenerateErrorMessage(error)),
       },
@@ -347,19 +357,38 @@ export function SowScreen({ projectId }: { projectId: string }) {
     });
 
   // --- states ---------------------------------------------------------------------------------------
+  // No SOW version yet: still generating, failed before writing one (retry from here, #376), or not started.
+  const noVersion = () =>
+    generating ? (
+      <Alert type="info" showIcon message={GENERATING} data-testid="sow-generating" />
+    ) : project?.pipeline_state === "SOW_GENERATION_FAILED" ? (
+      <>
+        <Alert
+          type="error"
+          showIcon
+          data-testid="sow-failed"
+          message="SOW generation failed"
+          description={FAILED_NO_VERSION}
+          action={<Button onClick={() => setRegenOpen(true)}>Regenerate</Button>}
+        />
+        <RegenerateModal
+          open={regenOpen}
+          busy={regenerate.mutation.isPending}
+          onCancel={() => setRegenOpen(false)}
+          onRegenerate={onRegenerate}
+        />
+      </>
+    ) : (
+      <EmptyState message={EMPTY_SOW} />
+    );
   if (overview.query.isLoading) return <LoadingState />;
   if (overview.query.error) {
-    if (statusOf(overview.query.error) === 404)
-      return generating ? (
-        <Alert type="info" showIcon message={GENERATING} data-testid="sow-generating" />
-      ) : (
-        <EmptyState message={EMPTY_SOW} />
-      );
+    if (statusOf(overview.query.error) === 404) return noVersion();
     return (
       <ApiErrorState error={overview.query.error} onRetry={() => void overview.query.refetch()} />
     );
   }
-  if (!current) return <EmptyState message={EMPTY_SOW} />;
+  if (!current) return noVersion();
 
   const version = detail.result.data;
   const isCurrent = shownVersion === current.version;
