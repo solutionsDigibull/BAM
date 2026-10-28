@@ -590,6 +590,16 @@ routes:
       fde_a_assigned: "200"
 
   # Revalidates every Sub-Skill of the Workflow; read-only (E8.3).
+  # E8.5: the RBAC world's Workflow has no Macro Skills, so an allowed caller gets 409 CONFLICT.
+  export_isatvon_api_v1_projects__project_id__workflows__workflow_id__isatvon_export_xlsx_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/isatvon/export.xlsx
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 CONFLICT"
+
   validate_api_v1_projects__project_id__workflows__workflow_id__isatvon_validate_post:
     request:
       method: POST
