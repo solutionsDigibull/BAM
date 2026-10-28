@@ -17,6 +17,12 @@ trace id.
 - A SUCCEEDED row keeps the validated output. An activity replayed with the same
   (workflow id, activity id, attempt) gets that output back and Bifrost is not called, so it is not
   billed twice.
+- Identical input is never billed twice (`llm_derivatives`): the key is the SHA-256 of the exact
+  messages plus the alias, shared by every project of the tenant. A changed prompt, schema or
+  document is a different key, so a stale answer is never served. A hit writes a zero-cost
+  `llm_calls` row (model `derivative-cache`) so provenance and the replay key stay whole.
+- Opt-in budgets (`LLM_PROJECT_BUDGET_USD`, `LLM_TENANT_BUDGET_USD`) refuse the next model call,
+  non-retryably, once recorded spend reaches them. Cache hits are still served.
 - Transport errors, 5xx and 429 are tried a few times with backoff, then raised as the retryable
   `LlmTransportError`. Schema failures end in the non-retryable `SchemaInvalidAfterRetries`.
 """
@@ -54,6 +60,7 @@ CHARS_PER_TOKEN = 4  # ponytail: a rough guard; the model's own count is in llm_
 IMAGE_TYPES = ("image/png", "image/jpeg")
 MAX_IMAGES = 4  # per call
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+DERIVATIVE_MODEL = "derivative-cache"  # `llm_calls.model` of a row served from the cache
 IMAGE_TOKENS = 2000  # ponytail: a rough allowance per image for the context guard
 IMAGE_RULES = (
     'The user message also holds images, each introduced by an <image name="..."> line. '
@@ -95,6 +102,12 @@ class ContextTooLarge(Exception):  # noqa: N818 - fixed name in E6.1
     retryable = False
 
 
+class BudgetExceeded(Exception):  # noqa: N818
+    """Recorded spend reached a configured budget. Retrying cannot help until it is raised."""
+
+    retryable = False
+
+
 class LlmTransportError(Exception):
     """Bifrost could not be reached or kept failing. Retryable: the activity's retry policy
     applies."""
@@ -130,6 +143,13 @@ def _cost(raw: Any) -> float:
     if isinstance(raw, dict):
         raw = raw.get("total_cost")
     return float(raw) if isinstance(raw, int | float) else 0.0
+
+
+def cache_key(alias: str, messages: list[Message]) -> str:
+    """What was asked, exactly: the alias and every byte of both messages (prompt text, schema,
+    documents, images). Nothing else (ids, correlation) may enter, or identical input would miss."""
+    canonical = json.dumps([alias, messages], sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def _escape(text: str) -> str:
@@ -264,10 +284,41 @@ class LlmClient:
             output = output_type.model_validate_json(json.dumps(hit.output), strict=True)
             return LlmResult(output, hit.llm_call_id, hit.trace_id, 0, cached=True)
 
+        key = cache_key(alias, messages)
+        if self.settings.llm_derivative_cache:
+            stored = await asyncio.to_thread(self.store.derivative, scope, key)
+            if stored is not None:
+                try:
+                    reused = output_type.model_validate_json(json.dumps(stored), strict=True)
+                except ValueError:  # an answer the current schema refuses: ask again
+                    reused = None
+                if reused is not None and not (validate and validate(reused)):
+                    row_id = await asyncio.to_thread(
+                        self.store.add,
+                        scope,
+                        {
+                            "alias": alias,
+                            "model": DERIVATIVE_MODEL,
+                            "prompt_id": prompt.id,
+                            "prompt_version": prompt.version,
+                            "prompt_sha256": prompt.sha256,
+                            "attempt": 1,
+                            "status": "SUCCEEDED",
+                            "trace_id": new_trace_id(),
+                            "context_manifest": {**manifest, "_derivative": {"cache_key": key}},
+                            "output": stored,
+                        },
+                    )
+                    return LlmResult(reused, row_id, "", 0, cached=True)
+
+        await self._check_budget(scope)
+
         trace_id = new_trace_id()
         shown = trace_view(messages)
         row_ids: list[uuid.UUID] = []
         started_at = datetime.now(UTC)
+        spent_in = spent_out = 0
+        spent_usd = Decimal(0)
 
         async def record(
             status: str,
@@ -277,8 +328,12 @@ class LlmClient:
             errors: tuple[str, ...] = (),
             error: str | None = None,
         ) -> None:
-            nonlocal started_at
+            nonlocal started_at, spent_in, spent_out, spent_usd
             ended = datetime.now(UTC)
+            if reply is not None:
+                spent_in += reply.tokens_in
+                spent_out += reply.tokens_out
+                spent_usd += Decimal(str(reply.cost_usd))
             output_json: dict[str, Any] | None = None
             if status == "SUCCEEDED" and reply is not None:
                 output_json = output_type.model_validate_json(
@@ -363,7 +418,35 @@ class LlmClient:
         result = await run_structured(
             call, messages, output_type, on_attempt=on_attempt, validate=validate
         )
+        if self.settings.llm_derivative_cache:
+            await asyncio.to_thread(
+                self.store.put_derivative,
+                scope,
+                {
+                    "cache_key": key,
+                    "alias": alias,
+                    "prompt_id": prompt.id,
+                    "prompt_version": prompt.version,
+                    "output": result.output.model_dump(mode="json"),
+                    "tokens_in": spent_in,
+                    "tokens_out": spent_out,
+                    "cost_usd": spent_usd,  # the whole run, re-asks included: what a hit saves
+                },
+            )
         return LlmResult(result.output, row_ids[-1], trace_id, len(result.attempts))
+
+    async def _check_budget(self, scope: LlmScope) -> None:
+        for limit, tenant, what in (
+            (self.settings.llm_project_budget_usd, False, "project"),
+            (self.settings.llm_tenant_budget_usd, True, "tenant"),
+        ):
+            if limit is None:
+                continue
+            spent = await asyncio.to_thread(self.store.spent, scope, tenant=tenant)
+            if spent >= limit:
+                raise BudgetExceeded(
+                    f"the {what} has spent ${spent:.4f} of its ${limit:.4f} LLM budget"
+                )
 
     async def _post(
         self,

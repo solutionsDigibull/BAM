@@ -16,7 +16,7 @@ import pytest
 from knowledge_db import World, versions
 from llm_db import FakeBifrost, completion, make_client, scope
 from sbam_api.db.repository import TenantContext
-from sbam_api.llm.models import LlmCall
+from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_api.llm.repository import LlmCallRepository
 from sbam_api.sow.models import Sow, SowVersion
 from sbam_api.sow.service import canonical_sha256
@@ -65,7 +65,12 @@ class Gen:
         engine = w.sessions.kw["bind"]
         Sow.metadata.create_all(
             engine,
-            tables=[LlmCall.__table__, Sow.__table__, SowVersion.__table__],  # type: ignore[list-item]
+            tables=[
+                LlmCall.__table__,
+                LlmDerivative.__table__,
+                Sow.__table__,
+                SowVersion.__table__,
+            ],  # type: ignore[list-item]
         )
         w.docs(*(docs or DOCS))
         self.inp = w.run_input()
@@ -235,8 +240,9 @@ def test_e6_2_a_citation_with_the_wrong_document_is_refused(g: Gen) -> None:
     bad["scope"]["citations"][0]["document_version_id"] = str(uuid.uuid4())
     bifrost = FakeBifrost([completion(json.dumps(bad)), completion(g.answer())])
     g.run(bifrost)
-    assert "scope.citations: CITATION_DOCUMENT_MISMATCH" in (
-        bifrost.requests[1]["messages"][-1]["content"]
+    assert (
+        "scope.citations: CITATION_DOCUMENT_MISMATCH"
+        in (bifrost.requests[1]["messages"][-1]["content"])
     )
 
 

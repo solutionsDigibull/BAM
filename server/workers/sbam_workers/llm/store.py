@@ -4,10 +4,11 @@ uses
 
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Protocol
 
 from sbam_api.db.repository import TenantContext
-from sbam_api.llm.repository import LlmCallRepository
+from sbam_api.llm.repository import LlmCallRepository, LlmDerivativeRepository
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -34,6 +35,16 @@ class CallStore(Protocol):
     def cached(self, scope: LlmScope, prompt_id: str) -> Cached | None: ...
 
     def add(self, scope: LlmScope, values: dict[str, Any]) -> uuid.UUID: ...
+
+    def derivative(self, scope: LlmScope, cache_key: str) -> dict[str, Any] | None:
+        """The stored answer for `cache_key` in the tenant (counting the hit), or None."""
+        ...
+
+    def put_derivative(self, scope: LlmScope, values: dict[str, Any]) -> None: ...
+
+    def spent(self, scope: LlmScope, *, tenant: bool = False) -> Decimal:
+        """Recorded spend of the scope's project, or of its whole tenant."""
+        ...
 
 
 class SqlCallStore:
@@ -65,3 +76,24 @@ class SqlCallStore:
             )
             session.commit()
             return row.id
+
+    def derivative(self, scope: LlmScope, cache_key: str) -> dict[str, Any] | None:
+        with self.sessions() as session:
+            repo = LlmDerivativeRepository(session, TenantContext(scope.tenant_id, None))
+            row = repo.by_key(cache_key)
+            if row is None:
+                return None
+            repo.hit(row)
+            session.commit()
+            return row.output
+
+    def put_derivative(self, scope: LlmScope, values: dict[str, Any]) -> None:
+        with self.sessions() as session:
+            repo = LlmDerivativeRepository(session, TenantContext(scope.tenant_id, None))
+            repo.put({**values, "created_by": "sbam-worker"})
+            session.commit()
+
+    def spent(self, scope: LlmScope, *, tenant: bool = False) -> Decimal:
+        with self.sessions() as session:
+            ctx = TenantContext(scope.tenant_id, None if tenant else scope.project_id)
+            return LlmCallRepository(session, ctx).spent()

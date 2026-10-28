@@ -496,8 +496,8 @@ def good(page: int, text: str = "Real text") -> str:
     return json.dumps({"page": page, "markdown": text, "unreadable": False})
 
 
-def real_reader(bifrost: FakeBifrost) -> tuple[Any, Any]:
-    return make_client(bifrost)
+def real_reader(bifrost: FakeBifrost, **settings: Any) -> tuple[Any, Any]:
+    return make_client(bifrost, **settings)
 
 
 def test_e4_8_t03_real_wrapper_invalid_answers_are_asked_three_more_times_then_unreadable(
@@ -614,10 +614,10 @@ def test_e4_8_r01_a_retry_does_not_ask_the_model_again_for_the_pages_already_rea
     assert blocks(h, ref) == [(n, f"Real text {n}", "llm", False) for n in range(1, 7)]
 
 
-def test_e4_8_r01_a_new_run_of_the_same_workflow_asks_again(h: Harness) -> None:
+def _retry_as_a_new_run(h: Harness, cache: bool) -> list[int]:
     ref = pending(h, "scan.pdf", scanned(2))
     bifrost = PagedBifrost()
-    client, _ = real_reader(bifrost)
+    client, _ = real_reader(bifrost, llm_derivative_cache=cache)
     run = OcrRun("wf-r01b", "act-1", 1, "run-a")
     assert asyncio.run(ocr.ocr_version(OcrDeps(h.sessions, h.storage, client), ref, run)).parsed
     assert bifrost.asked == [1, 2]
@@ -629,7 +629,19 @@ def test_e4_8_r01_a_new_run_of_the_same_workflow_asks_again(h: Harness) -> None:
         s.commit()
     fresh = OcrRun("wf-r01b", "act-1", 1, "run-b")
     asyncio.run(ocr.ocr_version(OcrDeps(h.sessions, h.storage, client), ref, fresh))
-    assert bifrost.asked == [1, 2, 1, 2]
+    return bifrost.asked
+
+
+def test_e4_8_r01_a_new_run_of_the_same_workflow_asks_again_without_the_derivative_cache(
+    h: Harness,
+) -> None:
+    assert _retry_as_a_new_run(h, cache=False) == [1, 2, 1, 2]
+
+
+def test_a_new_run_re_reading_the_same_pages_is_served_from_the_derivative_cache(
+    h: Harness,
+) -> None:
+    assert _retry_as_a_new_run(h, cache=True) == [1, 2]  # identical page images: not billed twice
 
 
 def test_e4_8_r01_the_temporal_attempt_is_kept_in_the_calls_manifest(h: Harness) -> None:
