@@ -393,7 +393,9 @@ services:
     mem_limit: 2g # Cognee + LanceDB; 1g is not enough for cognify
   worker-llm:
     <<: *worker
-    environment: { <<: *worker-env, SBAM_QUEUES: sbam-llm }
+    # SOW generation reads the OKF bundle and the SOW export stores files, so it needs the storage volume (#373).
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-llm, STORAGE_ROOT: /data/storage }
+    volumes: [storage:/data/storage]
   worker-build:
     <<: *worker
     # Also runs the run-mirror reconciler every 60 s (one worker is enough; passes are idempotent).
