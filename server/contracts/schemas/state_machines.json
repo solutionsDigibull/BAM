@@ -545,7 +545,9 @@
       "SUPERSEDED"
     ],
     "initial": [
-      "DRAFT"
+      "CERTIFIED",
+      "DRAFT",
+      "INVALIDATED"
     ],
     "terminal": [
       "SUPERSEDED"
@@ -560,6 +562,18 @@
         "from": null,
         "event": "extracted",
         "to": "DRAFT",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": null,
+        "event": "reused",
+        "to": "CERTIFIED",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": null,
+        "event": "carried_invalidated",
+        "to": "INVALIDATED",
         "actor": "SYSTEM"
       },
       {
@@ -751,6 +765,12 @@
       {
         "from": null,
         "event": "extracted",
+        "to": "PENDING",
+        "actor": "SYSTEM"
+      },
+      {
+        "from": null,
+        "event": "carried_over",
         "to": "PENDING",
         "actor": "SYSTEM"
       },
