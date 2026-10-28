@@ -19,6 +19,7 @@ import {
 } from "@/components/ui-kit";
 import type {
   IsatvonSchemaResponse,
+  WorkbenchMacro,
   RuleViolation,
   SubSkillPatch,
   ValidationReport,
@@ -28,7 +29,9 @@ import type {
 import { download } from "@/app/(admin)/admin/masters/masters-api";
 import type { ApiError } from "@/providers/data-provider";
 
+import { cycleMessage, ioGraph } from "./io-graph";
 import type { EditRequest, RowAction } from "./isatvon-grid";
+import { SubSkillDrawer } from "./sub-skill-drawer";
 import {
   applyReport,
   exportUrl,
@@ -54,6 +57,7 @@ const IsatvonGrid = dynamic(() => import("./isatvon-grid"), {
   ssr: false,
   loading: () => <LoadingState />,
 });
+const IoView = dynamic(() => import("./io-view"), { ssr: false, loading: () => <LoadingState /> });
 
 export const EMPTY_MESSAGE = "No Macro Skills yet";
 const EXTRACT_POLL_MS = 5_000;
@@ -113,6 +117,21 @@ export function WorkbenchScreen({
   const [busy, setBusy] = useState<string | null>(null);
   const [regen, setRegen] = useState<RowAction | null>(null);
   const [hint, setHint] = useState("");
+  const [open, setOpen] = useState<string | null>(null); // the drawer's Sub-Skill id
+  const [showIo, setShowIo] = useState(false);
+  // malformed rows (null macro / Sub-Skill) are flagged by the grid; the graph and drawer skip them
+  const macros = useMemo(
+    () =>
+      (((current as Partial<WorkbenchTree> | null)?.macros ?? []) as (WorkbenchMacro | null)[])
+        .filter((m): m is WorkbenchMacro => !!m)
+        .map((m) => ({ ...m, sub_skills: (m.sub_skills ?? []).filter((s) => s?.id) })),
+    [current],
+  );
+  const drawerRow = subs.find((s) => s.id === open) ?? null;
+  const drawerCycle = useMemo(() => {
+    const macro = macros.find((m) => (m.sub_skills ?? []).some((s) => s.id === open));
+    return macro && open ? cycleMessage(ioGraph(macro.sub_skills ?? []), open) : null;
+  }, [macros, open]);
 
   /** The answers every command shares: stale → reload, locked → read-only, else the problem detail. */
   const failed = async (err: ApiError) => {
@@ -204,6 +223,7 @@ export function WorkbenchScreen({
   };
 
   const onAction = (a: RowAction) => {
+    if (a.action === "details") return setOpen(a.id);
     if (a.action === "regenerate") return setRegen(a);
     modal.confirm({
       title: `Delete ${a.label}?`,
@@ -351,6 +371,13 @@ export function WorkbenchScreen({
             <Button size="small" loading={busy === "export"} onClick={exportExcel}>
               Export Excel
             </Button>
+            <Button
+              size="small"
+              type={showIo ? "primary" : "default"}
+              onClick={() => setShowIo((v) => !v)}
+            >
+              Dependencies
+            </Button>
             {/* A disabled button swallows hover, so the reason sits on a wrapper. */}
             <Tooltip title={blocked ?? "Generate code for every VALID Sub-Skill"}>
               <span>
@@ -376,6 +403,26 @@ export function WorkbenchScreen({
           onAction={onAction}
           state={state}
           locked={locked}
+        />
+        {showIo && (
+          <div style={{ marginTop: 16 }}>
+            <IoView macros={macros} onOpen={setOpen} />
+          </div>
+        )}
+        <SubSkillDrawer
+          projectId={projectId}
+          workflowId={workflowId}
+          row={drawerRow}
+          editable={canAct}
+          cycle={drawerCycle}
+          onSaved={(saved) => {
+            const next = replaceSub(latest.current.current, saved);
+            latest.current.current = next;
+            setPatched({ base: latest.current.server, tree: next });
+          }}
+          onStale={() => treeQuery.query.refetch()}
+          onLocked={() => setLocked(true)}
+          onClose={() => setOpen(null)}
         />
         <Modal
           open={!!regen}

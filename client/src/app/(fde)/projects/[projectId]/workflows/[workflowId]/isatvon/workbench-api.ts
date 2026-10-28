@@ -13,11 +13,15 @@ import type {
   WorkflowState,
 } from "@/contracts";
 
+import { gateMessage, parseGate } from "./gate-expr";
+
 export const SCHEMA_URL = "schemas/isatvon/1.4";
 export const treeUrl = (projectId: string, workflowId: string) =>
   `projects/${projectId}/workflows/${workflowId}/macro-skills`;
 export const subSkillUrl = (projectId: string, workflowId: string, subId: string) =>
   `projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}`;
+export const editsUrl = (projectId: string, workflowId: string, subId: string) =>
+  `${subSkillUrl(projectId, workflowId, subId)}/edits`;
 const workflowUrl = (projectId: string, workflowId: string) =>
   `projects/${projectId}/workflows/${workflowId}`;
 export const validateUrl = (p: string, w: string) => `${workflowUrl(p, w)}/isatvon/validate`;
@@ -191,16 +195,6 @@ export function toEditText(column: GridColumn, value: unknown): unknown {
   return value;
 }
 
-const balanced = (text: string) => {
-  const open: string[] = [];
-  const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
-  for (const ch of text) {
-    if ("([{".includes(ch)) open.push(ch);
-    else if (ch in pairs && open.pop() !== pairs[ch]) return false;
-  }
-  return open.length === 0;
-};
-
 /** The client-side check before a PATCH (E8.7); the server still revalidates everything. */
 export function parseEdit(
   column: GridColumn,
@@ -232,10 +226,13 @@ export function parseEdit(
       } catch {
         return { error: `${column.header} is not valid JSON` };
       }
-    case "expression":
-      return balanced(String(text))
+    case "expression": {
+      // The gate grammar (E8.8): the same parser as the editor; unknown names are the server's call.
+      const parsed = parseGate(String(text));
+      return parsed.ok
         ? { value: text }
-        : { error: `${column.header} has unbalanced brackets` };
+        : { error: `${column.header}: ${gateMessage(String(text), parsed.error)}` };
+    }
     case "stringList":
       return {
         value: String(text)
