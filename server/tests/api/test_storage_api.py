@@ -81,3 +81,106 @@ def test_e1_6_missing_or_placeholder_signing_key_turns_downloads_off(
 def test_e1_6_bad_key_in_url_is_400(client: TestClient) -> None:
     res = client.get("/api/v1/files/..%2F..%2Fetc%2Fpasswd?exp=9999999999&sig=x")
     assert res.status_code in (400, 404)  # rejected by key validation or by routing; never read
+
+
+# --- #402: a download carries the name and type the browser should use --------------------------
+
+OKF_TYPE = "application/zip"
+PDF_TYPE = "application/pdf"
+
+
+def named(key: str, name: str = "okf-bundle-v1-01a18113.zip", kind: str = OKF_TYPE) -> str:
+    return signed_url(SECRET, key, TenantContext(TENANT_A), 60, filename=name, content_type=kind)
+
+
+def test_e1_6_402_a_named_link_is_saved_and_served_as_that_name_and_type(
+    client: TestClient, tmp_path: Path
+) -> None:
+    key = stored(tmp_path)
+    url = named(key)
+    query = parse_qs(urlsplit(url).query)
+    assert query["name"] == ["okf-bundle-v1-01a18113.zip"] and query["type"] == [OKF_TYPE]
+    res = client.get(url)
+    assert res.status_code == 200 and res.content == b"report bytes"
+    assert res.headers["content-disposition"] == (
+        'attachment; filename="okf-bundle-v1-01a18113.zip"; '
+        "filename*=UTF-8''okf-bundle-v1-01a18113.zip"
+    )  # RFC 6266, from the shared helper
+    assert res.headers["content-type"] == OKF_TYPE
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["cache-control"] == "private, no-store"
+
+
+def test_e1_6_402_a_link_without_a_name_is_still_a_plain_attachment(
+    client: TestClient, tmp_path: Path
+) -> None:
+    res = client.get(signed_url(SECRET, stored(tmp_path), TenantContext(TENANT_A), 60))
+    assert res.headers["content-disposition"] == "attachment"
+    assert res.headers["content-type"] == "application/octet-stream"
+    assert res.headers["x-content-type-options"] == "nosniff"
+
+
+def test_e1_6_402_the_name_and_type_are_part_of_the_signature(
+    client: TestClient, tmp_path: Path
+) -> None:
+    key = stored(tmp_path)
+    query = parse_qs(urlsplit(named(key, "report.pdf", PDF_TYPE)).query)
+    exp, sig = query["exp"][0], query["sig"][0]
+    base = f"/api/v1/files/{key}?exp={exp}&sig={sig}"
+    other = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    cases = {
+        "another name": f"{base}&name=other.pdf&type={PDF_TYPE}",
+        "another type": f"{base}&name=report.pdf&type={other}",
+        "name removed": f"{base}&type={PDF_TYPE}",
+        "type removed": f"{base}&name=report.pdf",
+        "both removed": base,
+        "an unsafe name": f"{base}&name=..%2Fx.pdf&type={PDF_TYPE}",
+        "a type that is not allowed": f"{base}&name=report.pdf&type=text%2Fhtml",
+    }
+    for case, url in cases.items():
+        res = client.get(url)
+        assert res.status_code == 403, case
+        assert res.json()["code"] == "FORBIDDEN", case
+        assert "report bytes" not in res.text, case
+
+
+def test_e1_6_402_a_name_cannot_be_added_to_a_link_that_was_signed_without_one(
+    client: TestClient, tmp_path: Path
+) -> None:
+    key = stored(tmp_path)
+    query = parse_qs(urlsplit(signed_url(SECRET, key, TenantContext(TENANT_A), 60)).query)
+    exp, sig = query["exp"][0], query["sig"][0]
+    res = client.get(f"/api/v1/files/{key}?exp={exp}&sig={sig}&name=report.pdf&type={PDF_TYPE}")
+    assert res.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["", "../x.zip", "a/b.zip", "a b.zip", 'a"b.zip', "a\nb.zip", "a;b.zip", ".hidden", "x" * 101],
+)
+def test_e1_6_402_an_unsafe_file_name_is_never_signed(tmp_path: Path, name: str) -> None:
+    with pytest.raises(ValueError, match="file name"):
+        named(stored(tmp_path), name)
+
+
+def test_e1_6_402_a_name_needs_a_type_and_the_type_must_be_allowed(tmp_path: Path) -> None:
+    key, ctx = stored(tmp_path), TenantContext(TENANT_A)
+    with pytest.raises(ValueError, match="both"):
+        signed_url(SECRET, key, ctx, 60, filename="a.zip")
+    with pytest.raises(ValueError, match="both"):
+        signed_url(SECRET, key, ctx, 60, content_type=OKF_TYPE)
+    for bad in (
+        "text/html",
+        "application/octet-stream",
+        "image/svg+xml",
+        "application/zip\r\nX: y",
+    ):
+        with pytest.raises(ValueError, match="content type"):
+            signed_url(SECRET, key, ctx, 60, filename="a.zip", content_type=bad)
+
+
+def test_e1_6_402_a_cross_tenant_named_link_is_still_404(tmp_path: Path) -> None:
+    key = stored(tmp_path, TENANT_B)
+    with pytest.raises(ApiError) as err:
+        named(key)
+    assert err.value.status == 404

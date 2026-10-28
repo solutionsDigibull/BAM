@@ -3,6 +3,7 @@
 import hashlib
 import io
 import json
+import re
 import time
 import uuid
 import zipfile
@@ -13,6 +14,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from pydantic import SecretStr
+from sbam_api.core.conventions import content_disposition
 from sbam_api.core.ids import uuid7
 from sbam_api.ingest.models import Document, DocumentVersion
 from sbam_api.knowledge import graph as graph_module
@@ -380,3 +382,16 @@ def test_e5_6_malformed_coverage_is_empty_not_an_error(h: Harness) -> None:
         s.commit()
     [v] = h.get("").json()["versions"]
     assert v["documents"] == [] and v["counts"]["documents"] == 0
+
+
+def test_e5_402_the_okf_bundle_is_saved_as_a_named_zip(h: Harness) -> None:
+    kv = big(h, 3)
+    res = h.get(f"/{kv}/okf-bundle")
+    url = urlsplit(res.headers["location"])
+    params = parse_qs(url.query)
+    assert re.fullmatch(r"okf-bundle-v\d+-[0-9a-f]{8}\.zip", params["name"][0])
+    assert params["type"] == ["application/zip"]
+    download = h.client.get(f"{url.path}?{url.query}")
+    assert download.headers["content-type"] == "application/zip"
+    assert download.headers["content-disposition"] == content_disposition(params["name"][0])
+    assert f'filename="{params["name"][0]}"' in download.headers["content-disposition"]
