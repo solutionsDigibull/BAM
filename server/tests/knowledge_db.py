@@ -45,10 +45,21 @@ def derived(version: Any) -> dict[str, Derivative]:
     return DERIVED.get(version.id, {})
 
 
-def knowledge_sessions() -> sessionmaker[Session]:
-    engine = make_engine(
-        "sqlite://", poolclass=pool.StaticPool, connect_args={"check_same_thread": False}
-    ).execution_options(schema_translate_map={"sbam": None})
+def knowledge_sessions(database: Path | None = None) -> sessionmaker[Session]:
+    """The tables of a knowledge build on SQLite. In memory by default: one connection, shared,
+    which is only safe while one thread uses it. `database` is a file instead, so that every
+    thread of a concurrent Temporal activity gets its own connection (as in
+    `workflows_db.workflow_sessions`).
+    """
+    if database is None:
+        engine = make_engine(
+            "sqlite://", poolclass=pool.StaticPool, connect_args={"check_same_thread": False}
+        )
+    else:
+        engine = make_engine(
+            f"sqlite:///{database}", connect_args={"check_same_thread": False, "timeout": 30}
+        )
+    engine = engine.execution_options(schema_translate_map={"sbam": None})
     t = Tenant.metadata.tables
     Tenant.metadata.create_all(
         engine,
@@ -229,8 +240,11 @@ class Cognee(FakeCognee):
 
 
 class World:
-    def __init__(self, root: Path) -> None:
-        self.sessions: sessionmaker[Session] = knowledge_sessions()
+    def __init__(self, root: Path, threaded: bool = False) -> None:
+        """`threaded`: for tests whose activities run on several threads at once (see above)."""
+        self.sessions: sessionmaker[Session] = knowledge_sessions(
+            root / "world.sqlite" if threaded else None
+        )
         self.storage = LocalDiskBackend(root)
         self.cognee = Cognee()
         self.beats = 0
