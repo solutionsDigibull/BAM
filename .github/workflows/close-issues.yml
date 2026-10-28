@@ -1,34 +1,46 @@
-# Close the issues a merged PR names with `Closes #N` (#244). GitHub only does this on merges into
-# the default branch (main); SBAM merges into dev, so without this every issue stayed open.
+# Close the issues a merged PR names with `Closes #N` (#244, #365). GitHub only does this on merges
+# into the default branch (main); SBAM merges into dev, so without this every issue stayed open.
 #
-# pull_request_target: the token may write issues even for PRs from forks. It is safe because no PR
-# code runs: the checkout is the base branch (dev, trusted) for scripts/closing_issues.py, and the PR
-# body reaches the script only through an environment variable.
+# push, not pull_request_target: since 2025-12-08 pull_request_target always runs the workflow file
+# from the default branch, where this file doesn't exist, so it never fired (#365). A push to dev
+# runs dev's own copy. No PR code runs: the checkout is dev after the merge, and the PR body
+# reaches scripts/closing_issues.py only through an environment variable.
 name: close-issues
 
 on:
-  pull_request_target:
-    types: [closed]
+  push:
     branches: [dev]
 
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 jobs:
   close:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false } # the base branch: never the PR's code
-      - name: Close the issues the PR names
+        with: { persist-credentials: false } # dev after the merge: reviewed code only
+      - name: Find the PR this push merged
+        id: pr
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          PR: ${{ github.event.pull_request.number }}
         run: |
+          # the merged PR whose merge (or squash) commit is this push's head; none for a direct push
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null and .base.ref == "dev")][0].number // empty')"
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+          echo "PR: ${pr:-none}"
+      - name: Close the issues the PR names
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          PR_BODY="$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json body --jq .body)"
+          export PR_BODY
           closed=""
           for n in $(python3 scripts/closing_issues.py); do
             state="$(gh issue view "$n" -R "$GITHUB_REPOSITORY" --json state --jq .state 2>/dev/null || true)"

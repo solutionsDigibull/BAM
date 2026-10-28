@@ -50,19 +50,23 @@ def workflow() -> dict[Any, Any]:
     return data
 
 
-def test_244_runs_on_merges_into_dev_only() -> None:
+def test_365_runs_on_pushes_to_dev_only() -> None:
+    # not pull_request_target: GitHub reads that from the default branch (main) only (#365)
     wf = workflow()
-    assert wf["on"] == {"pull_request_target": {"types": ["closed"], "branches": ["dev"]}}
-    assert wf["jobs"]["close"]["if"] == "github.event.pull_request.merged == true"
-    assert wf["permissions"] == {"contents": "read", "issues": "write"}
+    assert wf["on"] == {"push": {"branches": ["dev"]}}
+    assert wf["permissions"] == {"contents": "read", "issues": "write", "pull-requests": "read"}
+    find, close = workflow()["jobs"]["close"]["steps"][1:]
+    assert "merged_at != null" in find["run"] and '.base.ref == "dev"' in find["run"]
+    assert close["if"] == "steps.pr.outputs.number != ''"  # a direct push closes nothing
 
 
 def test_244_never_runs_pr_code_and_never_interpolates_the_body() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
-    assert "head.sha" not in text and "head.ref" not in text  # checkout = base branch
+    assert "head.sha" not in text and "head.ref" not in text  # checkout = dev after the merge
     steps = workflow()["jobs"]["close"]["steps"]
     for step in steps:  # values reach the shell through env only
         assert "${{" not in step.get("run", "")
-    assert steps[-1]["env"]["PR_BODY"] == "${{ github.event.pull_request.body }}"
+    assert "PR_BODY" not in steps[-1]["env"]  # read with gh at run time, never interpolated
+    assert 'PR_BODY="$(gh pr view "$PR"' in steps[-1]["run"]
     for ref in re.findall(r"uses: (\S+)", text):
         assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref), ref
