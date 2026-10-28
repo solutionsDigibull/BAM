@@ -21,6 +21,7 @@ from sbam_api.manifests.repository import SubSkillManifestRepository
 from sbam_api.masters.models import MasterSnapshot
 from sbam_api.registry.models import RuntimeRegistryPackageRow, RuntimeRegistryRow
 from sbam_api.registry.repository import upsert_registry
+from sbam_api.schema_sql.models import WorkflowSchema
 from sbam_api.sow.models import SowVersion
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.canonical import deterministic_hash
@@ -50,6 +51,7 @@ class Build:
             CodeAttempt,
             SubSkillManifest,
             GateResultRow,
+            WorkflowSchema,
             MasterSnapshot,
             RuntimeRegistryRow,
             RuntimeRegistryPackageRow,

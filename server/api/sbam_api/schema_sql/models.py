@@ -1,8 +1,9 @@
 """`workflow_schemas` (TD §7, E9.4): the versions of a Workflow's foundational `schema.sql`.
 
-A version is either the FDE's uploaded base (`UPLOADED`, `source_document_id`, PENDING until a
-build applies it) or what a build produced from it / from generated DDL, with the SCHEMA_SQL
-verdict. The SQL itself lives in storage (`storage_key`, content-addressed `sha256`).
+A version is either the FDE's uploaded base (`UPLOADED`, `source_document_id`, always PENDING:
+only uploads are) or what a build produced from it / from generated DDL, with the SCHEMA_SQL
+verdict (PASSED / FAILED; `source_document_id` names the base it used). The SQL itself lives in
+storage (`storage_key`, content-addressed `sha256`).
 """
 
 import uuid

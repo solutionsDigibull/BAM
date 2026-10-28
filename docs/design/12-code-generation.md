@@ -80,13 +80,22 @@ Correction patches to ISATVON are recorded as edits by `sbam-corrector` and show
 | CLAMAV            | clamd scan of bundle                                                                          | Any detection                                                                                                                            |
 | BANDIT*(O-03)*  | Bandit                                                                                        | HIGH blocks; MEDIUM reported                                                                                                             |
 | IMPORT_RESOLUTION | Import all modules in`skill-runtime`                                                        | Any ImportError                                                                                                                          |
-| SCHEMA_SQL        | Parse DDL (`sqlglot`, postgres dialect *(proposed)*) and apply to an ephemeral PostgreSQL | Parse/apply error; missing handoff table; handoff table without an insert-only guarantee (*proposed*: trigger rejecting UPDATE/DELETE) |
+| SCHEMA_SQL        | Parse DDL (`sqlglot`, postgres dialect) against a DDL allowlist and apply it to a throwaway database on the isolated `schema-check` PostgreSQL (E9.4) | Parse/apply error; forbidden statement; declared table missing; two Sub-Skills defining one table differently; handoff table without the insert-only guard (a trigger rejecting UPDATE/DELETE and one rejecting TRUNCATE) |
 
-**Foundational schema (ISA14 "Contract-Driven Development"):** ISA14 states that ISATVON is fed to coding agents "alongside a foundational PostgreSQL .sql schema file". SBAM handles this as follows *(proposed, O-16)*:
+**Foundational schema (ISA14 "Contract-Driven Development"):** ISA14 states that ISATVON is fed to coding agents "alongside a foundational PostgreSQL .sql schema file". SBAM handles this as follows (O-16, built in E9.4):
 
 1. If the FDE uploaded a `.sql` file (Filetype master supports `.sql`), it becomes the base schema.
 2. Otherwise SBAM generates DDL for every table in `v_variables.tables` (LLM-proposed, validated by the SCHEMA_SQL gate).
 3. The Workflow-level `schema.sql` merges all fragments, is validated once, is used by every sandbox run and is shipped in the export package.
+
+How E9.4 builds it (`build_schema_sql`, `sbam_workers/build/schema_sql/`, once per build before the Sub-Skill builds):
+
+- **Allowlist.** Uploaded and generated SQL is data: it is split with the PostgreSQL tokenizer and each statement must be `CREATE TABLE` (with a column list), `CREATE INDEX`, `CREATE TRIGGER`, a `plpgsql`/`sql` `CREATE FUNCTION` without dynamic SQL or server file/program access, or `CREATE EXTENSION` of `pgcrypto`, `uuid-ossp`, `citext`. Anything else is `FORBIDDEN_STATEMENT`. Generated fragments may only hold `CREATE TABLE` / `CREATE INDEX`.
+- **Generation.** One `sbam-codegen` call (prompt `schema-ddl`) per Sub-Skill, in `skill_id` order, for the tables it declares that neither the base nor an earlier Sub-Skill defines; failures are re-asked (at most 3), then become findings.
+- **Merge** (deterministic): the base verbatim, then generated tables (referenced tables first, else by name), functions, indexes and triggers, then the guards. One table defined twice the same way is kept once; defined differently it is `CONFLICT`. Table names must be lower-case unquoted identifiers and not PostgreSQL reserved words (`INVALID_TABLE_NAME`).
+- **Guard.** A platform template, never model output: `sbam_handoff_insert_only()` with a row trigger `BEFORE UPDATE OR DELETE` and a statement trigger `BEFORE TRUNCATE` on every handoff table, appended even when the base defines the table.
+- **Apply.** The `schema-check` PostgreSQL 16 (Compose; tmpfs, trust auth, no published port, on its own internal network with `worker-build` only, never SBAM's database): a throwaway database per check, the script in one transaction, then every declared table must exist and every handoff table must refuse TRUNCATE (and UPDATE/DELETE on a probe row when one can be inserted). The database is dropped afterwards.
+- **Records.** The script is stored (`artifacts` kind `SCHEMA_SQL`), a `workflow_schemas` version and a Workflow-level `gate_results` row hold the verdict and findings; the Skill Manifest records the latest PASSED `sha256` as `schema_sql_sha256`. FAILED raises the non-retryable `SchemaInvalid` (the pipeline notifies the FDE); `schema-check` unreachable is retried (2 attempts).
 
 ---
 [← §11](11-manifest-design.md)   [Design index](README.md)   [§13 →](13-temporal-design.md)

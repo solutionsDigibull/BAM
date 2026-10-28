@@ -46,6 +46,7 @@ from sbam_api.manifests.models import GateResultRow
 from sbam_api.manifests.repository import GateResultRepository, SubSkillManifestRepository
 from sbam_api.masters.models import MasterSnapshot
 from sbam_api.registry.repository import active_registry
+from sbam_api.schema_sql.repository import WorkflowSchemaRepository
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
 from sbam_api.workflows.repository import WorkflowRepository
 from sbam_contracts.build import BuildStageInput
@@ -97,8 +98,8 @@ PLATFORM_SRIM: Final[Mapping[str, Mapping[str, str]]] = {
     "audit": {"telemetry": "PostgreSQL_Audit_Logs"},
     "ui": {"target": "SRIM_UI_Canvas", "method": "Embedded_iFrames_Widgets"},
 }
-# ponytail: build_schema_sql (E9.2) is still a stub; until it writes the Workflow's schema.sql
-# the manifest records the hash of an empty one.
+# The hash of the Workflow's latest PASSED schema.sql (E9.4, `build_schema_sql`); a Workflow that
+# never built one records the empty script's, which is also what a Workflow without tables builds.
 EMPTY_SCHEMA_SQL_SHA256: Final = hashlib.sha256(b"").hexdigest()
 # Set by SBAM only (TD §11.2): never taken from the stored ISATVON.
 PLATFORM_METADATA: Final = frozenset(
@@ -242,6 +243,11 @@ def _template() -> TemplateRef:
     return template.ref
 
 
+def _schema_sha256(session: Session, ctx: TenantContext, workflow_id: uuid.UUID) -> str:
+    row = WorkflowSchemaRepository(session, ctx).latest(workflow_id, status=GateStatus.PASSED)
+    return row.sha256 if row is not None and row.sha256 else EMPTY_SCHEMA_SQL_SHA256
+
+
 class SqlManifestStore:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self.sessions = sessions
@@ -304,6 +310,7 @@ class SqlManifestStore:
                 raw=dict(sub.isatvon),
                 macro_category=None if macro is None else macro.macro_category,
                 ctx=BuildContext(
+                    schema_sql_sha256=_schema_sha256(session, ctx, inp.workflow_id),
                     state=SubSkillState(sub.state),
                     # rows from before E9.1 have no validated_at: created_at is as stable
                     validated_at=sub.validated_at or sub.created_at,

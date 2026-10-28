@@ -138,6 +138,13 @@ async def manifest_stand_in(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "manifest"))
 
 
+@activity.defn(name="build_schema_sql")
+async def schema_sql_stand_in(inp: WorkflowRef) -> IdResult:
+    """The real stage (E9.4) calls sbam-codegen and the schema-check PostgreSQL; its tests are
+    tests/unit/test_e9_4_schema_sql.py and tests/temporal/test_e9_4_schema_sql_pipeline.py."""
+    return IdResult(id=stub_id(inp, "schema_sql"))
+
+
 DEFAULT_OVERRIDES: "Overrides" = {
     "build_knowledge": knowledge_stand_in,
     "build_okf_bundle": okf_stand_in,
@@ -146,6 +153,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "extract_macro_skills": macros_stand_in,
     "extract_sub_skills": sub_skills_stand_in,
     "build_manifest": manifest_stand_in,
+    "build_schema_sql": schema_sql_stand_in,
 }
 
 

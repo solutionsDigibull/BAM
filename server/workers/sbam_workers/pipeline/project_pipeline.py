@@ -67,7 +67,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.state_machines import Actor, MachineName
 
     from sbam_workers.build.plan import plan_builds
-    from sbam_workers.build.stubs import build_schema_sql
+    from sbam_workers.build.schema_sql.activity import build_schema_sql
     from sbam_workers.certify.stubs import (
         certify_macros,
         certify_workflow,

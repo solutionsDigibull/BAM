@@ -56,7 +56,7 @@ port and healthcheck, so nothing downstream changes when the real implementation
 profile core (always):
   sbam-web · sbam-api · api-migrate (one-off) · tusd · postgres (sbam, temporal, temporal_visibility, keycloak, langfuse)
   keycloak (+ realm import) · temporal (+ temporal-schema, temporal-namespace one-offs) · temporal-ui · bifrost
-  clamav (clamd + freshclam) · storage-init (one-off)
+  clamav (clamd + freshclam) · storage-init (one-off) · schema-check (scratch PostgreSQL for the SCHEMA_SQL gate)
   worker-ingest · worker-knowledge · worker-llm · worker-build · worker-test · worker-certify
   sbam-mock-api · sbam-llm-mock
   volumes: pgdata, storage (uploads, derived, okf, code, tests, exports), cognee_data, clamav_db
@@ -106,7 +106,7 @@ bump is a reviewed PR.
 
 | Service | Image | Version |
 |---|---|---|
-| postgres | `postgres` | `16.15-alpine` |
+| postgres, schema-check | `postgres` | `16.15-alpine` |
 | keycloak | `quay.io/keycloak/keycloak` | `26.8.0` |
 | temporal | `temporalio/server` | `1.31.3` |
 | temporal-schema / temporal-namespace | `temporalio/admin-tools` | `1.31.3` |
