@@ -13,10 +13,13 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from sbam_contracts.sow import SECTIONS
 from sbam_contracts.state_machines import MachineName
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator, TypeEngine
 
 import sbam_api.knowledge.models
 import sbam_api.llm.models  # noqa: F401 - llm_calls, a foreign-key target
@@ -25,6 +28,24 @@ from sbam_api.state_machine import Stateful, state_check
 from sbam_api.state_machine.registry import register_entity
 
 Json = JSON().with_variant(JSONB(), "postgresql")
+
+
+class SowJson(TypeDecorator[dict[str, Any]]):
+    """`Json` for a stored `SowDocument`: its sections come back in TD §10.6 order.
+
+    Postgres JSONB keeps no key order (it sorts by length, then bytes), but `SowDocument` rejects
+    sections that are out of order, so a document read back from JSONB could not be validated."""
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
+        return dialect.type_descriptor(JSONB() if dialect.name == "postgresql" else JSON())
+
+    def process_result_value(self, value: dict[str, Any] | None, dialect: Dialect) -> Any:
+        if isinstance(value, dict) and set(value) == set(SECTIONS):
+            return {section: value[section] for section in SECTIONS}
+        return value  # a failed version (null) or something that is not a whole SOW: as stored
 
 
 class SowSource(StrEnum):
@@ -65,7 +86,7 @@ class SowVersion(Stateful, ProjectOwned, Base):
     )
     llm_call_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA}.llm_calls.id"))
     schema_version: Mapped[str] = mapped_column(String(20), default="1.0")
-    structured: Mapped[dict[str, Any] | None] = mapped_column(Json)  # SowDocument
+    structured: Mapped[dict[str, Any] | None] = mapped_column(SowJson)  # SowDocument
     content_tiptap: Mapped[dict[str, Any] | None] = mapped_column(Json)  # E6.3 editor document
     sha256: Mapped[str | None] = mapped_column(String(64))  # of the canonical `structured` JSON
     error_reason: Mapped[str | None] = mapped_column(String(300))

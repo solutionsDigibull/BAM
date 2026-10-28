@@ -24,6 +24,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from sbam_api.core.logging import correlation_id_var
 from sbam_api.storage.base import Kind, StorageBackend
 from sbam_contracts.knowledge import (
     DATASET_PATTERN,
@@ -313,6 +314,7 @@ class CogneeAdapter:
             extra={
                 "tenant_id": str(scope.tenant_id),
                 "project_id": str(scope.project_id),
+                "correlation_id": correlation_id_var.get(),
                 **counts,
             },
         )

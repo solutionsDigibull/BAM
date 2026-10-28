@@ -68,6 +68,8 @@ class Finding(BaseModel):
     file: str | None = Field(default=None, max_length=500)
     line: int | None = Field(default=None, ge=1)
     col: int | None = Field(default=None, ge=0)
+    expected: str | None = Field(default=None, max_length=1_000)
+    actual: str | None = Field(default=None, max_length=1_000)
 
 
 class BuildRow(BaseModel):

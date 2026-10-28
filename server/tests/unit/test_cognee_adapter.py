@@ -12,6 +12,7 @@ import pytest
 from cognee_fake import DatasetNotFoundError, EmbeddingException, FakeCognee
 from pydantic import ValidationError
 from sbam_api.core.ids import uuid7
+from sbam_api.core.logging import correlation_id_var
 from sbam_api.storage.base import Kind, StorageScope
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_contracts.knowledge import (
@@ -202,6 +203,29 @@ def test_e5_1_logs_carry_ids_never_document_text(
     text = " ".join(f"{r.getMessage()} {r.__dict__}" for r in caplog.records)
     assert "SECRET-PRICE-991" not in text
     assert str(P1) in text
+
+
+def test_e5_1b_t01_every_adapter_log_line_carries_all_three_ids(
+    cognee: FakeCognee, storage: LocalDiskBackend, caplog: pytest.LogCaptureFixture
+) -> None:
+    item = stored(storage, scope(), "SECRET-PRICE-991")
+    caplog.set_level(logging.DEBUG)
+    token = correlation_id_var.set("corr-351")
+    try:
+        a = adapter(cognee, storage, {item.source_id})
+        run(a.ensure_dataset(scope()))
+        run(a.add(scope(), [item]))
+        run(a.cognify(scope()))
+        run(a.search(scope(), "SECRET-PRICE-991"))
+    finally:
+        correlation_id_var.reset(token)
+    records = [r for r in caplog.records if r.name == "sbam_workers.knowledge.cognee"]
+    assert len(records) >= 4
+    for r in records:
+        assert r.__dict__["tenant_id"] == str(T1)
+        assert r.__dict__["project_id"] == str(P1)
+        assert r.__dict__["correlation_id"] == "corr-351"
+    assert "SECRET-PRICE-991" not in " ".join(f"{r.getMessage()} {r.__dict__}" for r in records)
 
 
 # --- isolation, per-project users (unit side of T02) ------------------------------------------

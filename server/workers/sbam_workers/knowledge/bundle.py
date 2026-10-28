@@ -20,6 +20,7 @@ import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 
+from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import TenantContext
 from sbam_api.ingest.models import DocumentVersion
 from sbam_api.ingest.repository import DocumentVersionRepository
@@ -162,6 +163,7 @@ def _finish(
 
 
 async def build_bundle(deps: BuildDeps, inp: StageRef) -> uuid.UUID:
+    correlation_id_var.set(inp.correlation_id)  # adapter log lines carry it (#351)
     loaded = await asyncio.to_thread(_load, deps, inp)
     if loaded.state == KnowledgeVersionState.READY.value:
         return inp.ref_id

@@ -29,6 +29,7 @@ from typing import Any
 
 import sbam_api.knowledge.models  # noqa: F401 - registers KnowledgeVersion for the state machine
 from sbam_api.core.auth import CurrentUser
+from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.base import utcnow
 from sbam_api.db.repository import TenantContext
 from sbam_api.ingest.models import DocumentVersion
@@ -275,6 +276,7 @@ async def _heartbeating[R](deps: BuildDeps, work: Awaitable[R]) -> R:
 
 async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> uuid.UUID:
     """The knowledge version id of run `inp`. See the module docstring for the steps."""
+    correlation_id_var.set(inp.correlation_id)  # adapter log lines carry it (#351)
     try:
         version = await asyncio.to_thread(_allocate, deps, inp)
     except KnowledgeBuilding:  # another build of this project is running; try again later
