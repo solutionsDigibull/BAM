@@ -204,7 +204,7 @@ Rules the pipeline keeps:
 - PRs from forks get no secrets.
 - The buildx cache is scoped per branch, so a PR can't overwrite `dev`/`main` layers.
 - Integration tests skip when no stack is running, but fail under `CI=true`, so `compose-smoke` can't pass by skipping.
-- `compose-smoke` takes 13–28 min, so `smoke-gate` (`scripts/ci-smoke-gate.sh`) decides when it runs: on every 10th merge to `dev`, on any `dev` merge that touches the stack (`compose/`, migrations, Dockerfiles, `Makefile`, `pyproject.toml`/`uv.lock`/`pnpm-lock.yaml`, `.github/`), on `main` and tags, nightly, and on demand (**Actions → ci → Run workflow**). PRs skip it. The run summary says why it ran or skipped. Run `make test-int` locally before you merge a change the gate wouldn't catch. The 5-minute Keycloak refresh e2e (`e2_5_t07`) runs only nightly and on manual runs (`E2E_SLOW=1`).
+- `compose-smoke` takes 13–28 min, so `smoke-gate` (`scripts/ci-smoke-gate.sh`) decides when it runs: on every 10th merge to `dev`, on any `dev` merge that touches the stack (`compose/`, migrations, Dockerfiles, `Makefile`, `pyproject.toml`/`uv.lock`/`pnpm-lock.yaml`, `.github/`), on `main` and tags, nightly, and on demand (**Actions → ci → Run workflow**). A `dev` run that a newer push cancels while it waits leaves its changes to the next run, which judges everything since the last run that wasn't cancelled. PRs skip it. The run summary says why it ran or skipped. Run `make test-int` locally before you merge a change the gate wouldn't catch. The 5-minute Keycloak refresh e2e (`e2_5_t07`) runs only nightly and on manual runs (`E2E_SLOW=1`).
 
 Turning on the required checks needs repository admin, so the repo owner runs this once per branch (`main`, then `dev`):
 
