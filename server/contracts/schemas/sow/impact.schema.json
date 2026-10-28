@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/impact:0.1.0",
+  "$defs": {
+    "SectionChange": {
+      "enum": [
+        "ADDED",
+        "REMOVED",
+        "MODIFIED",
+        "UNCHANGED"
+      ],
+      "title": "SectionChange",
+      "type": "string"
+    },
+    "SowDiffItem": {
+      "additionalProperties": false,
+      "description": "A changed module / feature (by id) or, in other sections, a changed field (by name).",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "change": {
+          "$ref": "#/$defs/SectionChange"
+        }
+      },
+      "required": [
+        "id",
+        "change"
+      ],
+      "title": "SowDiffItem",
+      "type": "object"
+    },
+    "SowImpactMacroSkill": {
+      "additionalProperties": false,
+      "description": "A Macro Skill of the current Workflow whose SOW sections changed.",
+      "properties": {
+        "macro_category": {
+          "title": "Macro Category",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "macro_category",
+        "reason"
+      ],
+      "title": "SowImpactMacroSkill",
+      "type": "object"
+    },
+    "SowImpactSubSkill": {
+      "additionalProperties": false,
+      "description": "A Sub-Skill that cites a changed or removed feature: it is invalidated and rebuilt.",
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "reason"
+      ],
+      "title": "SowImpactSubSkill",
+      "type": "object"
+    },
+    "SowSectionDiff": {
+      "additionalProperties": false,
+      "properties": {
+        "section_id": {
+          "enum": [
+            "overview",
+            "users_authority",
+            "scope",
+            "modules",
+            "features",
+            "data_integrations",
+            "rules_constraints",
+            "deliverables_acceptance",
+            "assumptions_open_points"
+          ],
+          "title": "Section Id",
+          "type": "string"
+        },
+        "change": {
+          "$ref": "#/$defs/SectionChange"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/SowDiffItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "section_id",
+        "change"
+      ],
+      "title": "SowSectionDiff",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET P/sow/versions/{v}/impact` (E7.2): what approving draft `version` would invalidate in\nthe Workflow of the approved `base_version`. Computed on the server only; the same function\nruns at approval and its result is stored (`sow_impacts`), so the preview is what happens.\nSub-Skills not listed keep their state (`reused_sub_skills_count`). `added_modules` will get\nnew Macro Skills.",
+  "properties": {
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    },
+    "base_version": {
+      "title": "Base Version",
+      "type": "integer"
+    },
+    "changed_sections": {
+      "items": {
+        "$ref": "#/$defs/SowSectionDiff"
+      },
+      "title": "Changed Sections",
+      "type": "array"
+    },
+    "affected_macro_skills": {
+      "items": {
+        "$ref": "#/$defs/SowImpactMacroSkill"
+      },
+      "title": "Affected Macro Skills",
+      "type": "array"
+    },
+    "affected_sub_skills": {
+      "items": {
+        "$ref": "#/$defs/SowImpactSubSkill"
+      },
+      "title": "Affected Sub Skills",
+      "type": "array"
+    },
+    "added_modules": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Added Modules",
+      "type": "array"
+    },
+    "reused_sub_skills_count": {
+      "minimum": 0,
+      "title": "Reused Sub Skills Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "base_version",
+    "changed_sections",
+    "affected_macro_skills",
+    "affected_sub_skills",
+    "added_modules",
+    "reused_sub_skills_count"
+  ],
+  "title": "SowImpact",
+  "type": "object"
+}

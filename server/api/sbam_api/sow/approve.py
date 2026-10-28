@@ -10,6 +10,9 @@ lock, in one transaction:
 * the version becomes APPROVED (and locked: its content was already immutable, and a save onto it
   is 423), a previously approved version becomes SUPERSEDED, `sows.approved_version_id` moves, and
   audit_log gets SOW_APPROVED with the version and hash. The state machine writes the notification.
+* a scope change (another version was approved before, E7.2): 409 WORKFLOW_BUILDING while that
+  version's Workflow builds or certifies; otherwise its impact is computed by the preview's own
+  function and stored (`sow_impacts`), so what the FDE previewed is what happens.
 
 The signal goes last, and the transaction commits only once Temporal took it: a pipeline that is
 not waiting (409 PIPELINE_NOT_WAITING) or a Temporal that is down (503 ORCHESTRATOR_UNAVAILABLE)
@@ -26,7 +29,7 @@ from datetime import UTC, datetime
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.pipeline import PipelineStage, SowApproved
 from sbam_contracts.sow_api import SowApproval, SowApproveRequest, SowVersionStatus
-from sbam_contracts.state_machines import SOW_VERSION, Actor, SowVersionState
+from sbam_contracts.state_machines import SOW_VERSION, Actor, SowVersionState, WorkflowState
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import Client
 
@@ -37,6 +40,7 @@ from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.base import utcnow
 from sbam_api.pipeline.service import signal_pipeline
+from sbam_api.sow.impact import record_impact
 from sbam_api.sow.models import SowVersion
 from sbam_api.sow.repository import SowRepository, SowVersionRepository
 from sbam_api.sow.service import canonical_sha256
@@ -44,6 +48,8 @@ from sbam_api.state_machine import TransitionCommand, apply_transition
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
 
 SOW_APPROVED = "SOW_APPROVED"  # audit action
+# A scope change can't be approved while the current Workflow is being built (E7.2).
+BUILDING = frozenset({WorkflowState.BUILDING.value, WorkflowState.CERTIFYING.value})
 SERVICE_ACCOUNT_PREFIX = "service-account-"  # Keycloak's username for a client's own token
 
 
@@ -122,6 +128,20 @@ def _prepare(
         )
 
     if sow.approved_version_id and sow.approved_version_id != row.id:
+        base = versions.get(sow.approved_version_id)
+        if base is not None:
+            # Here, not at the top: the Workflow model imports the SOW package.
+            from sbam_api.workflows.repository import WorkflowRepository
+
+            workflow = WorkflowRepository(session, ctx).by_sow_version(base.id)
+            if workflow is not None and workflow.state in BUILDING:
+                raise _conflict(
+                    ErrorCode.WORKFLOW_BUILDING,
+                    "A build is running",
+                    f"Workflow {workflow.version} is being built; approve the new version once "
+                    "it has finished.",
+                )
+            record_impact(session, ctx, base, row)
         apply_transition(
             session,
             ctx,

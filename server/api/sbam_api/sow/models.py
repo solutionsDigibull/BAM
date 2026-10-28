@@ -115,3 +115,22 @@ class SowExport(ProjectOwned, Base):
     storage_key: Mapped[str] = mapped_column(String(255))
     sha256: Mapped[str] = mapped_column(String(64))  # of the file
     size: Mapped[int] = mapped_column(Integer)
+
+
+class SowImpactRecord(ProjectOwned, Base):
+    """`sow_impacts` (E7.2): the scope-change impact as it stood when a new version was approved.
+
+    `report` is the `SowImpact` the FDE could preview (same function, same inputs), and
+    `affected_sub_skill_ids` the Sub-Skills it invalidates in the Workflow of `base_version_id`.
+    One per approved version; never updated. `workflow_id` has no foreign key: `workflows` refers
+    to `sow_versions`, and the pair would be a cycle.
+    """
+
+    __tablename__ = "sow_impacts"
+    __table_args__ = (UniqueConstraint("sow_version_id"),)
+
+    sow_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.sow_versions.id"))
+    base_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.sow_versions.id"))
+    workflow_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    report: Mapped[dict[str, Any]] = mapped_column(Json)  # SowImpact
+    affected_sub_skill_ids: Mapped[list[str]] = mapped_column(Json)

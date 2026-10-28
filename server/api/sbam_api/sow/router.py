@@ -8,6 +8,10 @@
   If-Match, 409 SOW_VERSION_CONFLICT for a stale ETag or base, 422 template / schema / citation,
   423 SOW_LOCKED when approved, 413 over 2 MB.
 * `GET P/sow/versions/{v}/diff/{other}`: section by section, what changed from v to other.
+* `POST P/sow/new-version {reason}`: 201 the scope-change draft (copy of the approved version,
+  IN_REVIEW) with the new `ETag`; 409 NO_APPROVED_SOW / DRAFT_EXISTS; see `new_version.py` (E7.2).
+* `GET P/sow/versions/{v}/impact`: which Macro / Sub-Skills approving draft v invalidates; 409
+  NO_APPROVED_SOW, or NOT_IN_REVIEW when v is not a draft derived from the approved version.
 * `POST P/sow/regenerate {hint?}` + `Idempotency-Key`: 202 `{"run": Run}`; see `regenerate.py`.
 * `POST P/sow/versions/{v}/approve {sha256}`: the hash-bound approval (`approve.py`, E7.1).
 * `GET P/sow/versions/{v}/citations/{okf_ref_id}` (+ `/source`): the citation panel
@@ -27,6 +31,8 @@ from sbam_contracts.sow_api import (
     SowApproveRequest,
     SowCitationDetail,
     SowDiff,
+    SowImpact,
+    SowNewVersionRequest,
     SowOverview,
     SowRegenerateRequest,
     SowSaveRequest,
@@ -41,9 +47,10 @@ from sbam_api.core.conventions import content_disposition, validate_idempotency_
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
-from sbam_api.sow import citations, versions
+from sbam_api.sow import citations, impact, versions
 from sbam_api.sow.approve import approve_version
 from sbam_api.sow.exports import export_key
+from sbam_api.sow.new_version import start_new_version
 from sbam_api.sow.regenerate import start_regenerate
 from sbam_api.storage.router import backend
 from sbam_api.storage.signing import signed_url
@@ -104,6 +111,28 @@ def save_sow_version(
     if not saved.created:
         response.status_code = 200
     return saved.version
+
+
+@router.post("/projects/{project_id}/sow/new-version", status_code=201)
+def sow_new_version(
+    project_id: Project,
+    body: SowNewVersionRequest,
+    response: Response,
+    user: User,
+    sessions: Sessions,
+) -> SowVersionSummary:
+    with sessions() as session:
+        saved = start_new_version(
+            session, user, project_id, body, correlation_id_var.get() or "sow-new-version"
+        )
+    response.headers["ETag"] = saved.etag
+    return saved.version
+
+
+@router.get("/projects/{project_id}/sow/versions/{version}/impact")
+def sow_impact(project_id: Project, version: Version, user: User, sessions: Sessions) -> SowImpact:
+    with sessions() as session:
+        return impact.preview(session, user, project_id, version)
 
 
 @router.get("/projects/{project_id}/sow/versions/{version}/diff/{other}")
