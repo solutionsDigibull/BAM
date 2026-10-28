@@ -9,7 +9,7 @@ import httpx
 from pipeline_db import pipeline_sessions
 from pydantic import BaseModel, ConfigDict
 from sbam_api.db.repository import TenantContext
-from sbam_api.llm.models import LlmCall
+from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_api.llm.repository import LlmCallRepository
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.registry import PromptRegistry
@@ -35,7 +35,10 @@ SMOKE_CONTEXT = {"rfq": "Quote 12 cables"}
 
 def llm_sessions() -> sessionmaker[Session]:
     sessions = pipeline_sessions()
-    LlmCall.metadata.create_all(sessions.kw["bind"], tables=[LlmCall.__table__])  # type: ignore[list-item]
+    LlmCall.metadata.create_all(
+        sessions.kw["bind"],
+        tables=[LlmCall.__table__, LlmDerivative.__table__],  # type: ignore[list-item]
+    )
     return sessions
 
 
