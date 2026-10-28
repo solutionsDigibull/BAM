@@ -399,7 +399,15 @@ services:
   worker-build:
     <<: *worker
     # Also runs the run-mirror reconciler every 60 s (one worker is enough; passes are idempotent).
-    environment: { <<: *worker-env, SBAM_QUEUES: sbam-build, SBAM_RECONCILE_EVERY: "60" }
+    # The SOW export (SowExport, E6.4) renders on this queue and stores the file, so it needs the storage volume (#404).
+    environment:
+      {
+        <<: *worker-env,
+        SBAM_QUEUES: sbam-build,
+        SBAM_RECONCILE_EVERY: "60",
+        STORAGE_ROOT: /data/storage,
+      }
+    volumes: [storage:/data/storage]
   worker-test:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-test }
