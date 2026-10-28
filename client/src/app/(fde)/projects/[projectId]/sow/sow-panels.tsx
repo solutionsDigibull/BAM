@@ -22,6 +22,8 @@ import { ApiErrorState, LoadingState, StatusBadge } from "@/components/ui-kit";
 import type { SowCitationDetail, SowDiff, SowVersionSummary } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
+import type { CiteClick } from "./sow-editor";
+
 import {
   MAX_HINT,
   SOURCE_DELETED,
@@ -47,7 +49,7 @@ export function CitationPanel({
 }: {
   projectId: string;
   version: number;
-  cite: { okfRefId: string; number: number } | null;
+  cite: CiteClick | null;
 }) {
   if (!cite)
     return (
@@ -56,7 +58,27 @@ export function CitationPanel({
         description="Click a citation [n] in the SOW to see its source."
       />
     );
+  if (cite.kind === "fde") return <FdeCitationDetail cite={cite} />;
   return <CitationDetail projectId={projectId} version={version} cite={cite} />;
+}
+
+/** An FDE-authored citation has no OKF source to fetch: show who wrote it and when (text only). */
+function FdeCitationDetail({ cite }: { cite: Extract<CiteClick, { kind: "fde" }> }) {
+  return (
+    <div data-testid="citation-detail-fde">
+      <Typography.Title level={5} style={{ marginTop: 0 }}>
+        [{cite.number}] <Tag>Added by FDE</Tag>
+      </Typography.Title>
+      <Typography.Text type="secondary">
+        {cite.author}, {cite.date}
+      </Typography.Text>
+      {cite.note ? (
+        <Typography.Paragraph style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+          {cite.note}
+        </Typography.Paragraph>
+      ) : null}
+    </div>
+  );
 }
 
 function CitationDetail({
@@ -66,7 +88,7 @@ function CitationDetail({
 }: {
   projectId: string;
   version: number;
-  cite: { okfRefId: string; number: number };
+  cite: Extract<CiteClick, { kind: "okf" }>;
 }) {
   const detail = useCustom<SowCitationDetail, ApiError>({
     url: citationPath(projectId, version, cite.okfRefId),

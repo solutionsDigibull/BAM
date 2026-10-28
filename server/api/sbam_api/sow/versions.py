@@ -9,16 +9,18 @@
   (a scope change goes through P/sow/new-version, E7.x).
 * The editor's TipTap document is converted to a `SowDocument` (`tiptap.py`): template sections
   and schema problems are 422 with a path. Every citation must name a chunk or entity of the
-  version's OKF bundle, with its document version (no invented `okf_ref_id`).
+  version's OKF bundle, with its document version (no invented `okf_ref_id`). An FDE-authored
+  citation (`kind: fde`) names no bundle id; the API signs it with the saving user and today.
 """
 
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from sbam_contracts.api import ErrorCode, FieldError
-from sbam_contracts.sow import SowDocument
+from sbam_contracts.sow import AnyCitation, FdeCitation, SowDocument
 from sbam_contracts.sow_api import (
     MAX_TIPTAP_BYTES,
     SECTION_TITLES,
@@ -48,7 +50,7 @@ from sbam_api.knowledge.repository import KnowledgeVersionRepository
 from sbam_api.sow.models import Sow, SowSource, SowVersion
 from sbam_api.sow.repository import SowRepository, SowVersionRepository
 from sbam_api.sow.service import canonical_sha256
-from sbam_api.sow.tiptap import TipTapInvalid, citations_of, from_tiptap
+from sbam_api.sow.tiptap import TipTapInvalid, citations_of, from_tiptap, stamp_fde
 from sbam_api.state_machine.service import apply_create
 from sbam_api.storage.base import StorageBackend
 
@@ -118,6 +120,19 @@ def list_versions(session: Session, user: CurrentUser, project_id: uuid.UUID) ->
     return SowVersionList(items=[summary(r, numbers) for r in rows])
 
 
+def _ref(path: str, c: AnyCitation) -> SowCitationRef:
+    if isinstance(c, FdeCitation):
+        return SowCitationRef(
+            path=path, kind="fde", author=c.author, date=c.date.isoformat(), note=c.note
+        )
+    return SowCitationRef(
+        path=path,
+        okf_ref_id=c.okf_ref_id,
+        document_version_id=c.document_version_id,
+        location=c.location.model_dump(exclude_none=True),
+    )
+
+
 def detail(
     session: Session, user: CurrentUser, project_id: uuid.UUID, number: int
 ) -> tuple[SowVersionDetail, str]:
@@ -127,15 +142,7 @@ def detail(
     cites: list[SowCitationRef] = []
     if row.structured is not None:
         doc = SowDocument.model_validate(row.structured)
-        cites = [
-            SowCitationRef(
-                path=path,
-                okf_ref_id=c.okf_ref_id,
-                document_version_id=c.document_version_id,
-                location=c.location.model_dump(exclude_none=True),
-            )
-            for path, c in citations_of(doc)
-        ]
+        cites = [_ref(path, c) for path, c in citations_of(doc)]
     out = SowVersionDetail(
         **summary(row, numbers).model_dump(),
         content_tiptap=(
@@ -199,10 +206,31 @@ def _check_citations(
     errors = [
         FieldError(path=f"{path}.citations", message="UNKNOWN_CITATION: not in the OKF bundle")
         for path, c in citations_of(doc)
-        if c.document_version_id not in known.get(c.okf_ref_id, set())
+        if not isinstance(c, FdeCitation)  # the FDE's own: nothing in the bundle to match
+        and c.document_version_id not in known.get(c.okf_ref_id, set())
     ]
     if errors:
         raise _invalid(list({e.path: e for e in errors}.values()))
+
+
+def _signer(user: CurrentUser) -> str:
+    return (user.display_name or user.username or user.email or str(user.user_id))[:200]
+
+
+def _today() -> str:
+    return datetime.now(UTC).date().isoformat()
+
+
+def _fde_stamps(structured: dict[str, Any] | None) -> set[tuple[str, str, str | None]]:
+    """(author, date, note) of the FDE-authored citations the saved version already holds."""
+    if structured is None:
+        return set()
+    doc = SowDocument.model_validate(structured)
+    return {
+        (c.author, c.date.isoformat(), c.note)
+        for _, c in citations_of(doc)
+        if isinstance(c, FdeCitation)
+    }
 
 
 @dataclass(frozen=True)
@@ -245,8 +273,10 @@ def save(
         or body.base_version != current.version
     ):
         raise _conflict(current.version)
+    content = body.content_tiptap.model_dump(mode="json", exclude_none=True)
+    stamp_fde(content, _fde_stamps(current.structured), _signer(user), _today())
     try:
-        doc = from_tiptap(body.content_tiptap.model_dump(mode="json", exclude_none=True))
+        doc = from_tiptap(content)
     except TipTapInvalid as exc:
         raise _invalid(exc.errors) from None
     _check_citations(storage, session, user, project_id, doc, current.knowledge_version_id)
@@ -265,7 +295,7 @@ def save(
         knowledge_version_id=current.knowledge_version_id,
         parent_version_id=current.id,
         structured=structured,
-        content_tiptap=body.content_tiptap.model_dump(mode="json", exclude_none=True),
+        content_tiptap=content,
         sha256=sha,
         created_by=str(user.user_id),
     )
