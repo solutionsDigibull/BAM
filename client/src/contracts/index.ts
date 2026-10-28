@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:9d947db426dd373291aff61456ac171795ef1c47d12925aefbf54d2ffb6056b2
+// source-sha256:319a6e8a6531a65cbf31c57371091c2a1fc7582a6fd5ab477213129d6054a94f
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -428,6 +428,9 @@ export interface SbamContracts {
   SowApproveRequest?: SowApproveRequest;
   SowApproval?: SowApproval;
   SowCitationDetail?: SowCitationDetail;
+  CodeAttemptList?: CodeAttemptList;
+  CodeFileView?: CodeFileView;
+  CodeDiff?: CodeDiff;
   Run?: Run;
   RunAccepted?: RunAccepted;
   RuntimeRegistry?: RuntimeRegistry;
@@ -2175,6 +2178,82 @@ export interface SowCitationDetail {
   passage: string;
   truncated?: boolean;
   source_available: boolean;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeAttemptList".
+ */
+export interface CodeAttemptList {
+  items: CodeAttemptSummary[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeAttemptSummary".
+ */
+export interface CodeAttemptSummary {
+  build_no: number;
+  cycle: number;
+  attempt: number;
+  status: string;
+  template_name: string;
+  template_version: string;
+  correction_reason?: string | null;
+  files: CodeFileRef[];
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeFileRef".
+ */
+export interface CodeFileRef {
+  path: string;
+  sha256: string;
+}
+/**
+ * One gate finding (the shape E11.3 / E12.2 write into `code_attempts.findings`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeFinding".
+ */
+export interface CodeFinding {
+  gate: string;
+  code: string;
+  file?: string | null;
+  line?: number | null;
+  col?: number | null;
+  message: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeFileView".
+ */
+export interface CodeFileView {
+  path: string;
+  sha256: string;
+  content: string;
+  truncated: boolean;
+  slots: LineRange[];
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LineRange".
+ */
+export interface LineRange {
+  start: number;
+  end: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeDiff".
+ */
+export interface CodeDiff {
+  from_attempt: number;
+  to_attempt: number;
+  path: string;
+  changed: boolean;
+  unified: string;
+  truncated: boolean;
 }
 /**
  * One Temporal execution as the API returns it (mirror of `temporal_runs`).
