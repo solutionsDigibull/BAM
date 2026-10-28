@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:87e78bed0b9319652afb94423afc23ed26186d1d7e8890488b4585119fbf15fb
+// source-sha256:c060c24c58e638d41b4368ec39720b2a2ccd0351fb94e9fc5d5dc7f0dcb960d0
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -399,6 +399,7 @@ export interface SbamContracts {
   ValidationReport?: ValidationReport;
   MacroExtraction?: MacroExtraction;
   MacroSkillOut?: MacroSkillOut;
+  SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
   Isa14Manifest?: Isa14Manifest;
@@ -723,6 +724,9 @@ export interface NNotification {
   next: string | null;
 }
 /**
+ * One TD §10.4 finding: the rule number, the dotted path, a stable `code` (`ErrorCode`) and a
+ * message. The message never quotes a secret value.
+ *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "RuleViolation".
  */
@@ -730,6 +734,7 @@ export interface RuleViolation {
   rule: number;
   path: string;
   message: string;
+  code?: ErrorCode;
 }
 /**
  * GET /schemas/isatvon/{version}.
@@ -904,6 +909,32 @@ export interface MacroSkillOut {
   agent_ref: string | null;
   state: AgentState;
   validation_errors: string[];
+}
+/**
+ * The `sbam-isatvon` answer of pass 2 for one Macro Skill (prompt `isatvon-sub-skills`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillExtraction".
+ */
+export interface SubSkillExtraction {
+  /**
+   * @minItems 1
+   * @maxItems 50
+   */
+  sub_skills: [SubSkillProposal, ...SubSkillProposal[]];
+}
+/**
+ * One Sub-Skill as the model proposes it.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillProposal".
+ */
+export interface SubSkillProposal {
+  /**
+   * @minItems 1
+   */
+  sow_refs: [string, ...string[]];
+  sub_skill: SubSkill;
 }
 /**
  * `GET W/builds`. `active` is true while any Sub-Skill is still building or testing; the UI
