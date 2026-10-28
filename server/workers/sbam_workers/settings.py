@@ -56,6 +56,9 @@ class WorkerSettings(BaseSettings):
     # Redaction policy: prompts and answers hold client documents, so they are exported only as
     # sizes and hashes unless this is switched on (development).
     langfuse_log_content: bool = False
+    # SCHEMA_SQL gate (E9.4): the isolated `schema-check` PostgreSQL the build worker applies each
+    # Workflow's schema.sql to, in a throwaway database. Never SBAM's own database (refused).
+    schema_check_dsn: SecretStr | None = None
     # Environment and product analytics (E16.2): every worker dispatches the outbox, so each one
     # sends the PostHog events of the rows it dispatches. Same checks as sbam-api.
     sbam_env: str = Field(default="development", min_length=1)

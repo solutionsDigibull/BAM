@@ -405,6 +405,7 @@ def test_e6_1_shipped_prompts_match_their_manifest() -> None:
         "isatvon-sub-skills",
         "live-smoke",
         "ocr-page",
+        "schema-ddl",
         "smoke",
         "sow-generate",
     ]

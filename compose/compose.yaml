@@ -68,6 +68,25 @@ services:
       retries: 20
     restart: unless-stopped
 
+  schema-check:
+    # SCHEMA_SQL gate (E9.4, TD §12.6): a scratch PostgreSQL 16 the build worker applies each Workflow's
+    # schema.sql to, in a throwaway database it drops afterwards. Holds no SBAM data, keeps nothing
+    # (tmpfs), has no published port and is on its own internal network with worker-build only, so it
+    # uses trust auth: there is no secret to manage and nothing to protect but its own scratch databases.
+    image: postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    tmpfs: [/var/lib/postgresql/data]
+    networks: [sbam_schema_check]
+    cpus: 1.0
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   storage-init:
     image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
     command:
@@ -406,8 +425,14 @@ services:
         SBAM_QUEUES: sbam-build,
         SBAM_RECONCILE_EVERY: "60",
         STORAGE_ROOT: /data/storage,
+        SCHEMA_CHECK_DSN: postgresql://postgres@schema-check:5432/postgres,
       }
     volumes: [storage:/data/storage]
+    # schema-check (E9.4): the SCHEMA_SQL gate's scratch PostgreSQL, reachable from this worker only
+    networks: [sbam_internal, sbam_schema_check]
+    depends_on:
+      <<: *worker-depends
+      schema-check: { condition: service_healthy }
   worker-test:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-test }
@@ -453,6 +478,8 @@ networks:
   sbam_edge: {}
   sbam_internal:
     internal: true # no internet route; workers sit only here
+  sbam_schema_check:
+    internal: true # worker-build <-> schema-check only (E9.4)
 
 volumes:
   pgdata:

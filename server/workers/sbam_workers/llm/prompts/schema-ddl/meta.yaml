@@ -1,0 +1,2 @@
+alias: sbam-codegen
+description: PostgreSQL DDL for the tables a Sub-Skill declares that the base schema lacks (E9.4, TD §12.6).

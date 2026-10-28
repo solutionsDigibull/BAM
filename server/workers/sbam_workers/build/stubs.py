@@ -13,19 +13,12 @@ from sbam_contracts.build import (
     LibraryCheckResult,
     LibraryStatus,
 )
-from sbam_contracts.pipeline import IdResult, WorkflowRef
+from sbam_contracts.pipeline import IdResult
 from sbam_contracts.runs import TaskQueue
 from temporalio import activity
 
 from sbam_workers.registry import activity_for
-from sbam_workers.stub_ids import stage_stub_id, stub_id
-
-
-@activity_for(TaskQueue.BUILD)
-@activity.defn(name="build_schema_sql")
-async def build_schema_sql(inp: WorkflowRef) -> IdResult:
-    """Real: Workflow-level schema.sql (TD §12.6); non-retryable SchemaInvalid."""
-    return IdResult(id=stub_id(inp, "schema_sql"))
+from sbam_workers.stub_ids import stage_stub_id
 
 
 @activity_for(TaskQueue.BUILD)
