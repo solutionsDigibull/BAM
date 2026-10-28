@@ -30,6 +30,8 @@ export const MAX_TIPTAP_BYTES = 2 * 1024 * 1024; // the API's limit (413 above i
 export const MAX_HINT = 2000;
 export const EMPTY_SOW = "The SOW is generated once knowledge is ready.";
 export const GENERATING = "Generating the SOW…";
+export const FAILED_NO_VERSION =
+  "SOW generation failed before a version was written. Regenerate to try again.";
 export const SAVED = (version: number) => `Saved as v${version}`;
 export const NO_CHANGES = "No changes to save.";
 export const APPROVED_BANNER =

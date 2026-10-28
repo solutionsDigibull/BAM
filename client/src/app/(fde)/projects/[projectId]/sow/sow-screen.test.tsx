@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
@@ -9,7 +9,7 @@ import {
 } from "@/app/(admin)/admin/projects/test-harness";
 
 import fixture from "../../../../../../e2e/fixtures/sow-ms01.json";
-import { EMPTY_SOW, GENERATING } from "./sow-api";
+import { EMPTY_SOW, FAILED_NO_VERSION, GENERATING } from "./sow-api";
 import { readDraft, writeDraft } from "./sow-draft";
 import { SowScreen } from "./sow-screen";
 
@@ -107,6 +107,65 @@ describe("SOW screen states (E6.5)", () => {
     const failed = await screen.findByTestId("sow-failed", {}, { timeout: 5000 }); // 3 requests in turn
     expect(failed.textContent).toContain("LLM_UNAVAILABLE");
     expect(screen.getAllByRole("button", { name: "Regenerate" }).length).toBeGreaterThan(0);
+  });
+
+  test("#376 failed before any version: the failure state and a working Regenerate", async () => {
+    const failed = project({ pipeline_state: "SOW_GENERATION_FAILED" });
+    const generating = { ...failed, pipeline_state: "SOW_GENERATING" };
+    const api = fakeApi({
+      [PROJECTS]: [{ body: { items: [failed] } }, { body: { items: [generating] } }],
+      [SOW]: problem(404, "NOT_FOUND"),
+      [`POST /projects/${ID}/sow/regenerate`]: {
+        status: 202,
+        body: { run_id: "r1", workflow_id: "w1", status: "RUNNING" },
+      },
+    });
+    render();
+    const panel = await screen.findByTestId("sow-failed");
+    expect(panel.textContent).toContain(FAILED_NO_VERSION);
+    fireEvent.click(within(panel).getByRole("button", { name: "Regenerate" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Regenerate" }));
+    await waitFor(() =>
+      expect(api.calls.some((c) => c.method === "POST" && c.path.endsWith("/sow/regenerate"))).toBe(
+        true,
+      ),
+    );
+    const post = api.calls.find((c) => c.method === "POST")!;
+    expect(new Headers(post.init.headers).get("idempotency-key")).toBeTruthy();
+    expect(await screen.findByText(GENERATING)).toBeDefined(); // the project now says SOW_GENERATING
+  });
+
+  test("#376 failed with a SOW row but no current version shows the same failure state", async () => {
+    const failed = project({ pipeline_state: "SOW_GENERATION_FAILED" });
+    fakeApi({
+      [PROJECTS]: { body: { items: [failed] } },
+      [SOW]: { body: { sow_id: "s1", current: null, approved: null, etag: '"0"' } },
+      [VERSIONS]: { body: { items: [] } },
+    });
+    render();
+    const panel = await screen.findByTestId("sow-failed");
+    expect(within(panel).getByRole("button", { name: "Regenerate" })).toBeDefined();
+  });
+
+  test("#376 generating with a SOW row but no current version shows the generating state", async () => {
+    const generating = project({ pipeline_state: "SOW_GENERATING" });
+    fakeApi({
+      [PROJECTS]: { body: { items: [generating] } },
+      [SOW]: { body: { sow_id: "s1", current: null, approved: null, etag: '"0"' } },
+      [VERSIONS]: { body: { items: [] } },
+    });
+    render();
+    expect(await screen.findByText(GENERATING)).toBeDefined();
+    expect(screen.queryByTestId("sow-failed")).toBeNull();
+  });
+
+  test("#376 an earlier pipeline state with no SOW still shows the empty state", async () => {
+    const earlier = project({ pipeline_state: "KNOWLEDGE_BUILDING" });
+    fakeApi({ [PROJECTS]: { body: { items: [earlier] } }, [SOW]: problem(404, "NOT_FOUND") });
+    render();
+    expect(await screen.findByText(EMPTY_SOW)).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Regenerate" })).toBeNull();
   });
 
   test("session expiry: edits kept from before a sign-in are offered back", async () => {
