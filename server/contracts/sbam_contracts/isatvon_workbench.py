@@ -11,14 +11,26 @@ these are the shapes the workbench (#99) is built against; the edit endpoints ar
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any, Final
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.isatvon14 import RuleViolation, SubSkill
+from sbam_contracts.runs import RunInput
 from sbam_contracts.state_machines import SubSkillState, WorkflowState
+
+MAX_HINT_CHARS: Final = 2000
+ISATVON_REGENERATE: Final = (
+    "IsatvonRegenerate"  # workflow type of POST W/{macro,sub}-skills/{id}/regenerate
+)
+
+
+def regenerate_workflow_id(entity_id: UUID) -> str:
+    """One re-extraction at a time per Macro Skill / Sub-Skill (Temporal's FAIL conflict policy)."""
+    return f"isatvon-regen-{entity_id}"
+
 
 PLATFORM_OWNED = frozenset({"skill_metadata.skill_id"})  # read-only in the grid too (#98)
 # Top-level fields of a Sub-Skill row a PATCH may never carry (422 READ_ONLY).
@@ -130,6 +142,25 @@ class SubSkillEditHistory(BaseModel):
     edits: list[SubSkillEdit]
 
 
+class RegenerateRequest(BaseModel):
+    """`POST W/macro-skills/{id}/regenerate` and `POST W/sub-skills/{id}/regenerate` (E8.4): an
+    optional short instruction the FDE typed, never document content."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hint: Annotated[str | None, Field(max_length=MAX_HINT_CHARS)] = None
+
+
+class RegenerateInput(RunInput):
+    """`IsatvonRegenerate`'s input: ids only; no `sub_skill_id` re-extracts the Macro Skill."""
+
+    workflow_id: UUID
+    macro_skill_id: UUID
+    sub_skill_id: UUID | None = None
+    hint: Annotated[str | None, Field(max_length=MAX_HINT_CHARS)] = None
+    actor_id: Annotated[str, Field(min_length=1, max_length=100)]
+
+
 class SubSkillValidation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -154,6 +185,8 @@ def schemas() -> dict[str, dict[str, Any]]:
         "sub_skill_patch": SubSkillPatch,
         "macro_skill_patch": MacroSkillPatch,
         "sub_skill_edit_history": SubSkillEditHistory,
+        "regenerate_request": RegenerateRequest,
+        "regenerate_input": RegenerateInput,
         "validation_report": ValidationReport,
     }
     return {stem: contract_schema(model, f"isatvon/{stem}") for stem, model in models.items()}

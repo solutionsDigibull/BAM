@@ -74,6 +74,7 @@ from sbam_workers.llm.client import (
     ContextTooLarge,
     LlmClient,
     LlmRequestRejected,
+    LlmResult,
     LlmTransportError,
 )
 from sbam_workers.llm.embed import embed
@@ -220,8 +221,9 @@ def _features(sow: SowDocument, refs: list[str]) -> list[FeatureItem]:
     return [f for f in sow.features if f.id in wanted]
 
 
-def _load(deps: SowDeps, inp: MacroRef) -> Source | list[uuid.UUID]:
-    """The stored Sub-Skills' ids, or what pass 2 reads (raising when it may not run)."""
+def _load(deps: SowDeps, inp: MacroRef, reuse_stored: bool = True) -> Source | list[uuid.UUID]:
+    """The stored Sub-Skills' ids (unless `reuse_stored` is off, a regeneration), or what pass 2
+    reads (raising when it may not run)."""
     ctx = _ctx(inp)
     with deps.sessions() as session:
         macros = MacroSkillRepository(session, ctx)
@@ -230,7 +232,7 @@ def _load(deps: SowDeps, inp: MacroRef) -> Source | list[uuid.UUID]:
         if macro is None or workflow is None or macro.workflow_id != workflow.id:
             raise ApplicationError("no such Macro Skill", type="MacroNotFound", non_retryable=True)
         stored = SubSkillRepository(session, ctx).of_macro(macro.id)
-        if stored:
+        if stored and reuse_stored:
             return [s.id for s in stored]
         try:
             version = require_approved_sow(session, ctx, workflow)
@@ -363,21 +365,21 @@ def _failed(deps: SowDeps, inp: MacroRef, kind: str, reason: str) -> Application
     return ApplicationError(reason, type=kind, non_retryable=True)
 
 
-async def extract_for_macro(deps: SowDeps, inp: MacroRef, scope: LlmScope) -> list[uuid.UUID]:
-    """The Macro Skill's Sub-Skill ids; see the module docstring."""
+async def ask_sub_skills(
+    deps: SowDeps,
+    inp: MacroRef,
+    scope: LlmScope,
+    src: Source,
+    extra_blocks: dict[str, str] | None = None,
+) -> LlmResult[SubSkillExtraction]:
+    """One `sbam-isatvon` answer for the Macro Skill (`extra_blocks`: a regeneration's hint and
+    context). A failure is left on the Workflow and raised non-retryable (see the docstring)."""
     try:
-        loaded = await asyncio.to_thread(_load, deps, inp)
-    except ExtractionError as exc:
-        raise await asyncio.to_thread(_failed, deps, inp, exc.kind, exc.reason) from None
-    if isinstance(loaded, list):
-        return loaded
-    src = loaded
-    try:
-        result = await deps.llm.run(
+        return await deps.llm.run(
             ALIAS,
             PROMPT_ID,
             SubSkillExtraction,
-            _blocks(src),
+            {**_blocks(src), **(extra_blocks or {})},
             scope,
             validate=check_coverage(src.features),
             subject={"macro_skill_id": str(src.macro_id), "macro_category": src.macro_category},
@@ -399,6 +401,17 @@ async def extract_for_macro(deps: SowDeps, inp: MacroRef, scope: LlmScope) -> li
         reason = f"{src.macro_category}: {LLM_UNAVAILABLE}"
         raise await asyncio.to_thread(_failed, deps, inp, LLM_UNAVAILABLE, reason) from None
 
+
+async def extract_for_macro(deps: SowDeps, inp: MacroRef, scope: LlmScope) -> list[uuid.UUID]:
+    """The Macro Skill's Sub-Skill ids; see the module docstring."""
+    try:
+        loaded = await asyncio.to_thread(_load, deps, inp)
+    except ExtractionError as exc:
+        raise await asyncio.to_thread(_failed, deps, inp, exc.kind, exc.reason) from None
+    if isinstance(loaded, list):
+        return loaded
+    src = loaded
+    result = await ask_sub_skills(deps, inp, scope, src)
     ids = await asyncio.to_thread(_store, deps, inp, src, result.output, result.llm_call_id)
     log.info(
         "sub-skills extracted",

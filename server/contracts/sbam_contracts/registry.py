@@ -40,6 +40,8 @@ from sbam_contracts.isatvon_grid import IsatvonSchemaResponse
 from sbam_contracts.isatvon_macros import MacroExtraction, MacroSkillOut, SubSkillExtraction
 from sbam_contracts.isatvon_workbench import (
     MacroSkillPatch,
+    RegenerateInput,
+    RegenerateRequest,
     SubSkillEditHistory,
     SubSkillPatch,
     ValidationReport,
@@ -121,6 +123,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/sub_skill_patch", SubSkillPatch),
     ("isatvon/macro_skill_patch", MacroSkillPatch),
     ("isatvon/sub_skill_edit_history", SubSkillEditHistory),
+    ("isatvon/regenerate_request", RegenerateRequest),
+    ("isatvon/regenerate_input", RegenerateInput),
     ("isatvon/validation_report", ValidationReport),
     ("isatvon/macro_extraction", MacroExtraction),
     ("isatvon/macro_skill", MacroSkillOut),
