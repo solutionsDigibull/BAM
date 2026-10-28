@@ -9,7 +9,9 @@ import { useEffect, useMemo } from "react";
 import { canonical } from "./sow-draft";
 import { sowExtensions } from "./sow-schema";
 
-export type CiteClick = { okfRefId: string; number: number };
+export type CiteClick =
+  | { kind: "okf"; okfRefId: string; number: number }
+  | { kind: "fde"; author: string; date: string; note: string | null; number: number };
 
 const STYLE = `
 .sow-editor .ProseMirror { counter-reset: cite; outline: none; padding: 8px 4px; line-height: 1.55; }
@@ -27,6 +29,7 @@ const STYLE = `
 .sow-editor .sow-citations::before { content: "Sources "; }
 .sow-editor .sow-cite { counter-increment: cite; cursor: pointer; color: #1677ff; margin-right: 4px; }
 .sow-editor .sow-cite::after { content: "[" counter(cite) "]"; }
+.sow-editor .sow-cite-fde { color: #531dab; }
 .sow-editor .sow-cite.ProseMirror-selectednode { outline: 2px solid #91caff; border-radius: 2px; }
 `;
 
@@ -65,7 +68,18 @@ export function SowEditor({
         view.state.doc.nodesBetween(0, pos + 1, (n) => {
           if (n.type.name === "citation") number += 1;
         });
-        onCite({ okfRefId: String(node.attrs.okf_ref_id), number });
+        if (node.attrs.kind === "fde") {
+          const note = node.attrs.note;
+          onCite({
+            kind: "fde",
+            author: String(node.attrs.author ?? ""),
+            date: String(node.attrs.date ?? ""),
+            note: typeof note === "string" ? note : null,
+            number,
+          });
+        } else {
+          onCite({ kind: "okf", okfRefId: String(node.attrs.okf_ref_id), number });
+        }
         return true;
       },
     },

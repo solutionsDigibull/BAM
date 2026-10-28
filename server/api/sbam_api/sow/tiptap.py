@@ -13,7 +13,7 @@ from typing import Annotated, Any, Final, Union, get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
 from sbam_contracts.api import FieldError
-from sbam_contracts.sow import Citation, SowDocument
+from sbam_contracts.sow import AnyCitation, SowDocument
 from sbam_contracts.sow_api import SECTION_TITLES
 
 SECTION: Final = "sowSection"
@@ -22,6 +22,8 @@ ITEM: Final = "sowItem"
 RECORD: Final = "sowRecord"
 CITATIONS: Final = "sowCitations"
 CITATION: Final = "citation"
+OKF: Final = "okf"
+FDE: Final = "fde"  # a citation the FDE wrote themselves (no okf_ref_id)
 ITEM_SECTIONS: Final = {"modules": ("id",), "features": ("id", "module_id")}
 LISTS: Final = ("bulletList", "orderedList")
 
@@ -113,20 +115,23 @@ def _field_nodes(
     ]
 
 
+def _citation_attrs(c: dict[str, Any]) -> dict[str, Any]:
+    if c.get("kind") == FDE:
+        attrs: dict[str, Any] = {"kind": FDE, "author": c["author"], "date": str(c["date"])}
+        if c.get("note") is not None:
+            attrs["note"] = c["note"]
+        return attrs
+    return {
+        "okf_ref_id": c["okf_ref_id"],
+        "document_version_id": str(c["document_version_id"]),
+        "location": dict(c["location"]),
+    }
+
+
 def _citations(cites: list[dict[str, Any]]) -> Node:
     return {
         "type": CITATIONS,
-        "content": [
-            {
-                "type": CITATION,
-                "attrs": {
-                    "okf_ref_id": c["okf_ref_id"],
-                    "document_version_id": str(c["document_version_id"]),
-                    "location": dict(c["location"]),
-                },
-            }
-            for c in cites
-        ],
+        "content": [{"type": CITATION, "attrs": _citation_attrs(c)} for c in cites],
     }
 
 
@@ -251,6 +256,10 @@ class _Reader:
             for node in self.children(block):
                 if node.get("type") == CITATION:
                     a = self.attrs(node)
+                    if a.get("kind") == FDE:
+                        fde = {k: a.get(k) for k in ("kind", "author", "date", "note")}
+                        out.append({k: v for k, v in fde.items() if v is not None})
+                        continue
                     out.append(
                         {
                             "okf_ref_id": a.get("okf_ref_id"),
@@ -317,7 +326,13 @@ class _Reader:
 
 
 def _loc(loc: tuple[int | str, ...]) -> str:
-    return ".".join(str(part) for part in loc) or "content_tiptap"
+    """Dotted path of a validation error, without the citation union's `okf` / `fde` tag."""
+    parts = [
+        str(part)
+        for i, part in enumerate(loc)
+        if not (part in (OKF, FDE) and i and isinstance(loc[i - 1], int))
+    ]
+    return ".".join(parts) or "content_tiptap"
 
 
 def from_tiptap(doc: Any) -> SowDocument:
@@ -334,9 +349,29 @@ def from_tiptap(doc: Any) -> SowDocument:
         ) from None
 
 
-def citations_of(doc: SowDocument) -> list[tuple[str, Citation]]:
+def stamp_fde(
+    content: dict[str, Any], seen: set[tuple[str, str, str | None]], author: str, today: str
+) -> None:
+    """Sign every FDE-authored citation that is not already in the saved version as `author`, today.
+
+    An editor cannot write someone else's name or an older date: what the client sent is replaced,
+    and only a citation identical to one the previous version already holds keeps its stamp.
+    """
+    if isinstance(content, dict):
+        attrs = content.get("attrs")
+        if content.get("type") == CITATION and isinstance(attrs, dict) and attrs.get("kind") == FDE:
+            if (attrs.get("author"), attrs.get("date"), attrs.get("note")) not in seen:
+                attrs["author"], attrs["date"] = author, today
+        for value in content.values():
+            stamp_fde(value, seen, author, today)
+    elif isinstance(content, list):
+        for value in content:
+            stamp_fde(value, seen, author, today)
+
+
+def citations_of(doc: SowDocument) -> list[tuple[str, AnyCitation]]:
     """Every citation with the path of what it supports (`scope`, `features.0`, ...)."""
-    out: list[tuple[str, Citation]] = []
+    out: list[tuple[str, AnyCitation]] = []
     for section in SECTION_TITLES:
         value = getattr(doc, section)
         if isinstance(value, list):
