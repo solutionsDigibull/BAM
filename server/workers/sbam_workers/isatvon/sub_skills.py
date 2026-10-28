@@ -5,7 +5,11 @@ whole step and takes its dependencies as arguments (the SOW step's `SowDeps`; no
 is used), so tests run it with a fake Bifrost. For Macro Skill `inp.macro_skill_id`:
 
   1. Sub-Skills already stored for the Macro Skill are returned as they are (activity retry): one
-     set per Macro Skill, never a second one.
+     set per Macro Skill, never a second one. After a scope change (E7.2) the Macro Skill starts
+     with the Sub-Skills carried over from the previous version; the ones the change touched are
+     DRAFT, and each is extracted again on its own (`rework`: its features only), keeping its
+     `skill_id`, order and `next`, then validated (VALID / INVALID). The ids returned are the ones
+     the build needs: a reused CERTIFIED / FROZEN Sub-Skill is not built again.
   2. The Workflow's SOW version must still be the approved one (`require_approved_sow`).
   3. Context: the Macro Skill, the SOW features its `sow_refs` name (a module id stands for all of
      its features) with the mapping hints of `breakdown_hints`, the next Macro Skill and the
@@ -34,7 +38,7 @@ import logging
 import re
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Any, Final
 
@@ -64,7 +68,7 @@ from sbam_contracts.isatvon_macros import SubSkillExtraction
 from sbam_contracts.pipeline import IdsResult, MacroRef
 from sbam_contracts.runs import TaskQueue
 from sbam_contracts.sow import FeatureItem, SowDocument, breakdown_hints
-from sbam_contracts.state_machines import Actor
+from sbam_contracts.state_machines import Actor, SubSkillState
 from sqlalchemy.orm import Session
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -94,6 +98,7 @@ PROMPT_ID: Final = "isatvon-sub-skills"
 EXTRACT_ATTEMPTS: Final = 3  # ProjectPipeline's PLAN uses the same (a test checks)
 NAME_CHARS: Final = 100  # of the name part of `MSnn.m_<Name>`
 REDACTED: Final = "[REDACTED]"
+REUSED: Final = frozenset({SubSkillState.CERTIFIED.value, SubSkillState.FROZEN.value})
 SCHEMA_INVALID: Final = "SchemaInvalidAfterRetries"
 FEATURE_NOT_COVERED: Final = "FeatureNotCovered"
 SOW_NOT_APPROVED: Final = "SowNotApproved"
@@ -122,17 +127,34 @@ class Source:
     next_macro: str | None
     features: list[FeatureItem]
     hints: dict[str, dict[str, Any]]  # feature id -> breakdown hint
+    rework: list["Rework"] = field(default_factory=list)  # E7.2: DRAFT rows to extract again
+
+
+@dataclass(frozen=True)
+class Rework:
+    """A carried-over Sub-Skill the scope change touched: extracted again, ids kept."""
+
+    id: uuid.UUID
+    skill_id: str
+    skill_name: str
+    next: str | None  # its `next` link, kept
+    features: list[FeatureItem]
 
 
 # --- checks and SBAM's own fields -----------------------------------------------------------------
 
 
-def check_coverage(features: list[FeatureItem]) -> Callable[[SubSkillExtraction], tuple[str, ...]]:
-    """Every feature in some `sow_refs`; every ref one of the Macro Skill's features."""
+def check_coverage(
+    features: list[FeatureItem], one: bool = False
+) -> Callable[[SubSkillExtraction], tuple[str, ...]]:
+    """Every feature in some `sow_refs`; every ref one of the Macro Skill's features. `one`: the
+    answer replaces a single Sub-Skill (E7.2 rework), so it holds exactly one."""
     ids = [f.id for f in features]
 
     def check(answer: SubSkillExtraction) -> tuple[str, ...]:
         errors: list[str] = []
+        if one and len(answer.sub_skills) != 1:
+            errors.append("sub_skills: EXPECTED_ONE")
         covered: set[str] = set()
         for i, proposal in enumerate(answer.sub_skills):
             for j, ref in enumerate(proposal.sow_refs):
@@ -232,13 +254,24 @@ def _load(deps: SowDeps, inp: MacroRef, reuse_stored: bool = True) -> Source | l
         if macro is None or workflow is None or macro.workflow_id != workflow.id:
             raise ApplicationError("no such Macro Skill", type="MacroNotFound", non_retryable=True)
         stored = SubSkillRepository(session, ctx).of_macro(macro.id)
-        if stored and reuse_stored:
-            return [s.id for s in stored]
+        drafts = [r for r in stored if r.state == SubSkillState.DRAFT.value] if reuse_stored else []
+        if stored and reuse_stored and not drafts:
+            return to_build(stored)
         try:
             version = require_approved_sow(session, ctx, workflow)
         except ApiError:
             raise ExtractionError(SOW_NOT_APPROVED, "SOW_NOT_APPROVED") from None
         sow = SowDocument.model_validate(version.structured)
+        rework = [
+            Rework(
+                r.id,
+                r.skill_id,
+                r.skill_name,
+                r.isatvon.get("isatvon_definition", {}).get("n_notification", {}).get("next"),
+                _features(sow, list(r.sow_refs)),
+            )
+            for r in drafts
+        ]
         siblings = macros.of_workflow(workflow.id)
         later = [m for m in siblings if m.order > macro.order]
         hints = {h["feature_id"]: h for m in breakdown_hints(sow) for h in m["sub_skills"]}
@@ -251,7 +284,13 @@ def _load(deps: SowDeps, inp: MacroRef, reuse_stored: bool = True) -> Source | l
             later[0].macro_category if later else None,
             _features(sow, list(macro.sow_refs)),
             hints,
+            rework,
         )
+
+
+def to_build(rows: list[SubSkill]) -> list[uuid.UUID]:
+    """The Sub-Skills the build needs: all but the ones reused as they are (E7.2)."""
+    return [r.id for r in rows if r.state not in REUSED]
 
 
 def _blocks(src: Source) -> dict[str, str]:
@@ -371,9 +410,14 @@ async def ask_sub_skills(
     scope: LlmScope,
     src: Source,
     extra_blocks: dict[str, str] | None = None,
+    *,
+    one: bool = False,
+    what: str | None = None,
 ) -> LlmResult[SubSkillExtraction]:
     """One `sbam-isatvon` answer for the Macro Skill (`extra_blocks`: a regeneration's hint and
-    context). A failure is left on the Workflow and raised non-retryable (see the docstring)."""
+    context, or an E7.2 rework, which answers `one` Sub-Skill). A failure is left on the Workflow
+    (as `what`, default the Macro Skill) and raised non-retryable (see the docstring)."""
+    what = what or src.macro_category
     try:
         return await deps.llm.run(
             ALIAS,
@@ -381,29 +425,112 @@ async def ask_sub_skills(
             SubSkillExtraction,
             {**_blocks(src), **(extra_blocks or {})},
             scope,
-            validate=check_coverage(src.features),
+            validate=check_coverage(src.features, one=one),
             subject={"macro_skill_id": str(src.macro_id), "macro_category": src.macro_category},
         )
     except SchemaInvalidAfterRetries as exc:
         missing = _uncovered(exc)
         if missing:
-            reason = f"{src.macro_category}: feature {', '.join(missing)} not covered"
+            reason = f"{what}: feature {', '.join(missing)} not covered"
             raise await asyncio.to_thread(_failed, deps, inp, FEATURE_NOT_COVERED, reason) from None
-        reason = f"{src.macro_category}: SCHEMA_INVALID after {len(exc.attempts)}"
+        reason = f"{what}: SCHEMA_INVALID after {len(exc.attempts)}"
         raise await asyncio.to_thread(_failed, deps, inp, SCHEMA_INVALID, reason) from None
     except (ContextTooLarge, LlmRequestRejected) as exc:
         kind = type(exc).__name__
-        reason = f"{src.macro_category}: {kind}"
+        reason = f"{what}: {kind}"
         raise await asyncio.to_thread(_failed, deps, inp, kind, reason) from None
     except LlmTransportError:
         if scope.attempt < deps.attempts:
             raise
-        reason = f"{src.macro_category}: {LLM_UNAVAILABLE}"
+        reason = f"{what}: {LLM_UNAVAILABLE}"
         raise await asyncio.to_thread(_failed, deps, inp, LLM_UNAVAILABLE, reason) from None
 
 
+def _store_rework(
+    deps: SowDeps,
+    inp: MacroRef,
+    src: Source,
+    rework: Rework,
+    answer: SubSkillExtraction,
+    llm_call_id: uuid.UUID | None,
+) -> None:
+    """The re-extracted content on the DRAFT row: ids, order and `next` kept, then validated."""
+    ctx = _ctx(inp)
+    (proposal,) = answer.sub_skills
+    raw = proposal.sub_skill.model_dump(mode="json", exclude_unset=True)
+    raw["skill_metadata"]["skill_id"] = rework.skill_id
+    raw["skill_metadata"]["skill_name"] = rework.skill_name
+    raw["skill_metadata"]["macro_category"] = src.macro_category
+    raw["isatvon_definition"]["n_notification"]["next"] = rework.next
+    redact_secrets(raw)
+    findings = validate_sub_skill(
+        raw, macro_category=src.macro_category, library_registry=DEFAULT_LIBRARY_REGISTRY
+    )
+    with deps.sessions() as session:
+        row = SubSkillRepository(session, ctx).get_for_update(rework.id)
+        if row is None or row.state != SubSkillState.DRAFT.value:
+            return  # already done by an earlier attempt
+        row.isatvon = raw
+        row.sow_refs = list(dict.fromkeys(proposal.sow_refs))
+        row.validation_errors = [f.model_dump(mode="json") for f in findings]
+        row.content_sha256 = sha256_of(raw).removeprefix("sha256:")
+        apply_transition(
+            session,
+            ctx,
+            TransitionCommand(
+                model=SubSkill,
+                entity_id=row.id,
+                event="validation_failed" if findings else "validation_passed",
+                actor=Actor.SYSTEM,
+                actor_id=SYSTEM_ACTOR_ID,
+                correlation_id=inp.correlation_id,
+                idempotency_key=f"{inp.run_id}:rework:{row.id}",
+            ),
+        )
+        if llm_call_id is not None:
+            _redact_call(session, llm_call_id)
+        session.commit()
+
+
+def _ids_to_build(deps: SowDeps, inp: MacroRef) -> list[uuid.UUID]:
+    with deps.sessions() as session:
+        return to_build(SubSkillRepository(session, _ctx(inp)).of_macro(inp.macro_skill_id))
+
+
+async def _rework(deps: SowDeps, inp: MacroRef, scope: LlmScope, src: Source) -> list[uuid.UUID]:
+    """E7.2: each DRAFT Sub-Skill a scope change left extracted again, one model call each."""
+    for rework in src.rework:
+        one = replace(src, features=rework.features)
+        # Its own replay key: several model calls run in this one activity attempt.
+        own = replace(scope, activity_id=f"{scope.activity_id}#rework:{rework.id}")
+        target = json.dumps({"skill_id": rework.skill_id, "skill_name": rework.skill_name})
+        result = await ask_sub_skills(
+            deps,
+            inp,
+            own,
+            one,
+            {"rework": target},
+            one=True,
+            what=f"{src.macro_category} {rework.skill_id}",
+        )
+        await asyncio.to_thread(
+            _store_rework, deps, inp, src, rework, result.output, result.llm_call_id
+        )
+    log.info(
+        "sub-skills extracted again",
+        extra={
+            "tenant_id": str(inp.tenant_id),
+            "project_id": str(inp.project_id),
+            "workflow_id": str(inp.workflow_id),
+            "macro_skill_id": str(inp.macro_skill_id),
+            "reworked": len(src.rework),
+        },
+    )
+    return await asyncio.to_thread(_ids_to_build, deps, inp)
+
+
 async def extract_for_macro(deps: SowDeps, inp: MacroRef, scope: LlmScope) -> list[uuid.UUID]:
-    """The Macro Skill's Sub-Skill ids; see the module docstring."""
+    """The ids of the Macro Skill's Sub-Skills the build needs; see the module docstring."""
     try:
         loaded = await asyncio.to_thread(_load, deps, inp)
     except ExtractionError as exc:
@@ -411,6 +538,8 @@ async def extract_for_macro(deps: SowDeps, inp: MacroRef, scope: LlmScope) -> li
     if isinstance(loaded, list):
         return loaded
     src = loaded
+    if src.rework:
+        return await _rework(deps, inp, scope, src)
     result = await ask_sub_skills(deps, inp, scope, src)
     ids = await asyncio.to_thread(_store, deps, inp, src, result.output, result.llm_call_id)
     log.info(

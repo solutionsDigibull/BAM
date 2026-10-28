@@ -4,7 +4,9 @@
 `SowDeps`), so tests run it with a fake Bifrost and a temp-dir storage. For Workflow `inp`:
 
   1. Macro Skills already stored for the Workflow are returned as they are (activity retry): one
-     set per Workflow, never a second one.
+     set per Workflow, never a second one. After a scope change (E7.2) the Workflow starts with the
+     Macro Skills carried over from the previous version; SOW modules none of them covers (new
+     ones) are then extracted on their own (`scope`), numbered after the existing Macro Skills.
   2. The Workflow's SOW version must still be APPROVED and the SOW's approved version
      (`require_approved_sow`), else `SowNotApproved`. A SOW with more than 99 modules can't be
      numbered (`MSnn`), so it fails before any model call (`TooManyModules`).
@@ -32,7 +34,7 @@ import logging
 import re
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Final
 
@@ -111,15 +113,21 @@ class Source:
     knowledge_version_id: uuid.UUID
     sow: SowDocument
     agents: dict[str, str]  # AG-* -> "<name> - <description>"
+    only: list[str] = field(default_factory=list)  # E7.2: just these modules (none: all)
+    stored: list[uuid.UUID] = field(default_factory=list)  # Macro Skills already there, in order
+    first_order: int = 1  # of the first new Macro Skill
 
 
 # --- checks and SBAM's own fields -----------------------------------------------------------------
 
 
-def check_coverage(sow: SowDocument) -> Callable[[MacroExtraction], tuple[str, ...]]:
-    """Every module in some `sow_refs`; every ref a module or feature id of the SOW."""
-    modules = [m.id for m in sow.modules]
-    known = set(modules) | {f.id for f in sow.features}
+def check_coverage(
+    sow: SowDocument, only: list[str] | None = None
+) -> Callable[[MacroExtraction], tuple[str, ...]]:
+    """Every module (of `only`, if given) in some `sow_refs`; every ref a module or feature id of
+    the SOW (of those modules, if given: the others already have Macro Skills)."""
+    modules = list(only) if only else [m.id for m in sow.modules]
+    known = set(modules) | {f.id for f in sow.features if not only or f.module_id in only}
 
     def check(answer: MacroExtraction) -> tuple[str, ...]:
         errors: list[str] = []
@@ -203,13 +211,16 @@ def _load(deps: SowDeps, inp: WorkflowRef) -> Source | list[uuid.UUID]:
         if workflow is None:
             raise ApplicationError("no such Workflow", type="WorkflowNotFound", non_retryable=True)
         stored = MacroSkillRepository(session, ctx).of_workflow(workflow.id)
-        if stored:
-            return [m.id for m in stored]
         try:
             version = require_approved_sow(session, ctx, workflow)
         except ApiError:
+            if stored:
+                return [m.id for m in stored]
             raise ExtractionError(SOW_NOT_APPROVED, "SOW_NOT_APPROVED") from None
         sow = SowDocument.model_validate(version.structured)
+        only = _uncovered_modules(sow, stored) if stored else []
+        if stored and not only:
+            return [m.id for m in stored]
         if len(sow.modules) > MAX_MACROS:
             raise ExtractionError(TOO_MANY_MODULES, f"TOO_MANY_MODULES {len(sow.modules)}")
         kv = session.get(KnowledgeVersion, version.knowledge_version_id)
@@ -219,7 +230,20 @@ def _load(deps: SowDeps, inp: WorkflowRef) -> Source | list[uuid.UUID]:
             version.knowledge_version_id,
             sow,
             _agents(session, ctx, kv),
+            only=only,
+            stored=[m.id for m in stored],
+            first_order=max((m.order for m in stored), default=0) + 1,
         )
+
+
+def _uncovered_modules(sow: SowDocument, stored: list[MacroSkill]) -> list[str]:
+    """SOW modules no stored Macro Skill covers (by module id, or by one of its features)."""
+    module_of = {f.id: f.module_id for f in sow.features}
+    covered: set[str] = set()
+    for macro in stored:
+        for ref in macro.sow_refs:
+            covered.add(module_of.get(ref, ref))
+    return [m.id for m in sow.modules if m.id not in covered]
 
 
 def _store(
@@ -228,7 +252,7 @@ def _store(
     ctx = _ctx(inp)
     rows: list[MacroSkill] = []
     with deps.sessions() as session:
-        for order, proposal in enumerate(answer.macros, start=1):
+        for order, proposal in enumerate(answer.macros, start=src.first_order):
             agent_ref, warnings = _agent_ref(proposal.agent_ref, src.agents)
             row = MacroSkill(
                 id=uuid7(),
@@ -283,7 +307,10 @@ def _failed(deps: SowDeps, inp: WorkflowRef, kind: str, reason: str) -> Applicat
 def _blocks(src: Source, blocks: dict[str, str]) -> dict[str, str]:
     sow = src.sow.model_dump(mode="json", include={"modules", "features"})
     agents = "\n".join(f"{ref}: {text}" for ref, text in sorted(src.agents.items()))
-    return {"sow": json.dumps(sow, sort_keys=True), "agents": agents, **blocks}
+    out = {"sow": json.dumps(sow, sort_keys=True), "agents": agents, **blocks}
+    if src.only:  # E7.2: only these modules are broken down now
+        out["scope"] = "\n".join(src.only)
+    return out
 
 
 async def extract_macros(deps: SowDeps, inp: WorkflowRef, scope: LlmScope) -> list[uuid.UUID]:
@@ -309,7 +336,7 @@ async def extract_macros(deps: SowDeps, inp: WorkflowRef, scope: LlmScope) -> li
             MacroExtraction,
             _blocks(src, context.blocks),
             scope,
-            validate=check_coverage(src.sow),
+            validate=check_coverage(src.sow, src.only),
             manifest_extra=context.manifest,
         )
     except SchemaInvalidAfterRetries as exc:
@@ -329,7 +356,7 @@ async def extract_macros(deps: SowDeps, inp: WorkflowRef, scope: LlmScope) -> li
         reason = LLM_UNAVAILABLE
         raise await asyncio.to_thread(_failed, deps, inp, LLM_UNAVAILABLE, reason) from None
 
-    ids = await asyncio.to_thread(_store, deps, inp, src, result.output)
+    ids = src.stored + await asyncio.to_thread(_store, deps, inp, src, result.output)
     log.info(
         "macro skills extracted",
         extra={
