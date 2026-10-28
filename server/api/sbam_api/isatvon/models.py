@@ -82,3 +82,20 @@ class SubSkill(Stateful, ProjectOwned, Base):
 
 
 register_entity(MachineName.SUB_SKILL, SubSkill)
+
+
+class SubSkillEdit(ProjectOwned, Base):
+    """`sub_skill_edits` (TD §10, E8.4): one row per field an FDE changed, so the grid can show a
+    field's history. `path` is the grid `field_path` (or `order`); `old` / `new` are the JSON
+    values; `created_at` is when. Rows are only ever inserted."""
+
+    __tablename__ = "sub_skill_edits"
+
+    sub_skill_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA}.sub_skills.id"), index=True
+    )
+    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.workflows.id"), index=True)
+    path: Mapped[str] = mapped_column(String(300))
+    old: Mapped[Any] = mapped_column(Json)
+    new: Mapped[Any] = mapped_column(Json)
+    edited_by: Mapped[str] = mapped_column(String(255))
