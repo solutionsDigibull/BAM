@@ -28,7 +28,7 @@ class Harness(ValidateHarness):
     def sub_path(self, sub_id: uuid.UUID, suffix: str = "") -> str:
         return f"/projects/{self.project}/workflows/{self.wf}/sub-skills/{sub_id}{suffix}"
 
-    def sha(self, sub_id: uuid.UUID) -> str:
+    def etag_of(self, sub_id: uuid.UUID) -> str:
         with self.sessions() as s:
             row = s.get(SubSkill, sub_id)
             assert row is not None
@@ -43,7 +43,7 @@ class Harness(ValidateHarness):
         path: str | None = None,
     ) -> Any:
         if if_match == "current":
-            if_match = self.sha(sub_id)
+            if_match = self.etag_of(sub_id)
         headers = {} if if_match is None else {"If-Match": if_match}
         return self.call(
             "PATCH", path or self.sub_path(sub_id), token or self.fde(), headers=headers, json=body
@@ -87,13 +87,13 @@ def other_skill(n: int) -> dict[str, Any]:
 
 def test_e8_4_t01_valid_edit_revalidates_and_logs(h: Harness) -> None:
     sub = h.add_sub_skill(sample(), state="VALID")
-    before = h.sha(sub)
+    before = h.etag_of(sub)
     res = h.patch(sub, {"changes": {BUDGET: B6}})
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["state"] == "VALID"
     assert body["sub_skill"]["isatvon_definition"]["v_variables"]["budget_limit"] == B6
-    assert res.headers["ETag"] == h.sha(sub) != before
+    assert res.headers["ETag"] == h.etag_of(sub) != before
     (edit,) = h.edit_rows(sub)
     assert (edit.path, edit.old, edit.new) == (
         BUDGET,
@@ -117,10 +117,10 @@ def test_e8_4_t01_the_isatvon_prefix_is_read_as_isatvon_definition(h: Harness) -
 
 def test_e8_4_t02_type_error_is_422_with_a_path_and_stores_nothing(h: Harness) -> None:
     sub = h.add_sub_skill(sample())
-    before = h.sha(sub)
+    before = h.etag_of(sub)
     res = h.patch(sub, {"changes": {IDEF + "v_variables.max_iterations": "lots"}})
     assert res.status_code == 422, res.text
-    assert h.sha(sub) == before
+    assert h.etag_of(sub) == before
     assert h.edit_rows(sub) == []
     assert h.state_of(sub) == "VALID"
 
@@ -219,7 +219,7 @@ def test_e8_4_delete_soft_deletes_and_renumbers(h: Harness) -> None:
     a = h.add_sub_skill(sample(), order=1)
     b = h.add_sub_skill(other_skill(2), order=2)
     c = h.add_sub_skill(other_skill(3), order=3)
-    res = h.call("DELETE", h.sub_path(b), h.fde(), headers={"If-Match": h.sha(b)})
+    res = h.call("DELETE", h.sub_path(b), h.fde(), headers={"If-Match": h.etag_of(b)})
     assert res.status_code == 204
     assert h.orders() == {a: 1, c: 2}
     with h.sessions() as s:
