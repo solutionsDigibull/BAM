@@ -255,13 +255,16 @@ class LlmClient:
         manifest_extra: Mapping[str, Any] | None = None,
         images: Sequence[LlmImage] = (),
         subject: Mapping[str, str] | None = None,
+        fresh: bool = False,
     ) -> LlmResult[T]:
         """`validate` adds checks the schema cannot express (e.g. citations resolve); its error
         lines are re-asked like schema errors, so they hold codes and ids only. `manifest_extra` is
         stored with the context manifest (how the context was chosen), under `_extra`. `images` go
         with the prompt and are never stored (the manifest keeps name, type, size and hash under
         `_images`); `subject` (e.g. `{"document_version_id": ...}`) is kept in the manifest under
-        `_subject`, sent to Bifrost as metadata and put on the Langfuse trace."""
+        `_subject`, sent to Bifrost as metadata and put on the Langfuse trace. `fresh` skips the
+        derivative cache and stores the new answer over the old one (a retry that must not get the
+        same answer back, e.g. a correction)."""
         if alias not in ALIASES:
             raise UnknownAlias(f"{alias!r} is not an sbam alias; use one of {', '.join(ALIASES)}")
         require_strict_output(output_type)
@@ -285,7 +288,7 @@ class LlmClient:
             return LlmResult(output, hit.llm_call_id, hit.trace_id, 0, cached=True)
 
         key = cache_key(alias, messages)
-        if self.settings.llm_derivative_cache:
+        if self.settings.llm_derivative_cache and not fresh:
             stored = await asyncio.to_thread(self.store.derivative, scope, key)
             if stored is not None:
                 try:
@@ -418,6 +421,10 @@ class LlmClient:
         result = await run_structured(
             call, messages, output_type, on_attempt=on_attempt, validate=validate
         )
+        if self._budgeted and spent_usd == 0 and (spent_in or spent_out):
+            log.warning(
+                "llm budget is set but Bifrost reported no cost for %s; spend is untracked", alias
+            )
         if self.settings.llm_derivative_cache:
             await asyncio.to_thread(
                 self.store.put_derivative,
@@ -432,8 +439,16 @@ class LlmClient:
                     "tokens_out": spent_out,
                     "cost_usd": spent_usd,  # the whole run, re-asks included: what a hit saves
                 },
+                replace=True,  # reaching here means no usable entry existed (or fresh)
             )
         return LlmResult(result.output, row_ids[-1], trace_id, len(result.attempts))
+
+    @property
+    def _budgeted(self) -> bool:
+        return (
+            self.settings.llm_project_budget_usd is not None
+            or self.settings.llm_tenant_budget_usd is not None
+        )
 
     async def _check_budget(self, scope: LlmScope) -> None:
         for limit, tenant, what in (

@@ -166,3 +166,49 @@ def test_spent_counts_failed_attempts_too() -> None:
     run(client, scope(), {"rfq": "A"})
     with sessions() as session:
         assert LlmCallRepository(session, TenantContext(TENANT, PROJECT)).spent() == Decimal("0.25")
+
+
+def test_a_repaired_answer_replaces_the_stale_stored_one() -> None:
+    bifrost = FakeBifrost([reply()])
+    client, sessions = make_client(bifrost)
+    run(client, scope())
+    with sessions() as session:
+        row = session.query(LlmDerivative).one()
+        row.output = {"count": "three", "label": "ok"}
+        session.commit()
+    run(client, scope())  # asked again, the good answer must be stored over the bad one
+    third = run(client, scope())
+    assert len(bifrost.requests) == 2
+    assert third.cached
+
+
+def test_a_soft_deleted_entry_is_stored_again_not_blocking_its_key_forever() -> None:
+    bifrost = FakeBifrost([reply()])
+    client, sessions = make_client(bifrost)
+    run(client, scope())
+    with sessions() as session:
+        row = session.query(LlmDerivative).one()
+        row.deleted_at = row.created_at
+        session.commit()
+    run(client, scope())
+    third = run(client, scope())
+    assert len(bifrost.requests) == 2
+    assert third.cached
+
+
+def test_fresh_skips_the_cache_and_replaces_the_stored_answer() -> None:
+    other = json.dumps({"count": 9, "label": "new"})
+    bifrost = FakeBifrost([reply(), completion(other, usage={}, cost={"total_cost": 0.5})])
+    client, _ = make_client(bifrost)
+    run(client, scope())
+    again = run(client, scope(), fresh=True)
+    assert len(bifrost.requests) == 2 and not again.cached and again.output.count == 9
+    assert run(client, scope()).output.count == 9  # later plain calls get the newest answer
+
+
+def test_a_budget_with_replies_that_report_no_cost_warns(caplog: pytest.LogCaptureFixture) -> None:
+    bifrost = FakeBifrost([completion(GOOD, usage={"prompt_tokens": 10, "completion_tokens": 5})])
+    client, _ = make_client(bifrost, llm_project_budget_usd="1")
+    with caplog.at_level("WARNING"):
+        run(client, scope())
+    assert "reported no cost" in caplog.text

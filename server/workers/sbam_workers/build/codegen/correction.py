@@ -326,6 +326,7 @@ async def correct_code(
         request_context(sub_skill, current, skeleton, allowlist, findings, trace, previous),
         scope,
         prompt_version=prompt_version,
+        fresh=True,
         metadata={"template": f"{template.name}/{template.version}"},
     )
     out = result.output

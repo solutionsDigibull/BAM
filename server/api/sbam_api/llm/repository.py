@@ -82,8 +82,23 @@ class LlmDerivativeRepository(TenantScopedRepository[LlmDerivative]):
             .execution_options(synchronize_session=False)
         )
 
-    def put(self, values: dict[str, Any]) -> bool:
-        """Store an answer; False when another worker stored the same key first (first one wins)."""
+    def put(self, values: dict[str, Any], *, replace: bool = False) -> bool:
+        """Store an answer. An entry that is deleted, or `replace`, is overwritten; otherwise the
+        first writer wins and this returns False."""
+        key = values["cache_key"]
+        existing = self.session.scalars(
+            select(LlmDerivative).where(
+                LlmDerivative.tenant_id == self.ctx.tenant_id, LlmDerivative.cache_key == key
+            )
+        ).one_or_none()
+        if existing is not None:
+            if existing.deleted_at is None and not replace:
+                return False
+            for name, value in values.items():
+                setattr(existing, name, value)
+            existing.deleted_at = None
+            self.session.flush()
+            return True
         row = LlmDerivative(**{**values, "tenant_id": self.ctx.tenant_id})
         try:
             with self.session.begin_nested():

@@ -40,7 +40,9 @@ class CallStore(Protocol):
         """The stored answer for `cache_key` in the tenant (counting the hit), or None."""
         ...
 
-    def put_derivative(self, scope: LlmScope, values: dict[str, Any]) -> None: ...
+    def put_derivative(
+        self, scope: LlmScope, values: dict[str, Any], *, replace: bool = False
+    ) -> None: ...
 
     def spent(self, scope: LlmScope, *, tenant: bool = False) -> Decimal:
         """Recorded spend of the scope's project, or of its whole tenant."""
@@ -87,10 +89,12 @@ class SqlCallStore:
             session.commit()
             return row.output
 
-    def put_derivative(self, scope: LlmScope, values: dict[str, Any]) -> None:
+    def put_derivative(
+        self, scope: LlmScope, values: dict[str, Any], *, replace: bool = False
+    ) -> None:
         with self.sessions() as session:
             repo = LlmDerivativeRepository(session, TenantContext(scope.tenant_id, None))
-            repo.put({**values, "created_by": "sbam-worker"})
+            repo.put({**values, "created_by": "sbam-worker"}, replace=replace)
             session.commit()
 
     def spent(self, scope: LlmScope, *, tenant: bool = False) -> Decimal:
