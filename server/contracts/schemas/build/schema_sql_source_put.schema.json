@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:build/schema_sql_source_put:0.1.0",
+  "additionalProperties": false,
+  "description": "`PUT W/schema-sql/source`: this project document (a parsed, clean `.sql`) is the base.",
+  "properties": {
+    "document_id": {
+      "format": "uuid",
+      "title": "Document Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "document_id"
+  ],
+  "title": "SchemaSqlSourcePut",
+  "type": "object"
+}

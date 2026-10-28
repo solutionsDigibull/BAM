@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:3a44e4d7fc8a6a08f3d8e54f7da873e1476d9f4fa4ee0d8c8d5fa534cf5c238d
+// source-sha256:99f76ec7c53b449b2e1ab6cb8304ea0adeae2ada8739737f42ceb437440ab21d
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -209,6 +209,11 @@ export type GateName =
   | "LOOP_TESTS";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SchemaSource".
+ */
+export type SchemaSource = "UPLOADED" | "GENERATED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ManifestStatus".
  */
 export type ManifestStatus = "DRAFT" | "VALIDATING" | "APPROVED" | "SUPERSEDED";
@@ -406,6 +411,8 @@ export interface SbamContracts {
   SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
+  WorkflowSchemaSql?: WorkflowSchemaSql;
+  SchemaSqlSourcePut?: SchemaSqlSourcePut;
   Isa14Manifest?: Isa14Manifest;
   SkillManifest?: SkillManifest;
   WorkflowManifest?: WorkflowManifest;
@@ -1087,6 +1094,33 @@ export interface Finding {
   col?: number | null;
   expected?: string | null;
   actual?: string | null;
+}
+/**
+ * One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no
+ * build has applied yet is PENDING; `sql` is empty until then for a generated one.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowSchemaSql".
+ */
+export interface WorkflowSchemaSql {
+  workflow_id: string;
+  version: number;
+  source: SchemaSource;
+  source_document_id?: string | null;
+  sha256?: string | null;
+  tables?: string[];
+  status: GateStatus;
+  findings?: Finding[];
+  sql?: string;
+}
+/**
+ * `PUT W/schema-sql/source`: this project document (a parsed, clean `.sql`) is the base.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SchemaSqlSourcePut".
+ */
+export interface SchemaSqlSourcePut {
+  document_id: string;
 }
 /**
  * The ISA14 Skill Manifest: exactly these five blocks.
