@@ -369,7 +369,7 @@ services:
     environment:
       <<: *worker-env
       SBAM_QUEUES: sbam-knowledge
-      STORAGE_ROOT: /data/storage # parsed documents and masters.jsonl, read-only
+      STORAGE_ROOT: /data/storage # reads parsed documents; writes masters.jsonl and the OKF bundle (#371)
       ENABLE_BACKEND_ACCESS_CONTROL: "true"
       DATA_ROOT_DIRECTORY: /data/cognee/data
       SYSTEM_ROOT_DIRECTORY: /data/cognee/system
@@ -389,7 +389,7 @@ services:
       TELEMETRY_DISABLED: "1"
     volumes:
       - cognee_data:/data/cognee
-      - storage:/data/storage:ro
+      - storage:/data/storage # read-write: the build exports masters.jsonl and stores the OKF bundle (#371)
     mem_limit: 2g # Cognee + LanceDB; 1g is not enough for cognify
   worker-llm:
     <<: *worker
