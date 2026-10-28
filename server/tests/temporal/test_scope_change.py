@@ -11,7 +11,7 @@ from typing import Any
 
 from llm_db import FakeBifrost, completion, make_client
 from macros_db import fake_embed
-from sbam_api.llm.models import LlmCall
+from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_api.pipeline.service import start_pipeline
 from sbam_api.projects.models import Project
 from sbam_api.sow.models import SowVersion
@@ -113,7 +113,8 @@ def test_e7_2_t04_the_new_major_version_rebuilds_only_the_citing_sub_skill() -> 
 
 def with_extraction(w: World, bifrost: FakeBifrost, tmp_path: Path) -> dict[str, Any]:
     """REAL plus the real pass 1 and pass 2, wired to the test's Bifrost and database."""
-    LlmCall.__table__.create(w.sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
+    for table in (LlmCall, LlmDerivative):
+        table.__table__.create(w.sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
     client, _ = make_client(bifrost, sessions=w.sessions)
     deps = SowDeps(w.sessions, LocalDiskBackend(tmp_path), client, fake_embed, 100_000)
 
