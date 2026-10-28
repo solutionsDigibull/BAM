@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
+from sbam_contracts.code_view import CodeAttemptList, CodeDiff, CodeFileView
 from sbam_contracts.documents import (
     CleanupResult,
     DocumentOut,
@@ -158,6 +159,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sow/approve_request", SowApproveRequest),
     ("sow/approval", SowApproval),
     ("sow/citation_detail", SowCitationDetail),
+    ("code/attempt_list", CodeAttemptList),
+    ("code/file_view", CodeFileView),
+    ("code/diff", CodeDiff),
     ("sow/new_version_request", SowNewVersionRequest),
     ("sow/impact", SowImpact),
     ("runs/run", Run),
