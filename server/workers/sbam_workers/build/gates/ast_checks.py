@@ -88,6 +88,8 @@ class Finding:
     file: str | None = None
     line: int | None = None
     col: int | None = None
+    expected: str | None = None
+    actual: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """The `Finding` contract's shape (`sbam_contracts.build_dashboard.Finding`)."""
@@ -98,6 +100,8 @@ class Finding:
             "file": self.file,
             "line": self.line,
             "col": self.col,
+            "expected": None if self.expected is None else self.expected[:1000],
+            "actual": None if self.actual is None else self.actual[:1000],
         }
 
     def key(self) -> tuple[str, int, int, str, str]:
@@ -335,7 +339,7 @@ def _skeleton_file(name: str, fresh: str, bundle_text: str) -> list[Finding]:
         expected = ", ".join(f"{k}{s}" for k, s in fresh_markers)
         actual = ", ".join(f"{k}{s}" for k, s in markers)
         message = f"LLM_BODY markers differ: expected [{expected}], actual [{actual}]"
-        return [Finding(gate, "SLOT_MARKERS_MISMATCH", message, name)]
+        return [Finding(gate, "SLOT_MARKERS_MISMATCH", message, name, None, None, expected, actual)]
     try:
         expected_tree, actual_tree = ast.parse(fresh_masked), ast.parse(masked)
         _normalise_docstrings(expected_tree)
@@ -349,7 +353,8 @@ def _skeleton_file(name: str, fresh: str, bundle_text: str) -> list[Finding]:
         return [Finding(gate, "SKELETON_MISMATCH", message, name)]
     message = f"differs from the skeleton: expected {_dump(e)}, actual {_dump(a)}"
     line, col = getattr(anchor, "lineno", None), getattr(anchor, "col_offset", None)
-    return [Finding(gate, "SKELETON_MISMATCH", message, name, line, col)]
+    found = Finding(gate, "SKELETON_MISMATCH", message, name, line, col, _dump(e), _dump(a))
+    return [found]
 
 
 def check_skeleton(
@@ -421,7 +426,8 @@ def _signature_findings(file: str, fn: _Fn, signature: list[dict[str, Any]]) -> 
     expected_names = [f["name"] for f in signature]
     if names != expected_names:
         message = f"{fn.name}: parameters expected {expected_names}, actual {names}"
-        return [Finding(gate, "PARAM_SIGNATURE_MISMATCH", message, file, fn.lineno, fn.col_offset)]
+        at = (file, fn.lineno, fn.col_offset, str(expected_names), str(names))
+        return [Finding(gate, "PARAM_SIGNATURE_MISMATCH", message, *at)]
     findings: list[Finding] = []
     first_default = len(args.args) - len(args.defaults)
     for index, (arg, spec) in enumerate(zip(args.args, signature, strict=True)):
@@ -429,9 +435,8 @@ def _signature_findings(file: str, fn: _Fn, signature: list[dict[str, Any]]) -> 
         actual = _unparse(arg.annotation)
         if actual != expected:
             message = f"{fn.name}({arg.arg}): annotation expected {expected}, actual {actual}"
-            findings.append(
-                Finding(gate, "PARAM_TYPE_MISMATCH", message, file, arg.lineno, arg.col_offset)
-            )
+            at = (file, arg.lineno, arg.col_offset, expected, actual)
+            findings.append(Finding(gate, "PARAM_TYPE_MISMATCH", message, *at))
         default = args.defaults[index - first_default] if index >= first_default else None
         has_none = isinstance(default, ast.Constant) and default.value is None
         if (spec["required"] and default is not None) or (not spec["required"] and not has_none):
@@ -444,7 +449,7 @@ def _signature_findings(file: str, fn: _Fn, signature: list[dict[str, Any]]) -> 
     if _unparse(fn.returns) != EXPECTED_RETURN:
         actual = _unparse(fn.returns)
         message = f"{fn.name}: return annotation expected {EXPECTED_RETURN}, actual {actual}"
-        at = (file, fn.lineno, fn.col_offset)
+        at = (file, fn.lineno, fn.col_offset, EXPECTED_RETURN, actual)
         findings.append(Finding(gate, "RETURN_TYPE_MISMATCH", message, *at))
     return findings
 

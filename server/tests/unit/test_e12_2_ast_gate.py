@@ -92,6 +92,8 @@ def test_e12_2_t02_changed_registration_is_a_skeleton_mismatch(
     [finding] = skeleton.findings
     assert finding.code == "SKELETON_MISMATCH" and finding.file == "server.py" and finding.line
     assert CHECK in finding.message and "renamed" in finding.message  # expected vs actual node
+    assert finding.expected and CHECK in finding.expected
+    assert finding.actual and "renamed" in finding.actual
 
 
 def test_e12_2_t03_param_annotation_mismatch(
@@ -102,6 +104,7 @@ def test_e12_2_t03_param_annotation_mismatch(
     assert conformance.status is GateStatus.FAILED
     assert codes(conformance) == {"PARAM_TYPE_MISMATCH"}
     assert "mobile_number" in conformance.findings[0].message
+    assert (conformance.findings[0].expected, conformance.findings[0].actual) == ("str", "int")
 
 
 def test_e12_2_t04_missing_gate_identifier(
