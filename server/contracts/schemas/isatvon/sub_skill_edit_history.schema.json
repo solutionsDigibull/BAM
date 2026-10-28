@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/sub_skill_edit_history:0.1.0",
+  "$defs": {
+    "SubSkillEdit": {
+      "additionalProperties": false,
+      "description": "One changed field of an edit (`sub_skill_edits`): `path` is the grid `field_path`.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "old": {
+          "title": "Old"
+        },
+        "new": {
+          "title": "New"
+        },
+        "by": {
+          "title": "By",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "old",
+        "new",
+        "by",
+        "at"
+      ],
+      "title": "SubSkillEdit",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET W/sub-skills/{sub_id}/edits`: oldest first, per changed field.",
+  "properties": {
+    "sub_skill_id": {
+      "format": "uuid",
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "edits": {
+      "items": {
+        "$ref": "#/$defs/SubSkillEdit"
+      },
+      "title": "Edits",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sub_skill_id",
+    "edits"
+  ],
+  "title": "SubSkillEditHistory",
+  "type": "object"
+}

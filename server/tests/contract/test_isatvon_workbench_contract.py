@@ -15,6 +15,7 @@ from sbam_api.isatvon import grid
 from sbam_contracts import isatvon_grid
 from sbam_contracts.isatvon14 import SubSkill, validate_sub_skill
 from sbam_contracts.isatvon_workbench import (
+    MacroSkillPatch,
     SubSkillPatch,
     ValidationReport,
     WorkbenchSubSkill,
@@ -105,15 +106,36 @@ def test_e8_7_violation_paths_name_grid_columns() -> None:
     assert reported.validation_errors == violations
 
 
-def test_e8_7_patch_takes_dotted_paths_but_never_the_skill_id() -> None:
+def test_e8_7_patch_takes_dotted_paths_and_an_order() -> None:
     ok = SubSkillPatch.model_validate(
         {"changes": {"isatvon_definition.v_variables.max_iterations": 3}}
     )
     assert ok.changes == {"isatvon_definition.v_variables.max_iterations": 3}
-    bads: list[dict[str, Any]] = [{"changes": {}}, {"changes": {"skill_metadata.skill_id": "x"}}]
+    assert SubSkillPatch.model_validate({"order": 2}).order == 2
+    bads: list[dict[str, Any]] = [{}, {"changes": {}}, {"order": 0}]
     for bad in bads:
         with pytest.raises(ValidationError):
             SubSkillPatch.model_validate(bad)
+
+
+def test_e8_4_patch_keeps_unknown_top_level_keys_so_the_server_can_name_them_read_only() -> None:
+    patch = SubSkillPatch.model_validate({"state": "VALID"})
+    assert patch.model_extra == {"state": "VALID"}
+
+
+def test_e8_4_macro_patch_limits() -> None:
+    assert MacroSkillPatch.model_validate({"name": "A", "order": 1}).order == 1
+    bads: list[dict[str, Any]] = [
+        {},
+        {"name": ""},
+        {"name": "x" * 121},
+        {"description": "x" * 2001},
+        {"order": 0},
+        {"state": "X"},
+    ]
+    for bad in bads:
+        with pytest.raises(ValidationError):
+            MacroSkillPatch.model_validate(bad)
 
 
 def test_e8_7_validation_report() -> None:

@@ -2,7 +2,7 @@
 the answers of an edit or a validation.
 
 TD §8.8 lists the routes but leaves their bodies open ("tree", "Sub-Skill + validation_errors[]");
-these are the shapes the workbench (#99) is built against until the endpoints land (#94).
+these are the shapes the workbench (#99) is built against; the edit endpoints are E8.4 (#94).
 
 - `GET W/macro-skills` → `WorkbenchTree`. Each Sub-Skill row's `ETag` is its `content_sha256`.
 - `PATCH W/sub-skills/{sub_id}` takes `SubSkillPatch` + `If-Match` → `WorkbenchSubSkill` (the whole
@@ -10,16 +10,21 @@ these are the shapes the workbench (#99) is built against until the endpoints la
 - `POST W/isatvon/validate` → `ValidationReport`.
 """
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.isatvon14 import RuleViolation, SubSkill
 from sbam_contracts.state_machines import SubSkillState, WorkflowState
 
 PLATFORM_OWNED = frozenset({"skill_metadata.skill_id"})  # read-only in the grid too (#98)
+# Top-level fields of a Sub-Skill row a PATCH may never carry (422 READ_ONLY).
+READ_ONLY_ROW_FIELDS = frozenset(
+    {"id", "macro_id", "state", "content_sha256", "validation_errors", "sow_refs"}
+)
 
 
 class WorkbenchSubSkill(BaseModel):
@@ -62,21 +67,67 @@ class WorkbenchTree(BaseModel):
 
 
 class SubSkillPatch(BaseModel):
-    """`PATCH W/sub-skills/{sub_id}`: a partial ISATVON 1.4 Sub-Skill. Keys are dotted grid
-    `field_path`s (e.g. `isatvon_definition.v_variables.max_iterations`); the server merges them
-    into the row, revalidates and answers the whole row. `skill_metadata.skill_id` is never
-    accepted."""
+    """`PATCH W/sub-skills/{sub_id}` (E8.4): a partial ISATVON 1.4 Sub-Skill and/or a new position.
+
+    `changes` keys are dotted grid `field_path`s (e.g.
+    `isatvon_definition.v_variables.max_iterations`; a leading `isatvon.` is read as
+    `isatvon_definition.`); the server merges them into the row, revalidates and answers the whole
+    row. `order` moves the Sub-Skill within its Macro Skill (the server renumbers the rest
+    contiguously). Platform-owned fields (`skill_metadata.skill_id`, and a top-level `state`,
+    `content_sha256`, `validation_errors`, `sow_refs`, `id`) are not editable: the server answers
+    422 `READ_ONLY` with the field's path, so unknown top-level keys are kept (not rejected here)
+    for it to name.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    changes: dict[str, Any] = Field(default_factory=dict)
+    order: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> "SubSkillPatch":
+        if not self.changes and self.order is None and not self.model_extra:
+            raise ValueError("nothing to change: send `changes` and/or `order`")
+        return self
+
+
+class MacroSkillPatch(BaseModel):
+    """`PATCH W/macro-skills/{macro_id}` (E8.4). `order` renumbers the other Macro Skills
+    contiguously; the Macro Skill's `macro_category` and its Sub-Skills' ids never change."""
 
     model_config = ConfigDict(extra="forbid")
 
-    changes: dict[str, Any] = Field(min_length=1)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    order: int | None = Field(default=None, ge=1)
 
-    @field_validator("changes")
-    @classmethod
-    def _no_platform_fields(cls, changes: dict[str, Any]) -> dict[str, Any]:
-        if PLATFORM_OWNED & changes.keys():
-            raise ValueError("skill_metadata.skill_id is set by the platform, not edited")
-        return changes
+    @model_validator(mode="after")
+    def _something_to_change(self) -> "MacroSkillPatch":
+        if not self.model_fields_set:
+            raise ValueError("nothing to change")
+        return self
+
+
+class SubSkillEdit(BaseModel):
+    """One changed field of an edit (`sub_skill_edits`): `path` is the grid `field_path`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: UUID
+    path: str
+    old: Any
+    new: Any
+    by: str
+    at: datetime
+
+
+class SubSkillEditHistory(BaseModel):
+    """`GET W/sub-skills/{sub_id}/edits`: oldest first, per changed field."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sub_skill_id: UUID
+    edits: list[SubSkillEdit]
 
 
 class SubSkillValidation(BaseModel):
@@ -101,6 +152,8 @@ def schemas() -> dict[str, dict[str, Any]]:
         "workbench_tree": WorkbenchTree,
         "workbench_sub_skill": WorkbenchSubSkill,
         "sub_skill_patch": SubSkillPatch,
+        "macro_skill_patch": MacroSkillPatch,
+        "sub_skill_edit_history": SubSkillEditHistory,
         "validation_report": ValidationReport,
     }
     return {stem: contract_schema(model, f"isatvon/{stem}") for stem, model in models.items()}
