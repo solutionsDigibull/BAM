@@ -456,3 +456,104 @@ def test_e0_2_committed_schema_matches_model(stem: str) -> None:
     assert (
         committed == schemas()[stem]
     ), "regenerate: cd server && uv run python -m sbam_contracts.isatvon14"
+
+
+# --- E8.3: the same rules with stable codes, as pass 2 stores them ------------------------------
+
+
+def codes_at(violations: list[RuleViolation]) -> list[tuple[str, str]]:
+    return [(v.path, v.code.value) for v in violations]
+
+
+def test_e8_3_t02_the_golden_isa14_sample_has_no_findings() -> None:
+    assert validate_sub_skill(sample(), macro_category="MS01_Investor_Registration_Access") == []
+
+
+def test_e8_3_t03_the_same_tool_for_action_and_check_is_tools_not_decoupled() -> None:
+    tool = sample()["isatvon_definition"]["t_tech_stack"]["action_tool"]
+    raw = variant(**{IDEF + "t_tech_stack.fixed_check_tool": tool})
+    assert codes_at(validate_sub_skill(raw)) == [
+        (IDEF + "t_tech_stack.fixed_check_tool", "TOOLS_NOT_DECOUPLED")
+    ]
+
+
+@pytest.mark.parametrize(("value", "valid"), [(1, True), (10, True), (0, False), (11, False)])
+def test_e8_3_t04_max_iterations_boundaries(value: int, valid: bool) -> None:
+    raw = variant(
+        **{
+            IDEF + "v_variables.max_iterations": value,
+            IDEF + "i_instructions.bound": f"Up to {value} attempts, then escalate",
+        }
+    )
+    found = [v for v in validate_sub_skill(raw) if v.path == IDEF + "v_variables.max_iterations"]
+    assert (found == []) is valid
+
+
+def test_e8_3_t05_an_injected_gate_is_a_parse_error_and_never_evaluated() -> None:
+    gate = 'status == "done" AND __import__("os")'
+    raw = variant(**{IDEF + "v_variables.success_gate": gate})
+    assert codes_at(validate_sub_skill(raw)) == [
+        (IDEF + "v_variables.success_gate", "GATE_PARSE_ERROR")
+    ]
+
+
+def test_e8_3_an_unknown_identifier_in_a_gate_is_unresolved_identifier() -> None:
+    gate = 'auth_status == "OK" AND unknown_x > 1'
+    raw = variant(**{IDEF + "v_variables.success_gate": gate})
+    assert codes_at(validate_sub_skill(raw)) == [
+        (IDEF + "v_variables.success_gate", "UNRESOLVED_IDENTIFIER")
+    ]
+
+
+def test_e8_3_t06_a_handoff_table_missing_from_tables_is_flagged() -> None:
+    raw = variant(**{IDEF + "o_outcome.state_handoff_file.table": "audit_x"})
+    assert rules_at(validate_sub_skill(raw)) == [(7, IDEF + "o_outcome.state_handoff_file.table")]
+
+
+def test_e8_3_t08_three_violations_are_all_reported() -> None:
+    tool = sample()["isatvon_definition"]["t_tech_stack"]["action_tool"]
+    raw = variant(
+        **{
+            IDEF + "t_tech_stack.fixed_check_tool": tool,
+            IDEF + "o_outcome.state_handoff_file.mode": "overwrite",
+            IDEF + "v_variables.budget_limit": "2 minutes",
+        }
+    )
+    assert sorted(v.rule for v in validate_sub_skill(raw)) == [4, 5, 7]
+
+
+def test_e8_3_t09_a_secret_value_is_secret_value_not_allowed_and_not_quoted() -> None:
+    value = "sk-or-v1-abc1234567890"
+    raw = variant(**{IDEF + "v_variables.secrets": ["AUTH_VAULT_KEY", value]})
+    (finding,) = validate_sub_skill(raw)
+    assert (finding.path, finding.code.value) == (
+        IDEF + "v_variables.secrets.1",
+        "SECRET_VALUE_NOT_ALLOWED",
+    )
+    assert value not in finding.message
+
+
+def test_e8_3_t10_a_skill_id_of_another_macro_is_a_prefix_mismatch() -> None:
+    raw = variant(**{"skill_metadata.skill_id": "MS03.1_X"})
+    findings = validate_sub_skill(raw, macro_category="MS01_Investor_Registration_Access")
+    assert ("skill_metadata.skill_id", "SKILL_ID_PREFIX_MISMATCH") in codes_at(findings)
+
+
+def test_e8_3_a_library_outside_the_registry_is_library_not_in_registry() -> None:
+    raw = variant(**{IDEF + "t_tech_stack.libraries": [{"package": "leftpad"}]})
+    assert codes_at(validate_sub_skill(raw)) == [
+        (IDEF + "t_tech_stack.libraries.0.package", "LIBRARY_NOT_IN_REGISTRY")
+    ]
+
+
+def test_e8_3_other_findings_default_to_isatvon_contract() -> None:
+    raw = variant(**{IDEF + "v_variables.budget_limit": "2 minutes"})
+    assert codes_at(validate_sub_skill(raw)) == [
+        (IDEF + "v_variables.budget_limit", "ISATVON_CONTRACT")
+    ]
+
+
+def test_e8_3_a_stored_finding_reads_back_with_its_code() -> None:
+    finding = RuleViolation(rule=4, path="p", message="m", code="TOOLS_NOT_DECOUPLED")  # type: ignore[arg-type]
+    again = RuleViolation.model_validate(json.loads(finding.model_dump_json()))
+    assert again == finding

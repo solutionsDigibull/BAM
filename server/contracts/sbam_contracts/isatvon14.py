@@ -32,6 +32,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, Va
 
 from sbam_contracts import gate_expr
 from sbam_contracts._jsonschema import contract_schema
+from sbam_contracts.api import ErrorCode
 
 FRAMEWORK_VERSION: Final = "1.4"
 SHORT_CHARS: Final = 200
@@ -275,9 +276,18 @@ class Agent(_Strict):
 
 
 class RuleViolation(_Strict):
+    """One TD §10.4 finding: the rule number, the dotted path, a stable `code` (`ErrorCode`) and a
+    message. The message never quotes a secret value."""
+
     rule: int = Field(ge=1, le=10)
     path: str
     message: str
+    # Not strict: a stored finding comes back from JSON with the code as a string.
+    code: Annotated[ErrorCode, Field(strict=False)] = ErrorCode.ISATVON_CONTRACT
+
+
+# (rule, path, message) or, where a specific ErrorCode applies, (rule, path, message, code).
+Found = tuple[int, str, str] | tuple[int, str, str, ErrorCode]
 
 
 # --- Helpers --------------------------------------------------------------------------------------
@@ -355,8 +365,8 @@ def _macro_prefix(macro_category: str) -> str | None:
 
 def _check_sub_skill(
     skill: SubSkill, macro_category: str | None, registry: Collection[str]
-) -> list[tuple[int, str, str]]:
-    found: list[tuple[int, str, str]] = []
+) -> list[Found]:
+    found: list[Found] = []
     meta = skill.skill_metadata
     d = skill.isatvon_definition
     i, s, t, v, o, n = (
@@ -389,6 +399,7 @@ def _check_sub_skill(
                 2,
                 "skill_metadata.skill_id",
                 f"prefix MS{skill_nn} does not match Agent MS{parent_nn}",
+                ErrorCode.SKILL_ID_PREFIX_MISMATCH,
             )
         )
     if meta.skill_ref is not None and not SKILL_REF.match(meta.skill_ref):
@@ -413,7 +424,12 @@ def _check_sub_skill(
     # Rule 4: decoupling.
     if t.action_tool.strip().casefold() == t.fixed_check_tool.strip().casefold():
         found.append(
-            (4, idef + "t_tech_stack.fixed_check_tool", "must be independent of action_tool")
+            (
+                4,
+                idef + "t_tech_stack.fixed_check_tool",
+                "must be independent of action_tool",
+                ErrorCode.TOOLS_NOT_DECOUPLED,
+            )
         )
 
     # Rule 5: the five loop bounds.
@@ -431,10 +447,12 @@ def _check_sub_skill(
         try:
             names = gate_expr.identifiers(gate_expr.parse(getattr(v, field)))
         except gate_expr.ExpressionError as exc:
-            found.append((5, path, str(exc)))
+            found.append((5, path, str(exc), ErrorCode.GATE_PARSE_ERROR))
             continue
         for name in sorted(names - known):
-            found.append((5, path, f"unresolved identifier {name!r}"))
+            found.append(
+                (5, path, f"unresolved identifier {name!r}", ErrorCode.UNRESOLVED_IDENTIFIER)
+            )
 
     # Rule 6: contracts.
     for k, name in enumerate(s.required_inputs):
@@ -480,15 +498,22 @@ def _check_sub_skill(
         name = normalize_package(lib.package)
         path = f"{idef}t_tech_stack.libraries.{k}.package"
         if name in FORBIDDEN_LIBRARIES:
-            found.append((9, path, f"{lib.package!r} is not allowed (PostgreSQL only)"))
+            message = f"{lib.package!r} is not allowed (PostgreSQL only)"
+            found.append((9, path, message, ErrorCode.LIBRARY_NOT_IN_REGISTRY))
         elif name not in allowed:
-            found.append((9, path, f"{lib.package!r} is not in the runtime registry"))
+            message = f"{lib.package!r} is not in the runtime registry"
+            found.append((9, path, message, ErrorCode.LIBRARY_NOT_IN_REGISTRY))
 
     # Rule 10: secrets are names only.
     for k, secret in enumerate(v.secrets or []):
         if SECRET_VALUE.search(secret) or not SECRET_NAME.match(secret):
             found.append(
-                (10, f"{idef}v_variables.secrets.{k}", "must be a secret name, never a value")
+                (
+                    10,
+                    f"{idef}v_variables.secrets.{k}",
+                    "must be a secret name, never a value",
+                    ErrorCode.SECRET_VALUE_NOT_ALLOWED,
+                )
             )
     return found
 
@@ -498,8 +523,16 @@ def normalize_package(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name.strip()).lower()
 
 
-def _violations(found: list[tuple[int, str, str]], prefix: str = "") -> list[RuleViolation]:
-    return [RuleViolation(rule=r, path=prefix + p, message=m) for r, p, m in found]
+def _violations(found: Sequence[Found], prefix: str = "") -> list[RuleViolation]:
+    return [
+        RuleViolation(
+            rule=f[0],
+            path=prefix + f[1],
+            message=f[2],
+            code=f[3] if len(f) == 4 else ErrorCode.ISATVON_CONTRACT,
+        )
+        for f in found
+    ]
 
 
 def validate_sub_skill(
@@ -532,7 +565,7 @@ def validate_agent(
         agent = Agent.model_validate(raw)
     except ValidationError as exc:
         return _structure_errors(exc, "")
-    found: list[tuple[int, str, str]] = []
+    found: list[Found] = []
     if _macro_prefix(agent.macro_category) is None:
         found.append((2, "macro_category", f"{agent.macro_category!r} is not 'MSnn_<Name>'"))
     if agent.agent_ref is not None and not AGENT_REF.match(agent.agent_ref):
@@ -550,9 +583,9 @@ def validate_agent(
     return _violations(found) + violations
 
 
-def _check_chain(agent: Agent, workflow_agents: Sequence[str] | None) -> list[tuple[int, str, str]]:
+def _check_chain(agent: Agent, workflow_agents: Sequence[str] | None) -> list[Found]:
     """Rule 8: `next` links the Sub-Skills into one linear chain ending at the next Agent."""
-    found: list[tuple[int, str, str]] = []
+    found: list[Found] = []
     nexts = {
         s.skill_metadata.skill_id: s.isatvon_definition.n_notification.next
         for s in agent.sub_skills
