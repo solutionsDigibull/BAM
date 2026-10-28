@@ -8,6 +8,11 @@ Not done even now: Keycloak, Temporal, tusd, Caddy and the Next.js server were n
 config was read, not attacked); LLM prompt injection was not tested; Cognee/knowledge, ISATVON edit APIs and the
 builds router got no deep review.
 
+> **Status:** this file is the history of the second pass. The merged, current findings are in `01-findings.md`.
+> A later check also corrected the first pass on PDF parsing: I had said PDF parsing was "not implemented yet" and
+> pypdf unused (I relied on a stale design page). It is implemented (`ingest/loaders/pdf.py`), runs on every uploaded
+> PDF, and the pinned pypdf 6.20.1 is exploitable for denial of service (now F-24, P1, with a PoC).
+
 ## 1. What I got wrong or overstated in the first pass
 
 | First pass | What the challenge found | Now |
