@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sow/new_version_request:0.1.0",
+  "additionalProperties": false,
+  "description": "`POST P/sow/new-version` (E7.2): start a scope change from the approved version. The\nanswer is the new IN_REVIEW draft (`SowVersionSummary`), a copy of the approved content.",
+  "properties": {
+    "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reason"
+  ],
+  "title": "SowNewVersionRequest",
+  "type": "object"
+}

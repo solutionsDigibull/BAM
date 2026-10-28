@@ -14,7 +14,7 @@ from sbam_api.core.ids import uuid7
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.models import LlmCall
 from sbam_api.projects.models import Project
-from sbam_api.sow.models import Sow, SowVersion
+from sbam_api.sow.models import Sow, SowImpactRecord, SowVersion
 from sbam_api.sow.service import Generation, canonical_sha256, record_generation
 from sbam_api.sow.tiptap import to_tiptap
 from sbam_contracts.sow import SowDocument
@@ -30,7 +30,7 @@ class Harness(GraphHarness):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
         bind = self.sessions.kw["bind"]
-        for table in (LlmCall, Sow, SowVersion):
+        for table in (LlmCall, Sow, SowVersion, SowImpactRecord):  # impacts: E7.2
             table.__table__.create(bind, checkfirst=True)  # type: ignore[attr-defined]
         self.dvid, doc = self.document("Acme quotes cables. Scope: quoting only.")
         self.kv = self.ready([doc], [], [])
