@@ -1,12 +1,15 @@
 """Test helpers for E7.2: a project whose approved SOW v1 has a Workflow with Macro and Sub-Skills,
 and a scope change (v2 approved over it, its impact stored by the preview's own function).
 
-v1's Workflow: Macro MS01 (M-A) with A1 (F-A-1, CERTIFIED), A2 (F-A-2, CERTIFIED); Macro MS02 (M-B)
-with B1 (F-B-1, VALID, never built), B2 (F-B-2, CERTIFIED).
+v1's Workflow: Macro MS01 (M-REGISTER) with A1 (F-REGISTER-1, CERTIFIED), A2 (F-REGISTER-2,
+CERTIFIED); Macro MS02 (M-PORTFOLIO) with B1 (F-PORTFOLIO-1, VALID, never built), B2
+(F-PORTFOLIO-2, CERTIFIED).
 """
 
 import copy
+import json
 import uuid
+from pathlib import Path
 from typing import Any
 
 from sbam_api.audit.models import AuditLog
@@ -23,20 +26,25 @@ from sqlalchemy.orm import Session, sessionmaker
 from workflows_db import add_project, workflow_sessions
 
 TENANT = uuid.uuid4()
-DOC: dict[str, Any] = {
-    "modules": [{"id": "M-A", "name": "A"}, {"id": "M-B", "name": "B"}],
-    "features": [
-        {"id": "F-A-1", "module_id": "M-A", "name": "a1"},
-        {"id": "F-A-2", "module_id": "M-A", "name": "a2"},
-        {"id": "F-B-1", "module_id": "M-B", "name": "b1"},
-        {"id": "F-B-2", "module_id": "M-B", "name": "b2"},
-    ],
-}
+FOUR_MODULES = Path(__file__).parent / "fixtures" / "sow" / "sow_four_modules.json"
+
+
+def _two_modules() -> dict[str, Any]:
+    """The 4-module fixture SOW cut to M-REGISTER and M-PORTFOLIO (two features each): a valid
+    SowDocument, so the real pass 1 / pass 2 can read it."""
+    doc: dict[str, Any] = json.loads(FOUR_MODULES.read_text(encoding="utf-8"))
+    keep = {"M-REGISTER", "M-PORTFOLIO"}
+    doc["modules"] = [m for m in doc["modules"] if m["id"] in keep]
+    doc["features"] = [f for f in doc["features"] if f["module_id"] in keep]
+    return doc
+
+
+DOC: dict[str, Any] = _two_modules()
 SUBS = {
-    "A1": ("MS01", ["F-A-1"], "CERTIFIED"),
-    "A2": ("MS01", ["F-A-2"], "CERTIFIED"),
-    "B1": ("MS02", ["F-B-1"], "VALID"),
-    "B2": ("MS02", ["F-B-2"], "CERTIFIED"),
+    "A1": ("MS01", ["F-REGISTER-1"], "CERTIFIED"),
+    "A2": ("MS01", ["F-REGISTER-2"], "CERTIFIED"),
+    "B1": ("MS02", ["F-PORTFOLIO-1"], "VALID"),
+    "B2": ("MS02", ["F-PORTFOLIO-2"], "CERTIFIED"),
 }
 
 
@@ -53,8 +61,8 @@ class World:
         self.point_sow_at(self.v1)
         self.w1 = self.workflow(self.v1, 1)
         self.macros = {
-            "MS01": self.macro(self.w1, "MS01_A", 1, ["M-A"]),
-            "MS02": self.macro(self.w1, "MS02_B", 2, ["M-B"]),
+            "MS01": self.macro(self.w1, "MS01_A", 1, ["M-REGISTER"]),
+            "MS02": self.macro(self.w1, "MS02_B", 2, ["M-PORTFOLIO"]),
         }
         self.subs = {
             name: self.sub_skill(self.w1, self.macros[m], f"{m}.{i}_{name}", i, refs, state)
@@ -208,7 +216,7 @@ class World:
 
 
 def changed(**names: str) -> dict[str, Any]:
-    """DOC with features renamed (`F-A-1="x"`)."""
+    """DOC with features renamed (`**{"F-REGISTER-1": "x"}`)."""
     doc = copy.deepcopy(DOC)
     for f in doc["features"]:
         if f["id"] in names:

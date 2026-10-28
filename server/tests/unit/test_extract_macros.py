@@ -12,7 +12,9 @@ from knowledge_db import World
 from llm_db import FakeBifrost, completion
 from macros_db import FIXTURES, Pass1, answer, macro, sow_doc
 from sbam_api.core.conventions import ApiError
+from sbam_api.core.ids import uuid7
 from sbam_api.db.repository import TenantContext
+from sbam_api.isatvon.models import MacroSkill
 from sbam_api.isatvon.service import require_approved_sow
 from sbam_api.llm.models import LlmCall
 from sbam_api.workflows.models import Workflow
@@ -243,3 +245,66 @@ def test_e8_2_more_than_99_modules_fail_before_any_model_call(tmp_path: Path) ->
     assert err.type == TOO_MANY_MODULES
     assert p.workflow_row().error_reason == "TOO_MANY_MODULES 100"
     assert bifrost.requests == []
+
+
+# --- E7.2: after a scope change, only the modules no Macro Skill covers ------------------------
+
+
+def carried(p: Pass1, *covers: tuple[str, str]) -> list[str]:
+    """Macro Skills as carry-over leaves them (`name`, module), in order; their ids."""
+    ids = []
+    with p.w.sessions() as s:
+        for order, (name, module) in enumerate(covers, start=1):
+            row = MacroSkill(
+                id=uuid7(),
+                tenant_id=p.inp.tenant_id,
+                project_id=p.w.project,
+                workflow_id=p.workflow,
+                sow_version_id=p.version,
+                macro_category=macro_category(order, name),
+                name=name,
+                description=f"{name}.",
+                order=order,
+                sow_refs=[module],
+                agent_ref=None,
+                validation_errors=[],
+            )
+            row.state = "PENDING"
+            s.add(row)
+            ids.append(str(row.id))
+        s.commit()
+    return ids
+
+
+THREE = (
+    ("Investor Registration", "M-REGISTER"),
+    ("Portfolio Tracking", "M-PORTFOLIO"),
+    ("Investor Reporting", "M-REPORTS"),
+)
+
+
+def test_e7_2_a_new_module_gets_the_next_macro_skill_and_the_others_stay(p: Pass1) -> None:
+    before = carried(p, *THREE)
+    bifrost = FakeBifrost([completion(answer(macro("Investor Support", "M-SUPPORT")))])
+    ids = p.run(bifrost)
+    assert [str(i) for i in ids[:3]] == before
+    rows = p.macros()
+    assert [r.macro_category for r in rows][-1] == "MS04_Investor_Support"
+    assert rows[-1].order == 4 and rows[-1].sow_refs == ["M-SUPPORT"]
+    sent = "".join(str(m["content"]) for m in bifrost.requests[0]["messages"])
+    assert '<data name="scope">' in sent and "M-SUPPORT" in sent
+
+
+def test_e7_2_the_new_macro_skill_may_not_claim_an_old_module(p: Pass1) -> None:
+    carried(p, *THREE)
+    grabby = macro("Investor Support", "M-SUPPORT", "M-REPORTS")
+    good = macro("Investor Support", "M-SUPPORT")
+    bifrost = FakeBifrost([completion(answer(grabby)), completion(answer(good))])
+    p.run(bifrost)
+    assert "macros.0.sow_refs.1: UNKNOWN_SOW_REF M-REPORTS" in json.dumps(bifrost.requests[1])
+
+
+def test_e7_2_all_modules_covered_means_no_model_call(p: Pass1) -> None:
+    carried(p, *THREE, ("Investor Support", "M-SUPPORT"))
+    bifrost = FakeBifrost([completion(answer(*FOUR))])
+    assert len(p.run(bifrost)) == 4 and bifrost.requests == []

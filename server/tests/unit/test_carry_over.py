@@ -2,8 +2,8 @@
 Workflow version's rows are copied into the new one as the stored impact says. The impact is made
 by the preview's own function (`record_impact`), so these tests also pin "preview = what happens".
 
-v1's Workflow: Macro MS01 (M-A) with A1 (F-A-1, CERTIFIED), A2 (F-A-2, CERTIFIED); Macro MS02 (M-B)
-with B1 (F-B-1, VALID, never built), B2 (F-B-2, CERTIFIED).
+The world is `scope_change_db`'s: v1's Workflow has MS01 (A1, A2 certified) and MS02 (B1 never
+built, B2 certified).
 """
 
 import copy
@@ -21,7 +21,7 @@ def w() -> World:
 
 
 def test_e7_2_t04_only_the_citing_sub_skill_is_rebuilt_the_others_reused(w: World) -> None:
-    inp = w.scope_change(changed(**{"F-A-1": "a1 with refunds"}))
+    inp = w.scope_change(changed(**{"F-REGISTER-1": "a1 with refunds"}))
     ids = carry_over(w.sessions, inp)
     new = w.rows(w.w2)
     assert set(new) == {"MS01.1_A1", "MS01.2_A2", "MS02.3_B1", "MS02.4_B2"}
@@ -40,14 +40,14 @@ def test_e7_2_t04_only_the_citing_sub_skill_is_rebuilt_the_others_reused(w: Worl
 
 def test_e7_2_the_previous_version_is_never_changed(w: World) -> None:
     before = {k: (r.state, r.row_version) for k, r in w.rows(w.w1).items()}
-    carry_over(w.sessions, w.scope_change(changed(**{"F-A-1": "a1 with refunds"})))
+    carry_over(w.sessions, w.scope_change(changed(**{"F-REGISTER-1": "a1 with refunds"})))
     assert {k: (r.state, r.row_version) for k, r in w.rows(w.w1).items()} == before
     assert {m.state for m in w.macro_rows(w.w1)} == {"CERTIFIED"}
 
 
 def test_e7_2_a_removed_feature_drops_the_sub_skills_citing_only_it(w: World) -> None:
     doc = copy.deepcopy(DOC)
-    doc["features"] = [f for f in doc["features"] if f["id"] != "F-B-2"]
+    doc["features"] = [f for f in doc["features"] if f["id"] != "F-PORTFOLIO-2"]
     carry_over(w.sessions, w.scope_change(doc))
     assert "MS02.4_B2" not in w.rows(w.w2)
     assert len(w.rows(w.w2)) == 3
@@ -55,8 +55,8 @@ def test_e7_2_a_removed_feature_drops_the_sub_skills_citing_only_it(w: World) ->
 
 def test_e7_2_a_removed_module_drops_its_macro_and_sub_skills(w: World) -> None:
     doc = copy.deepcopy(DOC)
-    doc["modules"] = [m for m in doc["modules"] if m["id"] != "M-B"]
-    doc["features"] = [f for f in doc["features"] if f["module_id"] != "M-B"]
+    doc["modules"] = [m for m in doc["modules"] if m["id"] != "M-PORTFOLIO"]
+    doc["features"] = [f for f in doc["features"] if f["module_id"] != "M-PORTFOLIO"]
     carry_over(w.sessions, w.scope_change(doc))
     assert [m.macro_category for m in w.macro_rows(w.w2)] == ["MS01_A"]
     assert set(w.rows(w.w2)) == {"MS01.1_A1", "MS01.2_A2"}
@@ -75,7 +75,7 @@ def test_e7_2_a_change_outside_modules_and_features_reuses_everything(w: World) 
 
 
 def test_e7_2_a_retry_returns_the_copies_already_made(w: World) -> None:
-    inp = w.scope_change(changed(**{"F-A-1": "a1 with refunds"}))
+    inp = w.scope_change(changed(**{"F-REGISTER-1": "a1 with refunds"}))
     first = carry_over(w.sessions, inp)
     assert sorted(carry_over(w.sessions, inp)) == sorted(first)
     assert len(w.rows(w.w2)) == 4
