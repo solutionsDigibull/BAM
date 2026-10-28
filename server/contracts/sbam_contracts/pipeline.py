@@ -191,6 +191,14 @@ class CreateWorkflowResult(_Dto):
     workflow_id: UUID
 
 
+class CarryOverInput(WorkflowRef):
+    """E7.2 `carry_over_workflow`: after a scope-change approval, copy the previous version's Macro
+    and Sub-Skills into the new Workflow (`workflow_id`) as the stored impact of `sow_version_id`
+    says. A first approval has no impact: nothing to copy."""
+
+    sow_version_id: UUID
+
+
 class BuildPlanInput(WorkflowRef):
     """E10.3 `plan_builds`: every Sub-Skill of the Workflow (edges to other ids are rejected)."""
 
