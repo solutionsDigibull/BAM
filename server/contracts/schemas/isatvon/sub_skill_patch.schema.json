@@ -1,19 +1,28 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:sbam:contracts:isatvon/sub_skill_patch:0.1.0",
-  "additionalProperties": false,
-  "description": "`PATCH W/sub-skills/{sub_id}`: a partial ISATVON 1.4 Sub-Skill. Keys are dotted grid\n`field_path`s (e.g. `isatvon_definition.v_variables.max_iterations`); the server merges them\ninto the row, revalidates and answers the whole row. `skill_metadata.skill_id` is never\naccepted.",
+  "additionalProperties": true,
+  "description": "`PATCH W/sub-skills/{sub_id}` (E8.4): a partial ISATVON 1.4 Sub-Skill and/or a new position.\n\n`changes` keys are dotted grid `field_path`s (e.g.\n`isatvon_definition.v_variables.max_iterations`; a leading `isatvon.` is read as\n`isatvon_definition.`); the server merges them into the row, revalidates and answers the whole\nrow. `order` moves the Sub-Skill within its Macro Skill (the server renumbers the rest\ncontiguously). Platform-owned fields (`skill_metadata.skill_id`, and a top-level `state`,\n`content_sha256`, `validation_errors`, `sow_refs`, `id`) are not editable: the server answers\n422 `READ_ONLY` with the field's path, so unknown top-level keys are kept (not rejected here)\nfor it to name.",
   "properties": {
     "changes": {
       "additionalProperties": true,
-      "minProperties": 1,
       "title": "Changes",
       "type": "object"
+    },
+    "order": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Order"
     }
   },
-  "required": [
-    "changes"
-  ],
   "title": "SubSkillPatch",
   "type": "object"
 }
