@@ -19,7 +19,7 @@ from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.identity.models import Tenant
 from sbam_api.ingest.models import Document, DocumentVersion
 from sbam_api.knowledge.models import KnowledgeSource, KnowledgeVersion
-from sbam_api.masters.models import MasterEntry
+from sbam_api.masters.models import MasterDocument, MasterEntry
 from sbam_api.projects.models import Project
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.storage.local import LocalDiskBackend
@@ -61,6 +61,7 @@ def knowledge_sessions() -> sessionmaker[Session]:
             MasterEntry.metadata.tables["sbam.master_entries"],
             MasterEntry.metadata.tables["sbam.master_entry_versions"],
             MasterEntry.metadata.tables["sbam.master_snapshots"],
+            MasterEntry.metadata.tables["sbam.master_documents"],
             KnowledgeVersion.__table__,  # type: ignore[list-item]
             KnowledgeSource.__table__,  # type: ignore[list-item]
             TemporalRun.__table__,  # type: ignore[list-item]
@@ -87,6 +88,43 @@ def add_project(
         session.add(project)
         session.commit()
         return project.id
+
+
+def add_master_document(
+    sessions: sessionmaker[Session],
+    storage: StorageBackend,
+    text: str,
+    *,
+    tenant: uuid.UUID = TENANT,
+    project: uuid.UUID | None = None,
+    parse: str = "PARSED",
+    scan: str | None = "CLEAN",
+    title: str = "standard.pdf",
+) -> uuid.UUID:
+    """A master document (tenant-wide with no project) whose parsed `doc.md` is stored."""
+    where = StorageScope(tenant, project or uuid.UUID(int=0))
+    raw = storage.put(text.encode(), where, Kind.UPLOADS, "application/pdf")
+    md = storage.put(text.encode(), where, Kind.DERIVED, "text/markdown")
+    with sessions() as session:
+        row = MasterDocument(
+            tenant_id=tenant,
+            project_id=project,
+            title=title,
+            filetype_row_label="Filetype #21",
+            intent_class="Policy / rules",
+            master_type="RULES",
+            route_source="DEFAULT_BY_FILETYPE",
+            storage_key=raw.storage_key,
+            sha256=raw.sha256,
+            size=raw.size,
+            mime="application/pdf",
+            scan_status=scan,
+            parse_status=parse,
+            derived_md_key=md.storage_key if parse == "PARSED" else None,
+        )
+        session.add(row)
+        session.commit()
+        return row.id
 
 
 def add_document(
@@ -217,6 +255,9 @@ class World:
             run_id=run_id or uuid7(),
             correlation_id=str(uuid.uuid4()),
         )
+
+    def master_doc(self, text: str, **fields: Any) -> uuid.UUID:
+        return add_master_document(self.sessions, self.storage, text, **fields)
 
     def docs(self, *texts: str | None, **fields: Any) -> list[uuid.UUID]:
         return [add_document(self.sessions, self.storage, self.project, t, **fields) for t in texts]

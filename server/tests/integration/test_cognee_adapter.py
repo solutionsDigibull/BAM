@@ -33,6 +33,7 @@ from sbam_workers.knowledge.cognee_backend import CogneeLibrary
 class Allow:
     def project_in_tenant(self, scope): return True
     def eligible_versions(self, scope, ids): return ids
+    def eligible_master_documents(self, scope, ids): return ids
 
 def scope_of(tenant, project):
     return ProjectScope(tenant_id=uuid.UUID(tenant), project_id=uuid.UUID(project))

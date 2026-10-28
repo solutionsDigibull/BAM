@@ -180,3 +180,93 @@ def test_e5_2_a_second_concurrent_build_waits(w: World) -> None:
 
 def test_e5_2_attempts_match_the_pipeline_plan() -> None:
     assert PLAN["build_knowledge"][2] == BUILD_KNOWLEDGE_ATTEMPTS
+
+
+# --- E3.8b: parsed master documents are added as master context -----------------------------
+
+
+def added_names(w: World) -> list[str]:
+    return sorted(name for data in w.cognee.data.values() for name in data)
+
+
+def test_e3_8b_a_parsed_master_document_is_added_to_cognee_as_master_context(w: World) -> None:
+    (doc,) = w.docs("RFQ ZEBRA-7731")
+    master = w.master_doc("Costing standard: scrap is 1.5 percent, APPROVED by Finance")
+    kv_id = w.build_all(w.run_input())
+    (v1,) = versions(w.sessions, w.project)
+    assert v1.state == "READY" and coverage(v1).master_documents == 1
+    assert any(name.startswith(str(master)) for name in added_names(w))
+    # it is context, never an FDE source: not in the coverage documents nor in the sources
+    assert [r["document_version_id"] for r in sources(w.sessions, kv_id)] == [doc]
+    assert [e.document_version_id for e in coverage(v1).documents] == [doc]
+
+
+def test_e3_8b_a_tenant_wide_master_document_reaches_the_projects_dataset(w: World) -> None:
+    w.docs("RFQ ZEBRA-7731")
+    master = w.master_doc("Company policy: quotes are valid for 14 days", project=None)
+    w.build_all(w.run_input())
+    assert any(name.startswith(str(master)) for name in added_names(w))
+
+
+def test_e3_8b_the_projects_own_master_document_is_added_too(w: World) -> None:
+    w.docs("RFQ ZEBRA-7731")
+    mine = w.master_doc("Project rule: use the approved vendor list", project=w.project)
+    w.build_all(w.run_input())
+    assert any(name.startswith(str(mine)) for name in added_names(w))
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"parse": "PENDING"}, {"parse": "FAILED"}, {"scan": "INFECTED"}, {"scan": None}],
+)
+def test_e3_8b_a_master_document_that_is_not_clean_and_parsed_is_not_added(
+    w: World, fields: dict[str, Any]
+) -> None:
+    w.docs("RFQ ZEBRA-7731")
+    ignored = w.master_doc("not usable yet", **fields)
+    w.build_all(w.run_input())
+    assert not any(name.startswith(str(ignored)) for name in added_names(w))
+    assert coverage(versions(w.sessions, w.project)[0]).master_documents == 0
+
+
+def test_e3_8b_another_tenants_and_another_projects_master_documents_are_not_added(
+    w: World,
+) -> None:
+    import uuid
+
+    w.docs("RFQ ZEBRA-7731")
+    stranger = w.master_doc("another tenant", tenant=uuid.uuid4())
+    elsewhere = w.master_doc("another project", project=uuid.uuid4())
+    w.build_all(w.run_input())
+    names = added_names(w)
+    assert not any(name.startswith(str(stranger)) for name in names)
+    assert not any(name.startswith(str(elsewhere)) for name in names)
+
+
+def test_e3_8b_cognee_refusing_a_master_document_does_not_stop_the_build(w: World) -> None:
+    w.docs("RFQ ZEBRA-7731")
+    refused = w.master_doc("Policy that Cognee cannot read")
+    w.cognee.refuse.add(str(refused))
+    w.build_all(w.run_input())
+    (v1,) = versions(w.sessions, w.project)
+    assert v1.state == "READY" and coverage(v1).master_documents == 0
+
+
+def test_e3_8b_master_documents_alone_are_not_a_corpus(w: World) -> None:
+    w.master_doc("A policy and nothing else")
+    with pytest.raises(ApplicationError) as caught:
+        w.build(w.run_input())
+    assert caught.value.type == EMPTY_CORPUS  # only FDE documents are sources (C3)
+
+
+def test_e3_8b_the_snapshot_pinned_for_the_build_lists_the_master_document(w: World) -> None:
+    w.docs("RFQ ZEBRA-7731")
+    master = w.master_doc("Costing standard", title="costing.pdf")
+    w.build_all(w.run_input())
+    from sbam_api.masters.models import MasterSnapshot
+    from sqlalchemy import select
+
+    with w.sessions() as s:
+        [snap] = s.scalars(select(MasterSnapshot)).all()
+        assert [d["document_id"] for d in snap.documents] == [str(master)]
+        assert snap.documents[0]["title"] == "costing.pdf"

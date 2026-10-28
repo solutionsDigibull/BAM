@@ -49,6 +49,9 @@ class FakeGuard:
     def eligible_versions(self, scope: ProjectScope, ids: set[uuid.UUID]) -> set[uuid.UUID]:
         return ids & self.eligible
 
+    def eligible_master_documents(self, scope: ProjectScope, ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        return ids & self.eligible
+
 
 @pytest.fixture
 def storage(tmp_path: Path) -> LocalDiskBackend:
@@ -315,3 +318,101 @@ def test_e5_1_delete_dataset_removes_the_project_data(
     assert cognee.data == {}
     with pytest.raises(DatasetNotFound):
         run(a.delete_dataset(scope()))
+
+
+# --- E3.8b: parsed master documents as master context ---------------------------------------------
+
+ZERO = uuid.UUID(int=0)
+
+
+def master_document(
+    storage: LocalDiskBackend, sc: ProjectScope, text: str, *, tenant_wide: bool = False
+) -> KnowledgeItem:
+    """A parsed master document's `doc.md`: under the project, or the tenant's all-zero project."""
+    project = ZERO if tenant_wide else sc.project_id
+    obj = storage.put(text.encode(), StorageScope(sc.tenant_id, project), Kind.DERIVED, "x")
+    return KnowledgeItem(
+        source=ItemSource.MASTER_DOCUMENT,
+        source_id=uuid.uuid4(),
+        sha256=obj.sha256,
+        storage_key=obj.storage_key,
+    )
+
+
+def test_e3_8b_a_parsed_master_document_of_the_project_is_added(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    item = master_document(storage, scope(), "Costing standard: scrap is 1.5 percent")
+    a = adapter(cognee, storage, {item.source_id})
+    assert run(a.add(scope(), [item])).added == [f"{item.source_id}_{item.sha256}"]
+
+
+def test_e3_8b_a_tenant_wide_master_document_is_added_to_any_project_of_the_tenant(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    item = master_document(storage, scope(), "Company policy", tenant_wide=True)
+    a = adapter(cognee, storage, {item.source_id})
+    assert len(run(a.add(scope(), [item])).added) == 1
+    other_project = scope(T1, uuid.uuid4())  # a second project of the same tenant
+    guard = FakeGuard({other_project.project_id: T1}, {item.source_id})
+    again = CogneeAdapter(cognee, guard, storage, SECRET)
+    assert len(run(again.add(other_project, [item])).added) == 1
+
+
+def test_e3_8b_another_tenants_tenant_wide_document_is_rejected(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    stranger = master_document(storage, scope(T2, P2), "their policy", tenant_wide=True)
+    with pytest.raises(ItemRejected, match="not stored under this project"):
+        run(adapter(cognee, storage, {stranger.source_id}).add(scope(), [stranger]))
+    assert "add" not in cognee.calls
+
+
+def test_e3_8b_another_projects_master_document_is_rejected(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    item = master_document(storage, scope(T1, uuid.uuid4()), "project B context")
+    with pytest.raises(ItemRejected, match="not stored under this project"):
+        run(adapter(cognee, storage, {item.source_id}).add(scope(), [item]))
+
+
+def test_e3_8b_only_master_documents_may_use_the_tenant_wide_prefix(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    item = master_document(storage, scope(), "policy", tenant_wide=True)
+    as_fde_document = item.model_copy(update={"source": ItemSource.DOCUMENT})
+    with pytest.raises(ItemRejected, match="not stored under this project"):
+        run(adapter(cognee, storage, {item.source_id}).add(scope(), [as_fde_document]))
+    as_masters = item.model_copy(update={"source": ItemSource.MASTERS})
+    with pytest.raises(ItemRejected, match="not stored under this project"):
+        run(adapter(cognee, storage).add(scope(), [as_masters]))
+
+
+def test_e3_8b_a_master_document_that_is_not_clean_and_parsed_is_rejected(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    good = master_document(storage, scope(), "parsed")
+    pending = master_document(storage, scope(), "not parsed yet")
+    with pytest.raises(ItemRejected, match="1 master document"):
+        run(adapter(cognee, storage, {good.source_id}).add(scope(), [good, pending]))
+    assert "add" not in cognee.calls  # all-or-nothing
+
+
+def test_e3_8b_a_traversal_in_a_master_document_key_is_rejected(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    item = master_document(storage, scope(), "policy", tenant_wide=True)
+    sneaky = item.model_copy(
+        update={"storage_key": item.storage_key.replace("/derived/", "/derived/../../")}
+    )
+    with pytest.raises(ItemRejected):
+        run(adapter(cognee, storage, {item.source_id}).add(scope(), [sneaky]))
+
+
+def test_e3_8b_a_master_document_with_a_wrong_hash_is_rejected(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    item = master_document(storage, scope(), "real")
+    wrong = item.model_copy(update={"sha256": hashlib.sha256(b"other").hexdigest()})
+    with pytest.raises(ItemRejected, match="sha256"):
+        run(adapter(cognee, storage, {item.source_id}).add(scope(), [wrong]))
