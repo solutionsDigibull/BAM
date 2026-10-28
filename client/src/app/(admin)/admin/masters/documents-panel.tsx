@@ -76,7 +76,12 @@ function ScanChip({ doc }: { doc: MasterDocumentOut }) {
 
 const PARSE_COLOR = { PENDING: "default", PARSING: "processing", PARSED: "green", FAILED: "red" };
 
-const extension = (name: string) => /\.[^.]+$/.exec(name.toLowerCase())?.[0] ?? "";
+/** `GET /filetypes` lists extensions without the dot ("txt", "tar.gz"); the file picker wants ".txt". */
+const dotted = (ext: string) => `.${ext.replace(/^\./, "").toLowerCase()}`;
+
+/** Whether the name ends in one of the dotted extensions, so a compound one (".tar.gz") matches too. */
+const covers = (allowed: Set<string>, name: string) =>
+  [...allowed].some((ext) => name.toLowerCase().endsWith(ext));
 
 /** Master (and optional entry) for one document; PATCH with If-Match, only once the scan is clean. */
 function RouteOverride({ doc, onSaved }: { doc: MasterDocumentOut; onSaved: () => void }) {
@@ -182,7 +187,7 @@ export function DocumentsPanel() {
       new Set(
         (Array.isArray(filetypes.result.data) ? filetypes.result.data : []) // `{}` while loading
           .filter((f) => f.mvp_enabled)
-          .flatMap((f) => f.extensions),
+          .flatMap((f) => f.extensions.map(dotted)),
       ),
     [filetypes.result.data],
   );
@@ -195,7 +200,7 @@ export function DocumentsPanel() {
     // The server is authoritative; these only save a pointless upload.
     if (file.size > MAX_DOCUMENT_BYTES)
       return track({ ...base, state: "error", message: "Larger than 15 MB" });
-    if (allowed.size && !allowed.has(extension(file.name)))
+    if (allowed.size && !covers(allowed, file.name))
       return track({ ...base, state: "error", message: "File type not supported yet" });
     track({ ...base, state: "uploading", message: "Scanning…" });
     try {

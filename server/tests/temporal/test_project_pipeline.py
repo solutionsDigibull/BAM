@@ -53,7 +53,7 @@ from sbam_contracts.pipeline import (
 from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_workflow_id
 from sbam_workers import mirror, registry
 from sbam_workers.pipeline.project_pipeline import ProjectPipeline
-from sbam_workers.stub_ids import stub_id
+from sbam_workers.stub_ids import stage_stub_id, stub_id
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.client import Client, WorkflowHandle, WorkflowHistory
@@ -131,6 +131,13 @@ async def sub_skills_stand_in(inp: MacroRef) -> IdsResult:
     return IdsResult(ids=[stub_id(inp, f"sub:{inp.macro_skill_id}:{n}") for n in (1, 2)])
 
 
+@activity.defn(name="build_manifest")
+async def manifest_stand_in(inp: BuildStageInput) -> IdResult:
+    """The real stage (E9.1) reads the Sub-Skill and its provenance from the database; its tests are
+    tests/unit/test_e9_1_manifest_builder.py and tests/unit/test_e9_1_manifest_store.py."""
+    return IdResult(id=stage_stub_id(inp, "manifest"))
+
+
 DEFAULT_OVERRIDES: "Overrides" = {
     "build_knowledge": knowledge_stand_in,
     "build_okf_bundle": okf_stand_in,
@@ -138,6 +145,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "create_workflow": workflow_stand_in,
     "extract_macro_skills": macros_stand_in,
     "extract_sub_skills": sub_skills_stand_in,
+    "build_manifest": manifest_stand_in,
 }
 
 
