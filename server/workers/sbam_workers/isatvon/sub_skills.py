@@ -40,6 +40,7 @@ from typing import Any, Final
 
 from sbam_api.core.conventions import ApiError
 from sbam_api.core.ids import uuid7
+from sbam_api.db.base import utcnow
 from sbam_api.db.repository import TenantContext
 from sbam_api.isatvon.models import MacroSkill, SubSkill
 from sbam_api.isatvon.repository import MacroSkillRepository, SubSkillRepository
@@ -296,6 +297,7 @@ def _store(
                 sow_refs=list(dict.fromkeys(proposal.sow_refs)),
                 validation_errors=[f.model_dump(mode="json") for f in findings],
                 content_sha256=sha256_of(raw).removeprefix("sha256:"),
+                validated_at=None if findings else utcnow(),
                 created_by="SYSTEM",
             )
             key = f"{inp.run_id}:extract_sub_skills:{src.macro_id}:{k + 1}"

@@ -40,6 +40,7 @@ from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.conventions import ApiError, check_if_match, locked, not_found
 from sbam_api.core.logging import correlation_id_var
+from sbam_api.db.base import utcnow
 from sbam_api.db.repository import TenantContext
 from sbam_api.isatvon.models import MacroSkill, SubSkill, SubSkillEdit
 from sbam_api.isatvon.repository import (
@@ -263,6 +264,7 @@ def _store_content(
     sub.skill_name = parsed.skill_metadata.skill_name
     sub.validation_errors = [f.model_dump(mode="json") for f in findings]
     sub.content_sha256 = sha256_of(candidate).removeprefix("sha256:")
+    sub.validated_at = None if findings else utcnow()  # the manifest's timestamps (E9.1)
     actor_id = str(user.user_id)
 
     def move(event: str, actor: Actor) -> None:

@@ -29,13 +29,6 @@ async def build_schema_sql(inp: WorkflowRef) -> IdResult:
 
 
 @activity_for(TaskQueue.BUILD)
-@activity.defn(name="build_manifest")
-async def build_manifest(inp: BuildStageInput) -> IdResult:
-    """Real: the Sub-Skill's manifest + ISATVON hash (a new hash means a re-render)."""
-    return IdResult(id=stage_stub_id(inp, "manifest"))
-
-
-@activity_for(TaskQueue.BUILD)
 @activity.defn(name="check_libraries")
 async def check_libraries(inp: BuildStageInput) -> LibraryCheckResult:
     """Real: MISSING libraries -> DEPENDENCY_FAILED (findings persisted, ids returned)."""
