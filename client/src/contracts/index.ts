@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:d7d77aa9edc49801df71138b411c7eeecd893c706385925b216497adae575956
+// source-sha256:fbeaccf9c3916926bf562936c054c3f796de0ec7474bfb9dd4ec401257052c1b
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -398,6 +398,8 @@ export interface SbamContracts {
   SubSkillPatch?: SubSkillPatch;
   MacroSkillPatch?: MacroSkillPatch;
   SubSkillEditHistory?: SubSkillEditHistory;
+  RegenerateRequest?: RegenerateRequest;
+  RegenerateInput?: RegenerateInput;
   ValidationReport?: ValidationReport;
   MacroExtraction?: MacroExtraction;
   MacroSkillOut?: MacroSkillOut;
@@ -887,6 +889,36 @@ export interface SubSkillEdit {
   new: unknown;
   by: string;
   at: string;
+}
+/**
+ * `POST W/macro-skills/{id}/regenerate` and `POST W/sub-skills/{id}/regenerate` (E8.4): an
+ * optional short instruction the FDE typed, never document content.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegenerateRequest".
+ */
+export interface RegenerateRequest {
+  hint?: string | null;
+}
+/**
+ * `IsatvonRegenerate`'s input: ids only; no `sub_skill_id` re-extracts the Macro Skill.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegenerateInput".
+ */
+export interface RegenerateInput {
+  tenant_id: string;
+  project_id: string;
+  run_id: string;
+  /**
+   * Pattern: `^[A-Za-z0-9-]{1,64}$`
+   */
+  correlation_id: string;
+  workflow_id: string;
+  macro_skill_id: string;
+  sub_skill_id?: string | null;
+  hint?: string | null;
+  actor_id: string;
 }
 /**
  * `POST W/isatvon/validate`: every Sub-Skill of the Workflow, revalidated.
@@ -2135,7 +2167,7 @@ export interface SowCitationDetail {
 export interface Run {
   id: string;
   /**
-   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md))$`
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
    */
   temporal_workflow_id: string;
   temporal_run_id: string;

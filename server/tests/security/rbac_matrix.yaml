@@ -622,6 +622,26 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  regenerate_macro_skill_api_v1_projects__project_id__workflows__workflow_id__macro_skills__macro_id__regenerate_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/macro-skills/{macro_id}/regenerate
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", macro_id: "@sub_a"}
+      json: {hint: "rbac"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  regenerate_sub_skill_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__regenerate_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/regenerate
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      json: {hint: "rbac"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- isatvon ------------------------------------------------------------------------------
   # Describes the model, carries no tenant data: any signed-in user may read it (E8.6).
   isatvon_schema_api_v1_schemas_isatvon__version__get:

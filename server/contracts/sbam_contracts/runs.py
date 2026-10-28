@@ -30,7 +30,9 @@ _QUEUE = r"sbam-(?:ingest|knowledge|llm|build|test|certify)"
 WORKFLOW_ID_PATTERN: Final = (
     rf"^(?:pipeline-{_UUID}|ingest-{_UUID}|build-{_UUID}-[1-9][0-9]*|ping-{_QUEUE}-{_UUID}"
     # knowledge-: KnowledgeRebuild (E5.2), sow-: SowRegenerate (E6.3), sow-export-: SowExport (E6.4)
-    rf"|knowledge-{_UUID}|sow-{_UUID}|sow-export-{_UUID}-(?:pdf|docx|md))$"
+    rf"|knowledge-{_UUID}|sow-{_UUID}|sow-export-{_UUID}-(?:pdf|docx|md)"
+    # isatvon-regen-: IsatvonRegenerate (E8.4), one re-extraction per Macro Skill / Sub-Skill
+    rf"|isatvon-regen-{_UUID})$"
 )
 WORKFLOW_ID: Final = re.compile(WORKFLOW_ID_PATTERN)
 

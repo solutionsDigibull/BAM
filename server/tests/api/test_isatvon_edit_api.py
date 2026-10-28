@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from runs_db import FakeClient
 from sbam_api.audit.models import AuditLog
 from sbam_api.isatvon.models import MacroSkill, SubSkill, SubSkillEdit
 from sbam_api.workflows.models import Workflow
@@ -24,6 +25,8 @@ class Harness(ValidateHarness):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
         SubSkillEdit.__table__.create(self.sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
+        self.temporal = FakeClient()
+        self.client.app.state.temporal = self.temporal  # type: ignore[attr-defined]
 
     def sub_path(self, sub_id: uuid.UUID, suffix: str = "") -> str:
         return f"/projects/{self.project}/workflows/{self.wf}/sub-skills/{sub_id}{suffix}"
@@ -156,6 +159,24 @@ def test_e8_8_a_row_carries_the_sow_refs_it_cites(h: Harness) -> None:
     problem(h.patch(sub, {"changes": {BUDGET: B5}, "sow_refs": ["F-X"]}), 422, "READ_ONLY")
 
 
+def test_e9_1_an_edit_moves_validated_at_with_the_validation(h: Harness) -> None:
+    """The manifest's timestamps (E9.1): set when an edit passes, cleared when it doesn't."""
+    sub = h.add_sub_skill(sample(), state="VALID")
+    tool = sample()["isatvon_definition"]["t_tech_stack"]["action_tool"]
+    fixed = sample()["isatvon_definition"]["t_tech_stack"]["fixed_check_tool"]
+
+    def validated_at() -> object:
+        with h.sessions() as s:
+            row = s.get(SubSkill, sub)
+            assert row is not None
+            return row.validated_at
+
+    h.patch(sub, {"changes": {IDEF + "t_tech_stack.fixed_check_tool": tool}})
+    assert validated_at() is None
+    h.patch(sub, {"changes": {IDEF + "t_tech_stack.fixed_check_tool": fixed}})
+    assert validated_at() is not None
+
+
 def test_e8_4_t04_stale_if_match_is_412_and_missing_is_428(h: Harness) -> None:
     sub = h.add_sub_skill(sample())
     body = {"changes": {IDEF + "v_variables.max_iterations": 5}}
@@ -207,6 +228,70 @@ def test_e8_4_t08_another_tenant_or_workflow_is_404(h: Harness) -> None:
     other_wf = h.workflow(2, sow_version=h.generated(h.structured))
     wrong = f"/projects/{h.project}/workflows/{other_wf}/sub-skills/{sub}"
     problem(h.patch(sub, body, path=wrong), 404, "NOT_FOUND")
+
+
+# --- regenerate (E8.4-T09) ------------------------------------------------------------------------
+
+
+def regenerate(
+    h: Harness, entity: uuid.UUID, kind: str, body: Any = None, token: str | None = None, **hdr: str
+) -> Any:
+    path = f"/projects/{h.project}/workflows/{h.wf}/{kind}/{entity}/regenerate"
+    return h.call("POST", path, token or h.fde(), headers=hdr, json=body)
+
+
+def test_e8_4_t09_macro_regenerate_starts_the_run_and_replays_by_key(h: Harness) -> None:
+    h.add_sub_skill(sample())
+    key = {"Idempotency-Key": "key-isatvon-regen-1"}
+    res = regenerate(h, h.macro, "macro-skills", {"hint": "  Split it in two\x07 "}, **key)
+    assert res.status_code == 202, res.text
+    run = res.json()["run"]
+    assert run["type"] == "IsatvonRegenerate"
+    assert run["temporal_workflow_id"] == f"isatvon-regen-{h.macro}"
+    [call] = h.temporal.calls
+    assert call["task_queue"] == "sbam-llm" and call["id_conflict_policy"].name == "FAIL"
+    arg = call["arg"]
+    assert (arg.macro_skill_id, arg.sub_skill_id, arg.hint) == (h.macro, None, "Split it in two")
+    again = regenerate(h, h.macro, "macro-skills", {"hint": "Split it in two"}, **key)
+    assert again.json()["run"]["id"] == run["id"] and len(h.temporal.calls) == 1
+    problem(regenerate(h, h.macro, "macro-skills"), 409, "CONFLICT")  # one at a time
+
+
+def test_e8_4_t09_sub_skill_regenerate_names_the_sub_and_shares_the_macro_run(h: Harness) -> None:
+    sub = h.add_sub_skill(sample())
+    res = regenerate(h, sub, "sub-skills")
+    assert res.status_code == 202, res.text
+    [call] = h.temporal.calls
+    assert (call["arg"].macro_skill_id, call["arg"].sub_skill_id) == (h.macro, sub)
+    assert call["id"] == f"isatvon-regen-{h.macro}"
+
+
+def test_e8_4_t09_regenerate_frozen_is_423_building_is_409_over_long_hint_is_422(
+    h: Harness,
+) -> None:
+    h.add_sub_skill(sample())
+    problem(regenerate(h, h.macro, "macro-skills", {"hint": "x" * 2001}), 422, "VALIDATION_ERROR")
+    h.set_workflow_state("FROZEN")
+    problem(regenerate(h, h.macro, "macro-skills"), 423, "WORKFLOW_FROZEN")
+    h.set_workflow_state("BUILDING")
+    problem(regenerate(h, h.macro, "macro-skills"), 409, "WORKFLOW_BUILDING")
+    assert h.temporal.calls == []
+
+
+def test_e8_4_t09_a_certified_sub_skill_blocks_regenerate(h: Harness) -> None:
+    h.add_sub_skill(sample(), state="CERTIFIED")
+    problem(regenerate(h, h.macro, "macro-skills"), 409, "CONFLICT")
+    assert h.temporal.calls == []
+
+
+def test_e8_4_t09_regenerate_of_another_tenant_or_workflow_is_404(h: Harness) -> None:
+    sub = h.add_sub_skill(sample())
+    other = h.realm.token(uuid.uuid4(), tenant_id=[str(TENANT_B)])
+    problem(regenerate(h, h.macro, "macro-skills", token=other), 404, "NOT_FOUND")
+    problem(regenerate(h, sub, "sub-skills", token=other), 404, "NOT_FOUND")
+    problem(regenerate(h, uuid.uuid4(), "macro-skills"), 404, "NOT_FOUND")
+    problem(regenerate(h, uuid.uuid4(), "sub-skills"), 404, "NOT_FOUND")
+    assert h.temporal.calls == []
 
 
 def test_e8_4_reorder_renumbers_the_siblings_contiguously(h: Harness) -> None:
