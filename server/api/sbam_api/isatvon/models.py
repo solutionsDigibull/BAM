@@ -9,10 +9,11 @@ changes only through the state-machine service.
 """
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sbam_contracts.state_machines import MachineName
-from sqlalchemy import JSON, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -79,6 +80,9 @@ class SubSkill(Stateful, ProjectOwned, Base):
     sow_refs: Mapped[list[str]] = mapped_column(Json)
     validation_errors: Mapped[list[Any]] = mapped_column(Json, default=list)
     content_sha256: Mapped[str] = mapped_column(String(64))
+    # When it passed the TD §10.4 validator (E9.1): the manifest's timestamps, so a rebuild of the
+    # same ISATVON hashes the same. None while it has findings.
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 register_entity(MachineName.SUB_SKILL, SubSkill)

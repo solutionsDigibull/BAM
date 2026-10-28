@@ -50,7 +50,7 @@ from temporalio.client import (
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.worker import Replayer
-from test_project_pipeline import environment
+from test_project_pipeline import environment, manifest_stand_in
 
 TENANT = uuid.uuid4()
 FDE = str(uuid.uuid4())
@@ -73,9 +73,11 @@ STAGES = [  # TD §13.2, in order
     "certify_sub_skill",
 ]
 ORIGINALS: dict[str, Callable[..., Any]] = {
+    "build_manifest": manifest_stand_in,
+} | {
     name: getattr(module, name)
     for module, names in (
-        (build_stubs, [*STAGES[:7], "correct"]),
+        (build_stubs, [*STAGES[1:7], "correct"]),
         (test_stubs, ["generate_tests", "build_promptfoo_suite", "run_sandbox_tests"]),
         (certify_stubs, ["certify_sub_skill"]),
     )
