@@ -11,30 +11,37 @@
   422 and stores nothing. `PATCH W/macro-skills/{macro_id}` (`MacroSkillPatch`, `If-Match` =
   row_version), `DELETE W/sub-skills/{sub_id}` (204) and `GET W/sub-skills/{sub_id}/edits` (the
   per-field history). A Sub-Skill cannot be created here: POST is 405. See `isatvon/edits.py`.
+* `POST W/macro-skills/{macro_id}/regenerate` and `POST W/sub-skills/{sub_id}/regenerate`
+  (`RegenerateRequest {hint?}` + `Idempotency-Key`): 202 `{"run": Run}`; see `regenerate.py`.
 """
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.isatvon_macros import MacroSkillOut
 from sbam_contracts.isatvon_workbench import (
     MacroSkillPatch,
+    RegenerateRequest,
     SubSkillEditHistory,
     SubSkillPatch,
     ValidationReport,
     WorkbenchSubSkill,
 )
+from sbam_contracts.runs import RunAccepted
 from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.core.auth import CurrentUser, authenticated, fde, project_access
-from sbam_api.core.conventions import etag, not_found
+from sbam_api.core.conventions import etag, not_found, validate_idempotency_key
+from sbam_api.core.settings import Settings
 from sbam_api.isatvon import edits
 from sbam_api.isatvon.grid import IsatvonSchemaResponse, render
 from sbam_api.isatvon.models import MacroSkill, SubSkill
+from sbam_api.isatvon.regenerate import start_regenerate
 from sbam_api.isatvon.service import revalidate
-from sbam_api.temporal.deps import session_factory
+from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
+from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["isatvon"])
 CACHE_CONTROL = "private, max-age=300, must-revalidate"
@@ -83,6 +90,7 @@ Project = Annotated[UUID, Depends(project_access)]
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 IfMatch = Annotated[str | None, Header()]
+IdempotencyKey = Annotated[str | None, Header(min_length=1, max_length=MAX_IDEMPOTENCY_KEY)]
 
 
 def _row(sub: SubSkill) -> WorkbenchSubSkill:
@@ -162,3 +170,64 @@ def edit_macro_skill(
         session.commit()
         response.headers["ETag"] = etag(macro.row_version)
         return MacroSkillOut.model_validate(macro, from_attributes=True)
+
+
+async def _regenerate(
+    project_id: UUID,
+    workflow_id: UUID,
+    entity_id: UUID,
+    body: RegenerateRequest | None,
+    request: Request,
+    user: CurrentUser,
+    sessions: sessionmaker[Session],
+    idempotency_key: str | None,
+    is_sub: bool,
+) -> RunAccepted:
+    if idempotency_key is not None:
+        validate_idempotency_key(idempotency_key)
+    settings: Settings = request.app.state.settings
+    run = await start_regenerate(
+        sessions,
+        lambda: temporal_client(request),
+        user,
+        project_id,
+        workflow_id,
+        entity_id,
+        body.hint if body else None,
+        is_sub=is_sub,
+        idempotency_key=idempotency_key,
+        with_search_attributes=settings.temporal_search_attributes,
+    )
+    return RunAccepted(run=run)
+
+
+@router.post(W + "/macro-skills/{macro_id}/regenerate", status_code=202, response_model=RunAccepted)
+async def regenerate_macro_skill(
+    project_id: Project,
+    workflow_id: UUID,
+    macro_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    body: RegenerateRequest | None = None,
+    idempotency_key: IdempotencyKey = None,
+) -> RunAccepted:
+    return await _regenerate(
+        project_id, workflow_id, macro_id, body, request, user, sessions, idempotency_key, False
+    )
+
+
+@router.post(W + "/sub-skills/{sub_id}/regenerate", status_code=202, response_model=RunAccepted)
+async def regenerate_sub_skill(
+    project_id: Project,
+    workflow_id: UUID,
+    sub_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    body: RegenerateRequest | None = None,
+    idempotency_key: IdempotencyKey = None,
+) -> RunAccepted:
+    return await _regenerate(
+        project_id, workflow_id, sub_id, body, request, user, sessions, idempotency_key, True
+    )
