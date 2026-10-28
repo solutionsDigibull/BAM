@@ -74,6 +74,12 @@ class _Notes:
         marks = []
         for c in citations:
             n = len(self.lines) + 1
+            if c.get("kind") == "fde":  # the FDE's own statement: signed, not looked up
+                note = f", {escape(str(c['note']))}" if c.get("note") else ""
+                signed = f"FDE-authored by {escape(str(c['author']))}, {c['date']}{note}"
+                self.lines.append(f"[^{n}]: {signed}")
+                marks.append(f"[^{n}]")
+                continue
             doc = UUID(str(c["document_version_id"]))
             title = self.titles.get(doc) or f"document {str(doc)[:8]}"
             self.lines.append(f"[^{n}]: {escape(title)}, {escape(where(c.get('location') or {}))}")

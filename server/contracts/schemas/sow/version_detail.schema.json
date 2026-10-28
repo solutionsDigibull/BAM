@@ -10,26 +10,84 @@
           "title": "Path",
           "type": "string"
         },
-        "okf_ref_id": {
-          "title": "Okf Ref Id",
+        "kind": {
+          "default": "okf",
+          "enum": [
+            "okf",
+            "fde"
+          ],
+          "title": "Kind",
           "type": "string"
         },
+        "okf_ref_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Okf Ref Id"
+        },
         "document_version_id": {
-          "format": "uuid",
-          "title": "Document Version Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Version Id"
         },
         "location": {
           "additionalProperties": true,
           "title": "Location",
           "type": "object"
+        },
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
         }
       },
       "required": [
-        "path",
-        "okf_ref_id",
-        "document_version_id",
-        "location"
+        "path"
       ],
       "title": "SowCitationRef",
       "type": "object"

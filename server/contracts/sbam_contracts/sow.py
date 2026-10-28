@@ -21,11 +21,12 @@ Rules worth knowing
 import json
 import sys
 from collections import Counter
+from datetime import date as _Date  # noqa: N812 - the field below is named `date`
 from pathlib import Path
-from typing import Annotated, Any, Final, Self
+from typing import Annotated, Any, Final, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.isatvon14 import MAX_ITERATIONS_RANGE, RULE_REF, ShortText, Text
@@ -73,7 +74,29 @@ class Citation(_Strict):
     location: Location
 
 
-Citations = Annotated[list[Citation], Field(min_length=1)]
+class FdeCitation(_Strict):
+    """A statement the FDE sourced themselves: no `okf_ref_id`, so nothing to look up in the bundle.
+
+    The API stamps `author` and `date` on save (an editor cannot sign as someone else or backdate).
+    """
+
+    kind: Literal["fde"]
+    author: ShortText
+    date: Annotated[_Date, Field(strict=False)]  # ISO string from JSON
+    note: Text | None = None
+
+
+def _citation_kind(value: Any) -> str:
+    """Stored and generated documents have no `kind` on a bundle citation (their hashes stay)."""
+    kind = value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
+    return "fde" if kind == "fde" else "okf"
+
+
+AnyCitation = Annotated[
+    Annotated[Citation, Tag("okf")] | Annotated[FdeCitation, Tag("fde")],
+    Discriminator(_citation_kind),
+]
+Citations = Annotated[list[AnyCitation], Field(min_length=1)]
 
 
 class _Cited(_Strict):

@@ -21,7 +21,7 @@ from sbam_api.llm.repository import LlmCallRepository
 from sbam_api.sow.models import Sow, SowVersion
 from sbam_api.sow.service import canonical_sha256
 from sbam_contracts.pipeline import StageRef
-from sbam_contracts.sow import SECTIONS, SowDocument
+from sbam_contracts.sow import SECTIONS, Citation, SowDocument
 from sbam_workers.llm.store import LlmScope
 from sbam_workers.pipeline.project_pipeline import PLAN
 from sbam_workers.sow.context import Bundle, build_context
@@ -156,6 +156,7 @@ def test_e6_2_t01_fixture_bundle_gives_a_valid_cited_sow_v1_in_full_mode(g: Gen)
     chunks = {c.id: c for c in bundle.chunks}
     for path_doc in [doc.overview, doc.scope, *doc.modules, *doc.features]:
         for c in path_doc.citations:
+            assert isinstance(c, Citation)  # generated SOWs carry model citations only
             assert c.okf_ref_id in chunks  # 100% resolve
             real = chunks[c.okf_ref_id].location.model_dump(exclude={"scope"}, exclude_none=True)
             assert c.location.model_dump(exclude_none=True) == (real or {"line": 1})
