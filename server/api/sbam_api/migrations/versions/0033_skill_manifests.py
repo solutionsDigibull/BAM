@@ -1,7 +1,7 @@
 """sub_skill_manifests, gate_results and sub_skills.validated_at
 
-Revision ID: 0032_skill_manifests
-Revises: 0031_sub_skills
+Revision ID: 0033_skill_manifests
+Revises: 0032_sub_skill_edits
 Create Date: 2026-10-28
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -26,8 +26,8 @@ _GATES = (
     "'IMPORT_RESOLUTION', 'LOOP_TESTS'"
 )  # build_dashboard.GateName as of this revision
 
-revision: str = "0032_skill_manifests"
-down_revision: str | Sequence[str] | None = "0031_sub_skills"
+revision: str = "0033_skill_manifests"
+down_revision: str | Sequence[str] | None = "0032_sub_skill_edits"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
