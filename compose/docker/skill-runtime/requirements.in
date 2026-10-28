@@ -1,6 +1,7 @@
 # Allowed libraries for generated Sub-Skills (TD §20.2, C-25). Lock: requirements.lock (with hashes).
 # Regenerate: see the header of requirements.lock. Adding a library here = adding it to the runtime registry.
 fastmcp>=4.0,<4.1  # FastMCP server + MCP client
+authlib>=1.9.0  # via fastmcp-slim; floor for CVE-2026-96760 (signature bypass, #368)
 mcp
 pydantic
 httpx
