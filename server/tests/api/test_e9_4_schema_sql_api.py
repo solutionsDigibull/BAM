@@ -183,6 +183,6 @@ def test_e9_4_another_tenant_or_an_unassigned_fde_gets_404(h: Harness) -> None:
 
 
 def test_e9_4_only_the_fde_portal_sets_the_base(h: Harness) -> None:
-    # a tenant admin isn't assigned to the project: 404 like any other outsider, never 403
+    # refused before the handler; tests/security/rbac_matrix.yaml pins every role's answer
     problem(h.put(h.sql_document(BASE), h.realm.token(ADMIN_A)), 404, "NOT_FOUND")
     assert h.schemas() == []

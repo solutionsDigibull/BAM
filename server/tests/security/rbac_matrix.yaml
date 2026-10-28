@@ -609,6 +609,27 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"
 
+  # The Workflow's schema.sql (E9.4). The world seeds no schema, so an assigned FDE reads 404; the
+  # seeded document is not a parsed .sql, so setting it as the base is 422.
+  get_schema_sql_api_v1_projects__project_id__workflows__workflow_id__schema_sql_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/schema-sql
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  set_schema_sql_source_api_v1_projects__project_id__workflows__workflow_id__schema_sql_source_put:
+    request:
+      method: PUT
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/schema-sql/source
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      json: {document_id: "@doc_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "422 UNSUPPORTED_TYPE"
+
   # Edit, delete and history of a Sub-Skill / Macro Skill (E8.4). The world seeds no ISATVON rows,
   # so an assigned FDE reaches the handler and gets 404 for the unknown id; the other roles are
   # refused before it.

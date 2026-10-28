@@ -1,7 +1,7 @@
 """Workflow schema.sql endpoints (E9.4, TD §8.8).
 
 * `GET W/schema-sql?version=`: the newest version (or `version`) of the Workflow's schema.sql with
-  its SCHEMA_SQL verdict and findings (`WorkflowSchemaSql`); 404 before any. Any project member.
+  its SCHEMA_SQL verdict and findings (`WorkflowSchemaSql`); 404 before any. FDE portal.
 * `PUT W/schema-sql/source` (`SchemaSqlSourcePut`): a parsed, clean `.sql` document of the project
   becomes the base the next build uses; 422 SCHEMA_PARSE_ERROR (with the statement) for SQL the
   allowlist refuses, 409 WORKFLOW_BUILDING, 423 WORKFLOW_FROZEN. FDE portal.
@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Query
 from sbam_contracts.schema_sql import SchemaSqlSourcePut, WorkflowSchemaSql
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.core.auth import CurrentUser, authenticated, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde, project_access
 from sbam_api.schema_sql import service
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.router import backend
@@ -35,7 +35,7 @@ Storage = Annotated[StorageBackend, Depends(backend)]
 def get_schema_sql(
     project_id: Project,
     workflow_id: UUID,
-    user: Annotated[CurrentUser, Depends(authenticated)],
+    user: Annotated[CurrentUser, Depends(fde)],
     sessions: Sessions,
     storage: Storage,
     version: Annotated[int | None, Query(ge=1)] = None,
