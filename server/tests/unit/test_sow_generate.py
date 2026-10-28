@@ -16,7 +16,7 @@ import pytest
 from knowledge_db import World, versions
 from llm_db import FakeBifrost, completion, make_client, scope
 from sbam_api.db.repository import TenantContext
-from sbam_api.llm.models import LlmCall
+from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_api.llm.repository import LlmCallRepository
 from sbam_api.sow.models import Sow, SowVersion
 from sbam_api.sow.service import canonical_sha256
@@ -63,10 +63,8 @@ class Gen:
     def __init__(self, w: World, *docs: str) -> None:
         self.w = w
         engine = w.sessions.kw["bind"]
-        Sow.metadata.create_all(
-            engine,
-            tables=[LlmCall.__table__, Sow.__table__, SowVersion.__table__],  # type: ignore[list-item]
-        )
+        for table in (LlmCall, LlmDerivative, Sow, SowVersion):
+            table.__table__.create(engine, checkfirst=True)  # type: ignore[attr-defined]
         w.docs(*(docs or DOCS))
         self.inp = w.run_input()
         self.kv = w.build_all(self.inp)

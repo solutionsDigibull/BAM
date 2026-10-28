@@ -35,6 +35,7 @@ from sbam_api.pipeline.service import (
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.pipeline import (
     Cancel,
+    CarryOverInput,
     CreateWorkflowInput,
     CreateWorkflowResult,
     Generate,
@@ -69,6 +70,7 @@ HISTORY = Path(__file__).parent / "histories" / "project_pipeline.json"
 BEFORE_E5_2 = HISTORY.with_name("project_pipeline_before_e5_2.json")  # no heartbeat patch
 BEFORE_E10_3 = HISTORY.with_name("project_pipeline_before_e10_3.json")  # no build scheduler patch
 BEFORE_E8_3 = HISTORY.with_name("project_pipeline_before_e8_3.json")  # unbounded pass 2
+BEFORE_E7_2 = HISTORY.with_name("project_pipeline_before_e7_2.json")  # no scope-change carry-over
 FULL_ORDER = [
     "ingest",
     "knowledge",
@@ -145,6 +147,13 @@ async def schema_sql_stand_in(inp: WorkflowRef) -> IdResult:
     return IdResult(id=stub_id(inp, "schema_sql"))
 
 
+@activity.defn(name="carry_over_workflow")
+async def carry_over_stand_in(inp: CarryOverInput) -> IdsResult:
+    """The real one (E7.2) copies a scope change's untouched rows; its tests are
+    tests/unit/test_carry_over.py and tests/temporal/test_scope_change.py."""
+    return IdsResult(ids=[])
+
+
 DEFAULT_OVERRIDES: "Overrides" = {
     "build_knowledge": knowledge_stand_in,
     "build_okf_bundle": okf_stand_in,
@@ -154,6 +163,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "extract_sub_skills": sub_skills_stand_in,
     "build_manifest": manifest_stand_in,
     "build_schema_sql": schema_sql_stand_in,
+    "carry_over_workflow": carry_over_stand_in,
 }
 
 
@@ -627,14 +637,14 @@ def test_e10_1_signal_helper_refuses_when_not_waiting() -> None:
 
 @pytest.mark.parametrize(
     "recorded",
-    [HISTORY, BEFORE_E5_2, BEFORE_E10_3, BEFORE_E8_3],
-    ids=["current", "before_e5_2", "before_e10_3", "before_e8_3"],
+    [HISTORY, BEFORE_E5_2, BEFORE_E10_3, BEFORE_E8_3, BEFORE_E7_2],
+    ids=["current", "before_e5_2", "before_e10_3", "before_e8_3", "before_e7_2"],
 )
 def test_e10_1_replays_from_recorded_history(recorded: Path) -> None:
     """Determinism guard (TD §13.4): a change that breaks running pipelines fails here. E5.2-T09:
     `before_e5_2` was recorded before the knowledge stage's heartbeat patch, `current` after it.
     E10.3-T06: `before_e10_3` was recorded before the build scheduler patch. E8.3: `before_e8_3`
-    before pass 2 was bounded."""
+    before pass 2 was bounded. E7.2: `before_e7_2` before the scope-change carry-over step."""
     workflow_id = pipeline_workflow_id(uuid.UUID(int=0))
     history = WorkflowHistory.from_json(workflow_id, json.loads(recorded.read_text("utf-8")))
     replayer = Replayer(workflows=[ProjectPipeline], data_converter=pydantic_data_converter)

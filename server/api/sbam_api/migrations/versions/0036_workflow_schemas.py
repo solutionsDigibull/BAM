@@ -1,7 +1,7 @@
 """workflow_schemas, workflow-level gate_results and SCHEMA_SQL artifacts
 
-Revision ID: 0035_workflow_schemas
-Revises: 0034_sow_impacts
+Revision ID: 0036_workflow_schemas
+Revises: 0035_sub_skill_reuse
 Create Date: 2026-10-28 16:32:53.046190
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -18,8 +18,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0035_workflow_schemas"
-down_revision: str | Sequence[str] | None = "0034_sow_impacts"
+revision: str = "0036_workflow_schemas"
+down_revision: str | Sequence[str] | None = "0035_sub_skill_reuse"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

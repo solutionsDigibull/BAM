@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:code/diff:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "from_attempt": {
+      "title": "From Attempt",
+      "type": "integer"
+    },
+    "to_attempt": {
+      "title": "To Attempt",
+      "type": "integer"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "changed": {
+      "title": "Changed",
+      "type": "boolean"
+    },
+    "unified": {
+      "title": "Unified",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "from_attempt",
+    "to_attempt",
+    "path",
+    "changed",
+    "unified",
+    "truncated"
+  ],
+  "title": "CodeDiff",
+  "type": "object"
+}

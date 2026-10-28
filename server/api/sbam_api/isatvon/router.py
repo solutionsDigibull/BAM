@@ -13,12 +13,16 @@
   per-field history). A Sub-Skill cannot be created here: POST is 405. See `isatvon/edits.py`.
 * `POST W/macro-skills/{macro_id}/regenerate` and `POST W/sub-skills/{sub_id}/regenerate`
   (`RegenerateRequest {hint?}` + `Idempotency-Key`): 202 `{"run": Run}`; see `regenerate.py`.
+* `GET W/isatvon/export.xlsx?include_invalid=true` (E8.5): 302 to a signed URL (300 s) of the
+  breakdown as a workbook, a sheet per Macro Skill; 409 CONFLICT before any Macro Skill exists.
+  See `isatvon/export.py`.
 """
 
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
+from fastapi.responses import RedirectResponse
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.isatvon_macros import MacroSkillOut
 from sbam_contracts.isatvon_workbench import (
@@ -36,11 +40,14 @@ from sbam_api.core.auth import CurrentUser, authenticated, fde, project_access
 from sbam_api.core.conventions import etag, not_found, validate_idempotency_key
 from sbam_api.core.settings import Settings
 from sbam_api.isatvon import edits
+from sbam_api.isatvon.export import export_workbook
 from sbam_api.isatvon.grid import IsatvonSchemaResponse, render
 from sbam_api.isatvon.models import MacroSkill, SubSkill
 from sbam_api.isatvon.regenerate import start_regenerate
 from sbam_api.isatvon.service import revalidate
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
+from sbam_api.storage.router import backend
+from sbam_api.storage.signing import signed_url
 from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["isatvon"])
@@ -231,3 +238,35 @@ async def regenerate_sub_skill(
     return await _regenerate(
         project_id, workflow_id, sub_id, body, request, user, sessions, idempotency_key, True
     )
+
+
+EXPORT_URL_TTL = 300  # seconds a signed export link works (as SOW exports)
+
+
+@router.get(W + "/isatvon/export.xlsx", status_code=302, response_class=RedirectResponse)
+def export_isatvon(
+    project_id: Project,
+    workflow_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    include_invalid: Annotated[bool, Query()] = True,
+) -> RedirectResponse:
+    with sessions() as session:
+        made = export_workbook(
+            session,
+            backend(request),
+            user,
+            project_id,
+            workflow_id,
+            include_invalid=include_invalid,
+        )
+    settings: Settings = request.app.state.settings
+    secret = settings.storage_signing_key
+    url = signed_url(
+        secret.get_secret_value() if secret else None,
+        made.storage_key,
+        user.context(project_id),
+        EXPORT_URL_TTL,
+    )
+    return RedirectResponse(url, status_code=302, headers={"X-Content-SHA256": made.sha256})

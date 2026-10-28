@@ -16,10 +16,10 @@ from llm_db import FakeBifrost, make_client, scope
 from sbam_api.core.ids import uuid7
 from sbam_api.isatvon.models import MacroSkill, SubSkill
 from sbam_api.knowledge.models import KnowledgeVersion
-from sbam_api.llm.models import LlmCall
+from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion, MasterSnapshot
 from sbam_api.notifications.models import Notification
-from sbam_api.sow.models import Sow, SowVersion
+from sbam_api.sow.models import Sow, SowImpactRecord, SowVersion
 from sbam_api.sow.service import canonical_sha256
 from sbam_api.workflows.models import Workflow
 from sbam_contracts.pipeline import WorkflowRef
@@ -84,7 +84,17 @@ class Pass1:
         """`with_workflow=False`: the pipeline's `create_workflow` makes the Workflow."""
         self.w = w
         engine = w.sessions.kw["bind"]
-        for table in (LlmCall, Sow, SowVersion, Workflow, MacroSkill, SubSkill, Notification):
+        tables = (
+            LlmCall,
+            LlmDerivative,
+            Sow,
+            SowVersion,
+            Workflow,
+            MacroSkill,
+            SubSkill,
+            SowImpactRecord,
+        )
+        for table in (*tables, Notification):
             table.__table__.create(engine, checkfirst=True)  # type: ignore[attr-defined]
         w.docs(*DOCS)
         self.inp = w.run_input()

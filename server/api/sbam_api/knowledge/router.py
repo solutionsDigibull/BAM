@@ -151,4 +151,12 @@ def okf_bundle(
         row = graph.readable_version(session, ctx, kv_id)
     storage = backend(request)
     key = graph.store_zip(storage, ctx, graph.bundle_zip(storage, graph.load(storage, row)))
-    return RedirectResponse(signed_url(_secret(request), key, ctx, OKF_URL_TTL), status_code=302)
+    url = signed_url(
+        _secret(request),
+        key,
+        ctx,
+        OKF_URL_TTL,
+        filename=f"okf-bundle-v{row.version}-{project_id.hex[:8]}.zip",
+        content_type="application/zip",
+    )
+    return RedirectResponse(url, status_code=302)

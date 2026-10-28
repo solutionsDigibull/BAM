@@ -42,6 +42,20 @@ from sbam_api.sow.service import canonical_sha256
 from sbam_api.sow.versions import _version
 from sbam_api.temporal.client import OrchestratorUnavailable
 
+# What the browser is told an export is. The worker stores it with the same types (a test keeps
+# them equal).
+DOWNLOAD_CONTENT_TYPES: Final = {
+    ExportFormat.MD: "text/markdown; charset=utf-8",
+    ExportFormat.DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ExportFormat.PDF: "application/pdf",
+}
+
+
+def download_name(project_id: uuid.UUID, number: int, fmt: ExportFormat) -> str:
+    """`sow-v3-01a18113.pdf`: what an exported SOW is saved as."""
+    return f"sow-v{number}-{project_id.hex[:8]}.{fmt.value}"
+
+
 EXPORT_WAIT_SECONDS: Final = 60.0
 RETRY_AFTER_SECONDS: Final = 30
 

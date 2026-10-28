@@ -7,15 +7,16 @@ for it holds the
 validated output, so an activity replayed after a worker crash reuses it and is not billed twice.
 """
 
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Index, Integer, Numeric, String, Text
+from sqlalchemy import JSON, DateTime, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from sbam_api.db.base import Base, ProjectOwned, status_check
+from sbam_api.db.base import Base, ProjectOwned, TenantOwned, status_check
 
 Json = JSON().with_variant(JSONB(), "postgresql")
 
@@ -56,3 +57,27 @@ class LlmCall(ProjectOwned, Base):
     # The validated output of a SUCCEEDED row (platform fields are refused by the output model).
     output: Mapped[dict[str, Any] | None] = mapped_column(Json)
     error: Mapped[str | None] = mapped_column(Text)  # validation locations or transport reason
+
+
+class LlmDerivative(TenantOwned, Base):
+    """`llm_derivatives`: a validated answer, addressed by what was asked (issue: LLM cost control).
+
+    `cache_key` is the SHA-256 of the exact messages sent (prompt text and version, output schema,
+    every document and image) plus the alias, so identical input is never billed twice, in any
+    project of the tenant. A new prompt, schema or document changes the key: a stale answer cannot
+    be served. Tenant-scoped on purpose: nothing crosses tenants.
+    """
+
+    __tablename__ = "llm_derivatives"
+    __table_args__ = (UniqueConstraint("tenant_id", "cache_key"),)
+
+    cache_key: Mapped[str] = mapped_column(String(64))
+    alias: Mapped[str] = mapped_column(String(40))
+    prompt_id: Mapped[str] = mapped_column(String(100))
+    prompt_version: Mapped[str] = mapped_column(String(40))
+    output: Mapped[dict[str, Any]] = mapped_column(Json)
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)  # what the first call cost
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal(0))
+    hits: Mapped[int] = mapped_column(Integer, default=0)  # each hit saves `cost_usd` again
+    last_hit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -1,5 +1,6 @@
 """Worker settings from env (Compose passes them one by one, never an env_file; ADR 0001)."""
 
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
@@ -36,6 +37,13 @@ class WorkerSettings(BaseSettings):
     bifrost_url: AnyHttpUrl = AnyHttpUrl("http://bifrost:8080")
     llm_timeout_seconds: float = Field(default=120.0, gt=0)
     llm_max_context_tokens: int = Field(default=200_000, ge=1000)
+    # Cost control. Identical input (same prompt, schema, documents, alias) is answered from
+    # `llm_derivatives` for the whole tenant instead of being billed again. The budgets are opt-in
+    # (C-41: no limit by default): once the recorded spend of a project or tenant reaches one, the
+    # next model call is refused (non-retryable) until an admin raises it. Cache hits cost nothing.
+    llm_derivative_cache: bool = True
+    llm_project_budget_usd: Decimal | None = Field(default=None, gt=0)
+    llm_tenant_budget_usd: Decimal | None = Field(default=None, gt=0)
     # Transport errors, 5xx and 429s are tried this many times inside the wrapper, then surface as a
     # retryable `LlmTransportError` (the Temporal retry policy takes over).
     llm_transport_attempts: int = Field(default=3, ge=1, le=10)

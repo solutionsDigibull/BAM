@@ -1,10 +1,15 @@
 """Tenant- and project-scoped `llm_calls` access (E6.1). Rows are only ever added: a call is
 history."""
 
+from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
+
+from sbam_api.db.base import utcnow
 from sbam_api.db.repository import TenantScopedRepository
-from sbam_api.llm.models import LlmCall, LlmCallStatus
+from sbam_api.llm.models import LlmCall, LlmCallStatus, LlmDerivative
 
 
 class LlmCallRepository(TenantScopedRepository[LlmCall]):
@@ -48,3 +53,57 @@ class LlmCallRepository(TenantScopedRepository[LlmCall]):
             .order_by(LlmCall.id)
         )
         return list(self.session.scalars(query))
+
+    def spent(self) -> Decimal:
+        """Total `cost_usd` of every attempt in scope: the project's when the context names one,
+        else the whole tenant's. Failed attempts count: they were billed."""
+        query = select(func.coalesce(func.sum(LlmCall.cost_usd), 0)).where(
+            LlmCall.tenant_id == self.ctx.tenant_id, LlmCall.deleted_at.is_(None)
+        )
+        if self.ctx.project_id is not None:
+            query = query.where(LlmCall.project_id == self.ctx.project_id)
+        return Decimal(str(self.session.scalar(query) or 0))
+
+
+class LlmDerivativeRepository(TenantScopedRepository[LlmDerivative]):
+    model = LlmDerivative
+
+    def by_key(self, cache_key: str) -> LlmDerivative | None:
+        query = self._scoped().where(LlmDerivative.cache_key == cache_key)
+        return self.session.scalars(query).one_or_none()
+
+    def hit(self, row: LlmDerivative) -> None:
+        """Count a hit with an atomic UPDATE: concurrent hits must not trip the row-version
+        check."""
+        self.session.execute(
+            update(LlmDerivative)
+            .where(LlmDerivative.id == row.id)
+            .values(hits=LlmDerivative.hits + 1, last_hit_at=utcnow())
+            .execution_options(synchronize_session=False)
+        )
+
+    def put(self, values: dict[str, Any], *, replace: bool = False) -> bool:
+        """Store an answer. An entry that is deleted, or `replace`, is overwritten; otherwise the
+        first writer wins and this returns False."""
+        key = values["cache_key"]
+        existing = self.session.scalars(
+            select(LlmDerivative).where(
+                LlmDerivative.tenant_id == self.ctx.tenant_id, LlmDerivative.cache_key == key
+            )
+        ).one_or_none()
+        if existing is not None:
+            if existing.deleted_at is None and not replace:
+                return False
+            for name, value in values.items():
+                setattr(existing, name, value)
+            existing.deleted_at = None
+            self.session.flush()
+            return True
+        row = LlmDerivative(**{**values, "tenant_id": self.ctx.tenant_id})
+        try:
+            with self.session.begin_nested():
+                self.session.add(row)
+                self.session.flush()
+        except IntegrityError:
+            return False
+        return True

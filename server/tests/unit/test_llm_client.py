@@ -267,7 +267,7 @@ def test_e6_1_t08_platform_fields_from_the_model_are_refused_and_never_returned(
 
 def test_e6_1_t09_replay_with_the_same_attempt_key_is_served_from_the_row_not_rebilled() -> None:
     bifrost = FakeBifrost([completion(GOOD)])
-    client, sessions = make_client(bifrost)
+    client, sessions = make_client(bifrost, llm_derivative_cache=False)  # isolate the replay key
     sc = scope()
     first = run(client, sc)
     again = run(client, sc)  # the activity is replayed after a worker crash
@@ -333,7 +333,9 @@ def test_e6_1_langfuse_buffer_is_sent_with_the_next_call() -> None:
         return httpx.Response(207, json={"successes": [], "errors": []})
 
     bifrost = FakeBifrost([completion(GOOD)])
-    client, _ = make_client(bifrost, tracer=tracer_over(handler), **LANGFUSE)
+    client, _ = make_client(
+        bifrost, tracer=tracer_over(handler), llm_derivative_cache=False, **LANGFUSE
+    )
     run(client, scope())
     state["up"] = True
     run(client, scope())
