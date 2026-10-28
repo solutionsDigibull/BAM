@@ -63,15 +63,8 @@ class Gen:
     def __init__(self, w: World, *docs: str) -> None:
         self.w = w
         engine = w.sessions.kw["bind"]
-        Sow.metadata.create_all(
-            engine,
-            tables=[
-                LlmCall.__table__,
-                LlmDerivative.__table__,
-                Sow.__table__,
-                SowVersion.__table__,
-            ],  # type: ignore[list-item]
-        )
+        for table in (LlmCall, LlmDerivative, Sow, SowVersion):
+            table.__table__.create(engine, checkfirst=True)  # type: ignore[attr-defined]
         w.docs(*(docs or DOCS))
         self.inp = w.run_input()
         self.kv = w.build_all(self.inp)
@@ -240,9 +233,8 @@ def test_e6_2_a_citation_with_the_wrong_document_is_refused(g: Gen) -> None:
     bad["scope"]["citations"][0]["document_version_id"] = str(uuid.uuid4())
     bifrost = FakeBifrost([completion(json.dumps(bad)), completion(g.answer())])
     g.run(bifrost)
-    assert (
-        "scope.citations: CITATION_DOCUMENT_MISMATCH"
-        in (bifrost.requests[1]["messages"][-1]["content"])
+    assert "scope.citations: CITATION_DOCUMENT_MISMATCH" in (
+        bifrost.requests[1]["messages"][-1]["content"]
     )
 
 

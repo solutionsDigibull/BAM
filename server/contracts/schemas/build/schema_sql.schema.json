@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:build/schema_sql:0.1.0",
+  "$defs": {
+    "Finding": {
+      "additionalProperties": false,
+      "description": "One problem a gate found; the shape the build worker writes into `gate_results.findings`.\n`file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.",
+      "properties": {
+        "gate": {
+          "$ref": "#/$defs/GateName"
+        },
+        "code": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 10000,
+          "title": "Message",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "col": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Col"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "actual": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual"
+        }
+      },
+      "required": [
+        "gate",
+        "code",
+        "message"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "GateName": {
+      "description": "The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the\ndashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).",
+      "enum": [
+        "ISATVON_CONTRACT",
+        "LIBRARIES",
+        "SCHEMA_SQL",
+        "CODEGEN",
+        "AST_SYNTAX",
+        "AST_SKELETON",
+        "AST_CONFORMANCE",
+        "AST_DECOUPLING",
+        "AST_NO_MANUAL_LOOP",
+        "AST_HANDOFF",
+        "AST_IMPORTS",
+        "AST_SQL_SAFETY",
+        "RUFF",
+        "BLACK",
+        "MYPY",
+        "CLAMAV",
+        "BANDIT",
+        "IMPORT_RESOLUTION",
+        "LOOP_TESTS"
+      ],
+      "title": "GateName",
+      "type": "string"
+    },
+    "GateStatus": {
+      "enum": [
+        "PENDING",
+        "RUNNING",
+        "PASSED",
+        "FAILED",
+        "SKIPPED"
+      ],
+      "title": "GateStatus",
+      "type": "string"
+    },
+    "SchemaSource": {
+      "enum": [
+        "UPLOADED",
+        "GENERATED"
+      ],
+      "title": "SchemaSource",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no\nbuild has applied yet is PENDING; `sql` is empty until then for a generated one.",
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "source": {
+      "$ref": "#/$defs/SchemaSource"
+    },
+    "source_document_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Document Id"
+    },
+    "sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sha256"
+    },
+    "tables": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tables",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/GateStatus"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "sql": {
+      "default": "",
+      "title": "Sql",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "version",
+    "source",
+    "status"
+  ],
+  "title": "WorkflowSchemaSql",
+  "type": "object"
+}

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:695c039e77b26c8028e5b9d15a7ccdd44211e2b3139a2f8d5b1ea93a426d7bcb
+// source-sha256:99f76ec7c53b449b2e1ab6cb8304ea0adeae2ada8739737f42ceb437440ab21d
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -209,6 +209,11 @@ export type GateName =
   | "LOOP_TESTS";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SchemaSource".
+ */
+export type SchemaSource = "UPLOADED" | "GENERATED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ManifestStatus".
  */
 export type ManifestStatus = "DRAFT" | "VALIDATING" | "APPROVED" | "SUPERSEDED";
@@ -406,6 +411,8 @@ export interface SbamContracts {
   SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
+  WorkflowSchemaSql?: WorkflowSchemaSql;
+  SchemaSqlSourcePut?: SchemaSqlSourcePut;
   Isa14Manifest?: Isa14Manifest;
   SkillManifest?: SkillManifest;
   WorkflowManifest?: WorkflowManifest;
@@ -428,6 +435,9 @@ export interface SbamContracts {
   SowApproveRequest?: SowApproveRequest;
   SowApproval?: SowApproval;
   SowCitationDetail?: SowCitationDetail;
+  CodeAttemptList?: CodeAttemptList;
+  CodeFileView?: CodeFileView;
+  CodeDiff?: CodeDiff;
   SowNewVersionRequest?: SowNewVersionRequest;
   SowImpact?: SowImpact;
   Run?: Run;
@@ -1084,6 +1094,33 @@ export interface Finding {
   col?: number | null;
   expected?: string | null;
   actual?: string | null;
+}
+/**
+ * One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no
+ * build has applied yet is PENDING; `sql` is empty until then for a generated one.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowSchemaSql".
+ */
+export interface WorkflowSchemaSql {
+  workflow_id: string;
+  version: number;
+  source: SchemaSource;
+  source_document_id?: string | null;
+  sha256?: string | null;
+  tables?: string[];
+  status: GateStatus;
+  findings?: Finding[];
+  sql?: string;
+}
+/**
+ * `PUT W/schema-sql/source`: this project document (a parsed, clean `.sql`) is the base.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SchemaSqlSourcePut".
+ */
+export interface SchemaSqlSourcePut {
+  document_id: string;
 }
 /**
  * The ISA14 Skill Manifest: exactly these five blocks.
@@ -2177,6 +2214,82 @@ export interface SowCitationDetail {
   passage: string;
   truncated?: boolean;
   source_available: boolean;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeAttemptList".
+ */
+export interface CodeAttemptList {
+  items: CodeAttemptSummary[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeAttemptSummary".
+ */
+export interface CodeAttemptSummary {
+  build_no: number;
+  cycle: number;
+  attempt: number;
+  status: string;
+  template_name: string;
+  template_version: string;
+  correction_reason?: string | null;
+  files: CodeFileRef[];
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeFileRef".
+ */
+export interface CodeFileRef {
+  path: string;
+  sha256: string;
+}
+/**
+ * One gate finding (the shape E11.3 / E12.2 write into `code_attempts.findings`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeFinding".
+ */
+export interface CodeFinding {
+  gate: string;
+  code: string;
+  file?: string | null;
+  line?: number | null;
+  col?: number | null;
+  message: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeFileView".
+ */
+export interface CodeFileView {
+  path: string;
+  sha256: string;
+  content: string;
+  truncated: boolean;
+  slots: LineRange[];
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LineRange".
+ */
+export interface LineRange {
+  start: number;
+  end: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CodeDiff".
+ */
+export interface CodeDiff {
+  from_attempt: number;
+  to_attempt: number;
+  path: string;
+  changed: boolean;
+  unified: string;
+  truncated: boolean;
 }
 /**
  * `POST P/sow/new-version` (E7.2): start a scope change from the approved version. The

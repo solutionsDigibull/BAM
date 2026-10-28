@@ -7,7 +7,8 @@ the repository maps to 423 RESOURCE_LOCKED.
 
 `gate_results`: one gate's verdict with its findings (`build_dashboard.Finding` dumps). E9.1 writes
 ISATVON_CONTRACT when a Sub-Skill fails the TD §10.4 validator at build time; the code gates (E12)
-add theirs with `code_attempt_id`.
+add theirs with `code_attempt_id`. A Workflow-level gate (SCHEMA_SQL, E9.4) has `workflow_id` and no
+Sub-Skill; every row has one or the other.
 """
 
 import uuid
@@ -17,6 +18,7 @@ from sbam_contracts.build_dashboard import GateName, GateStatus
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Connection,
     ForeignKey,
     Integer,
@@ -28,7 +30,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-import sbam_api.isatvon.models  # noqa: F401 - sub_skills, a foreign-key target
+import sbam_api.isatvon.models  # sub_skills, a foreign-key target
+import sbam_api.workflows.models  # noqa: F401 - workflows, a foreign-key target
 from sbam_api.db.base import SCHEMA, Base, ProjectOwned, status_check
 
 Json = JSON().with_variant(JSONB(), "postgresql")
@@ -65,10 +68,17 @@ class SubSkillManifest(ProjectOwned, Base):
 
 class GateResultRow(ProjectOwned, Base):
     __tablename__ = "gate_results"
-    __table_args__ = (status_check(GateName, "gate"), status_check(GateStatus))
+    __table_args__ = (
+        status_check(GateName, "gate"),
+        status_check(GateStatus),
+        CheckConstraint("sub_skill_id IS NOT NULL OR workflow_id IS NOT NULL", name="has_subject"),
+    )
 
-    sub_skill_id: Mapped[uuid.UUID] = mapped_column(
+    sub_skill_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(f"{SCHEMA}.sub_skills.id"), index=True
+    )
+    workflow_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA}.workflows.id"), index=True
     )
     code_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(f"{SCHEMA}.code_attempts.id")

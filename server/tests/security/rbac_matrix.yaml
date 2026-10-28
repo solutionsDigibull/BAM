@@ -687,6 +687,35 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "202"
 
+  code_attempts_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__code_attempts_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/code/attempts
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  code_file_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__code_attempts__n__files_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/code/attempts/{n}/files
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", n: "0"}
+      query: {path: action.py}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  code_diff_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__code_attempts__n__diff__m__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/code/attempts/{n}/diff/{m}
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", n: "0", m: "1"}
+      query: {path: action.py}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.

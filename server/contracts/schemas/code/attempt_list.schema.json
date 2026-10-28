@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:code/attempt_list:0.1.0",
+  "$defs": {
+    "CodeAttemptSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "build_no": {
+          "title": "Build No",
+          "type": "integer"
+        },
+        "cycle": {
+          "title": "Cycle",
+          "type": "integer"
+        },
+        "attempt": {
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "template_name": {
+          "title": "Template Name",
+          "type": "string"
+        },
+        "template_version": {
+          "title": "Template Version",
+          "type": "string"
+        },
+        "correction_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Correction Reason"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/CodeFileRef"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/CodeFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "build_no",
+        "cycle",
+        "attempt",
+        "status",
+        "template_name",
+        "template_version",
+        "files",
+        "findings"
+      ],
+      "title": "CodeAttemptSummary",
+      "type": "object"
+    },
+    "CodeFileRef": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "title": "CodeFileRef",
+      "type": "object"
+    },
+    "CodeFinding": {
+      "additionalProperties": false,
+      "description": "One gate finding (the shape E11.3 / E12.2 write into `code_attempts.findings`).",
+      "properties": {
+        "gate": {
+          "title": "Gate",
+          "type": "string"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "col": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Col"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gate",
+        "code",
+        "message"
+      ],
+      "title": "CodeFinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/CodeAttemptSummary"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "CodeAttemptList",
+  "type": "object"
+}

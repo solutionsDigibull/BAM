@@ -1,7 +1,7 @@
 """llm_derivatives: content-addressed LLM answers, reused instead of paying twice
 
-Revision ID: 0035_llm_derivatives
-Revises: 0034_sow_impacts
+Revision ID: 0036_llm_derivatives
+Revises: 0035_sub_skill_reuse, 0035_workflow_schemas (also merges those two heads)
 Create Date: 2026-10-28
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0035_llm_derivatives"
-down_revision: str | Sequence[str] | None = "0034_sow_impacts"
+revision: str = "0036_llm_derivatives"
+down_revision: str | Sequence[str] | None = ("0035_sub_skill_reuse", "0035_workflow_schemas")
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

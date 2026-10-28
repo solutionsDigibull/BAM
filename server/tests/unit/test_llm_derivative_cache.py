@@ -50,7 +50,7 @@ def run(client: Any, sc: Any, context: dict[str, str] | None = None, **kw: Any) 
 
 
 def reply(cost: float = 0.5) -> dict[str, Any]:
-    return completion(GOOD, usage={}, **{"cost": {"total_cost": cost}})
+    return completion(GOOD, cost={"total_cost": cost})
 
 
 def test_identical_input_in_another_project_is_not_billed_again() -> None:

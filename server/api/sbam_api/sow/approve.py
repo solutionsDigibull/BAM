@@ -12,7 +12,10 @@ lock, in one transaction:
   audit_log gets SOW_APPROVED with the version and hash. The state machine writes the notification.
 * a scope change (another version was approved before, E7.2): 409 WORKFLOW_BUILDING while that
   version's Workflow builds or certifies; otherwise its impact is computed by the preview's own
-  function and stored (`sow_impacts`), so what the FDE previewed is what happens.
+  function and stored (`sow_impacts`), so what the FDE previewed is what happens. The pipeline is
+  not waiting for an approval any more, so instead of the signal a new run replaces it, resuming
+  at the approval with this one (`restart_pipeline`: 409 PIPELINE_RUNNING while the old run is
+  still working); it creates the next MAJOR Workflow and carries the untouched rows over.
 
 The signal goes last, and the transaction commits only once Temporal took it: a pipeline that is
 not waiting (409 PIPELINE_NOT_WAITING) or a Temporal that is down (503 ORCHESTRATOR_UNAVAILABLE)
@@ -27,7 +30,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sbam_contracts.api import ErrorCode
-from sbam_contracts.pipeline import PipelineStage, SowApproved
+from sbam_contracts.pipeline import PipelineInput, PipelineStage, ResumeState, SowApproved
 from sbam_contracts.sow_api import SowApproval, SowApproveRequest, SowVersionStatus
 from sbam_contracts.state_machines import SOW_VERSION, Actor, SowVersionState, WorkflowState
 from sqlalchemy.orm import Session, sessionmaker
@@ -39,7 +42,7 @@ from sbam_api.core.conventions import ApiError, not_found
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.base import utcnow
-from sbam_api.pipeline.service import signal_pipeline
+from sbam_api.pipeline.service import restart_pipeline, signal_pipeline
 from sbam_api.sow.impact import record_impact
 from sbam_api.sow.models import SowVersion
 from sbam_api.sow.repository import SowRepository, SowVersionRepository
@@ -70,6 +73,12 @@ def _approval(row: SowVersion) -> SowApproval:
     )
 
 
+def _tenant(user: CurrentUser) -> uuid.UUID:
+    if user.tenant_id is None:  # an FDE always has one (the `fde` policy)
+        raise not_found()
+    return user.tenant_id
+
+
 def _conflict(code: ErrorCode, title: str, detail: str) -> ApiError:
     return ApiError(409, code, title, detail)
 
@@ -80,6 +89,7 @@ class Prepared:
     version_id: uuid.UUID
     sha256: str
     signal: bool  # False: already approved with this hash, nothing to send
+    scope_change: bool = False  # another version was approved before (E7.2)
 
 
 def _prepare(
@@ -127,6 +137,7 @@ def _prepare(
             "The version you reviewed is not the one stored; reload it before approving.",
         )
 
+    scope_change = False
     if sow.approved_version_id and sow.approved_version_id != row.id:
         base = versions.get(sow.approved_version_id)
         if base is not None:
@@ -142,6 +153,7 @@ def _prepare(
                     "it has finished.",
                 )
             record_impact(session, ctx, base, row)
+        scope_change = True
         apply_transition(
             session,
             ctx,
@@ -187,7 +199,7 @@ def _prepare(
         },
     )
     session.flush()
-    return Prepared(_approval(row), row.id, sha256, signal=True)
+    return Prepared(_approval(row), row.id, sha256, signal=True, scope_change=scope_change)
 
 
 async def approve_version(
@@ -197,6 +209,8 @@ async def approve_version(
     project_id: uuid.UUID,
     number: int,
     body: SowApproveRequest,
+    *,
+    with_search_attributes: bool = True,
 ) -> SowApproval:
     if (user.username or "").startswith(SERVICE_ACCOUNT_PREFIX):
         raise ApiError(
@@ -211,17 +225,36 @@ async def approve_version(
             prepared = await asyncio.to_thread(
                 _prepare, session, user, project_id, number, body.sha256, correlation_id
             )
-            if prepared.signal:
+            approved = SowApproved(
+                sow_version_id=prepared.version_id,
+                sha256=prepared.sha256,
+                actor_id=str(user.user_id),
+            )
+            if prepared.signal and prepared.scope_change:
+                client = await get_client()
+                await restart_pipeline(
+                    client,
+                    sessions,
+                    PipelineInput(
+                        tenant_id=_tenant(user),
+                        project_id=project_id,
+                        run_id=uuid7(),
+                        correlation_id=correlation_id,
+                        actor_id=str(user.user_id),
+                        search_attributes=with_search_attributes,
+                        resume=ResumeState(
+                            stage=PipelineStage.WAIT_SOW_APPROVAL, sow_approved=approved
+                        ),
+                    ),
+                    with_search_attributes=with_search_attributes,
+                )
+            elif prepared.signal:
                 client = await get_client()
                 await signal_pipeline(
                     client,
                     project_id,
                     "sow_approved",
-                    SowApproved(
-                        sow_version_id=prepared.version_id,
-                        sha256=prepared.sha256,
-                        actor_id=str(user.user_id),
-                    ),
+                    approved,
                     expect_stage=PipelineStage.WAIT_SOW_APPROVAL,
                 )
             await asyncio.to_thread(session.commit)

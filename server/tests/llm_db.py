@@ -36,8 +36,9 @@ SMOKE_CONTEXT = {"rfq": "Quote 12 cables"}
 def llm_sessions() -> sessionmaker[Session]:
     sessions = pipeline_sessions()
     LlmCall.metadata.create_all(
-        sessions.kw["bind"], tables=[LlmCall.__table__, LlmDerivative.__table__]
-    )  # type: ignore[list-item]
+        sessions.kw["bind"],
+        tables=[LlmCall.__table__, LlmDerivative.__table__],  # type: ignore[list-item]
+    )
     return sessions
 
 

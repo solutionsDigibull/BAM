@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
+from sbam_contracts.code_view import CodeAttemptList, CodeDiff, CodeFileView
 from sbam_contracts.documents import (
     CleanupResult,
     DocumentOut,
@@ -98,6 +99,7 @@ from sbam_contracts.projects import (
 )
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
+from sbam_contracts.schema_sql import SchemaSqlSourcePut, WorkflowSchemaSql
 from sbam_contracts.sow import SowDocument
 from sbam_contracts.sow_api import (
     SowApproval,
@@ -133,6 +135,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/sub_skill_extraction", SubSkillExtraction),
     ("build/builds_response", BuildsResponse),
     ("build/gates_response", GatesResponse),
+    ("build/schema_sql", WorkflowSchemaSql),
+    ("build/schema_sql_source_put", SchemaSqlSourcePut),
     ("manifest/isa14_manifest", Isa14Manifest),
     ("manifest/skill_manifest", SkillManifest),
     ("manifest/workflow_manifest", WorkflowManifest),
@@ -155,6 +159,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sow/approve_request", SowApproveRequest),
     ("sow/approval", SowApproval),
     ("sow/citation_detail", SowCitationDetail),
+    ("code/attempt_list", CodeAttemptList),
+    ("code/file_view", CodeFileView),
+    ("code/diff", CodeDiff),
     ("sow/new_version_request", SowNewVersionRequest),
     ("sow/impact", SowImpact),
     ("runs/run", Run),
