@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/macro_skill_patch:0.1.0",
+  "additionalProperties": false,
+  "description": "`PATCH W/macro-skills/{macro_id}` (E8.4). `order` renumbers the other Macro Skills\ncontiguously; the Macro Skill's `macro_category` and its Sub-Skills' ids never change.",
+  "properties": {
+    "name": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Name"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "order": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Order"
+    }
+  },
+  "title": "MacroSkillPatch",
+  "type": "object"
+}

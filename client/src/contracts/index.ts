@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:ba89100125a4f30a7a91029fee16e0c478978f83cde123b3e4983aa8436c0e6a
+// source-sha256:bf6291f5775edb3993af2e9407912334350aece65dab8202e1b5bc6a905fb564
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -396,6 +396,8 @@ export interface SbamContracts {
   WorkbenchTree?: WorkbenchTree;
   WorkbenchSubSkill?: WorkbenchSubSkill;
   SubSkillPatch?: SubSkillPatch;
+  MacroSkillPatch?: MacroSkillPatch;
+  SubSkillEditHistory?: SubSkillEditHistory;
   ValidationReport?: ValidationReport;
   MacroExtraction?: MacroExtraction;
   MacroSkillOut?: MacroSkillOut;
@@ -828,18 +830,62 @@ export interface WorkbenchSubSkill {
   sub_skill: SubSkill;
 }
 /**
- * `PATCH W/sub-skills/{sub_id}`: a partial ISATVON 1.4 Sub-Skill. Keys are dotted grid
- * `field_path`s (e.g. `isatvon_definition.v_variables.max_iterations`); the server merges them
- * into the row, revalidates and answers the whole row. `skill_metadata.skill_id` is never
- * accepted.
+ * `PATCH W/sub-skills/{sub_id}` (E8.4): a partial ISATVON 1.4 Sub-Skill and/or a new position.
+ *
+ * `changes` keys are dotted grid `field_path`s (e.g.
+ * `isatvon_definition.v_variables.max_iterations`; a leading `isatvon.` is read as
+ * `isatvon_definition.`); the server merges them into the row, revalidates and answers the whole
+ * row. `order` moves the Sub-Skill within its Macro Skill (the server renumbers the rest
+ * contiguously). Platform-owned fields (`skill_metadata.skill_id`, and a top-level `state`,
+ * `content_sha256`, `validation_errors`, `sow_refs`, `id`) are not editable: the server answers
+ * 422 `READ_ONLY` with the field's path, so unknown top-level keys are kept (not rejected here)
+ * for it to name.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SubSkillPatch".
  */
 export interface SubSkillPatch {
-  changes: {
+  changes?: {
     [k: string]: unknown | undefined;
   };
+  order?: number | null;
+  [k: string]: unknown | undefined;
+}
+/**
+ * `PATCH W/macro-skills/{macro_id}` (E8.4). `order` renumbers the other Macro Skills
+ * contiguously; the Macro Skill's `macro_category` and its Sub-Skills' ids never change.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MacroSkillPatch".
+ */
+export interface MacroSkillPatch {
+  name?: string | null;
+  description?: string | null;
+  order?: number | null;
+}
+/**
+ * `GET W/sub-skills/{sub_id}/edits`: oldest first, per changed field.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillEditHistory".
+ */
+export interface SubSkillEditHistory {
+  sub_skill_id: string;
+  edits: SubSkillEdit[];
+}
+/**
+ * One changed field of an edit (`sub_skill_edits`): `path` is the grid `field_path`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillEdit".
+ */
+export interface SubSkillEdit {
+  id: string;
+  path: string;
+  old: unknown;
+  new: unknown;
+  by: string;
+  at: string;
 }
 /**
  * `POST W/isatvon/validate`: every Sub-Skill of the Workflow, revalidated.
