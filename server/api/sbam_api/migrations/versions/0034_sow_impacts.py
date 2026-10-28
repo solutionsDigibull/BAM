@@ -1,7 +1,7 @@
 """sow_impacts
 
-Revision ID: 0033_sow_impacts
-Revises: 0032_sub_skill_edits
+Revision ID: 0034_sow_impacts
+Revises: 0033_skill_manifests
 Create Date: 2026-10-28
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0033_sow_impacts"
-down_revision: str | Sequence[str] | None = "0032_sub_skill_edits"
+revision: str = "0034_sow_impacts"
+down_revision: str | Sequence[str] | None = "0033_skill_manifests"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
