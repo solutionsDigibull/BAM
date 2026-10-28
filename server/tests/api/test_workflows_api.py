@@ -85,7 +85,13 @@ def test_e8_1_t03_the_api_has_no_create_endpoint(h: Harness) -> None:
     assert workflow_paths[f"{API_BASE}/projects/{{project_id}}/workflows/{{workflow_id}}"] == {
         "patch"
     }
-    assert not any("post" in ops for p, ops in workflow_paths.items() if "sub-skills" not in p)
+    # No create: no POST on the collection or on a Workflow. Actions below one (sub-skill retry,
+    # isatvon/validate) are other routes.
+    workflow = (
+        f"{API_BASE}/projects/{{project_id}}/workflows",
+        f"{API_BASE}/projects/{{project_id}}/workflows/{{workflow_id}}",
+    )
+    assert not any("post" in workflow_paths.get(p, set()) for p in workflow)
     res = h.call("POST", h.path(), h.fde(), json={"name": "Mine", "sow_version_id": str(h.v1)})
     assert res.status_code == 405
     with h.sessions() as s:

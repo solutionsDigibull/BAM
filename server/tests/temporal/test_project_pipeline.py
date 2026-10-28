@@ -40,6 +40,7 @@ from sbam_contracts.pipeline import (
     Generate,
     IdResult,
     IdsResult,
+    MacroRef,
     PipelineInput,
     PipelineStage,
     PipelineStatus,
@@ -67,6 +68,7 @@ SHA = "ab" * 32
 HISTORY = Path(__file__).parent / "histories" / "project_pipeline.json"
 BEFORE_E5_2 = HISTORY.with_name("project_pipeline_before_e5_2.json")  # no heartbeat patch
 BEFORE_E10_3 = HISTORY.with_name("project_pipeline_before_e10_3.json")  # no build scheduler patch
+BEFORE_E8_3 = HISTORY.with_name("project_pipeline_before_e8_3.json")  # unbounded pass 2
 FULL_ORDER = [
     "ingest",
     "knowledge",
@@ -122,12 +124,20 @@ async def macros_stand_in(inp: WorkflowRef) -> IdsResult:
     return IdsResult(ids=[stub_id(inp, f"macro:{n}") for n in (1, 2)])
 
 
+@activity.defn(name="extract_sub_skills")
+async def sub_skills_stand_in(inp: MacroRef) -> IdsResult:
+    """The real pass 2 (E8.3) calls sbam-isatvon per Macro Skill; its tests are
+    tests/unit/test_extract_sub_skills.py and tests/temporal/test_sub_skill_extraction.py."""
+    return IdsResult(ids=[stub_id(inp, f"sub:{inp.macro_skill_id}:{n}") for n in (1, 2)])
+
+
 DEFAULT_OVERRIDES: "Overrides" = {
     "build_knowledge": knowledge_stand_in,
     "build_okf_bundle": okf_stand_in,
     "generate_sow": sow_stand_in,
     "create_workflow": workflow_stand_in,
     "extract_macro_skills": macros_stand_in,
+    "extract_sub_skills": sub_skills_stand_in,
 }
 
 
@@ -601,13 +611,14 @@ def test_e10_1_signal_helper_refuses_when_not_waiting() -> None:
 
 @pytest.mark.parametrize(
     "recorded",
-    [HISTORY, BEFORE_E5_2, BEFORE_E10_3],
-    ids=["current", "before_e5_2", "before_e10_3"],
+    [HISTORY, BEFORE_E5_2, BEFORE_E10_3, BEFORE_E8_3],
+    ids=["current", "before_e5_2", "before_e10_3", "before_e8_3"],
 )
 def test_e10_1_replays_from_recorded_history(recorded: Path) -> None:
     """Determinism guard (TD §13.4): a change that breaks running pipelines fails here. E5.2-T09:
     `before_e5_2` was recorded before the knowledge stage's heartbeat patch, `current` after it.
-    E10.3-T06: `before_e10_3` was recorded before the build scheduler patch."""
+    E10.3-T06: `before_e10_3` was recorded before the build scheduler patch. E8.3: `before_e8_3`
+    before pass 2 was bounded."""
     workflow_id = pipeline_workflow_id(uuid.UUID(int=0))
     history = WorkflowHistory.from_json(workflow_id, json.loads(recorded.read_text("utf-8")))
     replayer = Replayer(workflows=[ProjectPipeline], data_converter=pydantic_data_converter)

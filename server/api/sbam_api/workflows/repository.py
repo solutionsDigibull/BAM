@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import func
+from sqlalchemy import func, update
 
 from sbam_api.state_machine.repository import StatefulRepository
 from sbam_api.workflows.models import Workflow
@@ -25,3 +25,13 @@ class WorkflowRepository(StatefulRepository):
     def next_major(self) -> int:
         query = self._scoped(include_deleted=True).with_only_columns(func.max(Workflow.major))
         return int(self.session.scalar(query) or 0) + 1
+
+    def set_error_reason(self, workflow_id: uuid.UUID, reason: str | None) -> None:
+        """Why the last extraction failed (a code and ids). An UPDATE, not the loaded row: Macro
+        Skills fail in parallel and must not trip over the Workflow's row version."""
+        query = update(Workflow).where(
+            Workflow.id == workflow_id, Workflow.tenant_id == self.ctx.tenant_id
+        )
+        if self.ctx.project_id is not None:
+            query = query.where(Workflow.project_id == self.ctx.project_id)
+        self.session.execute(query.values(error_reason=None if reason is None else reason[:300]))

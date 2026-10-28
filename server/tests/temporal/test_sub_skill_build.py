@@ -20,7 +20,7 @@ from pipeline_db import pipeline_sessions, state_of
 from sbam_api.audit.models import AuditLog
 from sbam_api.builds.service import NotInReview, retry_build
 from sbam_api.core.conventions import ApiError
-from sbam_api.state_machine.registry import register_entity, unregister_entity
+from sbam_api.state_machine.registry import entity_model, register_entity, unregister_entity
 from sbam_contracts.build import (
     BuildStageInput,
     CorrectionInput,
@@ -88,11 +88,15 @@ ORIGINALS: dict[str, Callable[..., Any]] = {
 
 @contextmanager
 def sub_skill_table() -> Iterator[None]:
+    """The stand-in Sub-Skill table; afterwards the real one (E8.3) is registered again."""
+    real = entity_model(MachineName.SUB_SKILL)
     register_entity(MachineName.SUB_SKILL, SUB_SKILL)
     try:
         yield
     finally:
         unregister_entity(MachineName.SUB_SKILL)
+        if real is not None:
+            register_entity(MachineName.SUB_SKILL, real)
 
 
 def run(scenario: Callable[["Build"], Coroutine[Any, Any, Any]], **overrides: Any) -> Any:
