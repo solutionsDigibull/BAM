@@ -114,4 +114,49 @@ describe("signed downloads (#398)", () => {
       `/api/v1/files/${TENANT}/${SHA}?exp=1&sig=${SIG}`,
     );
   });
+
+  it("e5_402_t01 forwards the signed file name and type and returns the file under that name", async () => {
+    const name = "okf-bundle-v1-01a18113.zip";
+    upstream.mockResolvedValue(
+      new Response("zip-bytes", {
+        headers: {
+          "content-type": "application/zip",
+          "content-disposition": `attachment; filename="${name}"`,
+          "x-content-type-options": "nosniff",
+        },
+      }),
+    );
+    const res = await call(`${KEY}?exp=1893456000&sig=${SIG}&name=${name}&type=application%2Fzip`);
+    expect(String(upstream.mock.calls[0]![0])).toBe(
+      `http://sbam-api:8000/api/v1/files/${KEY}?exp=1893456000&sig=${SIG}&name=${name}&type=application%2Fzip`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-disposition")).toBe(`attachment; filename="${name}"`);
+    expect(res.headers.get("content-type")).toBe("application/zip");
+  });
+
+  it("e5_402_t02 passes a charset type through (the Markdown export)", async () => {
+    await call(
+      `${KEY}?exp=1&sig=${SIG}&name=sow-v1-01a18113.md&type=text%2Fmarkdown%3B%20charset%3Dutf-8`,
+    );
+    expect(String(upstream.mock.calls[0]![0])).toContain(
+      "name=sow-v1-01a18113.md&type=text%2Fmarkdown%3B+charset%3Dutf-8",
+    );
+  });
+
+  it("e5_402_t03 refuses a name without a type, a type without a name and unsafe values", async () => {
+    for (const query of [
+      "name=a.zip",
+      "type=application%2Fzip",
+      "name=..%2Fa.zip&type=application%2Fzip",
+      "name=a%20b.zip&type=application%2Fzip",
+      "name=a.zip&type=text%2Fhtml%0D%0AX-Evil%3A%201",
+      "name=a.zip&type=",
+      `name=${"x".repeat(101)}&type=application%2Fzip`,
+    ]) {
+      const res = await call(`${KEY}?exp=1&sig=${SIG}&${query}`);
+      expect(res.status, query).toBe(400);
+    }
+    expect(upstream).not.toHaveBeenCalled();
+  });
 });

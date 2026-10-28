@@ -11,8 +11,10 @@ from typing import Any
 
 import docx
 import pytest
+from sbam_api.core.conventions import content_disposition
 from sbam_api.sow import exports
 from sbam_api.sow.models import SowExport, SowVersion
+from sbam_api.storage import signing
 from sbam_contracts.sow_api import SowExportInput, SowExportResult
 from sbam_workers.sow.export.activity import ExportDeps, export_version
 from sqlalchemy import func, select, update
@@ -136,3 +138,46 @@ def test_e6_4_a_render_over_the_wait_is_503_with_retry_after(
 def test_e6_4_temporal_down_is_503(h: Harness) -> None:
     h.exporter.mode = "down"
     problem(h.export("md"), 503, "TEMPORAL_UNAVAILABLE")
+
+
+def weasyprint_available() -> bool:
+    try:
+        import weasyprint  # noqa: F401
+    except (ImportError, OSError):
+        return False
+    return True
+
+
+needs_weasyprint = pytest.mark.skipif(
+    not weasyprint_available(), reason="WeasyPrint needs Pango (installed in the worker image)"
+)
+
+
+@pytest.mark.parametrize(
+    ("fmt", "kind"),
+    [
+        pytest.param("pdf", "application/pdf", marks=needs_weasyprint),
+        ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        ("md", "text/markdown; charset=utf-8"),
+    ],
+)
+def test_e6_402_an_export_is_saved_with_its_own_name_and_content_type(
+    h: Harness, fmt: str, kind: str
+) -> None:
+    res = h.export(fmt)
+    assert res.status_code == 302, res.text
+    got = h.client.get(res.headers["location"])
+    assert got.status_code == 200
+    project = uuid.UUID(str(h.project)).hex[:8]
+    name = f"sow-v1-{project}.{fmt}"
+    assert got.headers["content-disposition"] == content_disposition(name)
+    assert f'filename="{name}"' in got.headers["content-disposition"]
+    assert got.headers["content-type"] == kind
+    assert got.headers["x-content-type-options"] == "nosniff"
+
+
+def test_e6_402_the_api_and_the_worker_agree_on_what_an_export_is() -> None:
+    from sbam_workers.sow.export.render import CONTENT_TYPES
+
+    assert exports.DOWNLOAD_CONTENT_TYPES == CONTENT_TYPES
+    assert set(CONTENT_TYPES.values()) <= signing.DOWNLOAD_TYPES

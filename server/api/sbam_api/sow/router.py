@@ -49,7 +49,7 @@ from sbam_api.core.settings import Settings
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
 from sbam_api.sow import citations, impact, versions
 from sbam_api.sow.approve import approve_version
-from sbam_api.sow.exports import export_key
+from sbam_api.sow.exports import DOWNLOAD_CONTENT_TYPES, download_name, export_key
 from sbam_api.sow.new_version import start_new_version
 from sbam_api.sow.regenerate import start_regenerate
 from sbam_api.storage.router import backend
@@ -197,6 +197,8 @@ async def export_sow_version(
         key,
         user.context(project_id),
         EXPORT_URL_TTL,
+        filename=download_name(project_id, version, format),
+        content_type=DOWNLOAD_CONTENT_TYPES[format],
     )
     return RedirectResponse(url, status_code=302)
 

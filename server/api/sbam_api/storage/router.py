@@ -4,12 +4,13 @@ The signature is the authorisation: `signed_url` issues it only to a caller in t
 """
 
 from collections.abc import Iterator
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
 from sbam_api.core.auth import internal
-from sbam_api.core.conventions import not_found
+from sbam_api.core.conventions import content_disposition, not_found
 from sbam_api.core.settings import Settings
 from sbam_api.storage.base import CHUNK, StorageBackend
 from sbam_api.storage.factory import make_backend
@@ -29,10 +30,26 @@ def backend(request: Request) -> StorageBackend:
 
 
 @router.get("/files/{key:path}", response_class=StreamingResponse)
-def download(key: str, exp: int, sig: str, request: Request) -> StreamingResponse:
+def download(
+    key: str,
+    exp: int,
+    sig: str,
+    request: Request,
+    name: str | None = None,
+    content_type: Annotated[str | None, Query(alias="type")] = None,
+) -> StreamingResponse:
+    """`name` and `type` (both or neither) are signed with the link: the file is saved and served
+    as that, else as a plain attachment named after the key (#402)."""
     settings: Settings = request.app.state.settings
     secret = settings.storage_signing_key
-    verify(secret.get_secret_value() if secret else None, key, exp, sig)
+    verify(
+        secret.get_secret_value() if secret else None,
+        key,
+        exp,
+        sig,
+        filename=name,
+        content_type=content_type,
+    )
     try:
         stream = backend(request).open(key)
     except FileNotFoundError:
@@ -42,8 +59,11 @@ def download(key: str, exp: int, sig: str, request: Request) -> StreamingRespons
         with stream:
             yield from iter(lambda: stream.read(CHUNK), b"")
 
+    headers = {
+        "Content-Disposition": content_disposition(name) if name else "attachment",
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    }
     return StreamingResponse(
-        body(),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": "attachment", "Cache-Control": "private, no-store"},
+        body(), media_type=content_type or "application/octet-stream", headers=headers
     )
