@@ -98,6 +98,7 @@ from sbam_contracts.projects import (
 )
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
+from sbam_contracts.schema_sql import SchemaSqlSourcePut, WorkflowSchemaSql
 from sbam_contracts.sow import SowDocument
 from sbam_contracts.sow_api import (
     SowApproval,
@@ -131,6 +132,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/sub_skill_extraction", SubSkillExtraction),
     ("build/builds_response", BuildsResponse),
     ("build/gates_response", GatesResponse),
+    ("build/schema_sql", WorkflowSchemaSql),
+    ("build/schema_sql_source_put", SchemaSqlSourcePut),
     ("manifest/isa14_manifest", Isa14Manifest),
     ("manifest/skill_manifest", SkillManifest),
     ("manifest/workflow_manifest", WorkflowManifest),

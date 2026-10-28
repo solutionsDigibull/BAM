@@ -33,6 +33,7 @@ from sbam_contracts import (
     projects,
     runs,
     runtime_registry,
+    schema_sql,
     sow,
     sow_api,
     state_machines,
@@ -212,6 +213,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
         for folder, module in (
             ("audit", audit),
             ("build", build_dashboard),
+            ("build", schema_sql),
             ("documents", documents),
             ("identity", identity),
             ("isatvon", isatvon14),
