@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:c060c24c58e638d41b4368ec39720b2a2ccd0351fb94e9fc5d5dc7f0dcb960d0
+// source-sha256:ba89100125a4f30a7a91029fee16e0c478978f83cde123b3e4983aa8436c0e6a
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -1001,6 +1001,8 @@ export interface Finding {
   file?: string | null;
   line?: number | null;
   col?: number | null;
+  expected?: string | null;
+  actual?: string | null;
 }
 /**
  * The ISA14 Skill Manifest: exactly these five blocks.
