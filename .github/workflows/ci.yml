@@ -267,6 +267,9 @@ jobs:
   smoke-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # which earlier dev runs were cancelled (#375)
     outputs:
       run: ${{ steps.gate.outputs.run }}
     steps:
@@ -278,6 +281,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
           BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
 
   compose-smoke:
     needs: [smoke-gate]
