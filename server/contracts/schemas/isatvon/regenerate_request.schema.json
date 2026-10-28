@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/regenerate_request:0.1.0",
+  "additionalProperties": false,
+  "description": "`POST W/macro-skills/{id}/regenerate` and `POST W/sub-skills/{id}/regenerate` (E8.4): an\noptional short instruction the FDE typed, never document content.",
+  "properties": {
+    "hint": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hint"
+    }
+  },
+  "title": "RegenerateRequest",
+  "type": "object"
+}

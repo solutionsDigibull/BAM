@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/regenerate_input:0.1.0",
+  "additionalProperties": false,
+  "description": "`IsatvonRegenerate`'s input: ids only; no `sub_skill_id` re-extracts the Macro Skill.",
+  "properties": {
+    "tenant_id": {
+      "format": "uuid",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "run_id": {
+      "format": "uuid",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "correlation_id": {
+      "pattern": "^[A-Za-z0-9-]{1,64}$",
+      "title": "Correlation Id",
+      "type": "string"
+    },
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "macro_skill_id": {
+      "format": "uuid",
+      "title": "Macro Skill Id",
+      "type": "string"
+    },
+    "sub_skill_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sub Skill Id"
+    },
+    "hint": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hint"
+    },
+    "actor_id": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Actor Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "project_id",
+    "run_id",
+    "correlation_id",
+    "workflow_id",
+    "macro_skill_id",
+    "actor_id"
+  ],
+  "title": "RegenerateInput",
+  "type": "object"
+}

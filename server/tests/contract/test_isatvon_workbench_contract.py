@@ -16,6 +16,8 @@ from sbam_contracts import isatvon_grid
 from sbam_contracts.isatvon14 import SubSkill, validate_sub_skill
 from sbam_contracts.isatvon_workbench import (
     MacroSkillPatch,
+    RegenerateInput,
+    RegenerateRequest,
     SubSkillPatch,
     ValidationReport,
     WorkbenchSubSkill,
@@ -143,3 +145,30 @@ def test_e8_7_validation_report() -> None:
         {"sub_skills": [{"id": str(uuid.uuid4()), "state": "INVALID", "validation_errors": []}]}
     )
     assert report.sub_skills[0].state == "INVALID"
+
+
+def test_e8_4_regenerate_request_and_workflow_id() -> None:
+    from sbam_contracts.isatvon_workbench import MAX_HINT_CHARS, regenerate_workflow_id
+    from sbam_contracts.runs import WORKFLOW_ID
+
+    assert RegenerateRequest.model_validate({}).hint is None
+    with pytest.raises(ValidationError):
+        RegenerateRequest.model_validate({"hint": "x" * (MAX_HINT_CHARS + 1)})
+    with pytest.raises(ValidationError):
+        RegenerateRequest.model_validate({"other": 1})
+    assert WORKFLOW_ID.match(regenerate_workflow_id(uuid.uuid4()))
+
+
+def test_e8_4_regenerate_input_is_ids_only() -> None:
+    base: dict[str, Any] = {
+        "tenant_id": str(uuid.uuid4()),
+        "project_id": str(uuid.uuid4()),
+        "run_id": str(uuid.uuid4()),
+        "correlation_id": str(uuid.uuid4()),
+        "workflow_id": str(uuid.uuid4()),
+        "macro_skill_id": str(uuid.uuid4()),
+        "actor_id": "u1",
+    }
+    assert RegenerateInput.model_validate(base).sub_skill_id is None
+    with pytest.raises(ValidationError):
+        RegenerateInput.model_validate({**base, "content": "x"})
