@@ -14,7 +14,6 @@ DOMPurify) rather than copying a competitor. I did not clone competitor reposito
 | U-03 | Approval signals Temporal, then commits (F-03); the Workflow-creation activity already re-checks the DB | Commit first, signal from an outbox relay | Removes the reverse race (legit approval failing as NOT_APPROVED) and the lock held across the Temporal call | `notification_outbox` pattern already in repo. Demoted to Wave 1 (P2) after the second pass | M |
 | U-04 | `COGNEE_USER_SECRET` has a known default; `.env.example` placeholders accepted (F-09) | Required secrets with `:?`; lint rejects `change-me`/low entropy outside dev | Fail at boot instead of running with known keys | Predictable per-project credentials | S |
 | U-05 | Dependency CVEs (F-10) | Bump pypdf, otel-api, monaco/dompurify, refine chain; add `pip-audit` + `pnpm audit --prod` to CI | Keeps known CVEs out | One critical + several high are runtime | S |
-
 | U-18 | User-mirror refresh updates one row from every parallel request (N-01); 37% of requests 500 right after login in the repro | One atomic `UPDATE ... WHERE last_session_id IS DISTINCT FROM :sid`; audit LOGIN only when it changed a row | No spurious 500s after sign-in | Reproduced live; user-visible on every login | S |
 
 ## Wave 1: security hardening
