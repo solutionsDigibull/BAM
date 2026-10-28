@@ -62,6 +62,7 @@ VALID: dict[str, Callable[[Raw], None]] = {
     "isa14/ms01_1_structured.json": check_sub_skill,
     "isa14/ms01_1_manifest.json": check_skill_manifest,
     "sow/ms01_1_sow.json": check_sow,
+    "sow/sow_four_modules.json": check_sow,
     "sow/sow_rfq_nav9.json": check_sow,
 }
 

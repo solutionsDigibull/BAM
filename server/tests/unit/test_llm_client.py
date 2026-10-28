@@ -399,6 +399,7 @@ def test_e6_1_shipped_prompts_match_their_manifest() -> None:
     assert registry.ids() == [
         "codegen-bodies",
         "correct-code",
+        "isatvon-macros",
         "live-smoke",
         "ocr-page",
         "smoke",

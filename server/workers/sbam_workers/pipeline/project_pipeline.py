@@ -75,7 +75,8 @@ with workflow.unsafe.imports_passed_through():
         validate_workflow,
     )
     from sbam_workers.ingest.stubs import ingest_documents
-    from sbam_workers.isatvon.stubs import extract_macro_skills, extract_sub_skills
+    from sbam_workers.isatvon.macros import extract_macro_skills
+    from sbam_workers.isatvon.stubs import extract_sub_skills
     from sbam_workers.knowledge.build import build_knowledge
     from sbam_workers.knowledge.bundle import build_okf_bundle
     from sbam_workers.mirror import update_run_mirror

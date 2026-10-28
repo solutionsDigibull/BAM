@@ -45,6 +45,7 @@ too_big = blob(15 * 1024 * 1024 + 1)                              # exact size, 
 |---|---|---|
 | `sow/sow_rfq_nav9.json` | A complete cited SOW for the NAV-9 RFQ project: the nine sections of TD §10.6, feature items with stable ids (`F-<module>-<n>`) and citations `{okf_ref_id, document_version_id, location}`. `document_version_id` is `document_version_uuid("documents/<file>")` from `fixtures/__init__.py`; `okf_ref_id` values are placeholders (`chunk:<file>#c<n>`) | Validates as `SowDocument` (E0.5); every section and feature cited; feature ids unique |
 | `sow/ms01_1_sow.json` | SOW for the MS01.1 investor-access example: module `M-ACCESS` (future Agent MS01) with features `F-ACCESS-1` (OTP + device limits, MS01.1) and `F-ACCESS-2` (KYC, MS01.2), cited like the NAV-9 SOW. Written by hand | Validates as `SowDocument` (E0.5-T01) |
+| `sow/sow_four_modules.json` | The MS01.1 SOW grown to four investor modules (`M-REGISTER`, `M-PORTFOLIO`, `M-REPORTS`, `M-SUPPORT`, two features each), for ISATVON pass 1 (E8.2-T01). Derived from `ms01_1_sow.json` | Validates as `SowDocument` |
 
 ## documents/
 

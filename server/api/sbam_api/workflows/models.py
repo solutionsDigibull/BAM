@@ -36,6 +36,8 @@ class Workflow(Stateful, ProjectOwned, Base):
     major: Mapped[int] = mapped_column(Integer)
     version: Mapped[str] = mapped_column(String(20))  # "MAJOR.0.PATCH"
     name: Mapped[str] = mapped_column(String(160))
+    # Why the last extraction failed (E8.2): a code and ids, never document text.
+    error_reason: Mapped[str | None] = mapped_column(String(300))
 
 
 register_entity(MachineName.WORKFLOW, Workflow)

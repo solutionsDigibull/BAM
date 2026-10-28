@@ -1,6 +1,7 @@
 {
   "codegen-bodies/1.0.0": "4a448dbc1d082c2288a3f887a2d209e8648fdd3d33aedff9ea4ade71d49ec912",
   "correct-code/1.0.0": "5013b740498265f3bb9b79b65aa8c22725cdc1eb3296ea18a3d1e5778cb641c7",
+  "isatvon-macros/1.0.0": "6ad4b8210c9ff9c7b1b22ccc14164786eefa69643639cb3becb8d72843dc3bb6",
   "live-smoke/1.0.0": "ac26f47cc7ed777e50af0b6edd0fcfcccf755e07626d60221852f08d48fecbc9",
   "ocr-page/1.0.0": "eb17c5f7aef070f80aef7fded45209b5943187fac228fdae3fff4e501f3bfda8",
   "smoke/1.0.0": "b97c5916e0a3d95a171f389136cced10ea79524c7aa7a94a9771400dfcd90bf2",
