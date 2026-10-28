@@ -147,6 +147,15 @@ def test_e8_4_an_invalid_sub_skill_can_be_fixed_back_to_valid(h: Harness) -> Non
     assert res.json()["state"] == "VALID"
 
 
+def test_e8_8_a_row_carries_the_sow_refs_it_cites(h: Harness) -> None:
+    """The drawer's citations (E8.8): the SOW features the Sub-Skill covers, read-only."""
+    sub = h.add_sub_skill(sample(), state="VALID")
+    res = h.patch(sub, {"changes": {BUDGET: B6}})
+    assert res.status_code == 200, res.text
+    assert res.json()["sow_refs"] == ["F-ACCESS-1"]
+    problem(h.patch(sub, {"changes": {BUDGET: B5}, "sow_refs": ["F-X"]}), 422, "READ_ONLY")
+
+
 def test_e8_4_t04_stale_if_match_is_412_and_missing_is_428(h: Harness) -> None:
     sub = h.add_sub_skill(sample())
     body = {"changes": {IDEF + "v_variables.max_iterations": 5}}

@@ -969,6 +969,13 @@
           "title": "Validation Errors",
           "type": "array"
         },
+        "sow_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sow Refs",
+          "type": "array"
+        },
         "sub_skill": {
           "$ref": "#/$defs/SubSkill"
         }

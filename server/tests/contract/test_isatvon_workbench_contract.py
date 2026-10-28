@@ -106,6 +106,12 @@ def test_e8_7_violation_paths_name_grid_columns() -> None:
     assert reported.validation_errors == violations
 
 
+def test_e8_8_sow_refs_are_optional_and_kept() -> None:
+    assert WorkbenchSubSkill.model_validate(row()).sow_refs == []  # rows from before E8.8
+    cited = WorkbenchSubSkill.model_validate(row(sow_refs=["M-ACCESS", "F-ACCESS-1"]))
+    assert cited.sow_refs == ["M-ACCESS", "F-ACCESS-1"]
+
+
 def test_e8_7_patch_takes_dotted_paths_and_an_order() -> None:
     ok = SubSkillPatch.model_validate(
         {"changes": {"isatvon_definition.v_variables.max_iterations": 3}}

@@ -93,6 +93,7 @@ def _row(sub: SubSkill) -> WorkbenchSubSkill:
             "state": sub.state,
             "content_sha256": sub.content_sha256,
             "validation_errors": sub.validation_errors,
+            "sow_refs": sub.sow_refs,
             "sub_skill": sub.isatvon,
         }
     )

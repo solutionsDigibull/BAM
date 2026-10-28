@@ -38,6 +38,8 @@ class WorkbenchSubSkill(BaseModel):
     content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     # each violation's `path` is a grid `field_path`, so the grid can mark that cell
     validation_errors: list[RuleViolation] = Field(default_factory=list)
+    # the approved SOW's module / feature ids this Sub-Skill covers (its citations; read-only)
+    sow_refs: list[str] = Field(default_factory=list)
     sub_skill: SubSkill
 
 

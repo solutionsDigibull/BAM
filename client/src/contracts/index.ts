@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:bf6291f5775edb3993af2e9407912334350aece65dab8202e1b5bc6a905fb564
+// source-sha256:d7d77aa9edc49801df71138b411c7eeecd893c706385925b216497adae575956
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -827,6 +827,7 @@ export interface WorkbenchSubSkill {
    */
   content_sha256: string;
   validation_errors?: RuleViolation[];
+  sow_refs?: string[];
   sub_skill: SubSkill;
 }
 /**
