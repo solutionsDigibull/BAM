@@ -40,6 +40,7 @@ with workflow.unsafe.imports_passed_through():
         BuildPlanInput,
         BuildProgress,
         Cancel,
+        CarryOverInput,
         CreateWorkflowInput,
         CreateWorkflowResult,
         FreezeResult,
@@ -75,6 +76,7 @@ with workflow.unsafe.imports_passed_through():
         validate_workflow,
     )
     from sbam_workers.ingest.stubs import ingest_documents
+    from sbam_workers.isatvon.carry_over import carry_over_workflow
     from sbam_workers.isatvon.macros import extract_macro_skills
     from sbam_workers.isatvon.sub_skills import extract_sub_skills
     from sbam_workers.knowledge.build import build_knowledge
@@ -104,6 +106,7 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "build_okf_bundle": (TaskQueue.KNOWLEDGE, timedelta(minutes=15), 3),
     "generate_sow": LLM,
     "create_workflow": (TaskQueue.LLM, timedelta(minutes=2), 5),
+    "carry_over_workflow": (TaskQueue.LLM, timedelta(minutes=2), 5),
     "extract_macro_skills": LLM,
     "extract_sub_skills": LLM,
     "build_schema_sql": (TaskQueue.BUILD, timedelta(minutes=5), 2),
@@ -124,6 +127,9 @@ SCHEDULER_PATCH = "e10-3-build-scheduler"
 # E8.3: pass 2 runs at most MAX_PARALLEL_EXTRACTIONS Macro Skills at a time, and once one of them
 # has failed the others record nothing more (one EXTRACTION_FAILED). Older runs: unbounded.
 EXTRACTION_PATCH = "e8-3-bounded-extraction"
+# E7.2: after creating the Workflow, copy what a scope change left untouched from the previous
+# version (a no-op on a first approval). Older runs: nothing copied.
+CARRY_OVER_PATCH = "e7-2-scope-change-carry-over"
 MAX_PARALLEL_EXTRACTIONS = 4
 WAITING_FOR = {
     PipelineStage.WAIT_SOW_APPROVAL: "sow_approved",
@@ -313,6 +319,11 @@ class ProjectPipeline:
         result = await self._attempt(create_workflow, create, CreateWorkflowResult, None)
         self.workflow_id = result.workflow_id
         await self._transition(MachineName.WORKFLOW, self.workflow_id, "sow_approved", create=True)
+        if workflow.patched(CARRY_OVER_PATCH):
+            carry = CarryOverInput(
+                **self._base(), workflow_id=self.workflow_id, sow_version_id=approval.sow_version_id
+            )
+            await self._attempt(carry_over_workflow, carry, IdsResult, None)
         await self._project("workflow_created")
         if self.inp.search_attributes:
             workflow.upsert_search_attributes([SBAM_WORKFLOW_ID.value_set(str(self.workflow_id))])

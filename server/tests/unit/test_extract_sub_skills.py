@@ -4,6 +4,7 @@ redaction and TD §10.4 findings are real."""
 
 import json
 import logging
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,8 @@ import pytest
 from knowledge_db import World
 from llm_db import FakeBifrost, completion
 from sbam_api.audit.models import AuditLog
+from sbam_api.core.ids import uuid7
+from sbam_api.isatvon.models import SubSkill
 from sbam_api.llm.models import LlmCall
 from sbam_workers.isatvon.sub_skills import (
     EXTRACT_ATTEMPTS,
@@ -267,3 +270,90 @@ def test_e8_3_bifrost_down_retries_then_fails_llm_unavailable(p: Pass2) -> None:
 
 def test_e8_3_the_pipeline_plan_matches_the_attempts_used_here() -> None:
     assert PLAN["extract_sub_skills"][2] == EXTRACT_ATTEMPTS
+
+
+# --- E7.2: after a scope change, the touched Sub-Skills are extracted again -------------------
+
+
+def carried_row(
+    p: Pass2, skill_id: str, order: int, refs: list[str], state: str, nxt: str | None
+) -> uuid.UUID:
+    """A Sub-Skill as carry-over leaves it: DRAFT (touched) or CERTIFIED (reused)."""
+    content = sample()
+    content["skill_metadata"]["skill_id"] = skill_id
+    content["isatvon_definition"]["n_notification"]["next"] = nxt
+    with p.w.sessions() as s:
+        row = SubSkill(
+            id=uuid7(),
+            tenant_id=p.inp.tenant_id,
+            project_id=p.w.project,
+            macro_skill_id=p.macro_ids[0],
+            workflow_id=p.workflow,
+            skill_id=skill_id,
+            skill_name=f"Old {skill_id}",
+            order=order,
+            isatvon=content,
+            isatvon_framework_version="1.4",
+            sow_refs=refs,
+            validation_errors=[],
+            content_sha256="0" * 64,
+        )
+        row.state = state
+        s.add(row)
+        s.commit()
+        return row.id
+
+
+KYC_ID = "MS01.2_Investor_KYC_Verifier"
+AUTH_ID = "MS01.1_Investor_Auth_Manager"
+
+
+def test_e7_2_a_touched_sub_skill_is_extracted_again_with_its_ids_kept(p: Pass2) -> None:
+    draft = carried_row(p, AUTH_ID, 1, ["F-ACCESS-1"], "DRAFT", KYC_ID)
+    reused = carried_row(p, KYC_ID, 2, ["F-ACCESS-2"], "CERTIFIED", None)
+    fresh = proposal("Something new", "F-ACCESS-1")
+    bifrost = FakeBifrost([completion(answer(fresh))])
+    ids = p.run_macro(bifrost)
+    assert ids == [draft]  # the reused CERTIFIED one is not built again
+    rows = {r.id: r for r in p.sub_skills()}
+    again = rows[draft]
+    assert again.state == "VALID" and again.skill_id == AUTH_ID
+    assert again.skill_name == f"Old {AUTH_ID}"  # its name and place are kept
+    meta = again.isatvon["skill_metadata"]
+    assert (meta["skill_id"], meta["macro_category"]) == (AUTH_ID, MACRO)
+    assert again.isatvon["isatvon_definition"]["n_notification"]["next"] == KYC_ID
+    assert rows[reused].state == "CERTIFIED"
+    sent = "".join(str(m["content"]) for m in bifrost.requests[0]["messages"])
+    assert '<data name="rework">' in sent and AUTH_ID in sent
+    assert "F-ACCESS-2" not in sent.split('<data name="features">')[1].split("</data>")[0]
+
+
+def test_e7_2_a_rework_answers_exactly_one_sub_skill(p: Pass2) -> None:
+    carried_row(p, AUTH_ID, 1, ["F-ACCESS-1"], "DRAFT", None)
+    two = answer(proposal("A", "F-ACCESS-1"), proposal("B", "F-ACCESS-1"))
+    bifrost = FakeBifrost([completion(two), completion(answer(proposal("A", "F-ACCESS-1")))])
+    p.run_macro(bifrost)
+    assert "sub_skills: EXPECTED_ONE" in json.dumps(bifrost.requests[1])
+
+
+def test_e7_2_each_touched_sub_skill_gets_its_own_answer(p: Pass2) -> None:
+    first = carried_row(p, AUTH_ID, 1, ["F-ACCESS-1"], "DRAFT", KYC_ID)
+    second = carried_row(p, KYC_ID, 2, ["F-ACCESS-2"], "DRAFT", None)
+    bifrost = FakeBifrost(
+        [
+            completion(answer(proposal("One", "F-ACCESS-1"))),
+            completion(answer(proposal("Two", "F-ACCESS-2"))),
+        ]
+    )
+    assert sorted(p.run_macro(bifrost)) == sorted([first, second])
+    assert len(bifrost.requests) == 2  # one call each, not one cached answer for both
+    rows = {r.id: r for r in p.sub_skills()}
+    assert rows[first].sow_refs == ["F-ACCESS-1"] and rows[second].sow_refs == ["F-ACCESS-2"]
+    assert {rows[first].state, rows[second].state} == {"VALID"}
+
+
+def test_e7_2_nothing_touched_means_no_model_call(p: Pass2) -> None:
+    carried_row(p, AUTH_ID, 1, ["F-ACCESS-1"], "CERTIFIED", KYC_ID)
+    valid = carried_row(p, KYC_ID, 2, ["F-ACCESS-2"], "VALID", None)
+    bifrost = FakeBifrost([completion(answer(AUTH))])
+    assert p.run_macro(bifrost) == [valid] and bifrost.requests == []

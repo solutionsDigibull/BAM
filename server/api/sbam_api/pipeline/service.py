@@ -27,7 +27,7 @@ from sbam_contracts.runs import Run, SubjectType, TaskQueue, pipeline_workflow_i
 from sbam_contracts.state_machines import Actor, MachineName
 from sbam_contracts.state_machines import ProjectPipelineState as P
 from sqlalchemy.orm import Session, sessionmaker
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.service import RPCError, RPCStatusCode
 
@@ -120,13 +120,14 @@ async def start_pipeline(
     *,
     with_search_attributes: bool = True,
 ) -> Run:
+    resume = pipeline_input.resume
     spec = StartSpec(
         workflow=PROJECT_PIPELINE,
         workflow_id=pipeline_workflow_id(pipeline_input.project_id),
         queue=PIPELINE_QUEUE,
         subject_type=SubjectType.PROJECT,
         subject_id=pipeline_input.project_id,
-        stage=PipelineStage.INGEST.value,
+        stage=(resume.stage if resume is not None else PipelineStage.INGEST).value,
         input=pipeline_input,
     )
     return await start_run(
@@ -135,6 +136,56 @@ async def start_pipeline(
         spec,
         with_search_attributes=with_search_attributes,
         conflict=WorkflowIDConflictPolicy.FAIL,
+    )
+
+
+class PipelineBusy(ApiError):  # noqa: N818
+    def __init__(self, stage: PipelineStage) -> None:
+        super().__init__(
+            409,
+            ErrorCode.PIPELINE_RUNNING,
+            "The pipeline is working",
+            f"The pipeline is at the {stage.value} step; approve once it waits or has finished.",
+        )
+
+
+# Where a scope change may replace the run (E7.2): it waits for a person, or it has ended.
+RESTARTABLE = frozenset(
+    {
+        PipelineStage.WAIT_SOW_APPROVAL,
+        PipelineStage.WAIT_GENERATE,
+        PipelineStage.WAIT_REBUILD,
+        PipelineStage.DONE,
+        PipelineStage.FAILED,
+        PipelineStage.CANCELLED,
+    }
+)
+
+
+async def restart_pipeline(
+    client: Client,
+    sessions: sessionmaker[Session],
+    pipeline_input: PipelineInput,
+    *,
+    with_search_attributes: bool = True,
+) -> Run:
+    """A scope-change approval (E7.2): replace the project's pipeline run by a new one resuming at
+    `pipeline_input.resume`. A run still working (extracting, building, ...) is 409
+    PIPELINE_RUNNING and nothing changes; one waiting for a person is terminated first (it changes
+    no data: the previous Workflow version stays as it is; the reconciler marks its mirror row)."""
+    status = await pipeline_status(client, pipeline_input.project_id)
+    if status is not None and status.stage not in RESTARTABLE:
+        raise PipelineBusy(status.stage)
+    handle = client.get_workflow_handle(pipeline_workflow_id(pipeline_input.project_id))
+    try:
+        described = await handle.describe()
+        if described.status == WorkflowExecutionStatus.RUNNING:
+            await handle.terminate(reason="replaced by a scope-change approval (E7.2)")
+    except RPCError as exc:
+        if exc.status != RPCStatusCode.NOT_FOUND:
+            raise OrchestratorUnavailable() from None
+    return await start_pipeline(
+        client, sessions, pipeline_input, with_search_attributes=with_search_attributes
     )
 
 

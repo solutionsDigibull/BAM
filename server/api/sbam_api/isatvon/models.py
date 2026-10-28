@@ -83,6 +83,9 @@ class SubSkill(Stateful, ProjectOwned, Base):
     # When it passed the TD §10.4 validator (E9.1): the manifest's timestamps, so a rebuild of the
     # same ISATVON hashes the same. None while it has findings.
     validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Scope change (E7.2): the Sub-Skill of the previous Workflow version this one reuses, as it is
+    # (certification included); null for an extracted or re-extracted Sub-Skill.
+    reused_from_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA}.sub_skills.id"))
 
 
 register_entity(MachineName.SUB_SKILL, SubSkill)

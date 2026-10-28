@@ -329,6 +329,10 @@ SUB_SKILL: Final = Machine(
     SubSkillState,
     _rows(
         (None, "extracted", K.DRAFT, S),
+        # Scope change (E7.2): a Sub-Skill copied into the new MAJOR Workflow version. Unaffected
+        # and certified: reused as it is; affected by the change: invalidated, then re_extracted.
+        (None, "reused", K.CERTIFIED, S),
+        (None, "carried_invalidated", K.INVALIDATED, S),
         (K.DRAFT, "validation_passed", K.VALID, S),
         (K.DRAFT, "validation_failed", K.INVALID, S),
         (K.VALID, "edit", K.DRAFT, F),
@@ -370,6 +374,7 @@ AGENT: Final = Machine(
     AgentState,
     _rows(
         (None, "extracted", G.PENDING, S),
+        (None, "carried_over", G.PENDING, S),  # scope change (E7.2): copied into the new version
         (G.PENDING, "build_started", G.BUILDING, S),
         (G.BUILDING, "all_sub_skills_certified", G.CERTIFIED, S),
         (G.CERTIFIED, "sub_skill_invalidated", G.BUILDING, S),
