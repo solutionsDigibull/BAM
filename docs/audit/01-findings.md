@@ -1,5 +1,9 @@
 # SBAM security and design audit: findings
 
+> **Superseded in part by `04-second-pass.md`.** A second pass disproved or reduced several findings below
+> (F-03, F-04, F-05, F-07, F-12) and added live-tested ones (N-01 to N-08). Where this file and
+> `04-second-pass.md` disagree, `04` is right.
+
 Target: `origin/dev` at `d8b0dce` (2026-10-28). Method: manual code review plus semgrep, bandit,
 pip-audit, pnpm audit, and one executable PoC (`poc/poc_ast_bypass.py`). Raw scanner output is in `poc/`.
 
@@ -56,7 +60,9 @@ realistic way to get hostile code into the pipeline.
 read-only FS, seccomp). Make static checks an allowlist (permitted node types and names), parse SQL with `pglast`
 and restrict it to the handoff relation, and run it under a read-only DB role scoped to one schema.
 
-### F-03 SOW approval signals Temporal before the DB commit `Code` · P1
+### F-03 (reduced) SOW approval signals Temporal before the DB commit `Code` · P2
+> Second pass: `workflows/create.py` re-reads and hash-checks the approval, so no phantom Workflow can be created. The real risk is the reverse race (a legitimate approval fails non-retryably if the activity reads before the commit) and the row lock held across the network call. The fix below still applies; the "phantom Workflow" impact does not.
+
 `sow/approve.py:253-260` calls `signal_pipeline`/`restart_pipeline` and only then `session.commit()`, with the
 `sows` row lock (`for_update=True`, line 106) held across the network call. If the commit fails after the signal
 is accepted, the pipeline builds a Workflow from a SOW that is not approved in the database. If Temporal is slow,
@@ -66,7 +72,7 @@ only for the signal failing, not the commit.
 signal from a relay with idempotent retry. Also have the Workflow-creation activity re-read the approved version
 from the DB and refuse otherwise.
 
-### F-04 Role changes and demotions do not take effect until the token expires `Code` · P1
+### F-04 Role demotions lag by up to the access-token lifetime (300 s) `PoC` · P2
 `core/auth.py:164` takes roles from the JWT and `admin()/fde()` (line 340+) authorize on them. The `users` mirror
 is consulted only to refuse `DEACTIVATED` accounts (`identity/service.py`). `update_user` calls `users.logout()`
 (service.py:264), but an access token that is already issued still verifies (no introspection, no `not-before`
@@ -75,7 +81,7 @@ check), so a demoted admin keeps admin rights for the access-token lifetime. The
 **Fix:** intersect token roles with the DB `portal_roles` in `current_user` (cached 15-30 s by `(sub, sid)`),
 keep access tokens at 5 minutes or less, and honor Keycloak's `not-before`/back-channel logout.
 
-### F-05 Cross-tenant email oracle on user invite `Code` · P1
+### F-05 Cross-tenant email oracle on user invite `PoC` · P2
 `identity/service.py:199`: `email_taken(session, body.email)` checks all tenants and answers 409 `USER_EXISTS`.
 The comment says the answer does not say which tenant, but the 409 itself tells any admin whether an address exists
 anywhere on the platform. It also blocks one person from being in two tenants, which may be a product decision.
@@ -93,14 +99,17 @@ tenant-only contexts. One forgotten `select(Model)` is a cross-tenant leak.
 current_setting('app.tenant_id')::uuid`, set with `SET LOCAL` per transaction. Keep the repository as the first
 layer.
 
-### F-07 "Frozen/immutable" and "append-only" are not enforced by the database `Code` · P1
-`create_frozen_trigger` is applied to one table only (`sub_skill_manifests`, migration 0033). `workflow_versions`,
-`sow_versions`, certificates and `audit_log` have no trigger. `audit_log` is described as append-only
-(migration 0003 docstring) but has no trigger and no `REVOKE UPDATE, DELETE`, and the app role owns it.
-`sow_versions.is_locked` is documented in TD §7.5 but was never implemented. (An uncommitted attempt exists in the
-original working tree: no backfill of existing approved rows, and no test.)
-**Fix:** triggers on every frozen table; `REVOKE UPDATE, DELETE ON audit_log` from the app role; hash-chain
-audit rows; backfill `is_locked` for APPROVED/SUPERSEDED rows in the same migration.
+### F-07 (corrected) The runtime DB role owns the tables, so DB-level immutability can be switched off `PoC`
+Triggers do exist: `audit_log_append_only`, `sow_versions_immutable`, `*_append_only` on master versions, snapshots
+and filetype versions, and the frozen trigger on `sub_skill_manifests`. (The first version of this finding said
+`audit_log` had no trigger; that was wrong.) But the API connects as `sbam`, which owns every table and the
+database (`compose/postgres/init.sh`: `CREATE DATABASE ... OWNER`). Live: `ALTER TABLE sbam.audit_log DISABLE
+TRIGGER audit_log_append_only; UPDATE sbam.audit_log SET action='TAMPERED'` succeeded. `workflows`, `code_attempts`,
+`artifacts` and macro/sub-skill rows have no immutability trigger. `sow_versions.is_locked` (TD §7.5) is redundant
+with the content trigger plus `state`, so the unfinished attempt in the original working tree is not needed for
+integrity.
+**Fix:** separate migration/owner role from a runtime role with DML only (no DDL, no `TRIGGER`), `REVOKE UPDATE,
+DELETE` on `audit_log`, triggers on the remaining certified tables, hash-chained audit rows.
 
 ### F-08 No general rate limiting; audit-table flooding `Code` · P1
 The only limiter is the knowledge-graph read limiter (`knowledge/graph.py:410`): in-process (per replica) and its
@@ -141,7 +150,8 @@ names, so attributes like `onmouseover` or `javascript:` hrefs on allowed elemen
 schema strips most of it afterwards, so exploitability is low, but there is no second layer.
 **Fix:** nonce-based CSP set in `proxy.ts`; replace the blocklist with DOMPurify and an allowlist.
 
-### F-12 Per-request cost of authentication and a small DB pool `Code`/`Live?`
+### F-12 (reduced) Per-request cost of authentication `Code` · P3
+> Second pass: steady-state load (80 concurrent users) did not exhaust the pool. Pool starvation is real only with long-held connections; see N-02.
 `current_user` runs, per request, a JWKS lookup (3 s timeout, blocking), a membership query in one session
 (`SqlMemberships`) and a user-mirror sync in a second session (`SqlUserDirectory.sync`), then the handler opens a
 third. Handlers are sync (threadpool) on SQLAlchemy sync; `make_engine` sets no `pool_size`/`max_overflow`, so

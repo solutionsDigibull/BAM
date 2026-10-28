@@ -11,9 +11,11 @@ DOMPurify) rather than copying a competitor. I did not clone competitor reposito
 |---|---|---|---|---|---|
 | U-01 | Certify/freeze/gate activities are stubs that always succeed, no env guard (F-01) | Stubs register only in dev/test; elsewhere they raise non-retryable `NOT_IMPLEMENTED`; test that prod worker has none | Makes "certified" mean something | Today a prod worker would freeze untested code | S |
 | U-02 | Denylist pre-check; no AST/static gate; sandbox is a stub (F-02) | Allowlist AST gate, `pglast` SQL validation, runtime audit hook, sandbox as the only trust boundary (Firecracker/gVisor, no network, cgroups, seccomp) | Contains LLM-written code | A denylist loses to string-built `getattr`; PoC passes 9 payloads | L |
-| U-03 | Approval signals Temporal, then commits (F-03) | Transactional outbox + relay; workflow re-reads approval from DB | No phantom approvals, no lock across network | Dual-write without compensation; `notification_outbox` pattern already in repo | M |
+| U-03 | Approval signals Temporal, then commits (F-03); the Workflow-creation activity already re-checks the DB | Commit first, signal from an outbox relay | Removes the reverse race (legit approval failing as NOT_APPROVED) and the lock held across the Temporal call | `notification_outbox` pattern already in repo. Demoted to Wave 1 (P2) after the second pass | M |
 | U-04 | `COGNEE_USER_SECRET` has a known default; `.env.example` placeholders accepted (F-09) | Required secrets with `:?`; lint rejects `change-me`/low entropy outside dev | Fail at boot instead of running with known keys | Predictable per-project credentials | S |
 | U-05 | Dependency CVEs (F-10) | Bump pypdf, otel-api, monaco/dompurify, refine chain; add `pip-audit` + `pnpm audit --prod` to CI | Keeps known CVEs out | One critical + several high are runtime | S |
+
+| U-18 | User-mirror refresh updates one row from every parallel request (N-01); 37% of requests 500 right after login in the repro | One atomic `UPDATE ... WHERE last_session_id IS DISTINCT FROM :sid`; audit LOGIN only when it changed a row | No spurious 500s after sign-in | Reproduced live; user-visible on every login | S |
 
 ## Wave 1: security hardening
 
@@ -21,13 +23,19 @@ DOMPurify) rather than copying a competitor. I did not clone competitor reposito
 |---|---|---|---|---|---|
 | U-06 | Roles come from the token; mirror only blocks deactivated users (F-04) | Intersect token roles with DB `portal_roles`, 15-30 s cache; access token <= 5 min; Keycloak back-channel logout | Demotion works immediately | Docs promise "apply at once"; today it is token lifetime | M |
 | U-07 | Tenant isolation by repository only (F-06) | Non-owner DB role + `FORCE ROW LEVEL SECURITY` + `SET LOCAL app.tenant_id` | DB refuses cross-tenant rows even if app code is wrong | One missed query is a cross-tenant leak; defense in depth is standard for multi-tenant SaaS | M-L |
-| U-08 | Immutability by app logic; one frozen trigger; audit_log not DB-protected (F-07) | Frozen triggers on all frozen tables, `REVOKE UPDATE,DELETE` on `audit_log`, hash chain, implement `is_locked` with backfill | Tamper-evident, immutable certified versions | Golden rule 'immutable (423)' should survive a bug or a rogue operator | M |
+| U-08 | Triggers exist for audit_log, SOW content, master/filetype versions, manifests, but the runtime role owns the tables and can disable them (F-07, live-confirmed) | Separate owner/migration role from a DML-only runtime role, `REVOKE UPDATE,DELETE` on `audit_log`, triggers on the remaining certified tables, hash chain | Tamper-evident audit and immutable certified versions even if the API process is compromised | Golden rule 'immutable (423)' should survive a bug or a rogue operator | M |
 | U-09 | No rate limits except knowledge reads, in-process (F-08) | Caddy rate limit + per-tenant/user token bucket on LLM-triggering routes; aggregate rejection audit rows | Stops abuse, flooding and cost runaway | Unbounded audit growth and LLM spend are reachable by any FDE | M |
 | U-10 | Invite 409 reveals emails across tenants (F-05) | Per-tenant uniqueness or neutral response; throttle | Removes enumeration oracle | Cross-tenant info leak by design | S |
 | U-11 | CSP without `script-src`; blocklist paste cleaner (F-11) | Nonce CSP in `proxy.ts`; DOMPurify allowlist | Second layer against XSS | LLM/user content is rendered in rich editor and code viewer | M |
 | U-12 | Upload token key derived from hook secret (F-14) | Independent secrets; hooks on private network with mTLS or request signing | Limits blast radius of a leaked secret | Key reuse across two trust roles | S |
 
 ## Wave 2: reliability and operability
+
+| # | Current | Proposed | What it does | Why | Size |
+|---|---|---|---|---|---|
+| U-19 | clamd scan, Keycloak admin and JWKS calls block sync handlers; 45 parallel imports stall the API while `/health/live` stays green (N-02) | Move scans to a Temporal activity or a bounded executor with a deadline; readiness reflects saturation | One slow dependency cannot take the API down | Reproduced live | M |
+| U-20 | Keycloak realm has no password policy, MFA or auth events (N-06) | Password policy, mandatory TOTP/WebAuthn for admin roles, event logging to the audit sink | Protects the accounts that approve code generation | TD §16 lists MFA as only optional | S |
+
 
 | # | Current | Proposed | What it does | Why | Size |
 |---|---|---|---|---|---|
