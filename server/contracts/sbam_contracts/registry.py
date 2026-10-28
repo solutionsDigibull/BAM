@@ -37,7 +37,7 @@ from sbam_contracts.identity import (
 )
 from sbam_contracts.isatvon14 import Agent, RuleViolation, SubSkill
 from sbam_contracts.isatvon_grid import IsatvonSchemaResponse
-from sbam_contracts.isatvon_macros import MacroExtraction, MacroSkillOut
+from sbam_contracts.isatvon_macros import MacroExtraction, MacroSkillOut, SubSkillExtraction
 from sbam_contracts.isatvon_workbench import (
     SubSkillPatch,
     ValidationReport,
@@ -120,6 +120,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/validation_report", ValidationReport),
     ("isatvon/macro_extraction", MacroExtraction),
     ("isatvon/macro_skill", MacroSkillOut),
+    ("isatvon/sub_skill_extraction", SubSkillExtraction),
     ("build/builds_response", BuildsResponse),
     ("build/gates_response", GatesResponse),
     ("manifest/isa14_manifest", Isa14Manifest),

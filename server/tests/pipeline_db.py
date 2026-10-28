@@ -27,11 +27,14 @@ def pipeline_sessions() -> sessionmaker[Session]:
 
 @contextmanager
 def registered_stand_ins() -> Iterator[None]:
-    """Afterwards the real models (if any) are registered again."""
-    machines = (MachineName.PROJECT_PIPELINE, MachineName.WORKFLOW)
+    """Stand-in project and Workflow tables; no Sub-Skill table (the pipeline's Sub-Skill ids are
+    stand-ins too, so their transitions are skipped). Afterwards the real models (if any) are
+    registered again."""
+    machines = (MachineName.PROJECT_PIPELINE, MachineName.WORKFLOW, MachineName.SUB_SKILL)
     real = {m: entity_model(m) for m in machines}
     register_entity(MachineName.PROJECT_PIPELINE, PROJECT_ROW)
     register_entity(MachineName.WORKFLOW, WORKFLOW_ROW)
+    unregister_entity(MachineName.SUB_SKILL)
     try:
         yield
     finally:

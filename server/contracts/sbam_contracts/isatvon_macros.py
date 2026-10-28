@@ -1,4 +1,5 @@
-"""ISATVON pass 1 (TD §10.2, §13.2, E8.2): Macro Skills from the approved SOW.
+"""ISATVON pass 1 and 2 (TD §10.2-10.4, §13.2, E8.2/E8.3): Macro Skills from the approved SOW, then
+each Macro Skill's Sub-Skills.
 
 `sbam-isatvon` answers a `MacroExtraction`: one proposal per Macro Skill, in order, each naming the
 SOW sections it covers (`sow_refs`: module and feature ids of the approved SowDocument) and, when
@@ -8,6 +9,12 @@ snapshot doesn't hold (with a warning), and stores them PENDING. Extra keys are 
 the SOW or the knowledge cannot add fields.
 
 `MacroSkillOut` is a stored Macro Skill as the API returns it.
+
+Pass 2: `sbam-isatvon` answers a `SubSkillExtraction` for one Macro Skill: each Sub-Skill as a full
+ISATVON 1.4 `SubSkill` plus the SOW features it implements (`sow_refs`). SBAM again owns the ids:
+it sets `skill_id` (`MSnn.m_<Name>`, m by order), `macro_category` and the `next` chain, then runs
+the TD §10.4 rules. A Sub-Skill that breaks a rule is kept INVALID with its findings; only an
+answer that isn't a `SubSkillExtraction` at all is asked again.
 """
 
 from typing import Annotated, Any
@@ -16,10 +23,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from sbam_contracts._jsonschema import contract_schema
-from sbam_contracts.isatvon14 import MACRO_CATEGORY, ShortText, Text
+from sbam_contracts.isatvon14 import MACRO_CATEGORY, ShortText, SubSkill, Text
 from sbam_contracts.state_machines import AgentState
 
 MAX_MACROS = 99  # `nn` is two digits
+MAX_SUB_SKILLS = 50  # per Macro Skill
 
 
 class MacroProposal(BaseModel):
@@ -39,6 +47,23 @@ class MacroExtraction(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     macros: Annotated[list[MacroProposal], Field(min_length=1, max_length=MAX_MACROS)]
+
+
+class SubSkillProposal(BaseModel):
+    """One Sub-Skill as the model proposes it."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    sow_refs: Annotated[list[ShortText], Field(min_length=1)]  # SOW feature ids it implements
+    sub_skill: SubSkill
+
+
+class SubSkillExtraction(BaseModel):
+    """The `sbam-isatvon` answer of pass 2 for one Macro Skill (prompt `isatvon-sub-skills`)."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    sub_skills: Annotated[list[SubSkillProposal], Field(min_length=1, max_length=MAX_SUB_SKILLS)]
 
 
 class MacroSkillOut(BaseModel):
@@ -65,5 +90,6 @@ def schemas() -> dict[str, dict[str, Any]]:
     models: dict[str, type[BaseModel]] = {
         "macro_extraction": MacroExtraction,
         "macro_skill": MacroSkillOut,
+        "sub_skill_extraction": SubSkillExtraction,
     }
     return {stem: contract_schema(model, f"isatvon/{stem}") for stem, model in models.items()}

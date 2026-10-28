@@ -76,7 +76,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from sbam_workers.ingest.stubs import ingest_documents
     from sbam_workers.isatvon.macros import extract_macro_skills
-    from sbam_workers.isatvon.stubs import extract_sub_skills
+    from sbam_workers.isatvon.sub_skills import extract_sub_skills
     from sbam_workers.knowledge.build import build_knowledge
     from sbam_workers.knowledge.bundle import build_okf_bundle
     from sbam_workers.mirror import update_run_mirror
@@ -121,6 +121,10 @@ TUNED: dict[str, tuple[timedelta, timedelta, float]] = {
 }
 # E10.3: configurable limit, upstream-first scheduling. Older runs keep the plain semaphore.
 SCHEDULER_PATCH = "e10-3-build-scheduler"
+# E8.3: pass 2 runs at most MAX_PARALLEL_EXTRACTIONS Macro Skills at a time, and once one of them
+# has failed the others record nothing more (one EXTRACTION_FAILED). Older runs: unbounded.
+EXTRACTION_PATCH = "e8-3-bounded-extraction"
+MAX_PARALLEL_EXTRACTIONS = 4
 WAITING_FOR = {
     PipelineStage.WAIT_SOW_APPROVAL: "sow_approved",
     PipelineStage.WAIT_GENERATE: "generate",
@@ -324,17 +328,23 @@ class ProjectPipeline:
         await self._enter(PipelineStage.EXTRACT_SUB_SKILLS)
         macros = [v for k, v in sorted(self.refs.items()) if k.startswith("macro:")]
         failed = ("extraction_failed", MachineName.WORKFLOW)
-        results = await asyncio.gather(  # parallel per Macro Skill (TD §13.2)
-            *(
-                self._attempt(
-                    extract_sub_skills,
-                    MacroRef(**self._base(), workflow_id=_need(self.workflow_id), macro_skill_id=m),
-                    IdsResult,
-                    failed,
-                )
-                for m in macros
-            )
-        )
+
+        def extract(m: UUID) -> Any:
+            ref = MacroRef(**self._base(), workflow_id=_need(self.workflow_id), macro_skill_id=m)
+            return self._attempt(extract_sub_skills, ref, IdsResult, failed)
+
+        if workflow.patched(EXTRACTION_PATCH):
+            slots = asyncio.Semaphore(MAX_PARALLEL_EXTRACTIONS)
+
+            async def bounded(m: UUID) -> Any:
+                async with slots:
+                    if self.failed_stage is not None:  # another Macro Skill already failed
+                        raise _Stop
+                    return await extract(m)
+
+            results = await asyncio.gather(*(bounded(m) for m in macros))
+        else:
+            results = await asyncio.gather(*(extract(m) for m in macros))  # TD §13.2
         self.sub_skill_ids = [sid for r in results for sid in r.ids]
         await self._workflow("extraction_completed")
 
@@ -555,6 +565,8 @@ class ProjectPipeline:
     async def _fail(
         self, step: str, exc: ActivityError, failure: tuple[str, MachineName] | None
     ) -> NoReturn:
+        if self.failed_stage is not None and workflow.patched(EXTRACTION_PATCH):
+            raise _Stop  # a parallel sibling failed first and is recording the failure
         cause = exc.cause
         error_type = getattr(cause, "type", None) or type(cause).__name__
         self.failed_stage = self.stage
