@@ -41,6 +41,11 @@ class SubSkillRepository(StatefulRepository):
         lowest = self.session.scalar(query.with_only_columns(func.min(SubSkill.order)))
         return int(lowest or 0)
 
+    def used_skill_ids(self, workflow_id: uuid.UUID) -> set[str]:
+        """Every `skill_id` of the Workflow, deleted rows included (their ids are never reused)."""
+        query = self._scoped(include_deleted=True).where(SubSkill.workflow_id == workflow_id)
+        return set(self.session.scalars(query.with_only_columns(SubSkill.skill_id)))
+
 
 class SubSkillEditRepository(TenantScopedRepository[SubSkillEdit]):
     """Use with a context that names the project. Rows are only inserted, never changed."""
