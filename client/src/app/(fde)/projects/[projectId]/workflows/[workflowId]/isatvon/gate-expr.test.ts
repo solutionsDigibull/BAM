@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, test } from "vitest";
 
-import corpus from "../../../../../../../../../server/tests/fixtures/isatvon/gate_corpus.json";
 import {
   GRAMMAR_FORBIDDEN,
   errorLabel,
@@ -12,6 +14,15 @@ import {
 } from "./gate-expr";
 
 type Entry = { expr: string; ok: boolean; code?: string; message?: string; identifiers?: string[] };
+
+// Read at run time (from client/, as pnpm test runs), not imported: the web image is built from
+// client/ alone, without server/.
+const corpus = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "../server/tests/fixtures/isatvon/gate_corpus.json"),
+    "utf-8",
+  ),
+) as Entry[];
 
 describe("gate expressions (E8.8)", () => {
   test("E8.8-T01 a valid gate parses and its identifiers resolve", () => {
@@ -47,7 +58,7 @@ describe("gate expressions (E8.8)", () => {
   );
 
   test("E8.8-T04 the TS parser agrees with the backend on the shared corpus", () => {
-    const entries = corpus as Entry[];
+    const entries = corpus;
     expect(entries.length).toBeGreaterThanOrEqual(100);
     for (const entry of entries) {
       const parsed = parseGate(entry.expr);

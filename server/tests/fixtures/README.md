@@ -33,6 +33,12 @@ too_big = blob(15 * 1024 * 1024 + 1)                              # exact size, 
 | `isa14/ms01_1_structured.json` | The same MS01.1 Sub-Skill in SBAM's structured ISATVON 1.4 build form (TD §10.3): `i_instructions` split into its parts, `state_handoff_file` as an object, `libraries`, and `n_notification.next` (N = Next + Notification). Written by hand | Validates as `SubSkill` with no TD §10.4 rule violations (E0.2-T01) |
 | `isa14/ms01_1_manifest.json` | MS01.1 as a full SBAM Skill Manifest (TD §11.1): the ISA14 sample's blocks with version `1.0.0`, `n_notification.next`, a structured `state_handoff_file` and an `sbam_build_record` (isatvon_detail = `ms01_1_structured.json`, synthetic digests). Generated once, then committed | Validates as `SkillManifest`; `governance.deterministic_hash` equals the RFC 8785 hash (E0.3-T01) |
 
+## isatvon/
+
+| File | What it is | Expected outcome |
+|---|---|---|
+| `isatvon/gate_corpus.json` | 132 gate expressions (valid, syntax errors, forbidden calls / attributes / subscripts / dunders, too long, too deep, Unicode) with the backend gate parser's result for each: `ok`, `code`, `message`, `identifiers`. Generated once from `sbam_contracts.gate_expr`, then committed | `test_gate_corpus.py` re-parses each and matches the backend; the client's `gate-expr.test.ts` matches the same results (E8.8-T04) |
+
 ## masters/
 
 | File | What it is | Expected outcome |
