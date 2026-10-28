@@ -133,7 +133,7 @@ async def _after_previous(p: Pass1, macro_skill_id: uuid.UUID) -> None:
 def run(
     tmp_path: Path, bifrost: FakeBifrost, until_stage: PipelineStage, in_order: bool = False
 ) -> tuple[Pass1, PipelineStatus]:
-    p = Pass1(World(tmp_path), with_workflow=False)
+    p = Pass1(World(tmp_path, threaded=True), with_workflow=False)  # macros extract in parallel
     with p.w.sessions() as s:
         project = s.get(Project, p.w.project)
         assert project is not None
