@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:99f76ec7c53b449b2e1ab6cb8304ea0adeae2ada8739737f42ceb437440ab21d
+// source-sha256:4c1f519f14e88675042bc223b31f5404942a8ac6ffee55ee05c699958e09dade
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -1081,6 +1081,8 @@ export interface GateResult {
 /**
  * One problem a gate found; the shape the build worker writes into `gate_results.findings`.
  * `file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.
+ * LIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the
+ * registry's version (null when it has none) and `message` the guidance.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "Finding".
@@ -1094,6 +1096,7 @@ export interface Finding {
   col?: number | null;
   expected?: string | null;
   actual?: string | null;
+  package?: string | null;
 }
 /**
  * One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no

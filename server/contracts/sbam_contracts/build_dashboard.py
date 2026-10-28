@@ -58,7 +58,9 @@ class GateStatus(StrEnum):
 
 class Finding(BaseModel):
     """One problem a gate found; the shape the build worker writes into `gate_results.findings`.
-    `file` / `line` point into the generated bundle, so the UI can open the Code Viewer there."""
+    `file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.
+    LIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the
+    registry's version (null when it has none) and `message` the guidance."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -70,6 +72,7 @@ class Finding(BaseModel):
     col: int | None = Field(default=None, ge=0)
     expected: str | None = Field(default=None, max_length=1_000)
     actual: str | None = Field(default=None, max_length=1_000)
+    package: str | None = Field(default=None, max_length=200)  # LIBRARIES: the normalized name
 
 
 class BuildRow(BaseModel):
