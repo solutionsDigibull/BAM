@@ -15,9 +15,10 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.projects.models import Project
+from sbam_api.sow.models import SowVersion
 from sbam_api.sow.service import Generation, record_generation
 from sbam_api.sow.sql import IMMUTABLE_SQLSTATE
-from sbam_contracts.sow import SowDocument
+from sbam_contracts.sow import SECTIONS, SowDocument
 from sqlalchemy import pool, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, sessionmaker
@@ -113,3 +114,19 @@ def test_e6_3_lifecycle_columns_still_change(sessions: sessionmaker[Session]) ->
             text("SELECT state FROM sbam.sow_versions WHERE id = :id"), {"id": version_id}
         ).scalar_one()
     assert state == "IN_REVIEW"
+
+
+def test_e6_378_a_sow_stored_in_postgres_reads_back_in_section_order_and_validates(
+    sessions: sessionmaker[Session],
+) -> None:
+    """JSONB keeps no key order; the column type restores it, so the stored SOW validates."""
+    version_id = a_version(sessions)
+    with sessions() as s:
+        raw = s.execute(
+            text("SELECT structured FROM sbam.sow_versions WHERE id = :id"), {"id": version_id}
+        ).scalar_one()
+        assert tuple(raw) != SECTIONS  # the database really did re-order the keys
+        row = s.get(SowVersion, version_id)
+        assert row is not None and row.structured is not None
+        assert tuple(row.structured) == SECTIONS
+        assert SowDocument.model_validate(row.structured).model_dump(mode="json") == DOC
