@@ -1,7 +1,7 @@
 """gate_results
 
-Revision ID: 0031_gate_results
-Revises: 0030_macro_skills
+Revision ID: 0032_gate_results
+Revises: 0031_sub_skills
 Create Date: 2026-10-27
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0031_gate_results"
-down_revision: str | Sequence[str] | None = "0030_macro_skills"
+revision: str = "0032_gate_results"
+down_revision: str | Sequence[str] | None = "0031_sub_skills"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
