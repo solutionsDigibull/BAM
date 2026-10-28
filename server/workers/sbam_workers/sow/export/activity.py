@@ -29,7 +29,7 @@ from sbam_api.sow.service import canonical_sha256
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.storage.factory import make_backend
 from sbam_contracts.runs import TaskQueue
-from sbam_contracts.sow import SowDocument
+from sbam_contracts.sow import FdeCitation, SowDocument
 from sbam_contracts.sow_api import (
     EXPORT_TEMPLATE,
     ExportFormat,
@@ -80,7 +80,7 @@ def _source(deps: ExportDeps, inp: SowExportInput) -> tuple[SowVersion, str, dic
             )
         project = ProjectRepository(session, TenantContext(inp.tenant_id)).get(inp.project_id)
         doc = SowDocument.model_validate(row.structured)
-        docs = {c.document_version_id for _, c in _citations(doc)}
+        docs = {c.document_version_id for _, c in _citations(doc) if not isinstance(c, FdeCitation)}
         titles = _titles(session, ctx, docs)
         session.expunge(row)
         return row, project.name if project is not None else "", titles

@@ -24,7 +24,10 @@ def errors(data: dict[str, Any]) -> list[tuple[str, str]]:
     """(dotted path, message) of every validation error."""
     with pytest.raises(ValidationError) as info:
         SowDocument.model_validate(data)
-    return [(".".join(str(p) for p in e["loc"]), e["msg"]) for e in info.value.errors()]
+    drop = {"okf", "fde"}  # the citation union's tag is not part of the document path
+    return [
+        (".".join(str(p) for p in e["loc"] if p not in drop), e["msg"]) for e in info.value.errors()
+    ]
 
 
 # --- T01 ------------------------------------------------------------------------------------------
@@ -74,6 +77,21 @@ def test_e0_5_t03_citation_needs_uuid_and_location() -> None:
     paths = [p for p, _ in errors(data)]
     assert "overview.citations.0.document_version_id" in paths
     assert "scope.citations.0.location" in paths
+
+
+def test_e6_3b_t00_an_fde_citation_is_a_valid_citation_without_a_source() -> None:
+    data = sow()
+    fde = {"kind": "fde", "author": "Asha", "date": "2026-10-28", "note": "Call with the client"}
+    data["overview"]["citations"] = [fde]
+    doc = SowDocument.model_validate(data)
+    assert doc.overview.citations[0].model_dump(mode="json") == fde
+
+
+def test_e6_3b_t00_an_fde_citation_cannot_carry_an_okf_ref_id() -> None:
+    data = sow()
+    fde = {"kind": "fde", "author": "Asha", "date": "2026-10-28", "okf_ref_id": "fake"}
+    data["overview"]["citations"] = [fde]
+    assert errors(data)
 
 
 def test_e0_5_t04_duplicate_feature_ids() -> None:

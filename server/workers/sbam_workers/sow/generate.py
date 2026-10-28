@@ -45,7 +45,7 @@ from sbam_api.storage.factory import make_backend
 from sbam_contracts.okf import BundleManifest
 from sbam_contracts.pipeline import IdResult, SowGenerateInput, StageRef
 from sbam_contracts.runs import TaskQueue
-from sbam_contracts.sow import SECTIONS, Citation, SowDocument
+from sbam_contracts.sow import SECTIONS, AnyCitation, FdeCitation, SowDocument
 from sbam_contracts.state_machines import KnowledgeVersionState, SowVersionState
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
@@ -98,9 +98,9 @@ class SowDeps:
 # --- checks and SBAM's own fields -----------------------------------------------------------------
 
 
-def _citations(doc: SowDocument) -> list[tuple[str, Citation]]:
+def _citations(doc: SowDocument) -> list[tuple[str, AnyCitation]]:
     """Every citation with the path the re-ask names it by."""
-    out: list[tuple[str, Citation]] = []
+    out: list[tuple[str, AnyCitation]] = []
     for name in SECTIONS:
         section = getattr(doc, name)
         if not isinstance(section, list):
@@ -118,6 +118,9 @@ def check_citations(context: SowContext) -> Callable[[SowDocument], tuple[str, .
     def check(doc: SowDocument) -> tuple[str, ...]:
         errors: list[str] = []
         for path, c in _citations(doc):
+            if isinstance(c, FdeCitation):  # only an FDE can author one; the model never may
+                errors.append(f"{path}: FDE_CITATION_NOT_ALLOWED")
+                continue
             ref = c.okf_ref_id if _SAFE_ID.match(c.okf_ref_id) else "<id>"
             docs = context.citable.get(c.okf_ref_id)
             if docs is None:
@@ -142,6 +145,8 @@ def finalize(doc: SowDocument, context: SowContext) -> dict[str, Any]:
     def fix(node: Any) -> None:
         if isinstance(node, dict):
             for c in node.get("citations", []):
+                if "okf_ref_id" not in c:
+                    continue
                 where = context.locations.get(
                     (c["okf_ref_id"], uuid.UUID(c["document_version_id"]))
                 )

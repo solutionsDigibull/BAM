@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:fbeaccf9c3916926bf562936c054c3f796de0ec7474bfb9dd4ec401257052c1b
+// source-sha256:9d947db426dd373291aff61456ac171795ef1c47d12925aefbf54d2ffb6056b2
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -1769,7 +1769,7 @@ export interface Overview {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   client: string;
   objective: string;
   background: string;
@@ -1796,6 +1796,20 @@ export interface SbamContracts_Sow__Location {
   cell?: string | null;
 }
 /**
+ * A statement the FDE sourced themselves: no `okf_ref_id`, so nothing to look up in the bundle.
+ *
+ * The API stamps `author` and `date` on save (an editor cannot sign as someone else or backdate).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FdeCitation".
+ */
+export interface FdeCitation {
+  kind: "fde";
+  author: string;
+  date: string;
+  note?: string | null;
+}
+/**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "UsersAuthority".
  */
@@ -1803,7 +1817,7 @@ export interface UsersAuthority {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   /**
    * @minItems 1
    */
@@ -1825,7 +1839,7 @@ export interface Scope {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   /**
    * @minItems 1
    */
@@ -1842,7 +1856,7 @@ export interface Module {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   /**
    * Pattern: `^M-[A-Za-z0-9][A-Za-z0-9.-]*$`
    */
@@ -1861,7 +1875,7 @@ export interface FeatureItem {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   /**
    * Pattern: `^F-[A-Za-z0-9][A-Za-z0-9.-]*$`
    */
@@ -1922,7 +1936,7 @@ export interface DataIntegrations {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   sources: string[];
   apis: string[];
   tables: string[];
@@ -1935,7 +1949,7 @@ export interface RulesConstraints {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   rule_refs: string[];
   constraints: string[];
 }
@@ -1947,7 +1961,7 @@ export interface DeliverablesAcceptance {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   /**
    * @minItems 1
    */
@@ -1965,7 +1979,7 @@ export interface AssumptionsOpenPoints {
   /**
    * @minItems 1
    */
-  citations: [Citation, ...Citation[]];
+  citations: [Citation | FdeCitation, ...(Citation | FdeCitation)[]];
   assumptions: string[];
   open_points: string[];
 }
@@ -2058,11 +2072,15 @@ export interface TipTapMark {
  */
 export interface SowCitationRef {
   path: string;
-  okf_ref_id: string;
-  document_version_id: string;
-  location: {
+  kind?: "okf" | "fde";
+  okf_ref_id?: string | null;
+  document_version_id?: string | null;
+  location?: {
     [k: string]: unknown | undefined;
   };
+  author?: string | null;
+  date?: string | null;
+  note?: string | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

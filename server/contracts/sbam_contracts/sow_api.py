@@ -120,9 +120,13 @@ class SowCitationRef(_Dto):
     """A citation with where it sits in the document (`features.0`, `scope`, ...)."""
 
     path: str
-    okf_ref_id: str
-    document_version_id: UUID
-    location: dict[str, Any]
+    kind: Literal["okf", "fde"] = "okf"
+    okf_ref_id: str | None = None  # None for an FDE-authored citation
+    document_version_id: UUID | None = None
+    location: dict[str, Any] = Field(default_factory=dict)
+    author: str | None = None  # FDE-authored only
+    date: str | None = None
+    note: str | None = None
 
 
 class SowVersionDetail(SowVersionSummary):
