@@ -36,7 +36,7 @@ from sqlalchemy import pool, select
 from sqlalchemy.orm import Session, sessionmaker
 
 TENANT = uuid7()
-# Derivatives by document version id: what `document_versions.derivative_keys` will hold (#71).
+# Derivatives by document version id: what `derivatives_of` finds from the version's derived keys.
 DERIVED: dict[uuid.UUID, dict[str, Derivative]] = {}
 
 
