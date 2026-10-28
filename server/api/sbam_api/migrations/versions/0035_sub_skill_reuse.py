@@ -1,7 +1,7 @@
 """sub_skill_reuse
 
-Revision ID: 0034_sub_skill_reuse
-Revises: 0033_sow_impacts
+Revision ID: 0035_sub_skill_reuse
+Revises: 0034_sow_impacts
 Create Date: 2026-10-28
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0034_sub_skill_reuse"
-down_revision: str | Sequence[str] | None = "0033_sow_impacts"
+revision: str = "0035_sub_skill_reuse"
+down_revision: str | Sequence[str] | None = "0034_sow_impacts"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
