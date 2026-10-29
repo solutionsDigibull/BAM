@@ -266,6 +266,36 @@ def test_e8_4_t09_sub_skill_regenerate_names_the_sub_and_shares_the_macro_run(h:
     assert call["id"] == f"isatvon-regen-{h.macro}"
 
 
+def test_a28_t01_subskill_retry_replays_same_run(h: Harness) -> None:
+    sub = h.add_sub_skill(sample())
+    key = {"Idempotency-Key": "key-isatvon-regen-sub-1"}
+    first = regenerate(h, sub, "sub-skills", {"hint": "Tighter gates"}, **key)
+    assert first.status_code == 202, first.text
+    again = regenerate(h, sub, "sub-skills", {"hint": "Tighter gates"}, **key)
+    assert again.status_code == 202, again.text
+    assert again.json()["run"]["id"] == first.json()["run"]["id"]
+    assert len(h.temporal.calls) == 1  # the retry did not start a second, billed run
+
+
+def test_a28_t02_the_same_key_for_another_target_is_not_a_replay(h: Harness) -> None:
+    sub = h.add_sub_skill(sample(), order=1)
+    other = h.add_sub_skill(other_skill(2), order=2)
+    key = {"Idempotency-Key": "key-isatvon-regen-sub-2"}
+    assert regenerate(h, sub, "sub-skills", **key).status_code == 202
+    problem(regenerate(h, other, "sub-skills", **key), 422, "IDEMPOTENCY_KEY_REUSED")
+    problem(regenerate(h, h.macro, "macro-skills", **key), 422, "IDEMPOTENCY_KEY_REUSED")
+    assert len(h.temporal.calls) == 1
+
+
+def test_a28_t03_a_sub_skill_key_is_not_replayed_across_tenants(h: Harness) -> None:
+    sub = h.add_sub_skill(sample())
+    key = {"Idempotency-Key": "key-isatvon-regen-sub-3"}
+    assert regenerate(h, sub, "sub-skills", **key).status_code == 202
+    other = h.realm.token(uuid.uuid4(), tenant_id=[str(TENANT_B)])
+    problem(regenerate(h, sub, "sub-skills", token=other, **key), 404, "NOT_FOUND")
+    assert len(h.temporal.calls) == 1
+
+
 def test_e8_4_t09_regenerate_frozen_is_423_building_is_409_over_long_hint_is_422(
     h: Harness,
 ) -> None:
