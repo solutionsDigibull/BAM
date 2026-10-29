@@ -41,6 +41,17 @@
           },
           "title": "Gates",
           "type": "object"
+        },
+        "loop_tests": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoopTestsBadge"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -111,6 +122,32 @@
       "title": "GateStatus",
       "type": "string"
     },
+    "LoopTestsBadge": {
+      "additionalProperties": false,
+      "description": "The 'Loop tests' cell of the Build & Test grid: `passed/total` and a state.",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/TestRunState"
+        },
+        "passed": {
+          "minimum": 0,
+          "title": "Passed",
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "state",
+        "passed",
+        "total"
+      ],
+      "title": "LoopTestsBadge",
+      "type": "object"
+    },
     "SubSkillState": {
       "enum": [
         "DRAFT",
@@ -129,6 +166,16 @@
         "SUPERSEDED"
       ],
       "title": "SubSkillState",
+      "type": "string"
+    },
+    "TestRunState": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "NON_CERTIFYING",
+        "BLOCKED"
+      ],
+      "title": "TestRunState",
       "type": "string"
     },
     "WorkflowState": {

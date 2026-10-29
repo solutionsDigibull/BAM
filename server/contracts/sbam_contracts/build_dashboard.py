@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.build import MAX_CORRECTIONS, BuildStage
+from sbam_contracts.promptfoo import LoopTestsBadge
 from sbam_contracts.state_machines import SubSkillState, WorkflowState
 
 Attempt = Annotated[int, Field(ge=0, le=MAX_CORRECTIONS)]
@@ -99,6 +100,7 @@ class BuildRow(BaseModel):
     attempt: Attempt = 0
     # a gate missing from the map is PENDING; keys are only ever GateName values
     gates: dict[GateName, GateStatus] = Field(default_factory=dict)
+    loop_tests: LoopTestsBadge | None = None  # E13.6: absent until a Promptfoo run exists
 
 
 class BuildsResponse(BaseModel):

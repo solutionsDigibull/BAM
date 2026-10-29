@@ -98,6 +98,7 @@ from sbam_contracts.projects import (
     WorkflowRename,
     WorkflowSummary,
 )
+from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.schema_sql import SchemaSqlSourcePut, WorkflowSchemaSql
@@ -225,4 +226,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("testgen/tests_response", TestsResponse),
     ("testgen/case_put", CasePut),
     ("testgen/case_post", CasePost),
+    ("promptfoo/suite", Suite),
+    ("promptfoo/test_run", TestRunOut),
+    ("promptfoo/test_runs_response", TestRunsResponse),
 )

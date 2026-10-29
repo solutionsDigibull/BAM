@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:2c519bc13c0f84c6940ea49e0b12aba36268b41fbdebdc7e8bc8d5f326c6d904
+// source-sha256:bd95f05c69e00d30e915154135d0ca25e430ae4dcfd781b3c993ff4e17baf945
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -182,6 +182,11 @@ export type BuildStage =
  * via the `definition` "GateStatus".
  */
 export type GateStatus = "PENDING" | "RUNNING" | "PASSED" | "FAILED" | "SKIPPED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestRunState".
+ */
+export type TestRunState = "PASS" | "FAIL" | "NON_CERTIFYING" | "BLOCKED";
 /**
  * The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the
  * dashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).
@@ -408,6 +413,22 @@ export type ExpectedTerminal = "SUCCESS" | "ESCALATED" | "NO_OP";
  * via the `definition` "CaseKind".
  */
 export type CaseKind = "PASS_FIRST" | "PASS_AFTER_RETRY" | "ESCALATION" | "NO_OP" | "EDGE" | "FDE";
+/**
+ * What a suite assertion checks. The values are the `Assertion.type` a test case may carry.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AssertionType".
+ */
+export type AssertionType =
+  | "output_schema"
+  | "state_handoff_id"
+  | "terminal_state"
+  | "expected_output"
+  | "iterations_within_bound"
+  | "cycle_time_within_budget"
+  | "handoff_rows"
+  | "ui_updates"
+  | "llm_rubric";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -519,6 +540,9 @@ export interface SbamContracts {
   TestsResponse?: TestsResponse;
   CasePut?: CasePut;
   CasePost?: CasePost;
+  Suite?: Suite;
+  TestRunOut?: TestRunOut;
+  TestRunsResponse?: TestRunsResponse;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1082,6 +1106,18 @@ export interface BuildRow {
   gates?: {
     [k: string]: GateStatus | undefined;
   };
+  loop_tests?: LoopTestsBadge | null;
+}
+/**
+ * The 'Loop tests' cell of the Build & Test grid: `passed/total` and a state.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LoopTestsBadge".
+ */
+export interface LoopTestsBadge {
+  state: TestRunState;
+  passed: number;
+  total: number;
 }
 /**
  * `GET W/sub-skills/{sub_id}/gates?attempt=`: one attempt's gate results, in GateName order.
@@ -3948,4 +3984,293 @@ export interface CasePost {
    * @maxItems 50
    */
   assertions?: Assertion[];
+}
+/**
+ * The suite for one Sub-Skill build: at least three cases, all of which must pass.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Suite".
+ */
+export interface Suite {
+  suite_version?: "1";
+  bounds: SuiteBounds;
+  output_schema: {
+    [k: string]: JsonValue | undefined;
+  };
+  /**
+   * @minItems 3
+   * @maxItems 20
+   */
+  cases:
+    | [SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ];
+}
+/**
+ * The V bounds the assertions read, as the manifest declares them.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SuiteBounds".
+ */
+export interface SuiteBounds {
+  max_iterations: number;
+  budget_ms: number;
+  /**
+   * @maxItems 200
+   */
+  handoff_fields?: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SuiteCase".
+ */
+export interface SuiteCase {
+  name: string;
+  kind: CaseKind;
+  input: {
+    [k: string]: JsonValue | undefined;
+  };
+  expected_terminal: "SUCCESS" | "ESCALATED" | "NO_OP";
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  assertions: [SuiteAssertion, ...SuiteAssertion[]];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SuiteAssertion".
+ */
+export interface SuiteAssertion {
+  type: AssertionType;
+  value?: JsonValue;
+}
+/**
+ * A stored Promptfoo run (`test_runs`): per case per assertion, and the totals by case.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestRunOut".
+ */
+export interface TestRunOut {
+  id: string;
+  sub_skill_id: string;
+  code_attempt_id: string;
+  sandbox_run_id: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  suite_sha256: string;
+  state: TestRunState;
+  total: number;
+  passed: number;
+  failed: number;
+  non_certifying?: boolean;
+  /**
+   * @maxItems 2000
+   */
+  results: AssertionResult[];
+  report_key?: string | null;
+  created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AssertionResult".
+ */
+export interface AssertionResult {
+  case: string;
+  type: AssertionType;
+  passed: boolean;
+  message?: string;
+}
+/**
+ * `GET W/sub-skills/{sub_id}/test-runs`: the runs, newest first (empty before any).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestRunsResponse".
+ */
+export interface TestRunsResponse {
+  /**
+   * @maxItems 100
+   */
+  runs?: TestRunOut[];
 }
