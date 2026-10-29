@@ -8,14 +8,17 @@ rules, not against the skeleton (AST_SKELETON already pinned everything outside 
   Neither imports, names or calls the other, and nothing reaches a sibling through `sys.modules`.
 * AST_NO_MANUAL_LOOP: iteration is declarative (the Temporal loop is the retry). No `while`, no
   retry decorator or library, no recursion, no unbounded iterator, no sleep, no retry-in-a-`for`.
-  A bounded `for` over data is fine.
+  A bounded `for` over data is fine; a `range()`, sequence repeat or integer whose literal size
+  is out of all proportion (`range(10**12)`, `"a" * 10**11`) is a resource bomb.
 * AST_HANDOFF: the action function itself calls `state_handoff.append(...)` with every
   manifest `required_fields` key as a keyword, and nothing writes the handoff table any other way
   (no UPDATE/DELETE/DDL against it, no reaching into the writer's private connection).
 * AST_IMPORTS: imports are within the template's base imports plus the registry-resolved
   libraries, siblings relative; never eval/exec/compile/__import__, `os.system`, pickle, marshal,
   ctypes, importlib, and subprocess only when declared. Dynamic attribute access that could
-  smuggle one of those past the name checks is refused too.
+  smuggle one of those past the name checks is refused too, and so is reaching a module through
+  another module's attribute (`json.codecs.sys.modules`) or through a format string
+  (`"{0.__class__}".format(x)`). The gate is a fast fail: the sandbox is the boundary.
 * AST_SQL_SAFETY: SQL is a literal, parameterised with `%s`. An f-string, `+`, `%`, `.format` or
   `.join` that builds SQL text is refused, and a tool file executes only a literal.
 
@@ -25,6 +28,7 @@ correction loop (E13) asks the model to write it plainly.
 
 import ast
 import re
+import string
 from collections.abc import Iterable, Mapping
 from typing import Any, Final
 
@@ -52,9 +56,57 @@ RETRY_NAMES: Final = frozenset(
 )
 UNBOUNDED_ITERATORS: Final = frozenset({"count", "cycle", "repeat"})
 SLEEPS: Final = frozenset({"sleep"})
+# Modules an allowed module imports for itself (`json.codecs.sys`, `pathlib.os`). Imports are
+# checked by name, so reaching one of these as an attribute is the way round that check.
+ESCAPE_MODULES: Final = frozenset(
+    {
+        "sys",
+        "os",
+        "posix",
+        "nt",
+        "builtins",
+        "modules",
+        "subprocess",
+        "socket",
+        "importlib",
+        "ctypes",
+        "pickle",
+        "marshal",
+        "shutil",
+        "signal",
+        "threading",
+        "multiprocessing",
+        "runpy",
+        "pty",
+        "thread",
+        "posixsubprocess",
+        "fcntl",
+        "select",
+        "selectors",
+        "asyncio",
+        "tempfile",
+        "glob",
+        "urllib",
+        "http",
+        "ssl",
+        "code",
+        "pdb",
+    }
+)
+# A string longer than this is not looked at as code (it is prose or data).
+MAX_CODE_STRING: Final = 2000
+# Walk an attribute path given as a string, which no name check can see.
+# `get_type_hints` and `ForwardRef` evaluate string annotations (`def f(x: "__import__('os')")`).
+STRING_WALKERS: Final = frozenset(
+    {"attrgetter", "methodcaller", "Formatter", "vformat", "get_type_hints", "ForwardRef"}
+)
+FORMAT_METHODS: Final = frozenset({"format", "format_map"})
+# A loop, repeat or integer past this is a resource bomb, not a size a tool needs.
+MAX_ITEMS: Final = 1_000_000
+_HUGE: Final = 1 << 64
 # Beyond the pre-check's list: direct file/terminal access has no place in a tool (the project's
 # files go through StorageBackend, its data through the DB), and `breakpoint()` runs pdb.
-GATE_FORBIDDEN_NAMES: Final = FORBIDDEN_NAMES | {"open", "breakpoint", "input"}
+GATE_FORBIDDEN_NAMES: Final = FORBIDDEN_NAMES | {"open", "breakpoint", "input"} | STRING_WALKERS
 ALLOWED_DUNDERS: Final = frozenset({"__name__", "__doc__"})
 DYNAMIC_ACCESS: Final = frozenset({"getattr", "setattr", "delattr", "globals", "locals", "vars"})
 EXECUTE_METHODS: Final = frozenset(
@@ -76,6 +128,7 @@ CODES: Final = {
         "RETRY_CONSTRUCT",
         "RETRY_DECORATOR",
         "UNBOUNDED_ITERATION",
+        "RESOURCE_BOMB",
     ],
     GateName.AST_HANDOFF: [
         "HANDOFF_FIELD_MISSING",
@@ -129,9 +182,7 @@ def _dotted(node: ast.expr) -> str:
 
 
 def _functions(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
-    return [
-        n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)
-    ]
+    return [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)]
 
 
 # --- AST_DECOUPLING -----
@@ -168,8 +219,7 @@ def check_decoupling(trees: Mapping[str, ast.Module], params: Mapping[str, Any])
             elif isinstance(node, ast.Name) and node.id in banned:
                 problem = f"refers to {node.id!r}"
             elif isinstance(node, ast.Attribute) and (
-                node.attr in banned
-                or (node.attr == "modules" and _dotted(node.value) == "sys")
+                node.attr in banned or (node.attr == "modules" and _dotted(node.value) == "sys")
             ):
                 problem = f"refers to {node.attr!r}"
             elif isinstance(node, ast.Constant) and node.value in banned:
@@ -227,6 +277,89 @@ def _recursive(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]
     return [f for f in fns if reaches(f.name)]
 
 
+def _int_value(node: ast.expr, env: Mapping[str, int] | None = None) -> int | None:
+    """The value of an integer expression made of literals (clamped to +-2**64), else None.
+    Nothing is evaluated beyond small arithmetic: a huge power or shift is clamped, not computed."""
+    if isinstance(node, ast.Constant) and type(node.value) is int:
+        return max(-_HUGE, min(_HUGE, node.value))
+    if isinstance(node, ast.Name):
+        return (env or {}).get(node.id)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub | ast.UAdd):
+        inner = _int_value(node.operand, env)
+        return None if inner is None else (-inner if isinstance(node.op, ast.USub) else inner)
+    if not isinstance(node, ast.BinOp):
+        return None
+    left, right = _int_value(node.left, env), _int_value(node.right, env)
+    if left is None or right is None:
+        return None
+    if isinstance(node.op, ast.Pow):
+        if right < 0 or (abs(left) > 1 and right * abs(left).bit_length() > 64):
+            return _HUGE
+        value: int = left**right
+    elif isinstance(node.op, ast.LShift):
+        if right < 0 or right > 64:
+            return _HUGE
+        value = left << right
+    elif isinstance(node.op, ast.Mult):
+        value = left * right
+    elif isinstance(node.op, ast.Add):
+        value = left + right
+    elif isinstance(node.op, ast.Sub):
+        value = left - right
+    else:
+        return None
+    clamped: int = max(-_HUGE, min(_HUGE, value))
+    return clamped
+
+
+def _is_sequence_literal(node: ast.expr) -> bool:
+    return isinstance(node, ast.List | ast.Tuple) or (
+        isinstance(node, ast.Constant) and isinstance(node.value, str | bytes)
+    )
+
+
+def _int_names(tree: ast.Module) -> dict[str, int]:
+    """Names bound exactly once, to an integer made of literals (any scope)."""
+    counts: dict[str, int] = {}
+    values: dict[str, int] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    counts[target.id] = counts.get(target.id, 0) + 1
+                    value = _int_value(node.value, values)
+                    if value is not None:
+                        values[target.id] = value
+        elif isinstance(node, ast.AugAssign | ast.AnnAssign | ast.NamedExpr | ast.For):
+            for sub in ast.walk(node.target):
+                if isinstance(sub, ast.Name):
+                    counts[sub.id] = counts.get(sub.id, 0) + 2
+    return {n: v for n, v in values.items() if counts.get(n, 0) == 1}
+
+
+def _resource_bombs(file: str, node: ast.AST, env: Mapping[str, int]) -> list[Finding]:
+    gate = GateName.AST_NO_MANUAL_LOOP
+    if isinstance(node, ast.Call):
+        name = _call_name(node)
+        sizes = [_int_value(a, env) for a in node.args]
+        if name == "range" and any(v is not None and abs(v) > MAX_ITEMS for v in sizes):
+            message = f"range() over more than {MAX_ITEMS} items is a resource bomb"
+            return [_at(gate, "UNBOUNDED_ITERATION", message, file, node)]
+        if name in ("bytes", "bytearray") and any(v is not None and v > MAX_ITEMS for v in sizes):
+            return [_at(gate, "RESOURCE_BOMB", f"{name}() of a huge size", file, node)]
+    elif isinstance(node, ast.BinOp):
+        if isinstance(node.op, ast.Mult) and (
+            (_is_sequence_literal(node.left) and (_int_value(node.right, env) or 0) > MAX_ITEMS)
+            or (_is_sequence_literal(node.right) and (_int_value(node.left, env) or 0) > MAX_ITEMS)
+        ):
+            return [
+                _at(gate, "RESOURCE_BOMB", "a literal repeated a huge number of times", file, node)
+            ]
+        if isinstance(node.op, ast.Pow | ast.LShift) and (_int_value(node, env) or 0) >= _HUGE:
+            return [_at(gate, "RESOURCE_BOMB", "an integer of a huge size", file, node)]
+    return []
+
+
 def check_no_manual_loop(trees: Mapping[str, ast.Module]) -> list[Finding]:
     gate = GateName.AST_NO_MANUAL_LOOP
     findings: list[Finding] = []
@@ -239,7 +372,9 @@ def check_no_manual_loop(trees: Mapping[str, ast.Module]) -> list[Finding]:
         for fn in _recursive(tree):
             message = f"{fn.name!r} calls itself, directly or through others: that is a manual loop"
             findings.append(_at(gate, "RECURSION", message, file, fn))
+        sizes = _int_names(tree)
         for node in ast.walk(tree):
+            findings += _resource_bombs(file, node, sizes)
             if isinstance(node, ast.While):
                 message = "`while` is a manual loop; iterate declaratively over data"
                 findings.append(_at(gate, "WHILE_LOOP", message, file, node))
@@ -390,11 +525,7 @@ def _import_findings(
             message = "relative imports may only name models, state or state_handoff"
             out.append(_at(gate, "IMPORT_NOT_ALLOWED", message, file, node))
         return out
-    modules = (
-        [a.name for a in node.names]
-        if isinstance(node, ast.Import)
-        else [node.module or ""]
-    )
+    modules = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or ""]
     for module in modules:
         top = _top(module)
         if top in FORBIDDEN_MODULES or (top in DECLARABLE_MODULES and top not in declared):
@@ -411,6 +542,64 @@ def _import_findings(
     return out
 
 
+def _format_walks(call: ast.Call) -> bool:
+    """True when `call` is `.format`/`.format_map` that can walk attributes or items: a format
+    field `{0.x}` / `{0[x]}` (also in a nested spec), or a format string that is not a literal."""
+    func = call.func
+    if not (isinstance(func, ast.Attribute) and func.attr in FORMAT_METHODS):
+        return False
+    if not (isinstance(func.value, ast.Constant) and isinstance(func.value.value, str)):
+        return True
+    pending = [func.value.value]
+    while pending:
+        try:
+            parsed = list(string.Formatter().parse(pending.pop()))
+        except ValueError:
+            return True
+        for _, field, spec, _ in parsed:
+            if field is not None and ("." in field or "[" in field):
+                return True
+            if spec:
+                pending.append(spec)
+    return False
+
+
+def _forbidden_attr(attr: str) -> bool:
+    return (
+        attr in FORBIDDEN_ATTRS | GATE_FORBIDDEN_NAMES
+        or attr.lstrip("_") in ESCAPE_MODULES
+        or (attr.startswith("__") and attr.endswith("__") and attr not in ALLOWED_DUNDERS)
+    )
+
+
+def _forbidden_name(name: str) -> bool:
+    return name in GATE_FORBIDDEN_NAMES or name in ("__builtins__", "__loader__")
+
+
+def _embedded_code(file: str, node: ast.Constant) -> list[Finding]:
+    """A string that parses as a call/attribute expression using a forbidden name. Strings reach
+    `eval` through annotations (pydantic, `get_type_hints`) and `create_model`, so the string
+    itself is held to the rules. A bare word such as "open" is only data."""
+    text = node.value
+    if not isinstance(text, str) or len(text) > MAX_CODE_STRING:
+        return []
+    try:
+        body = ast.parse(text.strip(), mode="eval").body
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        return []
+    if isinstance(body, ast.Name | ast.Constant):
+        return []
+    for sub in ast.walk(body):
+        if (
+            isinstance(sub, ast.Name) and (_forbidden_name(sub.id) or sub.id in DYNAMIC_ACCESS)
+        ) or (isinstance(sub, ast.Attribute) and _forbidden_attr(sub.attr)):
+            message = (
+                "a string that is code using a forbidden name can be evaluated as an annotation"
+            )
+            return [_at(GateName.AST_IMPORTS, "FORBIDDEN_CALL", message, file, node)]
+    return []
+
+
 def check_imports(
     trees: Mapping[str, ast.Module], template: LoadedTemplate, modules: Iterable[str]
 ) -> list[Finding]:
@@ -422,23 +611,19 @@ def check_imports(
         for node in ast.walk(tree):
             if isinstance(node, ast.Import | ast.ImportFrom):
                 findings += _import_findings(file, node, allowed, declared)
-            elif isinstance(node, ast.Name) and (
-                node.id in GATE_FORBIDDEN_NAMES or node.id in ("__builtins__", "__loader__")
-            ):
+            elif isinstance(node, ast.Name) and _forbidden_name(node.id):
                 message = f"{node.id} is forbidden in generated code"
                 findings.append(_at(gate, "FORBIDDEN_CALL", message, file, node))
-            elif isinstance(node, ast.Attribute) and (
-                node.attr in FORBIDDEN_ATTRS | GATE_FORBIDDEN_NAMES
-                or (
-                    node.attr.startswith("__")
-                    and node.attr.endswith("__")
-                    and node.attr not in ALLOWED_DUNDERS
-                )
-            ):
+            elif isinstance(node, ast.Name) and node.id in DYNAMIC_ACCESS:
+                message = f"{node.id} can reach a forbidden name dynamically"
+                findings.append(_at(gate, "DYNAMIC_ACCESS", message, file, node))
+            elif isinstance(node, ast.Attribute) and _forbidden_attr(node.attr):
                 message = f".{node.attr} is forbidden in generated code"
                 findings.append(_at(gate, "FORBIDDEN_CALL", message, file, node))
-            elif isinstance(node, ast.Call) and _call_name(node) in DYNAMIC_ACCESS:
-                message = f"{_call_name(node)}() can reach a forbidden name dynamically"
+            elif isinstance(node, ast.Constant):
+                findings += _embedded_code(file, node)
+            elif isinstance(node, ast.Call) and _format_walks(node):
+                message = "a format string may walk attributes; use an f-string or plain fields"
                 findings.append(_at(gate, "DYNAMIC_ACCESS", message, file, node))
     return findings
 
