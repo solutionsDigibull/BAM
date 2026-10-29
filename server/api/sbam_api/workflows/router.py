@@ -16,14 +16,15 @@ from sbam_contracts.api import Page
 from sbam_contracts.projects import WorkflowRename, WorkflowSummary
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.core.auth import CurrentUser, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import etag
+from sbam_api.projects.guard import active_project
 from sbam_api.temporal.deps import session_factory
 from sbam_api.workflows import service
 
 router = APIRouter(tags=["workflows"])
 
-Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 

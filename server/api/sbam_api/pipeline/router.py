@@ -17,18 +17,19 @@ from sbam_contracts.state_machines import ProjectPipelineState
 from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.audit.repository import entity_history
-from sbam_api.core.auth import CurrentUser, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import not_found
 from sbam_api.core.settings import Settings
 from sbam_api.ingest.repository import DocumentVersionRepository
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY, start_project_pipeline
 from sbam_api.pipeline.timeline import build_counts, build_steps
+from sbam_api.projects.guard import active_project
 from sbam_api.projects.repository import ProjectRepository
 from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["pipeline"])
 
-Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 IdempotencyKey = Annotated[str | None, Header(min_length=1, max_length=MAX_IDEMPOTENCY_KEY)]

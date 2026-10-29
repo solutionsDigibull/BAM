@@ -9,7 +9,9 @@ import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
+from sbam_api.projects.models import Project
 from sbam_api.temporal.models import TemporalRun
 from sbam_contracts.build import SubSkillBuildStatus
 from sqlalchemy import create_engine
@@ -30,6 +32,20 @@ def memory_sessions() -> sessionmaker[Session]:
     )
     TemporalRun.metadata.create_all(engine, tables=[TemporalRun.__table__])  # type: ignore[list-item]
     return sessionmaker(engine, expire_on_commit=False)
+
+
+def add_project(
+    sessions: sessionmaker[Session], tenant_id: UUID, project_id: UUID, status: str = "ACTIVE"
+) -> None:
+    """The `projects` row that the archive guard (A-26) reads before a write on a project route."""
+    Project.__table__.create(sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
+    with sessions() as session:
+        project = Project(
+            id=project_id, tenant_id=tenant_id, name=f"P-{project_id.hex[:8]}", status=status
+        )
+        project.state = "IDLE"
+        session.add(project)
+        session.commit()
 
 
 def all_rows(sessions: sessionmaker[Session]) -> list[TemporalRun]:

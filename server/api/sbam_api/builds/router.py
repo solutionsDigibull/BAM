@@ -16,14 +16,15 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.builds import code_view
 from sbam_api.builds.service import retry_build
-from sbam_api.core.auth import CurrentUser, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import validate_idempotency_key
+from sbam_api.projects.guard import active_project
 from sbam_api.storage.router import backend
 from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["builds"])
 
-Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 BuildNo = Annotated[int | None, Query(ge=1)]

@@ -23,18 +23,19 @@ from sbam_contracts.runs import (
 )
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.core.auth import CurrentUser, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import not_found
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
+from sbam_api.projects.guard import active_project
 from sbam_api.temporal.deps import session_factory, temporal_client
 from sbam_api.temporal.repository import TemporalRunRepository, to_run
 from sbam_api.temporal.service import StartSpec, start_run
 
 router = APIRouter(tags=["runs"])
 
-Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 
