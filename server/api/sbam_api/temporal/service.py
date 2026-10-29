@@ -27,7 +27,7 @@ from temporalio.service import RPCError
 
 from sbam_api.core.conventions import ApiError
 from sbam_api.db.repository import TenantContext
-from sbam_api.temporal.client import OrchestratorUnavailable
+from sbam_api.temporal.client import RPC_TIMEOUT, OrchestratorUnavailable
 from sbam_api.temporal.models import TemporalRun
 from sbam_api.temporal.repository import TemporalRunRepository, to_run
 
@@ -102,6 +102,7 @@ async def start_run(
             task_queue=spec.queue.value,
             id_conflict_policy=conflict,
             search_attributes=search_attributes(spec) if with_search_attributes else None,
+            rpc_timeout=RPC_TIMEOUT,
         )
     except WorkflowAlreadyStartedError:
         raise PipelineRunning() from None

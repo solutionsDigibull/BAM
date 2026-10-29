@@ -27,7 +27,7 @@ from temporalio.client import Client, WorkflowQueryFailedError
 from temporalio.service import RPCError, RPCStatusCode
 
 from sbam_api.core.conventions import ApiError, not_found
-from sbam_api.temporal.client import OrchestratorUnavailable
+from sbam_api.temporal.client import RPC_TIMEOUT, OrchestratorUnavailable
 
 QUERY_TIMEOUT = timedelta(seconds=5)
 QUERY_ATTEMPTS = 3
@@ -115,7 +115,9 @@ async def retry_build(
     if not status.waiting_for_retry:
         raise NotInReview()
     try:
-        await client.get_workflow_handle(build_id).signal(RETRY_SIGNAL, retry)
+        await client.get_workflow_handle(build_id).signal(
+            RETRY_SIGNAL, retry, rpc_timeout=RPC_TIMEOUT
+        )
     except RPCError as exc:
         if exc.status == RPCStatusCode.NOT_FOUND:  # finished between the query and the signal
             raise NotInReview() from None

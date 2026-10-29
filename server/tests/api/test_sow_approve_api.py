@@ -27,7 +27,7 @@ class Handle:
             raise RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
         return PipelineStatus(stage=self.client.stage)
 
-    async def signal(self, name: str, payload: Any) -> None:
+    async def signal(self, name: str, payload: Any, **_: Any) -> None:
         if self.client.down:
             raise RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
         self.client.signals.append((name, payload))

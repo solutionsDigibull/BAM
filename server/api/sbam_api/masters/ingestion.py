@@ -19,6 +19,7 @@ from temporalio.service import RPCError
 
 from sbam_api.core.ids import uuid7
 from sbam_api.masters.models import MasterDocument
+from sbam_api.temporal.client import RPC_TIMEOUT
 
 log = logging.getLogger("sbam_api.masters")
 TENANT_SCOPE_PROJECT = uuid.UUID(int=0)  # a tenant-wide document has no project
@@ -40,6 +41,7 @@ async def start_parse(client: Client, document: MasterDocument, correlation_id: 
             id=master_document_workflow_id(document.id),
             task_queue=TaskQueue.INGEST.value,
             id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            rpc_timeout=RPC_TIMEOUT,
         )
     except (RPCError, RuntimeError, WorkflowFailureError):
         log.warning("master document parse not started yet")
