@@ -123,19 +123,27 @@ class BodyLimitMiddleware:
             await send_problem(send, too_large)
             return
 
-        received, started = 0, False
+        received, started, exceeded, answered = 0, False, False, False
 
         async def limited_receive() -> Message:
-            nonlocal received
+            nonlocal received, exceeded
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > max_bytes:
+                    exceeded = True
                     raise _BodyTooLargeError
             return message
 
         async def tracking_send(message: Message) -> None:
-            nonlocal started
+            nonlocal started, answered
+            if exceeded and not started:
+                # The handler's own body parser catches the error above and answers 400 (A-19):
+                # the client is told 413, whatever the app made of the cut-off body.
+                if not answered:
+                    answered = True
+                    await send_problem(send, too_large)
+                return
             started = started or message["type"] == "http.response.start"
             await send(message)
 
@@ -144,4 +152,8 @@ class BodyLimitMiddleware:
         except _BodyTooLargeError:
             if started:
                 raise
-            await send_problem(send, too_large)
+            if not answered:
+                await send_problem(send, too_large)
+        else:
+            if exceeded and not started and not answered:  # the app swallowed it and sent nothing
+                await send_problem(send, too_large)

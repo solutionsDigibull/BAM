@@ -32,7 +32,10 @@ from sbam_contracts.masters_api import ImportMode, ImportReport, ImportRowError,
 from sbam_contracts.masters_workbook import (
     COLUMN_NUMBER_START,
     COLUMNS,
+    HEADER_ROWS,
     MAX_WORKBOOK_BYTES,
+    TAB_ORDER,
+    TAB_ORDER_WITH_TOOLING,
     TABS,
     Grid,
     MasterRow,
@@ -41,6 +44,7 @@ from sbam_contracts.masters_workbook import (
     check_content_types,
     check_workbook_container,
     parse_workbook,
+    validate_structure,
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -59,6 +63,16 @@ from sbam_api.scan.clamd import ClamdClient, ClamdError
 from sbam_api.storage import Kind, StorageBackend, StorageScope
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# The real tabs hold 10 to 160 rows. A tab with more rows than this is not a masters workbook, and
+# is refused while it streams, before anything but its header is kept (A-19: a 14 MB, 400k-row tab
+# took 11 s and 250 MB of the API process to be rejected after it was read whole).
+MAX_DATA_ROWS = 10_000
+_MAX_SCAN_ROWS = 4 * MAX_DATA_ROWS  # rows looked at, empty ones included, before giving up
+# openpyxl walks a whole sheet when it opens the workbook if the file carries no `<dimension>` (a
+# generated one need not), so a huge tab costs seconds before the first row is read. The unpacked
+# size of every sheet is in the zip directory: refuse an oversize one without reading it.
+MAX_SHEET_XML_BYTES = 16 * 1024 * 1024
+_SHEET_XML = re.compile(r"^xl/worksheets/[^/]+\.xml$")
 _PATH = re.compile(r"^(?P<tab>[^!]+)!row(?P<row>\d+):col(?P<col>\w+)$")
 _TAB_TYPES = {tab: master_type for master_type, tab in TABS.items()}
 
@@ -127,14 +141,18 @@ def read_workbook(
     _scan(session, user, settings, storage, scope, sha256, data)
     parsed = parse_workbook(_read(filename, data))
     if parsed.code == ErrorCode.STRUCTURE_MISMATCH:
-        raise ApiError(
-            422,
-            ErrorCode.STRUCTURE_MISMATCH,
-            "The workbook does not have the BAM 0.2 structure",
-            "Use the published template; columns and tabs are never mapped automatically.",
-            errors=parsed.errors,
-        )
+        raise _structure_mismatch(parsed.errors)
     return sha256, parsed
+
+
+def _structure_mismatch(errors: list[FieldError]) -> ApiError:
+    return ApiError(
+        422,
+        ErrorCode.STRUCTURE_MISMATCH,
+        "The workbook does not have the BAM 0.2 structure",
+        "Use the published template; columns and tabs are never mapped automatically.",
+        errors=errors,
+    )
 
 
 def _scan(
@@ -196,6 +214,9 @@ def _read(filename: str, data: bytes) -> dict[str, Grid]:
             raise ApiError(
                 422, ErrorCode.ARCHIVE_LIMIT, "The workbook expands too far", errors=[bomb]
             )
+        for info in infos:
+            if _SHEET_XML.match(info.filename) and info.file_size > MAX_SHEET_XML_BYTES:
+                raise _too_many_rows(info.filename)
         try:
             content_types = archive.read("[Content_Types].xml").decode("utf-8", "replace")
         except (KeyError, zipfile.BadZipFile, ValueError):
@@ -209,11 +230,39 @@ def _read(filename: str, data: bytes) -> dict[str, Grid]:
             [FieldError(path="file", message="the workbook can't be read")]
         ) from None
     try:
-        return {
-            ws.title: [list(r) for r in ws.iter_rows(values_only=True)] for ws in book.worksheets
-        }
+        return _stream_sheets(book)
     finally:
         book.close()
+
+
+def _too_many_rows(tab: str) -> ApiError:
+    return ApiError(
+        422,
+        ErrorCode.VALIDATION_ERROR,
+        "A tab is too large",
+        f"{tab} is larger than a masters tab can be ({MAX_DATA_ROWS} data rows).",
+        errors=[FieldError(path=f"{tab}!rows", message=f"more than {MAX_DATA_ROWS} data rows")],
+    )
+
+
+def _stream_sheets(book: Any) -> dict[str, Grid]:
+    """The tabs, checked before any row is read, then each tab's rows up to `MAX_DATA_ROWS`."""
+    names = tuple(book.sheetnames)
+    if names not in (TAB_ORDER, TAB_ORDER_WITH_TOOLING):  # the same tab error the full check gives
+        raise _structure_mismatch(validate_structure({name: [] for name in names}))
+    grids: dict[str, Grid] = {}
+    for sheet in book.worksheets:
+        rows: list[list[Any]] = []
+        filled = 0  # data rows (below the header) that hold a value
+        for number, values in enumerate(sheet.iter_rows(values_only=True), start=1):
+            row = list(values)  # row positions are kept: error paths cite the sheet row
+            rows.append(row)
+            if number > HEADER_ROWS and any(cell not in (None, "") for cell in row):
+                filled += 1
+            if filled > MAX_DATA_ROWS or number > _MAX_SCAN_ROWS:
+                raise _too_many_rows(sheet.title)
+        grids[sheet.title] = rows
+    return grids
 
 
 def _require_frozen_filetype(
