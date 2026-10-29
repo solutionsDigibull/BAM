@@ -8,7 +8,8 @@ and the build context it writes the six TD §11.1 blocks:
     wall clock, so a rebuild of the same ISATVON hashes the same.
   * isatvon_definition: ISA14's flat shape (`to_flat`); the structured form goes to
     `sbam_build_record.isatvon_detail`.
-  * srim_runtime_definition: `PLATFORM_SRIM`, with `persistence.table` from V.tables.
+  * srim_runtime_definition: the tenant's defaults (`BuildContext.srim`, ISA14's until it sets its
+    own, O-19), with `persistence.table` from V.tables.
   * contracts: `build_contracts` (S.required_inputs; O.json_schema + `state_handoff_id`).
   * governance: lifecycle from the Sub-Skill's state, versioning 1.0.0, and the deterministic hash
     (RFC 8785, `canonical.deterministic_hash`), set by `SkillManifest.sealed`.
@@ -48,6 +49,7 @@ from sbam_api.masters.models import MasterSnapshot
 from sbam_api.registry.repository import active_registry
 from sbam_api.schema_sql.repository import WorkflowSchemaRepository
 from sbam_api.sow.models import SowVersion
+from sbam_api.srim_defaults.repository import SrimDefaultsRepository
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
 from sbam_api.workflows.models import Workflow
 from sbam_api.workflows.repository import WorkflowRepository
@@ -64,7 +66,13 @@ from sbam_contracts.isatvon14 import (
 from sbam_contracts.isatvon14 import (
     SubSkill as IsatvonSubSkill,
 )
-from sbam_contracts.manifest import HASH_PLACEHOLDER, SkillManifest, TemplateRef
+from sbam_contracts.manifest import (
+    HASH_PLACEHOLDER,
+    ISA14_SRIM_DEFAULTS,
+    SkillManifest,
+    SrimRuntimeDefaults,
+    TemplateRef,
+)
 from sbam_contracts.pipeline import IdResult
 from sbam_contracts.runs import TaskQueue
 from sbam_contracts.state_machines import MANIFEST_STATUS, SubSkillState
@@ -84,22 +92,9 @@ TEMPLATE: Final = ("fastmcp-loopy", "1.0.0")
 SKILL_TYPE: Final = "Deterministic_Loopy_MCP"  # O-15
 PLATFORM_OWNER: Final = "SBAM Platform"
 FIRST_VERSION: Final = (1, 0, 0)  # C-32; MAJOR / PATCH bumps come with re-certification (E14)
-# ponytail: the ISA14 defaults (TD §11.1) for every tenant; per-tenant SRIM config (O-19) is
-# #391. `persistence.table` is filled from the Sub-Skill's V.tables.
-PLATFORM_SRIM: Final[Mapping[str, Mapping[str, str]]] = {
-    "orchestration": {
-        "router": "Dify_Dynamic_Master_Router",
-        "trigger": "HTTP_POST_Payload_plus_Variables",
-    },
-    "execution": {"engine": "FastMCP_Execution_Engine"},
-    "gateway": {"route_via": "MCP_Jungle_Gateway_Reverse_Proxy"},
-    "persistence": {
-        "database": "PostgreSQL_Database_State_Config",
-        "action": "Execute_SQL_Queries_via_Postgres_MCP",
-    },
-    "audit": {"telemetry": "PostgreSQL_Audit_Logs"},
-    "ui": {"target": "SRIM_UI_Canvas", "method": "Embedded_iFrames_Widgets"},
-}
+# The ISA14 defaults (TD §11.1) are `ISA14_SRIM_DEFAULTS`; a tenant's own values (O-19, E9.1b) come
+# in through `BuildContext.srim`. `persistence.table` is filled from the Sub-Skill's V.tables.
+PLATFORM_SRIM: Final[Mapping[str, Mapping[str, str]]] = ISA14_SRIM_DEFAULTS.model_dump(mode="json")
 # The hash of the Workflow's latest PASSED schema.sql (E9.4, `build_schema_sql`); a Workflow that
 # never built one records the empty script's, which is also what a Workflow without tables builds.
 EMPTY_SCHEMA_SQL_SHA256: Final = hashlib.sha256(b"").hexdigest()
@@ -129,6 +124,7 @@ class BuildContext:
     template: TemplateRef
     runtime_digest: str
     schema_sql_sha256: str = EMPTY_SCHEMA_SQL_SHA256
+    srim: SrimRuntimeDefaults = ISA14_SRIM_DEFAULTS  # the tenant's, or ISA14's if it set none
 
 
 def _utc(moment: datetime) -> str:
@@ -175,10 +171,7 @@ def build_skill_manifest(
     status = MANIFEST_STATUS[ctx.state]
     stamp = _utc(ctx.validated_at)
     major, minor, patch = FIRST_VERSION
-    persistence = {
-        **PLATFORM_SRIM["persistence"],
-        "table": ", ".join(definition.v_variables.tables),
-    }
+    srim = ctx.srim.runtime_definition(", ".join(definition.v_variables.tables))
     manifest = {
         "skill_metadata": {
             "macro_category": meta.macro_category,
@@ -193,7 +186,7 @@ def build_skill_manifest(
             "updated_at": stamp,
         },
         "isatvon_definition": to_flat(definition),
-        "srim_runtime_definition": {**PLATFORM_SRIM, "persistence": persistence},
+        "srim_runtime_definition": srim.model_dump(mode="json"),
         "contracts": build_contracts(sub),
         "governance": {
             "deterministic_hash": HASH_PLACEHOLDER,
@@ -339,6 +332,7 @@ class SqlManifestStore:
                 macro_category=None if macro is None else macro.macro_category,
                 ctx=BuildContext(
                     schema_sql_sha256=_schema_sha256(session, ctx, inp.workflow_id),
+                    srim=SrimDefaultsRepository(session, ctx).current()[0],
                     state=SubSkillState(sub.state),
                     # rows from before E9.1 have no validated_at: created_at is as stable
                     validated_at=sub.validated_at or sub.created_at,
