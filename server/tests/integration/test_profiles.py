@@ -62,11 +62,16 @@ def wait_healthy(services: list[str], timeout: float = 300) -> dict[str, str | N
         time.sleep(5)
 
 
-def env_value(name: str) -> str:
-    """A value from the stack's env file (secrets are never hard-coded in tests)."""
+def env_value(name: str, default: str | None = None) -> str:
+    """A value from the stack's env file (secrets are never hard-coded in tests); `default` when the
+    name is absent or empty, else the test fails."""
     for line in Path(ENV_FILE).read_text(encoding="utf-8").splitlines():
         if line.startswith(f"{name}="):
-            return line.split("=", 1)[1].strip()
+            value = line.split("=", 1)[1].strip()
+            if value or default is None:
+                return value
+    if default is not None:
+        return default
     pytest.fail(f"{name} missing from {ENV_FILE}")
 
 
