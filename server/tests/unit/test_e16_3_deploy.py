@@ -651,6 +651,7 @@ SECRET_NAMES = [
     "keycloak_admin_password",
     "keycloak_admin_client_secret",
     "tusd_hook_secret",
+    "upload_token_key",
     "storage_signing_key",
     "auth_secret",
     "openrouter_api_key",
@@ -666,7 +667,7 @@ def _write_secrets(directory: Path, **overrides: str | None) -> None:
             (
                 "a1b2c3d4e5f60718293a4b5c6d7e8f90"
                 if "password" in name
-                else "s3cret-value-0123456789abcdef0123456789"
+                else f"s3cret-{name}-0123456789abcdef012345"
             ),
         )
         if value is None:
@@ -969,3 +970,30 @@ def test_a09_t07_cognee_secret_below_32_characters_fails_the_secret_check(tmp_pa
     assert out.returncode == 1 and "cognee_user_secret: shorter than 32" in out.stdout
     _write_secrets(placeholder, **{"cognee_user_secret": "change-me-" + "0" * 30})
     assert "cognee_user_secret: still a template placeholder" in _check_secrets(placeholder).stdout
+
+
+def test_a14_t06_upload_token_key_equal_to_the_hook_secret_fails_the_secret_check(
+    tmp_path: Path,
+) -> None:
+    same = "s3cret-the-same-value-0123456789abcdef"
+    _write_secrets(tmp_path, **{"tusd_hook_secret": same, "upload_token_key": same})
+    out = _check_secrets(tmp_path)
+    assert (
+        out.returncode == 1 and "upload_token_key: must differ from tusd_hook_secret" in out.stdout
+    )
+
+
+def test_a14_t07_a_missing_upload_token_key_fails_the_secret_check(tmp_path: Path) -> None:
+    _write_secrets(tmp_path, **{"upload_token_key": None})
+    out = _check_secrets(tmp_path)
+    assert out.returncode == 1 and "upload_token_key: missing" in out.stdout
+
+
+def test_a14_t08_only_the_api_gets_the_upload_token_key_and_tusd_does_not() -> None:
+    deploy = (COMPOSE / "compose.deploy.yaml").read_text(encoding="utf-8")
+    tusd = deploy.split("\n  tusd:\n")[1].split("\n  # --- SBAM")[0]
+    assert "upload_token_key" not in tusd  # tusd only ever needs the hook secret
+    api = deploy.split("\n  sbam-api:\n")[1].split("\n  worker-ingest:")[0]
+    assert "UPLOAD_TOKEN_KEY_FILE: /run/secrets/upload_token_key" in api
+    workers = deploy.split("\n  worker-ingest:\n")[1]
+    assert "upload_token_key" not in workers.split("\nsecrets:")[0]

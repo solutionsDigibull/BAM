@@ -649,6 +649,12 @@
         "actor": "SYSTEM"
       },
       {
+        "from": "CORRECTING",
+        "event": "isatvon_review_required",
+        "to": "NEEDS_FDE_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
         "from": "NEEDS_FDE_REVIEW",
         "event": "retry",
         "to": "BUILDING",

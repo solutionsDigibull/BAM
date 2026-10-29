@@ -27,6 +27,7 @@ from enum import StrEnum
 from typing import Annotated, Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
+from sbam_contracts.build import MAX_CHANGED_PATHS, IsatvonPatchClass
 from sbam_contracts.canonical import sha256_of
 from sbam_contracts.isatvon14 import DEFAULT_LIBRARY_REGISTRY, SubSkill, validate_sub_skill
 
@@ -49,6 +50,14 @@ MAX_TRACE_BYTES: Final = 200 * 1024
 MAX_FINDING_TEXT: Final = 2000
 MAX_PATCH_OPS: Final = 50
 PATCH_ROOT: Final = "isatvon_definition"
+MAX_CHANGED_PATH_CHARS: Final = (
+    200  # CorrectionResult.changed_paths: one pointer, at most this long
+)
+# What a patch may change without changing what the Sub-Skill does (#446): the libraries it imports
+# (a library the runtime lacks is fixed this way). Everything else under /isatvon_definition (a
+# bound, a gate, a schema, the tools) changes its meaning, so the FDE decides. The default errs
+# towards asking: a path not listed here is BEHAVIOUR.
+NEUTRAL_SUBTREES: Final = (("isatvon_definition", "t_tech_stack", "libraries"),)
 FINDING_KEYS: Final = ("gate", "code", "message", "file", "field", "path", "line", "col")
 TRUNCATED: Final = "\n[... truncated]"
 
@@ -106,6 +115,32 @@ class _PatchError(ValueError):
     pass
 
 
+def _is_neutral(path: str) -> bool:
+    try:
+        tokens = _tokens(path)
+    except _PatchError:
+        return False
+    return any(tokens[: len(subtree)] == list(subtree) for subtree in NEUTRAL_SUBTREES)
+
+
+def classify_patch(ops: Sequence[PatchOp]) -> tuple[IsatvonPatchClass, tuple[str, ...]]:
+    """What an accepted patch did to the ISATVON, and the pointers it changed (#446).
+
+    `test` operations change nothing. NEUTRAL only when every changing operation stays inside a
+    neutral subtree; one operation outside it makes the whole patch BEHAVIOUR. The paths are
+    de-duplicated, in order, each cut to MAX_CHANGED_PATH_CHARS, at most MAX_CHANGED_PATHS."""
+    changing = [op for op in ops if op.op != "test"]
+    if not changing:
+        return IsatvonPatchClass.NONE, ()
+    paths = tuple(dict.fromkeys(op.path[:MAX_CHANGED_PATH_CHARS] for op in changing))
+    kind = (
+        IsatvonPatchClass.NEUTRAL
+        if all(_is_neutral(op.path) for op in changing)
+        else IsatvonPatchClass.BEHAVIOUR
+    )
+    return kind, paths[:MAX_CHANGED_PATHS]
+
+
 @dataclass(frozen=True)
 class Correction:
     output: CorrectorOutput
@@ -118,6 +153,8 @@ class Correction:
     trace_id: str
     attempts: int
     cached: bool
+    patch_class: IsatvonPatchClass = IsatvonPatchClass.NONE  # of the accepted patch, if any
+    changed_paths: tuple[str, ...] = ()
 
 
 # --- context -------------------------------------------------------------------------------------
@@ -343,6 +380,11 @@ async def correct_code(
             if broken:
                 patched = None
     problems.extend(precheck(bodies, allowlist, params, skeleton))
+    patch_class, changed_paths = (
+        classify_patch(out.isatvon_patch or [])
+        if patched is not None
+        else (IsatvonPatchClass.NONE, ())
+    )
     return Correction(
         output=out,
         bodies=bodies,
@@ -354,4 +396,6 @@ async def correct_code(
         trace_id=result.trace_id,
         attempts=result.attempts,
         cached=result.cached,
+        patch_class=patch_class,
+        changed_paths=changed_paths,
     )

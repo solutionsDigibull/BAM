@@ -16,6 +16,8 @@ DEPENDENCY_FAILED and are corrected the same way. Sandbox infrastructure failure
 the counter: TESTING_BLOCKED, then `retry` re-runs only the sandbox tests. A model that cannot
 answer in a model stage (the re-asks or the transport retries are spent) is neither: the Sub-Skill
 is fine, so `generation_failed` parks it in NEEDS_FDE_REVIEW and `retry` opens a new cycle (#483).
+A correction that changed what the Sub-Skill means (a BEHAVIOUR ISATVON patch) is held the same way
+instead of certifying on the corrector's say-so (#446).
 
 Rules (.claude/rules/temporal.md): deterministic (no clock, randomness, I/O); everything else is an
 activity. The counters live in workflow state and survive replay. State changes go through the
@@ -48,6 +50,8 @@ with workflow.unsafe.imports_passed_through():
         BuildStage,
         BuildStageInput,
         CorrectionInput,
+        CorrectionResult,
+        IsatvonPatchClass,
         LibraryCheckResult,
         LibraryStatus,
         SubSkillBuildStatus,
@@ -113,6 +117,8 @@ TIMED_OUT = "ActivityTimeout"
 GENERATION_FAILED = "GenerationFailed"  # internal failure kind
 GENERATION_PATCH = "e11-2c-generation-failed"
 FINDINGS_PATCH = "e11-4-cycle-findings"
+REVIEW_PATCH = "a20-isatvon-patch-review"
+MAX_SUMMARY_PATHS = 10
 SPECS: dict[BuildStage, _Spec] = {
     BuildStage.BUILD_MANIFEST: _Spec(TaskQueue.BUILD, 2 * _MIN, 3),
     BuildStage.CHECK_LIBRARIES: _Spec(TaskQueue.BUILD, 5 * _MIN, 3),
@@ -146,6 +152,7 @@ TARGET: dict[str, SubSkillState] = {
     "correction_applied": SubSkillState.BUILDING,
     "attempts_exhausted": SubSkillState.NEEDS_FDE_REVIEW,
     "generation_failed": SubSkillState.NEEDS_FDE_REVIEW,
+    "isatvon_review_required": SubSkillState.NEEDS_FDE_REVIEW,
     "sandbox_unavailable": SubSkillState.TESTING_BLOCKED,
 }
 WAITING_STATES = frozenset(
@@ -188,6 +195,13 @@ def _finding_ids(error: ApplicationError) -> list[UUID]:
     return ids
 
 
+def _summary(paths: list[str]) -> str:
+    """The changed pointers for a notification: the first few, then how many more."""
+    shown = " ".join(paths[:MAX_SUMMARY_PATHS])
+    more = len(paths) - MAX_SUMMARY_PATHS
+    return shown + (f" (+{more} more)" if more > 0 else "")
+
+
 def _model_failure(cause: BaseException | None) -> str | None:
     """The error type when the model side failed (see MODEL_FAILURES), else None. Only the type:
     a message may hold model output."""
@@ -210,6 +224,7 @@ class SubSkillBuild:
         self.corrections = 0
         self.findings: list[UUID] = []
         self.cycle_findings: list[UUID] = []  # every attempt's, for the escalation (#115)
+        self.held_patch: list[str] | None = None  # paths of a BEHAVIOUR patch held for the FDE
         self.waiting = False
         self.pending_retry: SubSkillRetry | None = None
         self.retry_keys: list[str] = []
@@ -298,6 +313,7 @@ class SubSkillBuild:
         self.corrections = 0
         self.findings = []
         self.cycle_findings = []
+        self.held_patch = None
 
     async def _pass(self) -> _Failure | None:
         """One build pass; None when it certified."""
@@ -359,10 +375,11 @@ class SubSkillBuild:
 
     async def _correct(self, failure: _Failure) -> bool:
         """One correction. It is spent even if the corrector changed nothing. False when the
-        corrector itself gave up (no further correction would help either)."""
+        corrector itself gave up (no further correction would help either), or when it changed
+        what the Sub-Skill means: that patch is held for the FDE (`_exhausted`), never applied."""
         self.corrections += 1
         try:
-            await self._call(
+            result: CorrectionResult = await self._call(
                 BuildStage.CORRECT,
                 correct,
                 CorrectionInput(
@@ -378,22 +395,26 @@ class SubSkillBuild:
                 raise
             self.corrections = MAX_CORRECTIONS
             return False
+        if result.isatvon_patch is IsatvonPatchClass.BEHAVIOUR and workflow.patched(REVIEW_PATCH):
+            self.held_patch = list(result.changed_paths)
+            return False
         await self._apply("correction_applied")
         return True
 
     async def _exhausted(self) -> None:
         """No correction left: NEEDS_FDE_REVIEW (DEPENDENCY_FAILED stays as it is), then tell the
         FDE which findings to look at and that `retry` is the next action."""
+        held = self.held_patch
         if self.state is SubSkillState.CORRECTING:
-            await self._apply("attempts_exhausted")
+            await self._apply("attempts_exhausted" if held is None else "isatvon_review_required")
         if workflow.patched(FINDINGS_PATCH):
             self.findings = list(self.cycle_findings)  # all attempts' findings, not the last pass's
-        kind = (
-            "sub_skill.dependency_failed"
-            if self.state is SubSkillState.DEPENDENCY_FAILED
-            else "sub_skill.needs_fde_review"
-        )
-        await self._notify(kind)
+        if self.state is SubSkillState.DEPENDENCY_FAILED:
+            kind = "sub_skill.dependency_failed"
+        else:
+            kind = "sub_skill.needs_fde_review" if held is None else "sub_skill.isatvon_review"
+        extra = {} if held is None else {"patch": "BEHAVIOUR", "changed_paths": _summary(held)}
+        await self._notify(kind, **extra)
 
     async def _generation_failed(self, failure: _Failure) -> None:
         """The model could not answer: NEEDS_FDE_REVIEW, tell the FDE why (the error type) and that

@@ -242,6 +242,24 @@ def test_e11_2c_the_transition_itself_is_not_a_second_notification() -> None:
     assert rows(sessions) == []
 
 
+def test_a20_a_held_isatvon_patch_tells_the_fde_the_sub_skill_needs_review() -> None:
+    """#446: a correction changed what the Sub-Skill means; it is held, not certified. Only the
+    FDE is told (the alert is not one of the admin types); the transition is not a second one."""
+    sessions = notification_sessions()
+    fde = add_user(sessions, TENANT)
+    admin = add_user(sessions, TENANT, roles=[ADMIN_ROLE])
+    project = add_project(sessions, TENANT, members=[fde])
+    base = {"project_id": str(project), "entity_id": str(uuid.uuid4())}
+    sink = InAppSink(sessions)
+    sink.send(OutboxItem(uuid.uuid4(), TENANT, "sub_skill.isatvon_review_required", base))
+    assert rows(sessions) == []  # the state change alone is audit and analytics
+    sink.send(OutboxItem(uuid.uuid4(), TENANT, "sub_skill.isatvon_review", base))
+    [row] = rows(sessions, fde)
+    assert row.type == "SUBSKILL_NEEDS_REVIEW" and row.title == "Sub-Skill needs review"
+    assert "needs your review before it can be certified" in row.body
+    assert admin not in {r.user_id for r in rows(sessions)}
+
+
 def test_e10_4_every_notification_type_has_a_template_and_a_producer() -> None:
     assert set(service.TEMPLATES) == set(NotificationType)
     assert {k.type for k in KINDS.values()} == set(NotificationType)

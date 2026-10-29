@@ -51,6 +51,9 @@ KINDS: dict[str, Kind] = {
     # #483: the model could not answer in a build stage; the Sub-Skill waits in NEEDS_FDE_REVIEW for
     # `retry`. The `error` parameter is the cause, `stage` the stage. FDEs and Admins both see it.
     "sub_skill.generation_error": Kind(T.GENERATION_FAILED, "body generation"),
+    # #446: a correction changed what the Sub-Skill means, so it is held for the FDE instead of
+    # certifying. The transition (`sub_skill.isatvon_review_required`) is deliberately not mapped.
+    "sub_skill.isatvon_review": Kind(T.SUBSKILL_NEEDS_REVIEW),
     "document_version.malware_detected": Kind(T.DOCUMENT_REJECTED),
     "document_version.type_rejected": Kind(T.DOCUMENT_REJECTED),  # E4.4; the reason is on screen
     "document_version.parse_failed": Kind(T.DOCUMENT_REJECTED),

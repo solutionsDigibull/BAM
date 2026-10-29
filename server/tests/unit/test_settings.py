@@ -72,6 +72,7 @@ def test_e1_15_t09_other_combinations_start(
 ) -> None:
     env.setenv("SBAM_ENV", sbam_env)
     env.setenv("LLM_PROVIDER", provider)
+    env.setenv("UPLOAD_TOKEN_KEY", "k" * 40)  # required once deployed (A-14)
     assert load_settings().llm_provider == provider
 
 
@@ -137,4 +138,52 @@ def test_a09_t03_real_secret_starts_when_deployed(env: pytest.MonkeyPatch) -> No
     env.setenv("SBAM_ENV", "production")
     env.setenv("LLM_PROVIDER", "bifrost")
     env.setenv("TUSD_HOOK_SECRET", "9f2c" * 16)
+    env.setenv("UPLOAD_TOKEN_KEY", "7b1e" * 16)
     assert load_settings().tusd_hook_secret is not None
+
+
+# A-14: upload tokens are signed with their own key, not the tusd hook secret.
+def _deployed(env: pytest.MonkeyPatch, **values: str) -> None:
+    env.setenv("SBAM_ENV", "production")
+    env.setenv("LLM_PROVIDER", "bifrost")
+    env.setenv("TUSD_HOOK_SECRET", "hook-" + "a" * 40)
+    for name, value in values.items():
+        env.setenv(name.upper(), value)
+
+
+def test_a14_t01_deployed_requires_its_own_upload_token_key(env: pytest.MonkeyPatch) -> None:
+    _deployed(env)
+    with pytest.raises(SettingsError, match="UPLOAD_TOKEN_KEY is required"):
+        load_settings()
+
+
+def test_a14_t02_deployed_refuses_the_hook_secret_reused_as_the_token_key(
+    env: pytest.MonkeyPatch,
+) -> None:
+    _deployed(env, upload_token_key="hook-" + "a" * 40)
+    with pytest.raises(SettingsError, match="must differ"):
+        load_settings()
+
+
+def test_a14_t03_the_two_secrets_are_independent_when_deployed(env: pytest.MonkeyPatch) -> None:
+    _deployed(env, upload_token_key="token-" + "b" * 40)
+    settings = load_settings()
+    assert settings.upload_token_secret() == "token-" + "b" * 40
+    assert settings.upload_token_secret() != settings.tusd_hook_secret.get_secret_value()  # type: ignore[union-attr]
+
+
+def test_a14_t04_dev_falls_back_to_the_hook_secret_and_prefers_its_own_key(
+    env: pytest.MonkeyPatch,
+) -> None:
+    env.setenv("SBAM_ENV", "development")
+    env.setenv("TUSD_HOOK_SECRET", "hook-dev")
+    assert load_settings().upload_token_secret() == "hook-dev"
+    env.setenv("UPLOAD_TOKEN_KEY", "token-dev")
+    assert load_settings().upload_token_secret() == "token-dev"
+    env.delenv("TUSD_HOOK_SECRET")
+    assert load_settings().upload_token_secret() == "token-dev"
+
+
+def test_a14_t05_no_secret_at_all_means_uploads_off(env: pytest.MonkeyPatch) -> None:
+    env.setenv("SBAM_ENV", "development")
+    assert load_settings().upload_token_secret() is None

@@ -142,6 +142,7 @@ get an `env_file`**. Each worker variable is passed one by one, so the OpenRoute
 | `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_LOG_CONTENT` | workers (ingest, llm, build, test) | staging/prod | key pair of the environment's Langfuse project (§17.2). Empty = no traces. On VMs `compose.deploy.obs.yaml` sets the internal host and reads the keys from the Docker secrets `langfuse_public_key` / `langfuse_secret_key`. `LOG_CONTENT=true` is development only |
 | `POSTHOG_HOST`, `POSTHOG_API_KEY`, `POSTHOG_DISTINCT_ID_SALT` | sbam-api, workers | no | product events (§17.2). Empty = off. The salt is required outside development once PostHog is on |
 | `TUSD_HOOK_SECRET` | tusd → sbam-api hooks | yes | |
+| `UPLOAD_TOKEN_KEY` | signs upload tokens (not the hook secret, A-14) | staging/prod | dev: falls back to `TUSD_HOOK_SECRET` |
 | `SBAM_DEV_AUTH` | sbam-web | no | `1` enables the dev role picker until Keycloak sign-in (#51); ignored in production builds |
 | `MAX_BODY_BYTES`, `LOG_LEVEL` | sbam-api | no | defaults 10 MiB, `INFO` |
 
