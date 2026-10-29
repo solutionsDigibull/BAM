@@ -11,11 +11,16 @@ Rules shared by every write here:
 * Each changed field is a `sub_skill_edits` row, and the edit one `ISATVON_EDIT` audit record.
 * Reordering renumbers the siblings 1..n; `macro_category` and `skill_id` never change on a rename
   or a move (they stay stable references), and a deleted row gives up its `order` for good.
+* A reorder or delete locks the Macro Skill before the Sub-Skill (one lock order, so two of them in
+  one Macro Skill queue instead of deadlocking). A deadlock or serialization failure that still
+  happens is 409 `CONFLICT` with `Retry-After`, never a 500 (`conflicts_are_409`).
 """
 
 import copy
 import json
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from pydantic import ValidationError
@@ -34,6 +39,7 @@ from sbam_contracts.isatvon_workbench import (
     SubSkillEdit as SubSkillEditOut,
 )
 from sbam_contracts.state_machines import Actor, MachineName, SubSkillState, WorkflowState, machine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
@@ -54,6 +60,7 @@ from sbam_api.workflows.repository import WorkflowRepository
 
 MAX_PATCH_BYTES = 256 * 1024
 _TEMP_ORDER = 100_000
+_CONFLICT_SQLSTATES = frozenset({"40P01", "40001"})  # deadlock detected, serialization failure
 EDITABLE_WORKFLOW = frozenset({WorkflowState.ISATVON_REVIEW, WorkflowState.EXTRACTION_FAILED})
 SUB_SKILL_LOCKED = machine(MachineName.SUB_SKILL).locked  # CERTIFIED, FROZEN, SUPERSEDED
 _EDITABLE_SUB = frozenset({SubSkillState.DRAFT, SubSkillState.VALID, SubSkillState.INVALID})
@@ -174,15 +181,52 @@ def _check_body(patch: SubSkillPatch) -> dict[str, Any]:
 
 def _renumber(session: Session, rows: list[Any]) -> None:
     """`order` 1..n in the given sequence. Two passes: the (parent, order) unique constraint is not
-    deferrable, so the rows first move out of the way."""
+    deferrable, so the rows first move out of the way. The rows are written in id order, the same
+    in every transaction, so two writers never take the row locks crosswise (A-29)."""
     if all(row.order == i for i, row in enumerate(rows, start=1)):
         return
-    for i, row in enumerate(rows, start=1):
+    ranked = sorted(enumerate(rows, start=1), key=lambda pair: pair[1].id)
+    for i, row in ranked:
         row.order = _TEMP_ORDER + i  # above any real order; deleted rows are negative
     session.flush()
-    for i, row in enumerate(rows, start=1):
+    for i, row in ranked:
         row.order = i
     session.flush()
+
+
+def _lock_sub_skill(
+    session: Session, ctx: TenantContext, sub_id: uuid.UUID, *, renumbers: bool
+) -> SubSkill | None:
+    """The Sub-Skill, locked. A reorder or delete renumbers every sibling, so it takes the Macro
+    Skill's lock first and the Sub-Skill's second; two of them on one Macro Skill then queue instead
+    of each holding a row the other needs (Postgres `deadlock detected`, A-29). A plain content edit
+    changes only its own row and takes no Macro Skill lock."""
+    repo = SubSkillRepository(session, ctx)
+    if renumbers:
+        macro_id = repo.macro_id_of(sub_id)
+        if macro_id is not None:
+            MacroSkillRepository(session, ctx).get_for_update(macro_id)
+    sub: SubSkill | None = repo.get_for_update(sub_id)
+    return sub
+
+
+@contextmanager
+def conflicts_are_409() -> Iterator[None]:
+    """A deadlock or serialization failure that still happens (two writers, Postgres picked a loser)
+    is the caller's cue to retry: 409 with a Retry-After, never a 500. The data is untouched."""
+    try:
+        yield
+    except OperationalError as exc:
+        state = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        if state not in _CONFLICT_SQLSTATES:
+            raise
+        raise ApiError(
+            409,
+            ErrorCode.CONFLICT,
+            "Edited at the same time",
+            "Another edit of this Macro Skill ran at the same moment; reload and try again.",
+            headers={"Retry-After": "1"},
+        ) from None
 
 
 def _move(rows: list[Any], row: Any, order: int) -> list[Any]:
@@ -202,8 +246,7 @@ def edit_sub_skill(
 ) -> SubSkill:
     ctx = user.context(project_id)
     editable_workflow(session, ctx, workflow_id)
-    repo = SubSkillRepository(session, ctx)
-    sub: SubSkill | None = repo.get_for_update(sub_id)
+    sub = _lock_sub_skill(session, ctx, sub_id, renumbers=patch.order is not None)
     if sub is None or sub.workflow_id != workflow_id:
         raise not_found()
     state = SubSkillState(sub.state)
@@ -343,7 +386,7 @@ def delete_sub_skill(
     ctx = user.context(project_id)
     editable_workflow(session, ctx, workflow_id)
     repo = SubSkillRepository(session, ctx)
-    sub: SubSkill | None = repo.get_for_update(sub_id)
+    sub = _lock_sub_skill(session, ctx, sub_id, renumbers=True)
     if sub is None or sub.workflow_id != workflow_id:
         raise not_found()
     if if_match:

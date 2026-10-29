@@ -125,7 +125,7 @@ def edit_sub_skill(
     response: Response,
     if_match: IfMatch = None,
 ) -> WorkbenchSubSkill:
-    with sessions() as session:
+    with sessions() as session, edits.conflicts_are_409():
         sub = edits.edit_sub_skill(session, user, project_id, workflow_id, sub_id, body, if_match)
         session.commit()
         response.headers["ETag"] = f'"{sub.content_sha256}"'
@@ -141,7 +141,7 @@ def delete_sub_skill(
     sessions: Sessions,
     if_match: IfMatch = None,
 ) -> Response:
-    with sessions() as session:
+    with sessions() as session, edits.conflicts_are_409():
         edits.delete_sub_skill(session, user, project_id, workflow_id, sub_id, if_match)
         session.commit()
     return Response(status_code=204)
@@ -170,7 +170,7 @@ def edit_macro_skill(
     response: Response,
     if_match: IfMatch = None,
 ) -> MacroSkillOut:
-    with sessions() as session:
+    with sessions() as session, edits.conflicts_are_409():
         macro: MacroSkill = edits.edit_macro_skill(
             session, user, project_id, workflow_id, macro_id, body, if_match
         )
