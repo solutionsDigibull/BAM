@@ -16,6 +16,7 @@ import sbam_api
 from sbam_api.db.base import Base
 from sbam_api.state_machine.stateful import Stateful
 from sbam_contracts.state_machines import MachineName
+from sqlalchemy import Table
 
 _QUOTED = re.compile(r"'((?:[^']|'')*)'")
 
@@ -40,11 +41,12 @@ def import_models() -> None:
 
 def stateful_tables() -> list[StatefulTable]:
     import_models()
-    found = {
-        StatefulTable(mapper.class_.__tablename__, mapper.class_.machine)
-        for mapper in Base.registry.mappers
-        if issubclass(mapper.class_, Stateful) and getattr(mapper.class_, "machine", None)
-    }
+    found: set[StatefulTable] = set()
+    for mapper in Base.registry.mappers:
+        cls = mapper.class_
+        if issubclass(cls, Stateful) and getattr(cls, "machine", None):
+            assert isinstance(mapper.local_table, Table)
+            found.add(StatefulTable(mapper.local_table.name, cls.machine))
     return sorted(found, key=lambda t: t.table)
 
 
