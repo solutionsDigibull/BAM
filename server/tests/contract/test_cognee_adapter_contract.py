@@ -6,7 +6,15 @@ import typing
 from sbam_contracts.knowledge import DATASET_PATTERN, ProjectScope
 from sbam_workers.knowledge.cognee_adapter import DATASET_RE, CogneeAdapter
 
-EXPECTED = {"ensure_dataset", "add", "cognify", "search", "graph_page", "delete_dataset"}
+EXPECTED = {
+    "ensure_dataset",
+    "add",
+    "prune",  # #450: remove what a rebuild no longer has in scope
+    "cognify",
+    "search",
+    "graph_page",
+    "delete_dataset",
+}
 
 
 def public_methods() -> dict[str, typing.Any]:
