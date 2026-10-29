@@ -1,4 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { expect, type Browser, type Page } from "@playwright/test";
 
@@ -103,9 +106,7 @@ export async function uploadDocuments(page: Page, projectId: string, files: File
   const n = files.length;
   await page.getByRole("button", { name: `Upload ${n} file${n === 1 ? "" : "s"}` }).click();
   for (const f of files)
-    await expect(page.getByRole("cell", { name: f.name, exact: true })).toBeVisible({
-      timeout: 60_000,
-    });
+    await expect(documentRow(page, f.name).first()).toBeVisible({ timeout: 60_000 });
 }
 
 /** A multipart POST through the proxy (the masters workbook import). */
@@ -124,3 +125,67 @@ export async function postFile(
   const text = await res.text();
   return { status: res.status(), body: text ? JSON.parse(text) : undefined };
 }
+
+const FIXTURES = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../server/tests/fixtures",
+);
+
+/** A pinned fixture file (server/tests/fixtures, checked by its SHA256SUMS). */
+export const fixture = (relative: string, mimeType: string): FilePayload => ({
+  name: path.basename(relative),
+  mimeType,
+  buffer: readFileSync(path.join(FIXTURES, relative)),
+});
+
+/** The EICAR test string, joined from its two stored halves at run time (never kept whole, #202). */
+export const eicar = (): Buffer =>
+  Buffer.concat(
+    ["eicar.part1.b64", "eicar.part2.b64"].map((name) =>
+      Buffer.from(readFileSync(path.join(FIXTURES, "malware", name), "ascii").trim(), "base64"),
+    ),
+  );
+
+export type Doc = {
+  id: string;
+  title: string;
+  state: string;
+  reject_code?: string | null;
+  deleted_at?: string | null;
+  parse_report?: { ocr_pages?: number[] } | null;
+};
+
+/** Polls the project's documents until each named one is in a final state; returns them by title. */
+export async function settled(
+  page: Page,
+  projectId: string,
+  titles: string[],
+  timeout = 5 * 60_000,
+): Promise<Record<string, Doc>> {
+  const FINAL = new Set(["PARSED", "REJECTED", "PARSE_FAILED"]);
+  let found: Record<string, Doc> = {};
+  await expect
+    .poll(
+      async () => {
+        const docs = await api<{ items: Doc[] }>(
+          page,
+          "GET",
+          `/projects/${projectId}/documents?limit=100`,
+        );
+        found = Object.fromEntries(docs.items.map((d) => [d.title, d]));
+        return titles.filter((t) => !FINAL.has(found[t]?.state ?? ""));
+      },
+      { timeout, intervals: [2_000, 5_000] },
+    )
+    .toEqual([]);
+  return found;
+}
+
+/** A document's row in the Documents table; its accessible text carries the stage chips (and, for a
+ * rejected document, the reason). Scenario file names are distinct, so the title picks one row. */
+export const documentRow = (page: Page, title: string) =>
+  page.getByRole("row").filter({ hasText: title });
+
+/** The "Some files were not uploaded" panel, each refused file with its reason. */
+export const rejections = (page: Page) =>
+  page.getByRole("alert").filter({ hasText: "Some files were not uploaded" });
