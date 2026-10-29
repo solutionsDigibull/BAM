@@ -768,6 +768,8 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "202"
 
+  # The world seeds no Sub-Skill, so an assigned FDE gets 404 for the unknown id (it was 200 with an
+  # empty list for any id until A-33).
   code_attempts_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__code_attempts_get:
     request:
       method: GET
@@ -775,7 +777,7 @@ routes:
       params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
     expect:
       <<: *fde_project_resource
-      fde_a_assigned: "200"
+      fde_a_assigned: "404 NOT_FOUND"
 
   code_file_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__code_attempts__n__files_get:
     request:
