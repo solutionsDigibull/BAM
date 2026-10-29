@@ -799,6 +799,49 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # Test data of a Sub-Skill (E13.4). The world seeds no ISATVON rows, so an assigned FDE reaches
+  # the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
+  get_tests_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  post_case_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_cases_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests/cases
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      headers: {if-match: '"rbac"'}
+      json: {name: x, input: {}, expected_terminal: SUCCESS}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  put_case_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_cases__case_id__put:
+    request:
+      method: PUT
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests/cases/{case_id}
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", case_id: "00000000-0000-0000-0000-000000000001"}
+      headers: {if-match: '"rbac"'}
+      json: {input: {}}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  delete_case_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_cases__case_id__delete:
+    request:
+      method: DELETE
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests/cases/{case_id}
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", case_id: "00000000-0000-0000-0000-000000000001"}
+      headers: {if-match: '"rbac"'}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.
