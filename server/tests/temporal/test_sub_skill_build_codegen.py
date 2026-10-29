@@ -245,3 +245,6 @@ def test_e12_2_t11_a_failing_real_gate_runs_the_correction_loop_and_escalates(
     failed = {(a, g, s) for a, g, s in real.verdicts() if s == "FAILED"}
     assert failed == {(a, "AST_SKELETON", "FAILED") for a in (0, 1, 2)}
     assert len(real.verdicts()) == 3 * 8  # eight verdicts per pass, none reused across passes
+    # the real corrector was told what the gate found (#514): the gate's finding is in its request
+    requests = [json.dumps(r) for r in real.bifrost.requests[1:]]
+    assert len(requests) == 2 and all("SKELETON_MISMATCH" in r for r in requests)
