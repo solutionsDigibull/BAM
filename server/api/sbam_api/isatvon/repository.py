@@ -30,6 +30,12 @@ class SubSkillRepository(StatefulRepository):
         query = self._scoped().where(SubSkill.macro_skill_id == macro_skill_id)
         return list(self.session.scalars(query.order_by(SubSkill.order)))
 
+    def macro_id_of(self, sub_id: uuid.UUID) -> uuid.UUID | None:
+        """The Sub-Skill's Macro Skill (it never changes), read as a bare id: nothing is loaded or
+        locked, so a caller can lock the Macro Skill first and the Sub-Skill second (E8.4, A-29)."""
+        query = self._scoped().where(SubSkill.id == sub_id)
+        return self.session.scalar(query.with_only_columns(SubSkill.macro_skill_id))
+
     def of_workflow(self, workflow_id: uuid.UUID) -> list[SubSkill]:
         """By Macro Skill (UUIDv7 ids follow the macros' creation order), then `order`."""
         query = self._scoped().where(SubSkill.workflow_id == workflow_id)
