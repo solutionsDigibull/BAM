@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:promptfoo/test_run_traces:0.1.0",
+  "$defs": {
+    "GateEval": {
+      "additionalProperties": false,
+      "properties": {
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        },
+        "escalation": {
+          "title": "Escalation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success",
+        "escalation"
+      ],
+      "title": "GateEval",
+      "type": "object"
+    },
+    "HarnessError": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "IMPORT_ERROR",
+            "RUNTIME_ERROR",
+            "TIMEOUT",
+            "OOM",
+            "OUTPUT_SCHEMA_MISMATCH",
+            "ASSERTION_FAILED",
+            "EGRESS_BLOCKED",
+            "INFRA_ERROR"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "pass": {
+          "minimum": 1,
+          "title": "Pass",
+          "type": "integer"
+        },
+        "step": {
+          "enum": [
+            "action",
+            "check",
+            "handoff",
+            "gate"
+          ],
+          "title": "Step",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "budget_exceeded": {
+          "default": false,
+          "title": "Budget Exceeded",
+          "type": "boolean"
+        },
+        "elapsed_ms": {
+          "minimum": 0,
+          "title": "Elapsed Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "category",
+        "pass",
+        "step",
+        "message",
+        "elapsed_ms"
+      ],
+      "title": "HarnessError",
+      "type": "object"
+    },
+    "HarnessTrace": {
+      "additionalProperties": false,
+      "description": "The harness output. A failed case has `error` set and no terminal state.",
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "terminal": {
+          "anyOf": [
+            {
+              "enum": [
+                "SUCCESS",
+                "ESCALATED",
+                "NO_OP"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Terminal"
+        },
+        "iterations": {
+          "minimum": 0,
+          "title": "Iterations",
+          "type": "integer"
+        },
+        "passes": {
+          "items": {
+            "$ref": "#/$defs/PassRecord"
+          },
+          "title": "Passes",
+          "type": "array"
+        },
+        "ui_updates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ui Updates",
+          "type": "array"
+        },
+        "handoff_rows": {
+          "minimum": 0,
+          "title": "Handoff Rows",
+          "type": "integer"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HarnessError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "case_id",
+        "terminal",
+        "iterations",
+        "passes",
+        "ui_updates",
+        "handoff_rows"
+      ],
+      "title": "HarnessTrace",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "PassRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "pass": {
+          "minimum": 1,
+          "title": "Pass",
+          "type": "integer"
+        },
+        "fresh_state": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Fresh State",
+          "type": "object"
+        },
+        "action_output": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Action Output",
+          "type": "object"
+        },
+        "check_output": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Check Output",
+          "type": "object"
+        },
+        "action_ms": {
+          "minimum": 0,
+          "title": "Action Ms",
+          "type": "integer"
+        },
+        "check_ms": {
+          "minimum": 0,
+          "title": "Check Ms",
+          "type": "integer"
+        },
+        "ui_update": {
+          "title": "Ui Update",
+          "type": "string"
+        },
+        "gate_eval": {
+          "$ref": "#/$defs/GateEval"
+        }
+      },
+      "required": [
+        "pass",
+        "fresh_state",
+        "action_output",
+        "check_output",
+        "action_ms",
+        "check_ms",
+        "ui_update",
+        "gate_eval"
+      ],
+      "title": "PassRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET W/sub-skills/{sub_id}/test-runs/{run_id}/traces`: the run's traces, one per case.",
+  "properties": {
+    "run_id": {
+      "format": "uuid",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "traces": {
+      "items": {
+        "$ref": "#/$defs/HarnessTrace"
+      },
+      "maxItems": 20,
+      "title": "Traces",
+      "type": "array"
+    }
+  },
+  "required": [
+    "run_id"
+  ],
+  "title": "TestRunTraces",
+  "type": "object"
+}

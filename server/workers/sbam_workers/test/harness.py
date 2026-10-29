@@ -29,24 +29,20 @@ from functools import partial
 from typing import Any, Final, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from sbam_contracts.harness import (
+    GateEval,
+    HarnessError,
+    HarnessTrace,
+    PassRecord,
+    Terminal,
+)
 from sbam_contracts.isatvon14 import NNotification
 
 from sbam_workers.isatvon import loop_expr
 from sbam_workers.isatvon.loop_expr import EvalContext, EvalError
 from sbam_workers.isatvon.loop_spec import SEMANTICS_REF, CompiledLoopSpec
 
-Terminal = Literal["SUCCESS", "ESCALATED", "NO_OP"]
 CaseKind = Literal["PASS_FIRST", "PASS_AFTER_RETRY", "ESCALATION", "NO_OP", "EDGE", "FDE"]
-FailureCategory = Literal[
-    "IMPORT_ERROR",
-    "RUNTIME_ERROR",
-    "TIMEOUT",
-    "OOM",
-    "OUTPUT_SCHEMA_MISMATCH",
-    "ASSERTION_FAILED",
-    "EGRESS_BLOCKED",
-    "INFRA_ERROR",
-]
 
 ITERATION_FIELD: Final = "iteration_pass"  # handoff column the harness fills with the pass number
 DEFAULT_COMPLETION: Final = "Status: Completed"
@@ -89,49 +85,6 @@ class HandoffSpec(_Strict):
 
     table: str = Field(min_length=1)
     required_fields: list[str] = Field(min_length=1)
-
-
-class GateEval(_Strict):
-    success: bool
-    escalation: bool  # both are always evaluated and recorded; success wins a tie (TD §15.2)
-
-
-class PassRecord(_Strict):
-    pass_no: int = Field(alias="pass", ge=1)
-    fresh_state: dict[str, JsonValue]
-    action_output: dict[str, JsonValue]
-    check_output: dict[str, JsonValue]
-    action_ms: int = Field(ge=0)
-    check_ms: int = Field(ge=0)
-    ui_update: str
-    gate_eval: GateEval
-
-
-class HarnessError(_Strict):
-    category: FailureCategory
-    pass_no: int = Field(alias="pass", ge=1)
-    step: Literal["action", "check", "handoff", "gate"]
-    message: str
-    budget_exceeded: bool = False
-    elapsed_ms: int = Field(ge=0)
-
-
-class HarnessTrace(_Strict):
-    """The harness output. A failed case has `error` set and no terminal state."""
-
-    case_id: str
-    terminal: Terminal | None
-    iterations: int = Field(ge=0)
-    passes: list[PassRecord]
-    ui_updates: list[str]
-    handoff_rows: int = Field(ge=0)
-    error: HarnessError | None = None
-
-    def to_json_object(self) -> dict[str, Any]:
-        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
-
-    def passed(self, expected: Terminal) -> bool:
-        return self.error is None and self.terminal == expected
 
 
 class ToolClient(Protocol):

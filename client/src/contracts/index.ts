@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:e54044a3e43222bb587f2186cbd8d88c4cef2c359c97b351957c3f4ead2e7543
+// source-sha256:337c7ecc2531b9742eeced5fe75f50c491d22e4181ed8e13ce67487760d3c26a
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -551,6 +551,7 @@ export interface SbamContracts {
   Suite?: Suite;
   TestRunOut?: TestRunOut;
   TestRunsResponse?: TestRunsResponse;
+  TestRunTraces?: TestRunTraces;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -4511,4 +4512,287 @@ export interface TestRunsResponse {
    * @maxItems 100
    */
   runs?: TestRunOut[];
+}
+/**
+ * `GET W/sub-skills/{sub_id}/test-runs/{run_id}/traces`: the run's traces, one per case.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestRunTraces".
+ */
+export interface TestRunTraces {
+  run_id: string;
+  /**
+   * @maxItems 20
+   */
+  traces?:
+    | []
+    | [HarnessTrace]
+    | [HarnessTrace, HarnessTrace]
+    | [HarnessTrace, HarnessTrace, HarnessTrace]
+    | [HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace]
+    | [HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace]
+    | [HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace]
+    | [HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace]
+    | [HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace, HarnessTrace]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ]
+    | [
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace,
+        HarnessTrace
+      ];
+}
+/**
+ * The harness output. A failed case has `error` set and no terminal state.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HarnessTrace".
+ */
+export interface HarnessTrace {
+  case_id: string;
+  terminal: ("SUCCESS" | "ESCALATED" | "NO_OP") | null;
+  iterations: number;
+  passes: PassRecord[];
+  ui_updates: string[];
+  handoff_rows: number;
+  error?: HarnessError | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PassRecord".
+ */
+export interface PassRecord {
+  pass: number;
+  fresh_state: {
+    [k: string]: JsonValue | undefined;
+  };
+  action_output: {
+    [k: string]: JsonValue | undefined;
+  };
+  check_output: {
+    [k: string]: JsonValue | undefined;
+  };
+  action_ms: number;
+  check_ms: number;
+  ui_update: string;
+  gate_eval: GateEval;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GateEval".
+ */
+export interface GateEval {
+  success: boolean;
+  escalation: boolean;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HarnessError".
+ */
+export interface HarnessError {
+  category:
+    | "IMPORT_ERROR"
+    | "RUNTIME_ERROR"
+    | "TIMEOUT"
+    | "OOM"
+    | "OUTPUT_SCHEMA_MISMATCH"
+    | "ASSERTION_FAILED"
+    | "EGRESS_BLOCKED"
+    | "INFRA_ERROR";
+  pass: number;
+  step: "action" | "check" | "handoff" | "gate";
+  message: string;
+  budget_exceeded?: boolean;
+  elapsed_ms: number;
 }

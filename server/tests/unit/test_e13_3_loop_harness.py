@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from fixtures import fixture_path
 from pydantic import JsonValue, ValidationError
+from sbam_contracts.harness import HarnessTrace
 from sbam_contracts.isatvon14 import IsatvonDefinition, SubSkill, output_fields
 from sbam_workers.isatvon.loop_spec import (
     BOUND_INVALID,
@@ -19,7 +20,6 @@ from sbam_workers.isatvon.loop_spec import (
 )
 from sbam_workers.test.harness import (
     HandoffSpec,
-    HarnessTrace,
     LoopHarnessError,
     LoopTestCase,
     progress_message,
