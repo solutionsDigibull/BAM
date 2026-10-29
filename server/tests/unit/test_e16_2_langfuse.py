@@ -104,6 +104,12 @@ def test_e16_2_development_is_lenient(caplog: pytest.LogCaptureFixture) -> None:
     assert "not those of project sbam-dev" in caplog.text
 
 
+@pytest.mark.parametrize("env", [" production", "prod-eu", "live", "uat", "staging-2"])
+def test_a27_t06_unlisted_spelling_is_strict_like_production(env: str) -> None:
+    with pytest.raises(PreflightError, match=MISCONFIGURED):  # no keys: strict mode refuses
+        check_langfuse(conf(env), unreachable)
+
+
 def test_e16_2_preflight_runs_on_the_llm_queues(monkeypatch: pytest.MonkeyPatch) -> None:
     registry.load_all()
     for queue in (TaskQueue.INGEST, TaskQueue.LLM, TaskQueue.BUILD, TaskQueue.TEST):

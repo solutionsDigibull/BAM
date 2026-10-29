@@ -7,8 +7,15 @@ from typing import Any, Literal
 from pydantic import AnyHttpUrl, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Environments where the deterministic LLM mock must never run (same list as sbam-llm-mock).
-MOCK_FORBIDDEN_ENVS = frozenset({"staging", "production", "prod"})
+# The only environments where the deterministic LLM mock (and the dev PostHog shortcut) may run,
+# the same list as sbam-llm-mock and `STUB_ENVS`. An allowlist, so a spelling nobody listed
+# ("prod-eu", "live", " production") counts as deployed and fails closed.
+DEV_ENVS = frozenset({"development", "test", "ci"})
+
+
+def deployed_env(env: str) -> bool:
+    """True unless `env` (trimmed, case-insensitive) is one of `DEV_ENVS`."""
+    return env.strip().lower() not in DEV_ENVS
 
 
 class SettingsError(RuntimeError):
@@ -70,7 +77,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _refuse_mock_provider_outside_dev(self) -> "Settings":
-        if self.llm_provider == "mock" and self.sbam_env.lower() in MOCK_FORBIDDEN_ENVS:
+        if self.llm_provider == "mock" and deployed_env(self.sbam_env):
             raise SettingsError(
                 f"LLM_PROVIDER=mock is forbidden when SBAM_ENV={self.sbam_env}. "
                 "Set LLM_PROVIDER=bifrost."
@@ -90,7 +97,7 @@ def _set(value: object) -> bool:
 
 def posthog_problem(env: str, host: object, key: object, salt: SecretStr | None) -> None:
     """Fail fast when PostHog would send outside development without a salt (raw ids at risk)."""
-    if _set(host) and _set(key) and env.lower() in MOCK_FORBIDDEN_ENVS and not _set(salt):
+    if _set(host) and _set(key) and deployed_env(env) and not _set(salt):
         raise SettingsError(
             f"POSTHOG_DISTINCT_ID_SALT is required when PostHog is on and SBAM_ENV={env}."
         )

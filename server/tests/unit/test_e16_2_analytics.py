@@ -233,3 +233,9 @@ def test_e16_2_posthog_outside_development_needs_a_salt() -> None:
     posthog_problem("development", host, key, None)  # local: allowed
     posthog_problem("production", None, None, None)  # PostHog off: nothing to check
     posthog_problem("production", "", SecretStr(""), None)  # what Compose passes when unset
+
+
+@pytest.mark.parametrize("env", [" production", "prod-eu", "live", "uat", "stage", "staging-2"])
+def test_a27_t05_posthog_salt_required_for_every_non_dev_spelling(env: str) -> None:
+    with pytest.raises(SettingsError, match="POSTHOG_DISTINCT_ID_SALT"):
+        posthog_problem(env, "http://posthog:8000", SecretStr("phc"), None)

@@ -79,3 +79,33 @@ def test_e1_15_t09_unknown_provider_is_rejected(env: pytest.MonkeyPatch) -> None
     env.setenv("LLM_PROVIDER", "openrouter")
     with pytest.raises(SettingsError, match="LLM_PROVIDER"):
         load_settings()
+
+
+# A-27: the mock runs only where SBAM_ENV is on the allowlist; every other spelling is deployed.
+@pytest.mark.parametrize(
+    "sbam_env",
+    [" production", "production ", "prod-eu", "prd", "live", "stage", "staging-2", "uat", "local"],
+)
+def test_a27_t01_mock_provider_refused_for_every_non_dev_spelling(
+    env: pytest.MonkeyPatch, sbam_env: str
+) -> None:
+    env.setenv("SBAM_ENV", sbam_env)
+    env.setenv("LLM_PROVIDER", "mock")
+    with pytest.raises(SettingsError, match="LLM_PROVIDER=mock is forbidden"):
+        load_settings()
+
+
+@pytest.mark.parametrize("sbam_env", ["development", "test", "ci", "CI", " Development "])
+def test_a27_t02_mock_provider_runs_in_dev_spellings(
+    env: pytest.MonkeyPatch, sbam_env: str
+) -> None:
+    env.setenv("SBAM_ENV", sbam_env)
+    env.setenv("LLM_PROVIDER", "mock")
+    assert load_settings().llm_provider == "mock"
+
+
+def test_a27_t03_blank_sbam_env_is_not_a_dev_env(env: pytest.MonkeyPatch) -> None:
+    env.setenv("SBAM_ENV", "   ")
+    env.setenv("LLM_PROVIDER", "mock")
+    with pytest.raises(SettingsError):
+        load_settings()
