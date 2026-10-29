@@ -72,6 +72,9 @@ class GateResultRow(ProjectOwned, Base):
         status_check(GateName, "gate"),
         status_check(GateStatus),
         CheckConstraint("sub_skill_id IS NOT NULL OR workflow_id IS NOT NULL", name="has_subject"),
+        # One result per gate per build stage key (E9.3); null keys (workflow gates, rows written
+        # before the key existed) never collide.
+        UniqueConstraint("sub_skill_id", "gate", "build_no", "cycle", "attempt"),
     )
 
     sub_skill_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -88,6 +91,11 @@ class GateResultRow(ProjectOwned, Base):
     findings: Mapped[list[dict[str, Any]]] = mapped_column(Json, default=list)
     tool_version: Mapped[str | None] = mapped_column(String(80))
     config_sha256: Mapped[str | None] = mapped_column(String(71))
+    # The build stage key it belongs to (BuildStageInput), for gates that run before any
+    # `code_attempts` row exists (LIBRARIES).
+    build_no: Mapped[int | None] = mapped_column(Integer)
+    cycle: Mapped[int | None] = mapped_column(Integer)
+    attempt: Mapped[int | None] = mapped_column(Integer)
 
 
 def _sqlite_frozen_guard(target: Table, connection: Connection, **_: object) -> None:

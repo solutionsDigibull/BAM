@@ -11,6 +11,7 @@ dependencies = [
     "jsonschema>=4.25",
     "olefile>=0.47",
     "openpyxl>=3.1.5",
+    "packaging>=26.0",
     "pillow>=13",
     "pypandoc-binary>=1.15",
     "pypdf>=6",

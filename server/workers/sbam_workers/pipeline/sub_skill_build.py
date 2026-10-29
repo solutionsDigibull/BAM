@@ -62,11 +62,11 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.runs import TaskQueue
     from sbam_contracts.state_machines import Actor, MachineName, SubSkillState
 
+    from sbam_workers.build.libraries import check_libraries
     from sbam_workers.build.manifest import build_manifest
     from sbam_workers.build.stubs import (
         assemble,
         ast_gate,
-        check_libraries,
         correct,
         generate_bodies,
         render_skeleton,

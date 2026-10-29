@@ -45,6 +45,9 @@ KINDS: dict[str, Kind] = {
     "workflow.workflow_validation_failed": Kind(T.GENERATION_FAILED, "workflow validation"),
     "workflow.freeze": Kind(T.WORKFLOW_FROZEN),
     "sub_skill.attempts_exhausted": Kind(T.SUBSKILL_NEEDS_REVIEW),
+    # E9.3: a library the runtime lacks, still after the corrections; the guidance is on the
+    # LIBRARIES gate finding.
+    "sub_skill.dependency_failed": Kind(T.SUBSKILL_NEEDS_REVIEW),
     "document_version.malware_detected": Kind(T.DOCUMENT_REJECTED),
     "document_version.type_rejected": Kind(T.DOCUMENT_REJECTED),  # E4.4; the reason is on screen
     "document_version.parse_failed": Kind(T.DOCUMENT_REJECTED),
