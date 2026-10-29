@@ -47,7 +47,9 @@ from sbam_api.manifests.repository import GateResultRepository, SubSkillManifest
 from sbam_api.masters.models import MasterSnapshot
 from sbam_api.registry.repository import active_registry
 from sbam_api.schema_sql.repository import WorkflowSchemaRepository
+from sbam_api.sow.models import SowVersion
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
+from sbam_api.workflows.models import Workflow
 from sbam_api.workflows.repository import WorkflowRepository
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.build_dashboard import Finding, GateName, GateStatus
@@ -243,6 +245,64 @@ def _template() -> TemplateRef:
     return template.ref
 
 
+@dataclass(frozen=True)
+class Provenance:
+    """The approved SOW, OKF and master snapshot a build is made from, and the runtime image."""
+
+    sow: SowVersion
+    fields: dict[str, str]  # manifest provenance without `sow_refs`
+    runtime_digest: str
+
+
+def load_provenance(session: Session, ctx: TenantContext, workflow: Workflow) -> Provenance:
+    """ProvenanceMissing (non-retryable) when any part is missing; another tenant's snapshot is
+    treated as missing."""
+    try:
+        sow = require_approved_sow(session, ctx, workflow)
+    except ApiError:
+        raise _failure(PROVENANCE_MISSING, "the Workflow's SOW is not approved") from None
+    knowledge = KnowledgeVersionRepository(session, ctx).get(sow.knowledge_version_id)
+    snapshot = (
+        session.get(MasterSnapshot, knowledge.master_snapshot_id)
+        if knowledge is not None and knowledge.master_snapshot_id is not None
+        else None
+    )
+    registry = active_registry(session)
+    if snapshot is not None and snapshot.tenant_id != ctx.tenant_id:
+        snapshot = None
+    digest = None if registry is None else registry.image_digest
+    okf = None if knowledge is None else knowledge.okf_sha256
+    if (
+        knowledge is None
+        or okf is None
+        or snapshot is None
+        or digest is None
+        or sow.sha256 is None
+        or sow.approved_at is None
+    ):
+        missing = {
+            "sow sha256": sow.sha256,
+            "sow approval": sow.approved_at,
+            "okf_sha256": okf,
+            "master snapshot": snapshot,
+            "runtime image digest": digest,
+        }
+        raise _failure(PROVENANCE_MISSING, ", ".join(k for k, v in missing.items() if v is None))
+    return Provenance(
+        sow=sow,
+        fields={
+            "sow_version_id": str(sow.id),
+            "sow_sha256": sow.sha256,
+            "approved_at": _utc(sow.approved_at),
+            "approved_by": sow.approved_by or "unknown",
+            "knowledge_version_id": str(knowledge.id),
+            "okf_sha256": okf,
+            "master_snapshot_sha256": snapshot.sha256,
+        },
+        runtime_digest=digest,
+    )
+
+
 def _schema_sha256(session: Session, ctx: TenantContext, workflow_id: uuid.UUID) -> str:
     row = WorkflowSchemaRepository(session, ctx).latest(workflow_id, status=GateStatus.PASSED)
     return row.sha256 if row is not None and row.sha256 else EMPTY_SCHEMA_SQL_SHA256
@@ -273,39 +333,7 @@ class SqlManifestStore:
             workflow = WorkflowRepository(session, ctx).get(inp.workflow_id)
             if workflow is None:
                 raise _failure(IDS_MISMATCH, f"Workflow {inp.workflow_id} is not in this run")
-            try:
-                sow = require_approved_sow(session, ctx, workflow)
-            except ApiError:
-                raise _failure(PROVENANCE_MISSING, "the Workflow's SOW is not approved") from None
-            knowledge = KnowledgeVersionRepository(session, ctx).get(sow.knowledge_version_id)
-            snapshot = (
-                session.get(MasterSnapshot, knowledge.master_snapshot_id)
-                if knowledge is not None and knowledge.master_snapshot_id is not None
-                else None
-            )
-            registry = active_registry(session)
-            if snapshot is not None and snapshot.tenant_id != inp.tenant_id:
-                snapshot = None
-            digest = None if registry is None else registry.image_digest
-            okf = None if knowledge is None else knowledge.okf_sha256
-            if (
-                knowledge is None
-                or okf is None
-                or snapshot is None
-                or digest is None
-                or sow.sha256 is None
-                or sow.approved_at is None
-            ):
-                missing = {
-                    "sow sha256": sow.sha256,
-                    "sow approval": sow.approved_at,
-                    "okf_sha256": okf,
-                    "master snapshot": snapshot,
-                    "runtime image digest": digest,
-                }
-                raise _failure(
-                    PROVENANCE_MISSING, ", ".join(k for k, v in missing.items() if v is None)
-                )
+            prov = load_provenance(session, ctx, workflow)
             return Source(
                 raw=dict(sub.isatvon),
                 macro_category=None if macro is None else macro.macro_category,
@@ -320,18 +348,9 @@ class SqlManifestStore:
                         "workflow_id": str(inp.workflow_id),
                         "sub_skill_id": str(sub.id),
                     },
-                    provenance={
-                        "sow_version_id": str(sow.id),
-                        "sow_sha256": sow.sha256,
-                        "approved_at": _utc(sow.approved_at),
-                        "approved_by": sow.approved_by or "unknown",
-                        "knowledge_version_id": str(knowledge.id),
-                        "okf_sha256": okf,
-                        "master_snapshot_sha256": snapshot.sha256,
-                        "sow_refs": list(sub.sow_refs),
-                    },
+                    provenance={**prov.fields, "sow_refs": list(sub.sow_refs)},
                     template=template,
-                    runtime_digest=digest,
+                    runtime_digest=prov.runtime_digest,
                 ),
             )
 
