@@ -29,6 +29,9 @@ TESTS_FAILED: Final = "TestsFailed"  # run_sandbox_tests: the tests ran and fail
 SANDBOX_UNAVAILABLE: Final = "SandboxUnavailable"
 # render_skeleton / assemble: BUILD_ERROR, a platform defect an admin fixes
 TEMPLATE_ERROR: Final = "TemplateError"
+# check_libraries: no runtime registry for the pinned image digest; non-retryable, an operator
+# fixes it (E9.3). Never `correct`.
+REGISTRY_UNAVAILABLE: Final = "RegistryUnavailable"
 
 
 class _Dto(BaseModel):

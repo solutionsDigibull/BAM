@@ -32,7 +32,7 @@ from sbam_api.pipeline.service import (
     signal_pipeline,
     start_pipeline,
 )
-from sbam_contracts.build import BuildStageInput
+from sbam_contracts.build import BuildStageInput, LibraryCheckResult, LibraryStatus
 from sbam_contracts.pipeline import (
     Cancel,
     CarryOverInput,
@@ -147,6 +147,13 @@ async def schema_sql_stand_in(inp: WorkflowRef) -> IdResult:
     return IdResult(id=stub_id(inp, "schema_sql"))
 
 
+@activity.defn(name="check_libraries")
+async def libraries_stand_in(inp: BuildStageInput) -> LibraryCheckResult:
+    """The real check (E9.3) reads the manifest and the runtime registry from the database; its
+    tests are tests/unit/test_e9_3_libraries.py."""
+    return LibraryCheckResult(status=LibraryStatus.OK)
+
+
 @activity.defn(name="carry_over_workflow")
 async def carry_over_stand_in(inp: CarryOverInput) -> IdsResult:
     """The real one (E7.2) copies a scope change's untouched rows; its tests are
@@ -163,6 +170,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "extract_sub_skills": sub_skills_stand_in,
     "build_manifest": manifest_stand_in,
     "build_schema_sql": schema_sql_stand_in,
+    "check_libraries": libraries_stand_in,
     "carry_over_workflow": carry_over_stand_in,
 }
 

@@ -10,8 +10,6 @@ non_retryable=True)` with the persisted finding ids as details.
 from sbam_contracts.build import (
     BuildStageInput,
     CorrectionInput,
-    LibraryCheckResult,
-    LibraryStatus,
 )
 from sbam_contracts.pipeline import IdResult
 from sbam_contracts.runs import TaskQueue
@@ -19,13 +17,6 @@ from temporalio import activity
 
 from sbam_workers.registry import activity_for
 from sbam_workers.stub_ids import stage_stub_id
-
-
-@activity_for(TaskQueue.BUILD)
-@activity.defn(name="check_libraries")
-async def check_libraries(inp: BuildStageInput) -> LibraryCheckResult:
-    """Real: MISSING libraries -> DEPENDENCY_FAILED (findings persisted, ids returned)."""
-    return LibraryCheckResult(status=LibraryStatus.OK)
 
 
 @activity_for(TaskQueue.BUILD)

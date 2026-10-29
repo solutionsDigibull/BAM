@@ -73,8 +73,19 @@ def active_registry(session: Session) -> RuntimeRegistry | None:
     row = session.scalars(
         select(RuntimeRegistryRow).where(RuntimeRegistryRow.is_active.is_(True))
     ).one_or_none()
-    if row is None:
-        return None
+    return None if row is None else _registry(session, row)
+
+
+def registry_for_digest(session: Session, image_digest: str) -> RuntimeRegistry | None:
+    """The registry of one skill-runtime image, active or not (E9.3: a build keeps checking
+    against the image it pinned at its start, even after a newer registry was activated)."""
+    row = session.scalars(
+        select(RuntimeRegistryRow).where(RuntimeRegistryRow.image_digest == image_digest)
+    ).one_or_none()
+    return None if row is None else _registry(session, row)
+
+
+def _registry(session: Session, row: RuntimeRegistryRow) -> RuntimeRegistry:
     packages = session.scalars(
         select(RuntimeRegistryPackageRow)
         .where(RuntimeRegistryPackageRow.registry_id == row.id)

@@ -34,3 +34,30 @@ class SubSkillManifestRepository(TenantScopedRepository[SubSkillManifest]):
 
 class GateResultRepository(TenantScopedRepository[GateResultRow]):
     model = GateResultRow
+
+    def for_stage(
+        self, sub_skill_id: uuid.UUID, gate: str, build_no: int, cycle: int, attempt: int
+    ) -> GateResultRow | None:
+        """The result of `gate` for one build stage key, if the gate already ran (E9.3)."""
+        query = self._scoped().where(
+            GateResultRow.sub_skill_id == sub_skill_id,
+            GateResultRow.gate == gate,
+            GateResultRow.build_no == build_no,
+            GateResultRow.cycle == cycle,
+            GateResultRow.attempt == attempt,
+        )
+        return self.session.scalars(query).one_or_none()
+
+    def record_stage(self, values: dict[str, Any]) -> GateResultRow:
+        """Insert once per (sub_skill, gate, stage key); a retried activity gets the row it
+        already wrote, with the same findings."""
+        found = self.for_stage(
+            values["sub_skill_id"],
+            values["gate"],
+            values["build_no"],
+            values["cycle"],
+            values["attempt"],
+        )
+        if found is not None:
+            return found
+        return self.add(GateResultRow(**values))

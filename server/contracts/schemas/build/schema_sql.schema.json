@@ -4,7 +4,7 @@
   "$defs": {
     "Finding": {
       "additionalProperties": false,
-      "description": "One problem a gate found; the shape the build worker writes into `gate_results.findings`.\n`file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.",
+      "description": "One problem a gate found; the shape the build worker writes into `gate_results.findings`.\n`file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.\nLIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the\nregistry's version (null when it has none) and `message` the guidance.",
       "properties": {
         "gate": {
           "$ref": "#/$defs/GateName"
@@ -84,6 +84,19 @@
           ],
           "default": null,
           "title": "Actual"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
         }
       },
       "required": [
