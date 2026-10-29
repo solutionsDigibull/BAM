@@ -193,7 +193,7 @@ def test_e11_3_file_names_come_only_from_the_template() -> None:
 
 
 def test_e11_3_black_provenance_is_pinned() -> None:
-    assert BLACK_VERSION == "26.10.0"  # matches the workers pin; a bump must update both
+    assert BLACK_VERSION == "26.10.1"  # matches the workers pin; a bump must update both
     assert len(BLACK_CONFIG_SHA256) == 64
 
 
