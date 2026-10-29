@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:5c299a49cc8eae8b22b513f6e41e9211dcf3f806e495dfd6aa8148862839ae62
+// source-sha256:2c519bc13c0f84c6940ea49e0b12aba36268b41fbdebdc7e8bc8d5f326c6d904
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -209,6 +209,14 @@ export type GateName =
   | "BANDIT"
   | "IMPORT_RESOLUTION"
   | "LOOP_TESTS";
+/**
+ * How serious a static-gate finding is (E12.4). A gate fails on a HIGH finding; LOW and MEDIUM
+ * ones are reported (Bandit's own scale; Ruff, Black, MyPy and ClamAV findings are all HIGH).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Severity".
+ */
+export type Severity = "LOW" | "MEDIUM" | "HIGH";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SchemaSource".
@@ -1100,7 +1108,8 @@ export interface GateResult {
  * One problem a gate found; the shape the build worker writes into `gate_results.findings`.
  * `file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.
  * LIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the
- * registry's version (null when it has none) and `message` the guidance.
+ * registry's version (null when it has none) and `message` the guidance. The static gates
+ * (E12.4) set `severity`; the AST gates leave it out.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "Finding".
@@ -1115,6 +1124,7 @@ export interface Finding {
   expected?: string | null;
   actual?: string | null;
   package?: string | null;
+  severity?: Severity | null;
 }
 /**
  * One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no

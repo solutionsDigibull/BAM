@@ -56,11 +56,21 @@ class GateStatus(StrEnum):
     SKIPPED = "SKIPPED"  # not run: an earlier gate failed, or it doesn't apply to this Sub-Skill
 
 
+class Severity(StrEnum):
+    """How serious a static-gate finding is (E12.4). A gate fails on a HIGH finding; LOW and MEDIUM
+    ones are reported (Bandit's own scale; Ruff, Black, MyPy and ClamAV findings are all HIGH)."""
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
 class Finding(BaseModel):
     """One problem a gate found; the shape the build worker writes into `gate_results.findings`.
     `file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.
     LIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the
-    registry's version (null when it has none) and `message` the guidance."""
+    registry's version (null when it has none) and `message` the guidance. The static gates
+    (E12.4) set `severity`; the AST gates leave it out."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -73,6 +83,7 @@ class Finding(BaseModel):
     expected: str | None = Field(default=None, max_length=1_000)
     actual: str | None = Field(default=None, max_length=1_000)
     package: str | None = Field(default=None, max_length=200)  # LIBRARIES: the normalized name
+    severity: Severity | None = None  # static gates (E12.4): what the gate blocks on is HIGH
 
 
 class BuildRow(BaseModel):
