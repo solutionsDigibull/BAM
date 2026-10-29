@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sandbox/runner_outputs:0.1.0",
+  "$defs": {
+    "FailureCategory": {
+      "enum": [
+        "IMPORT_ERROR",
+        "RUNTIME_ERROR",
+        "TIMEOUT",
+        "OOM",
+        "OUTPUT_SCHEMA_MISMATCH",
+        "ASSERTION_FAILED",
+        "EGRESS_BLOCKED",
+        "INFRA_ERROR"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "RunnerCaseResult": {
+      "additionalProperties": false,
+      "description": "One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker.",
+      "properties": {
+        "case_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "expected_terminal": {
+          "enum": [
+            "SUCCESS",
+            "ESCALATED",
+            "NO_OP"
+          ],
+          "title": "Expected Terminal",
+          "type": "string"
+        },
+        "terminal": {
+          "anyOf": [
+            {
+              "enum": [
+                "SUCCESS",
+                "ESCALATED",
+                "NO_OP"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Terminal"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "failure_category": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FailureCategory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "trace": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Trace",
+          "type": "object"
+        }
+      },
+      "required": [
+        "case_id",
+        "expected_terminal",
+        "terminal",
+        "passed",
+        "trace"
+      ],
+      "title": "RunnerCaseResult",
+      "type": "object"
+    },
+    "RunnerResources": {
+      "additionalProperties": false,
+      "properties": {
+        "wall_ms": {
+          "minimum": 0,
+          "title": "Wall Ms",
+          "type": "integer"
+        },
+        "cpu_ms": {
+          "minimum": 0,
+          "title": "Cpu Ms",
+          "type": "integer"
+        },
+        "peak_rss_kb": {
+          "minimum": 0,
+          "title": "Peak Rss Kb",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "wall_ms",
+        "cpu_ms",
+        "peak_rss_kb"
+      ],
+      "title": "RunnerResources",
+      "type": "object"
+    },
+    "SandboxMode": {
+      "enum": [
+        "CUBESANDBOX",
+        "LOCAL_DOCKER_NONCERT"
+      ],
+      "title": "SandboxMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`/work/out/outputs.json`, written by the runner as its last act.",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "runtime_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Runtime Digest",
+      "type": "string"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/RunnerCaseResult"
+      },
+      "title": "Cases",
+      "type": "array"
+    },
+    "resources": {
+      "$ref": "#/$defs/RunnerResources"
+    },
+    "mode": {
+      "$ref": "#/$defs/SandboxMode"
+    }
+  },
+  "required": [
+    "runtime_digest",
+    "cases",
+    "resources",
+    "mode"
+  ],
+  "title": "RunnerOutputs",
+  "type": "object"
+}

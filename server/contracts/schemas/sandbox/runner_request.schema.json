@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sandbox/runner_request:0.1.0",
+  "$defs": {
+    "JsonValue": {},
+    "SandboxLimits": {
+      "additionalProperties": false,
+      "description": "VM resources and time. Anything outside the policy is rejected, never clamped.",
+      "properties": {
+        "cpu": {
+          "default": 1,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Cpu",
+          "type": "integer"
+        },
+        "memory_mb": {
+          "default": 1024,
+          "maximum": 2048,
+          "minimum": 512,
+          "title": "Memory Mb",
+          "type": "integer"
+        },
+        "case_timeout_s": {
+          "default": 60,
+          "maximum": 300,
+          "minimum": 10,
+          "title": "Case Timeout S",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 10485760,
+          "maximum": 10485760,
+          "minimum": 1024,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "SandboxLimits",
+      "type": "object"
+    },
+    "SandboxMode": {
+      "enum": [
+        "CUBESANDBOX",
+        "LOCAL_DOCKER_NONCERT"
+      ],
+      "title": "SandboxMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`/work/request.json`, the only way data reaches the runner besides the files it reads.",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "limits": {
+      "$ref": "#/$defs/SandboxLimits"
+    },
+    "mode": {
+      "$ref": "#/$defs/SandboxMode"
+    },
+    "tool_module": {
+      "maxLength": 200,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+      "title": "Tool Module",
+      "type": "string"
+    },
+    "loop_spec": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Loop Spec",
+      "type": "object"
+    },
+    "handoff_table": {
+      "pattern": "^[a-z_][a-z0-9_]{0,62}$",
+      "title": "Handoff Table",
+      "type": "string"
+    },
+    "cases": {
+      "items": {
+        "additionalProperties": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "type": "object"
+      },
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "egress_probe": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "Egress Probe",
+      "type": "array"
+    }
+  },
+  "required": [
+    "limits",
+    "mode",
+    "tool_module",
+    "loop_spec",
+    "handoff_table",
+    "cases"
+  ],
+  "title": "RunnerRequest",
+  "type": "object"
+}

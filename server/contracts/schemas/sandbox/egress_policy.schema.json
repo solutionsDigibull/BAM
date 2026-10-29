@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sandbox/egress_policy:0.1.0",
+  "additionalProperties": false,
+  "description": "`runtime.network.allowlist` of a Sub-Skill. The platform adds the mock API on its own.",
+  "properties": {
+    "allow": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "Allow",
+      "type": "array"
+    }
+  },
+  "title": "EgressPolicy",
+  "type": "object"
+}
