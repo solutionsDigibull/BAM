@@ -5,7 +5,7 @@ GitHub issues filed). Read in this order.
 
 | File | What it is | Read it if you want |
 |---|---|---|
-| `01-findings.md` | **Final, merged findings** (F-01..F-36, N-01..N-08), evidence level, priority, fix | the verdict on what is wrong |
+| `01-findings.md` | **Final, merged findings** (F-01..F-37, N-01..N-08), evidence level, priority, fix | the verdict on what is wrong |
 | `02-upgrade-plan.md` | Current design vs proposed change, what it does, why, size, wave order | the roadmap to review and decide on |
 | `03-issue-drafts.md` | 21 issue drafts with comparison, acceptance criteria, owners (not filed) | to approve issues for filing |
 | `04-second-pass.md` | History: what the second pass corrected, live pentest results, severity changes | how confident to be in each finding |
@@ -25,7 +25,7 @@ GitHub issues filed). Read in this order.
   defence in depth.
 
 ## What this audit does not cover
-Live-tested in round 3: Keycloak, tusd, Caddy, the Next.js server (with real Chromium) and the ISATVON/builds/workflows/notifications APIs. Still not tested: Temporal under failure, Cognee live, CubeSandbox (not built), LLM prompt injection (needs a real model and a built codegen path). Issues filed: #427 to #460 on GitHub. Not reviewed
+Live-tested in round 3: Keycloak, tusd, Caddy, the Next.js server (with real Chromium) and the ISATVON/builds/workflows/notifications APIs. Round 4 added Temporal failure injection (no bug found) and F-27 reproduction. Still not tested: a hung activity or killed worker on a real Temporal server, Cognee live, CubeSandbox (not built), LLM prompt injection (needs a real model and a built codegen path). Issues filed: #427 to #461 on GitHub. Not reviewed
 in depth: knowledge/Cognee, ISATVON edit APIs, builds router, notifications, most client pages, 33 local-only
 branches. 25 of 79 endpoints are inventoried only (`05`). Findings tagged `Unverified` need confirmation.
 

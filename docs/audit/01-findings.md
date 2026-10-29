@@ -68,6 +68,7 @@ injection bugs.
 | F-34 | Schema-SQL validator reads the first `LANGUAGE` anywhere in the text (comment trick accepted); not exploitable with the current scratch image | **PoC** | P3 |
 | F-35 | A stolen session cookie keeps working about 5 minutes after sign-out | **PoC** | P3 |
 | F-36 | Unmerged AST gate stack is bypassed by module attribute chains to `sys.modules` (os.execv, socket, environ) | **PoC** | P1 pre-merge (#460) |
+| F-37 | LLM data-block escape is case-sensitive; forged `<data>`/`<image>` markers pass (hardening; model behaviour untested) | **PoC** (deterministic part) | P2 (#461) |
 | F-11 | CSP has no `script-src`; blocklist HTML paste filter | Code | P3 |
 | F-12 | Auth path opens 2 sessions per request | Code | P3 |
 | F-13 | Keycloak calls inside a DB transaction holding the tenant lock | Code | P3 |
@@ -396,6 +397,16 @@ for admins consider a shorter access token or a server-side session denylist.
 
 ### F-36 The unmerged AST gate stack can be bypassed with an attribute chain `PoC` · P1 pre-merge
 Local branches `117-ast-gate`, `118-ast-rules-pr`, `119-static-gate`, `120-import-resolution` (PRs #382 and #383 merged into a stacked branch, **not** into `dev`; `build/gates/` does not exist on `dev`, so F-02 stands). Run against my escape payloads, the gate blocks 8 of 10, but `json.codecs.sys.modules['os'].execv(...)`, `.listdir('/')`, `.environ` and `json.codecs.sys.modules['socket'].create_connection(...)` produce no findings using only allowed modules; `range(10**12)` and `'a'*10**11` also pass. Filed as #460, with comments on #118 and #120.
+
+### F-37 LLM data delimiters can be forged in document text `PoC` (deterministic part) · P2
+`llm/client.py` `_escape` only rewrites the exact string `</data`. `</DATA>`, `</Data >`, `</ data>` and a forged `<image name=...>` label pass unchanged (executed). Whether a real model is fooled was not tested. Filed as #461.
+
+### Round-4 results: Temporal failure injection and Cognee (what held)
+Run in the repo's Temporal time-skipping harness (`poc/temporal/audit_failure_test.py`; the repo's own 212 temporal tests also pass):
+- Continue-as-new while waiting for a rebuild (history padded with ignored duplicate signals, clock advanced past the 3-day reminder): the run really continued as new, a later rebuild signal was accepted, and the pipeline reached DONE. A reviewer's claim that the `generate`/`rebuilds` state is lost is **refuted**: `generate` is only read in the build stage, which a resumed wait never re-enters.
+- Cancel on the continued run: CANCELLED correctly. Two `generate` signals with different keys: each sub-skill built exactly once.
+- Knowledge activity failing transiently 3 times: recovered on attempt 4 and reached the SOW wait. Failing every time: 5 attempts, then FAILED with `KNOWLEDGE_FAILED`, a `pipeline.failed` notification and a FAILED mirror row, as designed.
+- Not testable here: a truly hung activity (needs a real Temporal server with real timers; the time-skipping harness cannot expire it), worker process kills, and a real Cognee (needs a model). F-27 was reproduced at adapter level with the repo's fake (`poc/temporal/audit_f27_test.py`).
 
 ## 5. What is already good (keep it)
 
