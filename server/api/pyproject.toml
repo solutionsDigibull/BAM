@@ -21,7 +21,7 @@ dependencies = [
     "sbam-contracts",
     "sqlalchemy>=2.0.54,<2.1",  # OTel sqlalchemy instrumentation supports <2.1 only
     "sqlglot>=30.23,<31",  # SCHEMA_SQL statement allowlist (E9.4)
-    "temporalio[opentelemetry]>=1.33,<1.34",
+    "temporalio[opentelemetry]>=1.35,<1.36",
     "uvicorn[standard]>=0.54.0",
 ]
 
