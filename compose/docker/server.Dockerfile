@@ -28,15 +28,17 @@ RUN groupadd --gid 10001 sbam \
  && chown -R sbam:sbam /data /tmp/sbam
 # SOW export (#88): WeasyPrint prints PDFs through Pango, and every font a PDF uses is embedded from
 # the Noto families here (Latin, CJK, Arabic, mono). Pandoc ships inside the pypandoc-binary wheel.
-# Debian's versions follow the pinned base image digest.
+# Debian's versions follow the pinned base image digest, except libbrotli1: the base ships 1.0.9-2+b6
+# (CVE-2026-111497, fixed in 1.0.9-2+deb12u1), so both roles take the security update (#467).
 # hadolint ignore=DL3008
-RUN if [ "$ROLE" = worker ]; then \
-      apt-get update \
-   && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends --only-upgrade libbrotli1 \
+ && if [ "$ROLE" = worker ]; then \
+      apt-get install -y --no-install-recommends \
         libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
-        fonts-noto-core fonts-noto-cjk fonts-noto-mono \
-   && rm -rf /var/lib/apt/lists/*; \
-    fi
+        fonts-noto-core fonts-noto-cjk fonts-noto-mono; \
+    fi \
+ && rm -rf /var/lib/apt/lists/*
 COPY --chmod=0755 compose/docker/server/healthcheck.py /usr/local/bin/sbam-healthcheck
 COPY --chmod=0755 compose/docker/server/migrate.sh /usr/local/bin/sbam-migrate
 WORKDIR /app/server
