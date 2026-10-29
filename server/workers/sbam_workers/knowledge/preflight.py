@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
+from sbam_api.core.settings import PLACEHOLDER, deployed_env
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.runs import TaskQueue
 
@@ -46,6 +47,10 @@ def check_cognee_env(env: Mapping[str, str]) -> None:
             problems.append(f"{name} must be under {VOLUME_ROOT}")
     if len(env.get("COGNEE_USER_SECRET", "")) < MIN_SECRET_LENGTH:
         problems.append(f"COGNEE_USER_SECRET must be at least {MIN_SECRET_LENGTH} characters")
+    if PLACEHOLDER in env.get("COGNEE_USER_SECRET", "").lower() and deployed_env(
+        env.get("SBAM_ENV") or "development"
+    ):
+        problems.append(f"COGNEE_USER_SECRET still holds the `{PLACEHOLDER}` template value")
     if problems:
         raise PreflightError(MISCONFIGURED, "; ".join(problems))
 

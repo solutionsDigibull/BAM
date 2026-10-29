@@ -109,3 +109,32 @@ def test_a27_t03_blank_sbam_env_is_not_a_dev_env(env: pytest.MonkeyPatch) -> Non
     env.setenv("LLM_PROVIDER", "mock")
     with pytest.raises(SettingsError):
         load_settings()
+
+
+# A-09: a template secret ("change-me-...") must not run in a deployed environment.
+@pytest.mark.parametrize(
+    "name", ["STORAGE_SIGNING_KEY", "KEYCLOAK_ADMIN_CLIENT_SECRET", "TUSD_HOOK_SECRET"]
+)
+@pytest.mark.parametrize("sbam_env", ["staging", "production", "prod-eu", " production"])
+def test_a09_t01_placeholder_secret_refused_when_deployed(
+    env: pytest.MonkeyPatch, name: str, sbam_env: str
+) -> None:
+    env.setenv("SBAM_ENV", sbam_env)
+    env.setenv("LLM_PROVIDER", "bifrost")
+    env.setenv(name, "Change-Me-secret-0000")  # any case
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+    assert name in str(info.value) and "Change-Me" not in str(info.value)
+
+
+def test_a09_t02_placeholder_secret_still_works_in_dev(env: pytest.MonkeyPatch) -> None:
+    env.setenv("SBAM_ENV", "development")
+    env.setenv("TUSD_HOOK_SECRET", "change-me-tusd")
+    assert load_settings().tusd_hook_secret is not None
+
+
+def test_a09_t03_real_secret_starts_when_deployed(env: pytest.MonkeyPatch) -> None:
+    env.setenv("SBAM_ENV", "production")
+    env.setenv("LLM_PROVIDER", "bifrost")
+    env.setenv("TUSD_HOOK_SECRET", "9f2c" * 16)
+    assert load_settings().tusd_hook_secret is not None
