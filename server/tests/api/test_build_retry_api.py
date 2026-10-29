@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from runs_db import add_project, memory_sessions
 from sbam_api.core.auth import ROLE_FDE, CurrentUser, fde
 from sbam_api.core.ids import uuid7
 from sbam_api.main import create_app
@@ -100,6 +101,8 @@ def fde_user(projects: frozenset[uuid.UUID] = frozenset({PROJECT})) -> CurrentUs
 def client(tmp_path: Path, temporal: object, user: CurrentUser | None = None) -> TestClient:
     app = create_app(make_settings(tmp_path), ALL_OK)
     app.state.temporal = temporal
+    app.state.sessions = memory_sessions()
+    add_project(app.state.sessions, TENANT, PROJECT)  # the archive guard reads it
     if user is not None:
         app.dependency_overrides[fde] = lambda: user
     return TestClient(app)

@@ -28,7 +28,7 @@ from sbam_contracts.documents import DocumentOut, UploadRequest, UploadToken
 from sbam_contracts.runs import Run, RunAccepted, SubjectType
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.core.auth import CurrentUser, fde, internal, project_access
+from sbam_api.core.auth import CurrentUser, fde, internal
 from sbam_api.core.conventions import ApiError
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
@@ -37,6 +37,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.ingest import retention, service, tusd
 from sbam_api.ingest.ingestion import start_ingestion_run, start_waiting
 from sbam_api.ingest.rules import STAGING
+from sbam_api.projects.guard import active_project
 from sbam_api.storage.router import backend
 from sbam_api.temporal.client import OrchestratorUnavailable
 from sbam_api.temporal.deps import session_factory, temporal_client
@@ -44,7 +45,7 @@ from sbam_api.temporal.repository import TemporalRunRepository, to_run
 
 router = APIRouter(tags=["ingest"])
 
-Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 

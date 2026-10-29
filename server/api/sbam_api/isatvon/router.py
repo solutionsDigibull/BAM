@@ -46,6 +46,7 @@ from sbam_api.isatvon.models import MacroSkill, SubSkill
 from sbam_api.isatvon.regenerate import start_regenerate
 from sbam_api.isatvon.service import revalidate
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
+from sbam_api.projects.guard import active_project
 from sbam_api.storage.router import backend
 from sbam_api.storage.signing import signed_url
 from sbam_api.temporal.deps import session_factory, temporal_client
@@ -93,7 +94,7 @@ def validate(
 
 
 W = "/projects/{project_id}/workflows/{workflow_id}"
-Project = Annotated[UUID, Depends(project_access)]
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 IfMatch = Annotated[str | None, Header()]

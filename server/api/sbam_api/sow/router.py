@@ -42,11 +42,12 @@ from sbam_contracts.sow_api import (
 )
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.core.auth import CurrentUser, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import content_disposition, validate_idempotency_key
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
+from sbam_api.projects.guard import active_project
 from sbam_api.sow import citations, impact, versions
 from sbam_api.sow.approve import approve_version
 from sbam_api.sow.exports import DOWNLOAD_CONTENT_TYPES, download_name, export_key
@@ -58,7 +59,7 @@ from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["sow"])
 
-Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 Version = Annotated[int, Path(ge=1, le=100_000)]

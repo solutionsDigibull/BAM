@@ -28,18 +28,19 @@ from sbam_contracts.knowledge import (
 from sbam_contracts.runs import RunAccepted
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.core.auth import CurrentUser, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.settings import Settings
 from sbam_api.knowledge import graph
 from sbam_api.knowledge.service import start_rebuild
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
+from sbam_api.projects.guard import active_project
 from sbam_api.storage.router import backend
 from sbam_api.storage.signing import signed_url
 from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["knowledge"])
 
-Project = Annotated[UUID, Depends(project_access)]  # fde policy + assignment check
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 IdempotencyKey = Annotated[str | None, Header(min_length=1, max_length=MAX_IDEMPOTENCY_KEY)]

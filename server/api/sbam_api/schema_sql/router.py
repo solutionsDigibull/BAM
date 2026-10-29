@@ -17,7 +17,8 @@ from fastapi import APIRouter, Depends, Query
 from sbam_contracts.schema_sql import SchemaSqlSourcePut, WorkflowSchemaSql
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.core.auth import CurrentUser, fde, project_access
+from sbam_api.core.auth import CurrentUser, fde
+from sbam_api.projects.guard import active_project
 from sbam_api.schema_sql import service
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.router import backend
@@ -26,7 +27,7 @@ from sbam_api.temporal.deps import session_factory
 router = APIRouter(tags=["schema-sql"])
 
 W = "/projects/{project_id}/workflows/{workflow_id}"
-Project = Annotated[UUID, Depends(project_access)]
+Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 Storage = Annotated[StorageBackend, Depends(backend)]
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from runs_db import FakeClient, all_rows, memory_sessions
+from runs_db import FakeClient, add_project, all_rows, memory_sessions
 from sbam_api.core.auth import ROLE_FDE, CurrentUser, fde
 from sbam_api.core.ids import uuid7
 from sbam_api.main import create_app
@@ -41,6 +41,8 @@ def make_app(tmp_path: Path) -> MakeApp:
     ) -> tuple[FastAPI, TestClient]:
         app = create_app(make_settings(tmp_path, **{"enable_ping": True, **settings}), ALL_OK)
         app.state.sessions = memory_sessions()
+        if tenant is not None:
+            add_project(app.state.sessions, tenant, PROJECT)
         if temporal is not None:
             app.state.temporal = temporal
         if tenant is not None:
