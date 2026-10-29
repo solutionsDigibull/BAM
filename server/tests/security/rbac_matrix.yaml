@@ -842,6 +842,17 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # Test runs of a Sub-Skill (E13.6). The world seeds no ISATVON rows, so an assigned FDE reaches
+  # the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
+  get_test_runs_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__test_runs_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/test-runs
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.
