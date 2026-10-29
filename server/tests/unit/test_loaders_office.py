@@ -102,9 +102,11 @@ def test_e4_5_a_file_that_is_not_a_readable_pdf_is_corrupt(data: bytes) -> None:
 def test_e4_5_a_pdf_with_too_many_pages_is_refused_not_cut(monkeypatch: pytest.MonkeyPatch) -> None:
     from sbam_workers.ingest.loaders import pdf
 
-    monkeypatch.setattr(pdf, "MAX_PDF_PAGES", 3)
-    assert run("pdf", make_pdf(["a", "b", "c"])).report.pages == 3
-    assert refused("pdf", make_pdf(["a", "b", "c", "d"])) is ErrorCode.PARSE_ERROR
+    monkeypatch.setattr(pdf, "MAX_PDF_PAGES", 3)  # in this process: call the loader, not the child
+    assert pdf.load_pdf(make_pdf(["a", "b", "c"]), no_heartbeat).report.pages == 3
+    with pytest.raises(ParseError) as caught:
+        pdf.load_pdf(make_pdf(["a", "b", "c", "d"]), no_heartbeat)
+    assert caught.value.code is ErrorCode.PARSE_ERROR
 
 
 def test_e4_5_control_characters_never_reach_the_text() -> None:
