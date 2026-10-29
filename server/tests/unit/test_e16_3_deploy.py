@@ -458,6 +458,41 @@ def test_e16_3_t06_admin_block_precedes_routes_and_auth_site_is_an_allowlist() -
     portal = CADDY.split("{$SBAM_PORTAL_HOST}")[1].split("{$SBAM_AUTH_HOST}")[0]
     assert "import hardening" in portal
     assert "@dev_pages path /dev /dev/*" in portal
+    assert "@files path /files /files/*" in portal and "handle @files {" in portal
+
+
+_BLOCK_DIRECTIVE = re.compile(r"^\s*(handle|handle_path|route)\b(.*)$")
+_ONE_MATCHER = re.compile(r"^(\s+(@[\w-]+|/\S*))?\s*\{$")
+
+
+def test_e16_3_block_directives_take_at_most_one_matcher() -> None:
+    """#448: `handle /files /files/* {` made Caddy refuse the whole file. handle / handle_path /
+    route accept one matcher token (a path or a named @matcher); two paths need a named matcher.
+    Caught here without Docker; the real `caddy validate` runs in CI (SBAM_VALIDATE_PROXY)."""
+    bad = [
+        f"Caddyfile:{n}: {line.strip()}"
+        for n, line in enumerate(CADDY.splitlines(), start=1)
+        if (m := _BLOCK_DIRECTIVE.match(line)) and not _ONE_MATCHER.match(m.group(2))
+    ]
+    assert bad == []
+
+
+@pytest.mark.parametrize(
+    ("line", "ok"),
+    [
+        ("\thandle {", True),
+        ("\thandle @files {", True),
+        ("\thandle /files/* {", True),
+        ("\thandle_path /api/* {", True),
+        ("\thandle /files /files/* {", False),
+        ("\troute @a @b {", False),
+        ("\thandle @files", False),  # no block
+    ],
+)
+def test_e16_3_the_matcher_guard_itself(line: str, ok: bool) -> None:
+    m = _BLOCK_DIRECTIVE.match(line)
+    assert m is not None
+    assert bool(_ONE_MATCHER.match(m.group(2))) is ok
 
 
 def test_e16_3_t08_tls_policy_and_hsts() -> None:

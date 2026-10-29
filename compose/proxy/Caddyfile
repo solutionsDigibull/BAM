@@ -51,8 +51,9 @@
 	}
 
 	# tusd resumable uploads (-base-path=/files/). The API's pre-create hook checks the upload token.
-	# 16 MB: the 15 MiB file cap plus tus framing headroom.
-	handle /files /files/* {
+	# 16 MB: the 15 MiB file cap plus tus framing headroom. `handle` takes one matcher, hence the named one.
+	@files path /files /files/*
+	handle @files {
 		request_body {
 			max_size 16MB
 		}

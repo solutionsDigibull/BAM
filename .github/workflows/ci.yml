@@ -93,8 +93,11 @@ jobs:
       # installs the same packages. Without them the PDF tests would only be skipped.
       - name: Install Pango and Noto fonts for WeasyPrint
         run: sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-noto-core
-      # unit + contract + temporal (workflow replay tests live in tests/temporal)
+      # unit + contract + temporal (workflow replay tests live in tests/temporal). SBAM_VALIDATE_PROXY
+      # runs `caddy validate` on the Caddyfile with the pinned image (#448): the proxy is the only
+      # public service, and an invalid file only shows when staging fails to start.
       - run: cd server && uv run pytest tests/unit tests/contract tests/temporal --junitxml=../reports/server-unit.xml
+        env: { SBAM_VALIDATE_PROXY: "1" }
       - run: pnpm --dir client test
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
