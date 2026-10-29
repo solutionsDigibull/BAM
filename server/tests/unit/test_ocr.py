@@ -20,6 +20,7 @@ from pdfs import make_pdf
 from PIL import Image
 from sbam_api.audit.models import AuditLog
 from sbam_api.ingest.models import DocumentVersion
+from sbam_api.masters.models import MasterDocument
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.documents import OcrPage, ParsedDocument, ParseOutcome
 from sbam_contracts.pipeline import StageRef
@@ -433,6 +434,91 @@ def test_e4_8_a_retry_after_the_ocr_finished_repeats_the_answer_and_sends_nothin
     reader = FakeReader()
     again = run_ocr(h, h.ref(ref.ref_id), reader)
     assert again == first and reader.calls == [] and h.audit().count("DOCUMENT_PARSED") == 1
+
+
+# --- A-23b (#496): the text pass's derived files go once OCR has replaced them ---------------
+
+
+EMPTY_SHA = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+
+def keys(h: Harness, ref: StageRef) -> set[str]:
+    version = h.version(ref)
+    assert version.derived_md_key and version.derived_json_key
+    return {version.derived_md_key, version.derived_json_key}
+
+
+def test_a23b_t01_ocr_leaves_no_unreferenced_derived_file(h: Harness) -> None:
+    ref = pending(h, "scan.pdf", scanned(2))
+    before = keys(h, ref)
+    run_ocr(h, ref, FakeReader())
+    after = keys(h, ref)
+    assert all(h.storage.exists(k) for k in after)
+    assert not any(h.storage.exists(k) for k in before - after)
+    assert len(before - after) >= 1  # doc.json names the version and its blocks: it always changes
+
+
+def test_a23b_t02_a_file_another_version_still_uses_is_kept(h: Harness) -> None:
+    first = pending(h, "a.pdf", scanned(2))
+    second = pending(h, "b.pdf", scanned(2))
+    shared = {k for k in keys(h, first) & keys(h, second) if k.endswith(EMPTY_SHA)}
+    assert shared, "two scans with no text layer share their text-pass markdown"
+    run_ocr(h, first, FakeReader())
+    assert all(h.storage.exists(k) for k in shared)  # `second` still points at it
+    assert all(h.storage.exists(k) for k in keys(h, second))
+    run_ocr(h, second, FakeReader())
+    assert all(h.storage.exists(k) for k in keys(h, second))
+
+
+def test_a23b_t03_a_master_document_using_the_file_keeps_it(h: Harness) -> None:
+    ref = pending(h, "scan.pdf", scanned(2))
+    old_md = h.version(ref).derived_md_key
+    with h.sessions() as s:
+        s.add(
+            MasterDocument(
+                tenant_id=ref.tenant_id,
+                title="rules",
+                filetype_row_label="Filetype #12",
+                intent_class="Policy / rules",
+                master_type="RULES",
+                route_source="DEFAULT_BY_FILETYPE",
+                storage_key="k",
+                sha256="0" * 64,
+                size=1,
+                mime="text/plain",
+                derived_md_key=old_md,
+            )
+        )
+        s.commit()
+    run_ocr(h, ref, FakeReader())
+    assert old_md and h.storage.exists(old_md)
+
+
+def test_a23b_t04_a_failing_delete_does_not_fail_the_step(h: Harness) -> None:
+    ref = pending(h, "scan.pdf", scanned(2))
+
+    def broken(key: str) -> None:
+        raise OSError("disk")
+
+    h.storage.delete = broken  # type: ignore[method-assign]
+    outcome = run_ocr(h, ref, FakeReader())
+    assert outcome.parsed is True and h.version(ref).state == "PARSED"
+
+
+def test_a23b_t05_a_retry_after_the_cleanup_deletes_nothing_more(h: Harness) -> None:
+    ref = pending(h, "scan.pdf", scanned(2))
+    run_ocr(h, ref, FakeReader())
+    after = keys(h, ref)
+    run_ocr(h, h.ref(ref.ref_id), FakeReader())
+    assert all(h.storage.exists(k) for k in after) and keys(h, ref) == after
+
+
+def test_a23b_t06_a_unreadable_scan_keeps_its_text_pass_files(h: Harness) -> None:
+    ref = pending(h, "scan.pdf", scanned(1))
+    blank = OcrPage(page=1, markdown="", unreadable=True)
+    outcome = run_ocr(h, ref, FakeReader({1: blank}))
+    assert outcome.code == ErrorCode.EMPTY
+    assert all(h.storage.exists(k) for k in keys(h, ref))
 
 
 # --- T07: the page is data ------------------------------------------------------------------------
