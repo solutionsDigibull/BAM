@@ -53,7 +53,9 @@ for name in $DB_SECRETS $OTHER_SECRETS; do
       printf '%s' "$value" | grep -Eq '^[A-Za-z0-9._~-]{16,}$' ||
         bad "$name" "must be 16+ URL-safe characters [A-Za-z0-9._~-] (use openssl rand -hex 32)" ;;
     *)
-      if [ "$name" != openrouter_api_key ] && [ "${#value}" -lt 16 ]; then bad "$name" "shorter than 16 characters"; fi ;;
+      min=16
+      [ "$name" = cognee_user_secret ] && min=32 # the knowledge worker preflight refuses a shorter one (A-09)
+      if [ "$name" != openrouter_api_key ] && [ "${#value}" -lt "$min" ]; then bad "$name" "shorter than $min characters"; fi ;;
   esac
 done
 

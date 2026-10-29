@@ -13,6 +13,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 DEV_ENVS = frozenset({"development", "test", "ci"})
 
 
+PLACEHOLDER = "change-me"  # what compose/.env.example ships for every secret
+
+
 def deployed_env(env: str) -> bool:
     """True unless `env` (trimmed, case-insensitive) is one of `DEV_ENVS`."""
     return env.strip().lower() not in DEV_ENVS
@@ -76,6 +79,22 @@ class Settings(BaseSettings):
     posthog_distinct_id_salt: SecretStr | None = None
 
     @model_validator(mode="after")
+    def _refuse_placeholder_secrets_outside_dev(self) -> "Settings":
+        if deployed_env(self.sbam_env):
+            secrets_by_name = {
+                "STORAGE_SIGNING_KEY": self.storage_signing_key,
+                "KEYCLOAK_ADMIN_CLIENT_SECRET": self.keycloak_admin_client_secret,
+                "TUSD_HOOK_SECRET": self.tusd_hook_secret,
+            }
+            bad = [n for n, v in secrets_by_name.items() if _is_placeholder(v)]
+            if bad:  # names only, never values
+                raise SettingsError(
+                    f"{', '.join(bad)} still hold the `{PLACEHOLDER}` template value "
+                    f"while SBAM_ENV={self.sbam_env}. Provision real secrets."
+                )
+        return self
+
+    @model_validator(mode="after")
     def _refuse_mock_provider_outside_dev(self) -> "Settings":
         if self.llm_provider == "mock" and deployed_env(self.sbam_env):
             raise SettingsError(
@@ -93,6 +112,12 @@ def _set(value: object) -> bool:
     if isinstance(value, SecretStr):
         value = value.get_secret_value()
     return bool(str(value).strip()) if value is not None else False
+
+
+def _is_placeholder(value: object) -> bool:
+    if isinstance(value, SecretStr):
+        value = value.get_secret_value()
+    return isinstance(value, str) and PLACEHOLDER in value.lower()
 
 
 def posthog_problem(env: str, host: object, key: object, salt: SecretStr | None) -> None:

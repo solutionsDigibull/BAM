@@ -653,7 +653,7 @@ def _write_secrets(directory: Path, **overrides: str | None) -> None:
             (
                 "a1b2c3d4e5f60718293a4b5c6d7e8f90"
                 if "password" in name
-                else "s3cret-value-0123456789abcdef"
+                else "s3cret-value-0123456789abcdef0123456789"
             ),
         )
         if value is None:
@@ -939,3 +939,20 @@ def test_e16_3_scripts_are_executable_and_the_loader_is_world_readable() -> None
     assert (
         LOADER.stat().st_mode & 0o444 == 0o444
     )  # containers run as uid 1000/10001 and bind-mount it
+
+
+def test_a09_t06_compose_has_no_builtin_cognee_secret_default() -> None:
+    text = (REPO / "compose" / "compose.yaml").read_text("utf-8")
+    assert "COGNEE_USER_SECRET: ${COGNEE_USER_SECRET:-}" in text
+    assert "change-me" not in text
+
+
+def test_a09_t07_cognee_secret_below_32_characters_fails_the_secret_check(tmp_path: Path) -> None:
+    short, placeholder = tmp_path / "short", tmp_path / "placeholder"
+    short.mkdir()
+    placeholder.mkdir()
+    _write_secrets(short, **{"cognee_user_secret": "s3cret-value-0123456789abcdef"})  # 28 chars
+    out = _check_secrets(short)
+    assert out.returncode == 1 and "cognee_user_secret: shorter than 32" in out.stdout
+    _write_secrets(placeholder, **{"cognee_user_secret": "change-me-" + "0" * 30})
+    assert "cognee_user_secret: still a template placeholder" in _check_secrets(placeholder).stdout

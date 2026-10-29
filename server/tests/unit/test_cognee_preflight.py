@@ -92,3 +92,18 @@ def test_e5_1_other_queues_do_not_need_cognee(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("TEMPORAL_HOST", "temporal:7233")
     monkeypatch.setenv("DATABASE_URL", "postgresql://x@localhost/x")
     registry.run_preflight([TaskQueue.INGEST, TaskQueue.LLM])  # no error
+
+
+@pytest.mark.parametrize("env_name", ["staging", "production", "prod-eu"])
+def test_a09_t04_placeholder_cognee_secret_refused_when_deployed(env_name: str) -> None:
+    placeholder = "change-me-cognee-user-secret-0000000000"
+    err = failure(SBAM_ENV=env_name, COGNEE_USER_SECRET=placeholder)
+    assert err.code == "COGNEE_MISCONFIGURED" and "template value" in str(err)
+    assert "0000000000" not in str(err)
+
+
+def test_a09_t05_placeholder_cognee_secret_allowed_in_dev() -> None:
+    check_cognee_env(
+        {**GOOD, "SBAM_ENV": "development", "COGNEE_USER_SECRET": "change-me-" + "0" * 30}
+    )
+    check_cognee_env({**GOOD, "COGNEE_USER_SECRET": "change-me-" + "0" * 30})  # unset = development
