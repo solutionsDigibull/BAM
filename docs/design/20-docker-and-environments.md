@@ -144,6 +144,7 @@ get an `env_file`**. Each worker variable is passed one by one, so the OpenRoute
 | `TUSD_HOOK_SECRET` | tusd → sbam-api hooks | yes | |
 | `UPLOAD_TOKEN_KEY` | signs upload tokens (not the hook secret, A-14) | staging/prod | dev: falls back to `TUSD_HOOK_SECRET` |
 | `MOCK_CONTROL_TOKEN` | sbam-mock-api (control surface, E13.5) | yes | 16+ characters; tools under test never get it. Deployed environments mount the Docker secret `mock_control_token` (`MOCK_CONTROL_TOKEN_FILE`): **provision `/etc/sbam/secrets/mock_control_token` before deploying this release** (`install -m 0400 -o root -g root /dev/stdin /etc/sbam/secrets/mock_control_token <<<"$(openssl rand -hex 32)"`) |
+| `LLM_DERIVATIVE_CACHE`, `LLM_PROJECT_BUDGET_USD`, `LLM_TENANT_BUDGET_USD`, `LLM_PRICE_USD_PER_MTOK` | workers | no | cost control (ADR 0015): the tenant-wide answer cache (default `true`); opt-in budgets in USD (empty = no limit; NaN, Infinity, 0 and negatives stop the worker at start); per-alias price table (JSON, USD per million tokens) for calls Bifrost reports no cost for, and for Cognee's `sbam-knowledge` / `sbam-embed` |
 | `SBAM_DEV_AUTH` | sbam-web | no | `1` enables the dev role picker until Keycloak sign-in (#51); ignored in production builds |
 | `MAX_BODY_BYTES`, `LOG_LEVEL` | sbam-api | no | defaults 10 MiB, `INFO` |
 

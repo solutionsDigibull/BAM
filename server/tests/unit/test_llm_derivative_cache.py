@@ -23,7 +23,8 @@ from pydantic import BaseModel, ConfigDict
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.models import LlmDerivative
 from sbam_api.llm.repository import LlmCallRepository, LlmDerivativeRepository
-from sbam_workers.llm.client import DERIVATIVE_MODEL, BudgetExceeded, cache_key
+from sbam_workers.llm.budget import BudgetExceeded
+from sbam_workers.llm.client import DERIVATIVE_MODEL, cache_key
 from sbam_workers.llm.registry import PromptRegistry
 
 GOOD = json.dumps({"count": 3, "label": "ok"})
@@ -204,11 +205,3 @@ def test_fresh_skips_the_cache_and_replaces_the_stored_answer() -> None:
     again = run(client, scope(), fresh=True)
     assert len(bifrost.requests) == 2 and not again.cached and again.output.count == 9
     assert run(client, scope()).output.count == 9  # later plain calls get the newest answer
-
-
-def test_a_budget_with_replies_that_report_no_cost_warns(caplog: pytest.LogCaptureFixture) -> None:
-    bifrost = FakeBifrost([completion(GOOD, usage={"prompt_tokens": 10, "completion_tokens": 5})])
-    client, _ = make_client(bifrost, llm_project_budget_usd="1")
-    with caplog.at_level("WARNING"):
-        run(client, scope())
-    assert "reported no cost" in caplog.text
