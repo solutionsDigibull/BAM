@@ -1,7 +1,7 @@
 """sandbox_runs
 
-Revision ID: 0040_sandbox_runs
-Revises: 0039_workflow_manifests
+Revision ID: 0046_sandbox_runs
+Revises: 0045_dataset_mocks_keys
 Create Date: 2026-10-29
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -18,8 +18,8 @@ from alembic import op
 from sbam_api.db.frozen import create_frozen_trigger, drop_frozen_trigger
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0040_sandbox_runs"
-down_revision: str | Sequence[str] | None = "0039_workflow_manifests"
+revision: str = "0046_sandbox_runs"
+down_revision: str | Sequence[str] | None = "0045_dataset_mocks_keys"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

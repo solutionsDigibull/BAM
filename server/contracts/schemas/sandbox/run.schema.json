@@ -28,7 +28,8 @@
         "DATASET_INVALID",
         "EGRESS_LOG_UNAVAILABLE",
         "DESTROY_FAILED",
-        "CANCELLED"
+        "CANCELLED",
+        "SUPERSEDED"
       ],
       "title": "InfraReason",
       "type": "string"

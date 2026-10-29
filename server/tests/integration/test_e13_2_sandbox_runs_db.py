@@ -1,4 +1,4 @@
-"""E13.2 `sandbox_runs` against the Compose Postgres: migration 0040 up and down, every row
+"""E13.2 `sandbox_runs` against the Compose Postgres: migration 0046 up and down, every row
 constraint, the frozen trigger, tenant scoping, `claim` semantics and a race between claimers. A
 scratch database is created and dropped. Needs `make up`; not part of the unit run."""
 
@@ -29,7 +29,7 @@ DB = f"sbam_e132_{uuid.uuid4().hex[:10]}"
 TENANT, OTHER, PROJECT = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 DIGEST = "sha256:" + "a" * 64
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
-PARENT = "0039_workflow_manifests"
+PARENT = "0045_dataset_mocks_keys"
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +43,7 @@ def sessions() -> Iterator[sessionmaker[Session]]:
             mp.setenv("DATABASE_URL", url(database=DB))
             command.upgrade(config(), "head")
             yield make_sessionmaker(engine)
-            command.downgrade(config(), PARENT)  # 0040 undoes itself
+            command.downgrade(config(), PARENT)  # 0046 undoes itself
             with engine.connect() as conn:
                 found = conn.execute(text("SELECT to_regclass('sbam.sandbox_runs')")).scalar()
                 trigger = conn.execute(
