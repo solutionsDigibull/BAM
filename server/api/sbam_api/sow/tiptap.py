@@ -8,7 +8,9 @@ empty paragraphs are ignored, any block's text is read. Its errors carry a dotte
 `SowDocument`, whose errors are reported with the same kind of path.
 """
 
+import json
 import types
+from collections.abc import Iterator
 from typing import Annotated, Any, Final, Union, get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
@@ -349,24 +351,59 @@ def from_tiptap(doc: Any) -> SowDocument:
         ) from None
 
 
-def stamp_fde(
-    content: dict[str, Any], seen: set[tuple[str, str, str | None]], author: str, today: str
-) -> None:
-    """Sign every FDE-authored citation that is not already in the saved version as `author`, today.
+def _statement(owner: Node) -> str:
+    """What an owner (a section or an item) says, without its citations, whitespace folded."""
+    reader = _Reader()
+    kept = [c for c in reader.children(owner) if c.get("type") != CITATIONS]
+    return " ".join(reader.text({"type": "doc", "content": kept}).split())
 
-    An editor cannot write someone else's name or an older date: what the client sent is replaced,
-    and only a citation identical to one the previous version already holds keeps its stamp.
+
+def _owner_key(section: str, owner: Node) -> str:
+    """Names one statement: its section, its item ids and its text. A citation's stamp is only
+    valid for the statement it was written on, so editing the text or moving the citation to
+    another statement voids it."""
+    attrs = _Reader.attrs(owner) if owner.get("type") == ITEM else {}
+    ids = [attrs.get(k) for k in ITEM_SECTIONS.get(section, ())]
+    return json.dumps([section, ids, _statement(owner)], ensure_ascii=False)
+
+
+def _fde_citations(content: Any) -> Iterator[tuple[str, Node]]:
+    """(statement key, citation node) for every FDE-authored citation in an editor document."""
+    reader = _Reader()
+    for node in reader.children(content):
+        section = reader.attrs(node).get("section_id")
+        if node.get("type") != SECTION or not isinstance(section, str):
+            continue
+        owners = [n for n in reader.children(node) if n.get("type") == ITEM] or [node]
+        for owner in owners:
+            key = _owner_key(section, owner)
+            for block in (n for n in reader.children(owner) if n.get("type") == CITATIONS):
+                for cite in reader.children(block):
+                    if cite.get("type") == CITATION and reader.attrs(cite).get("kind") == FDE:
+                        yield key, cite
+
+
+def fde_stamps(content: Any) -> set[tuple[str, Any, Any, Any]]:
+    """(statement, author, date, note) of every FDE-authored citation a saved document holds."""
+    return {
+        (key, a.get("author"), a.get("date"), a.get("note"))
+        for key, cite in _fde_citations(content)
+        for a in [_Reader.attrs(cite)]
+    }
+
+
+def stamp_fde(content: Any, seen: set[tuple[str, Any, Any, Any]], author: str, today: str) -> None:
+    """Sign every FDE-authored citation as `author`, today, unless the saved version already holds
+    exactly this citation on exactly this statement.
+
+    An editor cannot write someone else's name or an older date, and cannot copy a colleague's
+    stamp (visible on any read) onto a statement of their own: the stamp is keyed to the statement
+    it was made on, so anywhere else, or after the text changed, it is replaced.
     """
-    if isinstance(content, dict):
-        attrs = content.get("attrs")
-        if content.get("type") == CITATION and isinstance(attrs, dict) and attrs.get("kind") == FDE:
-            if (attrs.get("author"), attrs.get("date"), attrs.get("note")) not in seen:
-                attrs["author"], attrs["date"] = author, today
-        for value in content.values():
-            stamp_fde(value, seen, author, today)
-    elif isinstance(content, list):
-        for value in content:
-            stamp_fde(value, seen, author, today)
+    for key, cite in _fde_citations(content):
+        attrs = cite.setdefault("attrs", {})
+        if (key, attrs.get("author"), attrs.get("date"), attrs.get("note")) not in seen:
+            attrs["author"], attrs["date"] = author, today
 
 
 def citations_of(doc: SowDocument) -> list[tuple[str, AnyCitation]]:

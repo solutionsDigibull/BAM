@@ -129,3 +129,84 @@ def test_e6_3b_t08_a_fake_okf_ref_id_on_an_fde_citation_is_not_kept(h: Harness) 
     block["content"][-1]["attrs"]["okf_ref_id"] = "c-999"
     assert h.save(tiptap).status_code == 201
     assert "okf_ref_id" not in _fde(h.rows()[1].structured)[0]
+
+
+# --- a stamp is bound to the statement it was made on (review note on #353) -----------------------
+
+
+def _save_as(h: Harness, monkeypatch: pytest.MonkeyPatch, who: str, tiptap: Any, base: int) -> Any:
+    monkeypatch.setattr("sbam_api.sow.versions._signer", lambda user: who)
+    res = h.save(tiptap, base=base)
+    assert res.status_code == 201, res.text
+    return h.rows()[-1].structured
+
+
+def _alice_cites_scope(h: Harness, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    structured = _save_as(h, monkeypatch, "Alice", _with(h, FORGED), base=1)
+    assert [c["author"] for c in _fde(structured)] == ["Alice"]
+    return copy.deepcopy(structured or {})
+
+
+def test_e6_3b_t09_a_colleagues_stamp_copied_onto_another_statement_is_replaced(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc = _alice_cites_scope(h, monkeypatch)
+    alice = next(c for c in doc["scope"]["citations"] if c.get("kind") == "fde")
+    doc["features"][0]["citations"].append(dict(alice))  # Alice's exact (author, date, note)
+    structured = _save_as(h, monkeypatch, "Bob", to_tiptap(doc), base=2)
+    assert [c["author"] for c in _fde(structured)] == ["Alice"]  # scope: untouched
+    copied = [c for c in structured["features"][0]["citations"] if c.get("kind") == "fde"]
+    assert [c["author"] for c in copied] == ["Bob"]  # the copy is Bob's own claim, not Alice's
+
+
+def test_e6_3b_t10_editing_the_statement_a_stamp_stands_on_re_signs_it(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc = _alice_cites_scope(h, monkeypatch)
+    doc["scope"]["in_scope"] = [*doc["scope"]["in_scope"], "Returns handling"]
+    structured = _save_as(h, monkeypatch, "Bob", to_tiptap(doc), base=2)
+    assert [c["author"] for c in _fde(structured)] == ["Bob"]
+
+
+def test_e6_3b_t11_an_edit_elsewhere_keeps_the_stamp(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc = _alice_cites_scope(h, monkeypatch)
+    doc["overview"]["objective"] = doc["overview"]["objective"] + " (revised)"
+    structured = _save_as(h, monkeypatch, "Bob", to_tiptap(doc), base=2)
+    assert [c["author"] for c in _fde(structured)] == ["Alice"]
+
+
+def test_e6_3b_t12_reordering_items_keeps_the_stamp_with_its_item(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc = copy.deepcopy(h.structured)
+    doc["features"][1]["citations"].append(dict(FORGED))
+    structured = _save_as(h, monkeypatch, "Alice", to_tiptap(doc), base=1)
+    moved = copy.deepcopy(structured or {})
+    moved["features"].reverse()
+    structured = _save_as(h, monkeypatch, "Bob", to_tiptap(moved), base=2)
+    stamped = [
+        (f["id"], c["author"])
+        for f in structured["features"]
+        for c in f["citations"]
+        if c.get("kind") == "fde"
+    ]
+    assert stamped == [(h.structured["features"][1]["id"], "Alice")]
+
+
+def test_e6_3b_t13_a_stamp_survives_formatting_only_changes_in_the_editor(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    doc = _alice_cites_scope(h, monkeypatch)
+    tiptap = to_tiptap(doc)
+    section = next(n for n in tiptap["content"] if n["attrs"]["section_id"] == "scope")
+    for field in section["content"]:  # bold marks and a stray blank paragraph, same words
+        for block in field.get("content", []):
+            for run in block.get("content", []):
+                if run.get("type") == "text":
+                    run["marks"] = [{"type": "bold"}]
+        if field.get("type") == "sowField":
+            field["content"].append({"type": "paragraph"})
+    res = h.save(tiptap, base=2)
+    assert res.status_code == 200 and len(h.rows()) == 2  # no new version, so no re-sign
