@@ -9,7 +9,7 @@ x-worker: &worker { cpus: 2.0, mem_limit: 2g }
 x-worker-real: &worker-real
   cpus: 2.0
   mem_limit: 2g
-  environment: { LLM_PROVIDER: bifrost }
+  environment: { LLM_PROVIDER: bifrost, SBAM_ENV: production } # stubs refuse to run outside dev (A-01)
 
 services:
   postgres:

@@ -16,11 +16,12 @@ from sbam_contracts.runs import TaskQueue
 from temporalio import activity
 
 from sbam_workers.registry import activity_for
-from sbam_workers.stub_ids import stage_stub_id
+from sbam_workers.stub_ids import stage_stub_id, stub_activity
 
 
 @activity_for(TaskQueue.BUILD)
 @activity.defn(name="render_skeleton")
+@stub_activity
 async def render_skeleton(inp: BuildStageInput) -> IdResult:
     """Real (#112 templates): non-retryable TemplateError."""
     return IdResult(id=stage_stub_id(inp, "skeleton"))
@@ -40,6 +41,7 @@ async def assemble(inp: BuildStageInput) -> IdResult:
 
 @activity_for(TaskQueue.BUILD)
 @activity.defn(name="ast_gate")
+@stub_activity
 async def ast_gate(inp: BuildStageInput) -> IdResult:
     """Real (E11/E12): AST checks; raises GateFailed with finding ids."""
     return IdResult(id=stage_stub_id(inp, "ast_gate"))
@@ -47,6 +49,7 @@ async def ast_gate(inp: BuildStageInput) -> IdResult:
 
 @activity_for(TaskQueue.BUILD)
 @activity.defn(name="static_gate")
+@stub_activity
 async def static_gate(inp: BuildStageInput) -> IdResult:
     """Real (E11/E12): static analysis; raises GateFailed with finding ids."""
     return IdResult(id=stage_stub_id(inp, "static_gate"))

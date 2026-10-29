@@ -329,6 +329,10 @@ def _env_rules(services: dict[str, Any], env: str, core: set[str]) -> list[Findi
     if not str(kc.get("KC_HOSTNAME", "")).startswith("https://"):
         err("keycloak", "KC_HOSTNAME must be the public https URL")
     if env != "dev":
+        for name in sorted(n for n in services if n.startswith("worker-")):
+            worker_env = _env_pairs(services[name]).get("SBAM_ENV")
+            if worker_env != expected:  # an unset one reads as development: stubs would run (A-01)
+                err(name, f"SBAM_ENV must be {expected}, got {worker_env}")
         if "sbam-llm-mock" in services:
             err("sbam-llm-mock", f"the mock LLM upstream must not run in {env}")
         for name in ["sbam-api"] + sorted(n for n in services if n.startswith("worker-")):
