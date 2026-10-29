@@ -1,10 +1,20 @@
 # Local development mode (TD §20.3.5), loaded by `make up` on laptops: dev image targets with the source
 # bind-mounted, so code changes don't need image rebuilds. Dev/staging/prod use compose.<env>.yaml (#142).
 
+# Workers restart on code change (TD §20.3.5, #198): watchfiles (already in the lock via uvicorn[standard])
+# restarts the bootstrap when a .py file under the mounted source changes. Every worker imports all of
+# sbam_workers at start (registry.load_all), so any change restarts all of them; the API reloads itself
+# (uvicorn --reload) and the web app is untouched. Polling, because file events don't cross Docker
+# Desktop bind mounts (as WATCHPACK_POLLING for sbam-web). init: `docker compose stop` reaches the worker.
 x-worker-dev: &worker-dev
   build:
     target: dev
   volumes: [../server:/app/server]
+  init: true
+  command: [watchfiles, --filter, python, "python -m sbam_workers.bootstrap", /app/server/api, /app/server/workers,
+            /app/server/contracts] # the packages only: polling server/.venv would take minutes
+  environment:
+    WATCHFILES_FORCE_POLLING: "true"
 
 services:
   sbam-api:
@@ -70,8 +80,7 @@ services:
       - web_node_modules:/app/client/node_modules
       - web_next:/app/client/.next
 
-  # The bootstrap (#40) runs from the mounted source: `docker compose restart worker-<queue>` after a change.
-  # ponytail: no watch mode yet (the TD asks for restart-on-change); follow-up issue.
+  # The bootstrap (#40) runs from the mounted source and restarts on change (x-worker-dev above).
   worker-ingest: *worker-dev
   worker-knowledge: *worker-dev
   worker-llm: *worker-dev

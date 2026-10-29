@@ -255,6 +255,9 @@ make down                                 # stop (data kept);  make reset CONFIR
 
 If a port is already in use on your machine, change it in `compose/.env` (`API_PORT`, `WEB_PORT`, …).
 Code changes reload automatically: `compose.override.yaml` mounts `server/` and `client/` into the containers.
+The API reloads (`uvicorn --reload`), the web app hot-reloads (`next dev`), and every worker restarts when a `.py`
+file under `server/` changes (watchfiles; each worker imports all of `sbam_workers`, so all of them restart).
+No `docker compose restart` needed. `docker compose logs -f worker-<queue>` shows the restart.
 
 **Where configuration lives.** `compose/.env` configures the Docker stack. `server/.env` is only needed if you run the
 API on the host (`uv run uvicorn sbam_api.main:create_app --factory`) against the Compose services; point it at
