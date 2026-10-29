@@ -73,6 +73,8 @@ from sbam_workers.llm.store import SqlCallStore
 from sbam_workers.llm.trace import LangfuseTracer
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
+from sbam_workers.test import testgen as testgen_stage
+from sbam_workers.test.testgen import GenerateTests, SqlDatasetStore
 
 INPUT_MISMATCH = assemble_stage.INPUT_MISMATCH
 LOOP_SPEC_INVALID = "LoopSpecInvalid"
@@ -206,6 +208,14 @@ class SqlBuildInputs:
                 manifest_id=loaded.manifest_id,
             )
 
+    def _tests_sub_skill(self, inp: BuildStageInput) -> dict[str, Any]:
+        with self.sessions() as session:
+            return self._sub_skill(session, inp)
+
+    async def tests_sub_skill(self, inp: BuildStageInput) -> dict[str, Any]:
+        """The Sub-Skill as the corrections left it, for `generate_tests` (E13.4)."""
+        return await asyncio.to_thread(self._tests_sub_skill, inp)
+
     async def bodies(self, inp: BuildStageInput) -> BodiesInputs:
         return await asyncio.to_thread(self._bodies, inp)
 
@@ -275,6 +285,16 @@ def _static_gate() -> StaticGate:
     return StaticGate(make_backend(settings), sessions, clamd)
 
 
+@lru_cache(maxsize=1)
+def _generate_tests() -> GenerateTests:
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    return GenerateTests(
+        SqlBuildInputs(sessions).tests_sub_skill,
+        _llm(settings, sessions),
+        SqlDatasetStore(sessions, make_backend(settings)),
+    )
+
+
 @activity_for(TaskQueue.BUILD)
 @activity.defn(name=ast_gate_stage_module.STAGE)
 async def ast_gate_stage_activity(inp: BuildStageInput) -> IdResult:
@@ -289,6 +309,13 @@ async def static_gate_stage_activity(inp: BuildStageInput) -> IdResult:
     """Ruff, Black, MyPy, Bandit and ClamAV on the stored bundle (E12.4); a blocking finding is
     GateFailed with the attempt id, a tool that gives no verdict is retried, never corrected."""
     return await _static_gate().run(inp)
+
+
+@activity_for(TaskQueue.LLM)
+@activity.defn(name=testgen_stage.STAGE)
+async def generate_tests_stage_activity(inp: BuildStageInput) -> IdResult:
+    """Synthetic test cases and files for the Sub-Skill, stored as a new dataset version (E13.4)."""
+    return await _generate_tests().run(inp)
 
 
 @activity_for(TaskQueue.LLM)

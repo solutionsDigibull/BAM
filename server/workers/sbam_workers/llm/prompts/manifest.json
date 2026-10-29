@@ -10,5 +10,6 @@
   "ocr-page/1.0.0": "eb17c5f7aef070f80aef7fded45209b5943187fac228fdae3fff4e501f3bfda8",
   "schema-ddl/1.0.0": "e6e4d87552e50abfbdb2d2bfacbc4e992b6c6363073de8fe6da3fd9cdc1e4cf5",
   "smoke/1.0.0": "b97c5916e0a3d95a171f389136cced10ea79524c7aa7a94a9771400dfcd90bf2",
-  "sow-generate/1.0.0": "16baa4b97537702929a670a62e214cb9ec8827dd93108ddd0f5bbb0254bcd9c9"
+  "sow-generate/1.0.0": "16baa4b97537702929a670a62e214cb9ec8827dd93108ddd0f5bbb0254bcd9c9",
+  "testgen/1.0.0": "9e0764c14c84d3ebed0b6623c584b4cb052043dbd4bf2cf9345a269c964f1385"
 }
