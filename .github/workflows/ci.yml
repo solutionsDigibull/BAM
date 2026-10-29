@@ -70,6 +70,15 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # A scratch PostgreSQL 16 for the schema-SQL apply tests (test_e9_4_schema_sql.py, #476). It needs a
+    # superuser: the tests create and drop their own databases.
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env: { POSTGRES_PASSWORD: ci }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -97,7 +106,20 @@ jobs:
       # runs `caddy validate` on the Caddyfile with the pinned image (#448): the proxy is the only
       # public service, and an invalid file only shows when staging fails to start.
       - run: cd server && uv run pytest tests/unit tests/contract tests/temporal --junitxml=../reports/server-unit.xml
-        env: { SBAM_VALIDATE_PROXY: "1" }
+        env:
+          SBAM_VALIDATE_PROXY: "1"
+          SCHEMA_CHECK_TEST_DSN: postgresql://postgres:ci@localhost:5432/postgres
+      # fastmcp is a skill-runtime dependency, not a dev one, so the rendered-template test that needs it
+      # skips in the run above. Run it here with the version the runtime image pins, and fail on a skip.
+      - name: Codegen template contract with the real fastmcp
+        run: |
+          FASTMCP="$(awk '/^fastmcp==/ {sub(/==/," "); print "fastmcp=="$2}' compose/docker/skill-runtime/requirements.lock | head -1)"
+          cd server && uv run --with "$FASTMCP" python -m pytest tests/contract/test_codegen_templates_contract.py \
+            --junitxml=../reports/server-fastmcp.xml
+      - name: Opt-in tests must run, not skip (#476)
+        run: |
+          uv run scripts/ci_assert_ran.py reports/server-unit.xml test_e9_4_schema_sql
+          uv run scripts/ci_assert_ran.py reports/server-fastmcp.xml test_codegen_templates_contract
       - run: pnpm --dir client test
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
