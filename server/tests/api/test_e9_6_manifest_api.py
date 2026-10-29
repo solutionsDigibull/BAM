@@ -76,7 +76,7 @@ class Harness(WorkbenchHarness):
             s.commit()
         return sha
 
-    def get(self, path: str, token: str | None = None) -> Any:
+    def read(self, path: str, token: str | None = None) -> Any:
         base = f"/projects/{self.project}/workflows/{self.wf}"
         return self.call("GET", base + path, token or self.fde())
 
@@ -89,56 +89,56 @@ def h(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Harness]:
 def test_e9_6_the_newest_manifest_by_default_and_any_version_by_number(h: Harness) -> None:
     first = h.manifest(1)
     second = h.manifest(2, patch=1)
-    res = h.get(f"/sub-skills/{h.sub}/manifest")
+    res = h.read(f"/sub-skills/{h.sub}/manifest")
     assert res.status_code == 200, res.text
     body = res.json()
     assert (body["version"], body["sha256"], body["build_no"]) == ("1.0.1", second, 2)
     assert body["manifest"]["governance"]["deterministic_hash"] == second  # the stored JSON
     assert body["schema_version"] == "manifest/skill_manifest@1.0" and not body["reused"]
-    older = h.get(f"/sub-skills/{h.sub}/manifest?version=1.0.0").json()
+    older = h.read(f"/sub-skills/{h.sub}/manifest?version=1.0.0").json()
     assert (older["sha256"], older["build_no"]) == (first, 1)
-    assert h.get(f"/sub-skills/{h.sub}/manifest?build_no=1").json()["sha256"] == first
-    versions = h.get(f"/sub-skills/{h.sub}/manifests").json()["items"]
+    assert h.read(f"/sub-skills/{h.sub}/manifest?build_no=1").json()["sha256"] == first
+    versions = h.read(f"/sub-skills/{h.sub}/manifests").json()["items"]
     assert [(v["version"], v["build_no"]) for v in versions] == [("1.0.1", 2), ("1.0.0", 1)]
 
 
 def test_e9_6_a_rebuilt_identical_manifest_is_one_version_marked_reused(h: Harness) -> None:
     h.manifest(1)
     h.manifest(1, attempt=1)  # a retried attempt, same hash
-    assert len(h.get(f"/sub-skills/{h.sub}/manifests").json()["items"]) == 1
+    assert len(h.read(f"/sub-skills/{h.sub}/manifests").json()["items"]) == 1
     with h.sessions() as s:
         s.execute(update(SubSkill).values(reused_from_id=h.sub))
         s.commit()
-    assert h.get(f"/sub-skills/{h.sub}/manifest").json()["reused"] is True
+    assert h.read(f"/sub-skills/{h.sub}/manifest").json()["reused"] is True
 
 
 @pytest.mark.parametrize("version", ["1.2.0", "latest", "1.0"])
 def test_e9_6_a_version_is_major_0_patch(h: Harness, version: str) -> None:
     h.manifest(1)
-    problem(h.get(f"/sub-skills/{h.sub}/manifest?version={version}"), 422, "VALIDATION_ERROR")
+    problem(h.read(f"/sub-skills/{h.sub}/manifest?version={version}"), 422, "VALIDATION_ERROR")
 
 
 def test_e9_6_t07_no_manifest_yet_is_404(h: Harness) -> None:
-    problem(h.get(f"/sub-skills/{h.sub}/manifest"), 404, "NOT_FOUND")
-    assert h.get(f"/sub-skills/{h.sub}/manifests").json() == {"items": []}
+    problem(h.read(f"/sub-skills/{h.sub}/manifest"), 404, "NOT_FOUND")
+    assert h.read(f"/sub-skills/{h.sub}/manifests").json() == {"items": []}
     h.manifest(1)
-    problem(h.get(f"/sub-skills/{h.sub}/manifest?version=2.0.0"), 404, "NOT_FOUND")
+    problem(h.read(f"/sub-skills/{h.sub}/manifest?version=2.0.0"), 404, "NOT_FOUND")
 
 
 def test_e9_6_t05_manifest_text_comes_back_as_data(h: Harness) -> None:
     h.manifest(1, name=XSS)
-    res = h.get(f"/sub-skills/{h.sub}/manifest")
+    res = h.read(f"/sub-skills/{h.sub}/manifest")
     assert res.headers["content-type"].startswith("application/json")
     assert res.json()["manifest"]["skill_metadata"]["skill_name"] == XSS
 
 
 def test_e9_6_the_workflow_manifest_of_each_build(h: Harness) -> None:
-    problem(h.get("/manifest"), 404, "NOT_FOUND")
+    problem(h.read("/manifest"), 404, "NOT_FOUND")
     first = h.workflow_manifest(1)
     second = h.workflow_manifest(2)
-    assert h.get("/manifest").json()["sha256"] == second
-    assert h.get("/manifest?build_no=1").json()["sha256"] == first
-    assert [v["build_no"] for v in h.get("/manifests").json()["items"]] == [2, 1]
+    assert h.read("/manifest").json()["sha256"] == second
+    assert h.read("/manifest?build_no=1").json()["sha256"] == first
+    assert [v["build_no"] for v in h.read("/manifests").json()["items"]] == [2, 1]
 
 
 def test_e9_6_a_sub_skill_or_workflow_of_another_project_is_404(h: Harness) -> None:
@@ -146,7 +146,7 @@ def test_e9_6_a_sub_skill_or_workflow_of_another_project_is_404(h: Harness) -> N
     other = h.workflow(major=2, sow_version=h.generated(h.structured))  # same project
     path = f"/projects/{h.project}/workflows/{other}/sub-skills/{h.sub}/manifest"
     problem(h.call("GET", path, h.fde()), 404, "NOT_FOUND")
-    problem(h.get(f"/sub-skills/{uuid.uuid4()}/manifests"), 404, "NOT_FOUND")
+    problem(h.read(f"/sub-skills/{uuid.uuid4()}/manifests"), 404, "NOT_FOUND")
     unknown = f"/projects/{h.project}/workflows/{uuid.uuid4()}/manifests"
     problem(h.call("GET", unknown, h.fde()), 404, "NOT_FOUND")
 
@@ -161,13 +161,13 @@ def test_e9_6_t06_another_tenant_or_an_unassigned_fde_gets_404(h: Harness) -> No
             f"/sub-skills/{h.sub}/manifests",
             "/manifest",
         ):
-            problem(h.get(path, token), 404, "NOT_FOUND")
+            problem(h.read(path, token), 404, "NOT_FOUND")
 
 
 def test_e9_6_only_the_fde_portal_reads_manifests(h: Harness) -> None:
     h.manifest(1)
     # refused before the handler; tests/security/rbac_matrix.yaml pins every role's answer
-    problem(h.get(f"/sub-skills/{h.sub}/manifest", h.realm.token(ADMIN_A)), 404, "NOT_FOUND")
+    problem(h.read(f"/sub-skills/{h.sub}/manifest", h.realm.token(ADMIN_A)), 404, "NOT_FOUND")
 
 
 @pytest.mark.parametrize("name", ["skill_manifest", "workflow_manifest"])
