@@ -120,9 +120,11 @@ Paths below are relative to `/api/v1`. **P** = `/projects/{project_id}` (project
 
 | Method | Endpoint                           | Request                                 | Response                                                         | Errors                        |
 | ------ | ---------------------------------- | --------------------------------------- | ---------------------------------------------------------------- | ----------------------------- |
-| GET    | `/schemas/manifest/{version}`    | —                                      | Sub-Skill + Workflow manifest schemas                            | 404                           |
-| GET    | `W/sub-skills/{sub_id}/manifest` | `version?`                            | manifest + sha256                                                | 404                           |
-| GET    | `W/manifest`                     | `version?`                            | Workflow manifest                                                | 404                           |
+| GET    | `/schemas/manifest/{name}`       | `skill_manifest` \| `workflow_manifest` | the committed JSON Schema (editor hover, E9.6); `ETag`, 304 on `If-None-Match` | 404                           |
+| GET    | `W/sub-skills/{sub_id}/manifests` | —                                      | `ManifestVersionList`: the Sub-Skill's manifests newest first, one per hash (E9.6) | 404                           |
+| GET    | `W/sub-skills/{sub_id}/manifest` | `version?` (MAJOR.0.PATCH), `build_no?` | `ManifestView`: the stored manifest + sha256, reuse marker (E9.6) | 404, 422 not MAJOR.0.PATCH   |
+| GET    | `W/manifests`                    | —                                      | `ManifestVersionList`: the Workflow manifest of each build (E9.5 draft), newest first | 404                           |
+| GET    | `W/manifest`                     | `build_no?`                            | `ManifestView`: the Workflow manifest (default: the newest build) | 404                           |
 | GET    | `W/schema-sql`                   | `version?`                            | Workflow foundational`schema.sql` + SCHEMA_SQL status, findings + tables (`WorkflowSchemaSql`, E9.4) | 404                           |
 | PUT    | `W/schema-sql/source`            | `document_id` of an uploaded `.sql` | marks it as the base schema (O-16); a new PENDING version the next build applies | 422 `SCHEMA_PARSE_ERROR` (statement index; also a statement outside the DDL allowlist), 422 not a parsed clean `.sql`, 409 `WORKFLOW_BUILDING`, 423 `WORKFLOW_FROZEN` |
 

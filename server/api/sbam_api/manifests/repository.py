@@ -31,6 +31,19 @@ class SubSkillManifestRepository(TenantScopedRepository[SubSkillManifest]):
             return found
         return self.add(SubSkillManifest(**values))
 
+    def history(self, sub_skill_id: uuid.UUID) -> list[SubSkillManifest]:
+        """Every manifest of the Sub-Skill, newest stage key first."""
+        query = (
+            self._scoped()
+            .where(SubSkillManifest.sub_skill_id == sub_skill_id)
+            .order_by(
+                SubSkillManifest.build_no.desc(),
+                SubSkillManifest.cycle.desc(),
+                SubSkillManifest.attempt.desc(),
+            )
+        )
+        return list(self.session.scalars(query))
+
     def newest(self, sub_skill_ids: list[uuid.UUID]) -> dict[uuid.UUID, SubSkillManifest]:
         """Each Sub-Skill's newest manifest (highest build_no, cycle, attempt)."""
         query = self._scoped().where(SubSkillManifest.sub_skill_id.in_(sub_skill_ids))
@@ -52,6 +65,15 @@ class WorkflowManifestRepository(TenantScopedRepository[WorkflowManifestRow]):
             WorkflowManifestRow.build_no == build_no,
         )
         return self.session.scalars(query).one_or_none()
+
+    def history(self, workflow_id: uuid.UUID) -> list[WorkflowManifestRow]:
+        """Every build's manifest of the Workflow, newest first."""
+        query = (
+            self._scoped()
+            .where(WorkflowManifestRow.workflow_id == workflow_id)
+            .order_by(WorkflowManifestRow.build_no.desc())
+        )
+        return list(self.session.scalars(query))
 
     def record(self, values: dict[str, Any]) -> WorkflowManifestRow:
         """Insert once per (workflow_id, build_no); a retried activity gets the row it wrote."""
