@@ -362,6 +362,54 @@ def test_e0_3_workflow_skill_needs_manifest_and_bundle_hashes() -> None:
         WorkflowManifest.sealed(bad)
 
 
+def draft() -> dict[str, Any]:
+    """The build's draft (E9.5): no certification yet, so no bundle or certificate ids either."""
+    data = workflow()
+    del data["certification"]
+    data["evidence_index"] = []
+    data["macro_skills"][0]["certification_id"] = None
+    for skill in data["macro_skills"][0]["skills"]:
+        skill["bundle_sha256"] = None
+        skill["certification_id"] = None
+    return data
+
+
+def test_e9_5_a_draft_is_valid_without_bundle_or_certification() -> None:
+    sealed = WorkflowManifest.sealed(draft())
+    assert sealed.certification is None
+    assert sealed.integrity.content_sha256 == sealed.computed_hash()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("macro_skills", 0, "skills", 0, "bundle_sha256"),
+        ("macro_skills", 0, "skills", 1, "certification_id"),
+        ("macro_skills", 0, "certification_id"),
+    ],
+)
+def test_e9_5_a_certified_manifest_has_every_bundle_and_certificate(path: tuple[Any, ...]) -> None:
+    bad = workflow()
+    node: Any = bad
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = None
+    with pytest.raises(ValidationError, match="certified without"):
+        WorkflowManifest.sealed(bad)
+
+
+def test_e9_5_certifying_does_not_change_the_hash() -> None:
+    certified = draft()
+    certified["certification"] = {"state": "CERTIFIED", "certified_at": "2026-06-29T12:00:00Z"}
+    certified["macro_skills"] = workflow()["macro_skills"]
+    plain = draft()
+    plain["macro_skills"] = workflow()["macro_skills"]
+    assert (
+        WorkflowManifest.sealed(certified).computed_hash()
+        == WorkflowManifest.sealed(plain).computed_hash()
+    )
+
+
 # --- loop_spec ------------------------------------------------------------------------------------
 
 

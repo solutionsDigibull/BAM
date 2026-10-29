@@ -387,17 +387,18 @@ class WorkflowSkill(_Strict):
     skill_id: ShortText
     deterministic_hash: Annotated[str, Field(strict=True, pattern=HASH_PATTERN.pattern)]
     manifest_sha256: Digest
-    bundle_sha256: Digest
-    certification_id: ShortText
+    # null only in a draft (E9.5): no bundle before codegen, no certification before E14
+    bundle_sha256: Digest | None
+    certification_id: ShortText | None
 
 
 class WorkflowAgent(_Strict):
-    """One Agent (TD: Macro Skill) of the Workflow and its certified Sub-Skills."""
+    """One Agent (TD: Macro Skill) of the Workflow and its Sub-Skills, certified once frozen."""
 
     macro_category: ShortText
     name: ShortText
     agent_ref: ShortText | None = None
-    certification_id: ShortText
+    certification_id: ShortText | None
     skills: list[WorkflowSkill] = Field(min_length=1)
 
 
@@ -429,7 +430,8 @@ class Integrity(_Strict):
 
 
 class WorkflowManifest(_Strict):
-    """The final SBAM output for one Workflow (TD §11.3)."""
+    """The final SBAM output for one Workflow (TD §11.3). Without `certification` it is the build's
+    draft (E9.5): bundle and certification ids may still be null. Once certified, none may be."""
 
     schema_version: Literal["sbam-workflow-manifest/1.0"]
     ids: WorkflowIds
@@ -443,8 +445,8 @@ class WorkflowManifest(_Strict):
     schema_sql: SchemaSql
     dag: Dag
     runtime_image_digest: Digest
-    evidence_index: list[EvidenceEntry]
-    certification: WorkflowCertification
+    evidence_index: list[EvidenceEntry] = Field(default_factory=list)
+    certification: WorkflowCertification | None = None
     integrity: Integrity
 
     @model_validator(mode="after")
@@ -455,6 +457,18 @@ class WorkflowManifest(_Strict):
         ):
             if version is not None and VERSION.match(version) is None:
                 raise ValueError(f"{where} {version!r} is not MAJOR.0.PATCH")
+        return self
+
+    @model_validator(mode="after")
+    def _certified_is_complete(self) -> Self:
+        if self.certification is None:
+            return self
+        for agent in self.macro_skills:
+            if agent.certification_id is None:
+                raise ValueError(f"{agent.macro_category}: certified without a certification_id")
+            for skill in agent.skills:
+                if skill.bundle_sha256 is None or skill.certification_id is None:
+                    raise ValueError(f"{skill.skill_id}: certified without bundle or certificate")
         return self
 
     def computed_hash(self) -> str:

@@ -165,6 +165,8 @@
         "LIBRARY_NOT_IN_REGISTRY",
         "TOOLS_NOT_DECOUPLED",
         "WORKFLOW_BUILDING",
+        "DAG_CYCLE",
+        "SCHEMA_SQL_MISSING",
         "MIN_TEST_CASES",
         "MOCK_UNMATCHED",
         "WORKFLOW_FROZEN",

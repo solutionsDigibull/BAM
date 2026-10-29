@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:4c1f519f14e88675042bc223b31f5404942a8ac6ffee55ee05c699958e09dade
+// source-sha256:11fb8199f882d97d6157900d9d9c99afddc601a58b5878addc0608719c14b4af
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -85,6 +85,8 @@ export type ErrorCode =
   | "LIBRARY_NOT_IN_REGISTRY"
   | "TOOLS_NOT_DECOUPLED"
   | "WORKFLOW_BUILDING"
+  | "DAG_CYCLE"
+  | "SCHEMA_SQL_MISSING"
   | "MIN_TEST_CASES"
   | "MOCK_UNMATCHED"
   | "WORKFLOW_FROZEN"
@@ -1493,7 +1495,8 @@ export interface Certification {
   reused_from?: string | null;
 }
 /**
- * The final SBAM output for one Workflow (TD §11.3).
+ * The final SBAM output for one Workflow (TD §11.3). Without `certification` it is the build's
+ * draft (E9.5): bundle and certification ids may still be null. Once certified, none may be.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "WorkflowManifest".
@@ -1517,8 +1520,8 @@ export interface WorkflowManifest {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   runtime_image_digest: string;
-  evidence_index: EvidenceEntry[];
-  certification: WorkflowCertification;
+  evidence_index?: EvidenceEntry[];
+  certification?: WorkflowCertification | null;
   integrity: Integrity;
 }
 /**
@@ -1531,7 +1534,7 @@ export interface WorkflowIds {
   workflow_id: string;
 }
 /**
- * One Agent (TD: Macro Skill) of the Workflow and its certified Sub-Skills.
+ * One Agent (TD: Macro Skill) of the Workflow and its Sub-Skills, certified once frozen.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "WorkflowAgent".
@@ -1540,7 +1543,7 @@ export interface WorkflowAgent {
   macro_category: string;
   name: string;
   agent_ref?: string | null;
-  certification_id: string;
+  certification_id: string | null;
   /**
    * @minItems 1
    */
@@ -1560,11 +1563,8 @@ export interface WorkflowSkill {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   manifest_sha256: string;
-  /**
-   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
-   */
-  bundle_sha256: string;
-  certification_id: string;
+  bundle_sha256: string | null;
+  certification_id: string | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
