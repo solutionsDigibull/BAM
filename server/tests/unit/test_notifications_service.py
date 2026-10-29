@@ -205,6 +205,43 @@ def test_e10_4_sink_skips_events_the_user_does_not_hear_about() -> None:
     assert rows(sessions) == []
 
 
+def test_e11_2c_a_generation_error_reaches_fdes_and_admins_with_the_cause() -> None:
+    """#483: the model could not answer in a build stage; the Sub-Skill waits for `retry`."""
+    sessions = notification_sessions()
+    fde = add_user(sessions, TENANT)
+    admin = add_user(sessions, TENANT, roles=[ADMIN_ROLE])
+    project = add_project(sessions, TENANT, members=[fde])
+    payload = {
+        "project_id": str(project),
+        "entity_id": str(uuid.uuid4()),
+        "error": "SchemaInvalidAfterRetries",
+        "stage": "body generation",
+        "next_action": "retry",
+    }
+    InAppSink(sessions).send(
+        OutboxItem(uuid.uuid4(), TENANT, "sub_skill.generation_error", payload)
+    )
+    by_user = {r.user_id: r for r in rows(sessions)}
+    assert set(by_user) == {fde, admin}
+    for row in by_user.values():
+        assert row.type == "GENERATION_FAILED" and row.title == "Generation failed"
+        assert "failed at body generation" in row.body
+        assert "SchemaInvalidAfterRetries" in row.body and row.body.rstrip().endswith("retry")
+
+
+def test_e11_2c_the_transition_itself_is_not_a_second_notification() -> None:
+    """The state change `sub_skill.generation_failed` is audit and analytics only: the user hears
+    about it once, from the notification that names the cause."""
+    sessions = notification_sessions()
+    fde = add_user(sessions, TENANT)
+    project = add_project(sessions, TENANT, members=[fde])
+    payload = {"project_id": str(project), "entity_id": str(uuid.uuid4())}
+    InAppSink(sessions).send(
+        OutboxItem(uuid.uuid4(), TENANT, "sub_skill.generation_failed", payload)
+    )
+    assert rows(sessions) == []
+
+
 def test_e10_4_every_notification_type_has_a_template_and_a_producer() -> None:
     assert set(service.TEMPLATES) == set(NotificationType)
     assert {k.type for k in KINDS.values()} == set(NotificationType)

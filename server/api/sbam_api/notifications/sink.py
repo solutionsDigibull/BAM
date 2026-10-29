@@ -48,6 +48,9 @@ KINDS: dict[str, Kind] = {
     # E9.3: a library the runtime lacks, still after the corrections; the guidance is on the
     # LIBRARIES gate finding.
     "sub_skill.dependency_failed": Kind(T.SUBSKILL_NEEDS_REVIEW),
+    # #483: the model could not answer in a build stage; the Sub-Skill waits in NEEDS_FDE_REVIEW for
+    # `retry`. The `error` parameter is the cause, `stage` the stage. FDEs and Admins both see it.
+    "sub_skill.generation_error": Kind(T.GENERATION_FAILED, "body generation"),
     "document_version.malware_detected": Kind(T.DOCUMENT_REJECTED),
     "document_version.type_rejected": Kind(T.DOCUMENT_REJECTED),  # E4.4; the reason is on screen
     "document_version.parse_failed": Kind(T.DOCUMENT_REJECTED),
