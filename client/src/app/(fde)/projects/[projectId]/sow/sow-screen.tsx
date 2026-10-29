@@ -35,6 +35,7 @@ import type {
   Project,
   RunAccepted,
   SowApproval,
+  SowImpact,
   SowOverview,
   SowVersionDetail,
   SowVersionList,
@@ -54,7 +55,6 @@ import {
   FAILED_NO_VERSION,
   GENERATING,
   MAX_TIPTAP_BYTES,
-  NEW_VERSION_SOON,
   NO_CHANGES,
   ORCHESTRATOR_DOWN,
   POLL_MS,
@@ -63,8 +63,12 @@ import {
   SUPERSEDED_BANNER,
   exportUrl,
   fieldProblems,
+  impactPath,
   isLocked,
+  isScopeChange,
   newKey,
+  newVersionErrorMessage,
+  newVersionPath,
   newest,
   regenerateErrorMessage,
   regeneratePath,
@@ -75,7 +79,13 @@ import {
   versionPath,
   versionsPath,
 } from "./sow-api";
-import { ApprovalDetails, ApproveDialog, StaleApprovalModal } from "./sow-approve";
+import {
+  ApprovalDetails,
+  ApproveDialog,
+  ImpactPanel,
+  NewVersionModal,
+  StaleApprovalModal,
+} from "./sow-approve";
 import { type StoredDraft, clearDraft, readDraft, writeDraft } from "./sow-draft";
 import type { CiteClick } from "./sow-editor";
 import {
@@ -137,6 +147,13 @@ export function SowScreen({ projectId }: { projectId: string }) {
   });
   const current = overview.result.data?.current ?? undefined;
   const items: SowVersionSummary[] = versions.result.data?.items ?? [];
+  // A draft made from the approved SOW: its impact preview comes from the API (E7.2), never from here.
+  const scopeChange = isScopeChange(overview.result.data?.approved, current);
+  const impact = useCustom<SowImpact, ApiError>({
+    url: impactPath(projectId, current?.version ?? 0),
+    method: "get",
+    queryOptions: { enabled: scopeChange, retry: false },
+  });
 
   const [shown, setShown] = useState<number | undefined>();
   const shownVersion = shown ?? current?.version;
@@ -162,6 +179,8 @@ export function SowScreen({ projectId }: { projectId: string }) {
   const save = useCustomMutation<SowVersionSummary, ApiError>();
   const regenerate = useCustomMutation<RunAccepted, ApiError>();
   const approve = useCustomMutation<SowApproval, ApiError>();
+  const createVersion = useCustomMutation<SowVersionSummary, ApiError>();
+  const [newVersionOpen, setNewVersionOpen] = useState(false);
   const saving = useRef(false);
   const approving = useRef(false); // one approval in flight, however fast the clicks (E7.3-T05)
   const [approveOpen, setApproveOpen] = useState(false);
@@ -349,6 +368,34 @@ export function SowScreen({ projectId }: { projectId: string }) {
       },
     );
   };
+
+  const onNewVersion = (reason: string) =>
+    createVersion.mutate(
+      {
+        url: newVersionPath(projectId),
+        method: "post",
+        values: { reason },
+        successNotification: false,
+        errorNotification: false,
+      },
+      {
+        onSuccess: (res) => {
+          setNewVersionOpen(false);
+          setApproval(null);
+          setShown(undefined); // the new draft is current: it opens in the editor
+          setReload((n) => n + 1);
+          setTab("impact");
+          void message.success(`v${res.data.version} created: edit it, then approve it.`);
+          refetchAll();
+          void projects.query.refetch(); // the project is back in SOW_REVIEW
+        },
+        onError: (error) => {
+          setNewVersionOpen(false);
+          void message.error(newVersionErrorMessage(error));
+          refetchAll();
+        },
+      },
+    );
 
   const openVersion = (v: number) =>
     discardFirst(() => {
@@ -544,8 +591,18 @@ export function SowScreen({ projectId }: { projectId: string }) {
           message={version?.status === "SUPERSEDED" ? SUPERSEDED_BANNER : APPROVED_BANNER}
           description={shownApproval ? <ApprovalDetails approval={shownApproval} /> : undefined}
           action={
-            <Tooltip title={NEW_VERSION_SOON}>
-              <Button size="small" disabled>
+            <Tooltip
+              title={
+                current.status === "APPROVED"
+                  ? "Start a scope change from the approved version"
+                  : `v${current.version} is already open as the new version`
+              }
+            >
+              <Button
+                size="small"
+                disabled={current.status !== "APPROVED" || createVersion.mutation.isPending}
+                onClick={() => setNewVersionOpen(true)}
+              >
                 Create new version
               </Button>
             </Tooltip>
@@ -626,6 +683,22 @@ export function SowScreen({ projectId }: { projectId: string }) {
                     <VersionsPanel versions={items} shown={shownVersion} onOpen={openVersion} />
                   ),
                 },
+                ...(scopeChange
+                  ? [
+                      {
+                        key: "impact",
+                        label: "Impact",
+                        children: (
+                          <ImpactPanel
+                            impact={impact.result.data}
+                            loading={impact.query.isLoading}
+                            error={impact.query.error}
+                            onRetry={() => void impact.query.refetch()}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           </Card>
@@ -644,6 +717,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
           open={approveOpen}
           version={version.version}
           sha256={version.sha256}
+          impact={scopeChange && isCurrent ? impact.result.data : undefined}
           busy={approve.mutation.isPending}
           onConfirm={() => onApprove(version.version, version.sha256 ?? "")}
           onCancel={() => setApproveOpen(false)}
@@ -666,6 +740,13 @@ export function SowScreen({ projectId }: { projectId: string }) {
         busy={regenerate.mutation.isPending}
         onCancel={() => setRegenOpen(false)}
         onRegenerate={onRegenerate}
+      />
+      <NewVersionModal
+        open={newVersionOpen}
+        approved={overview.result.data?.approved?.version ?? current.version}
+        busy={createVersion.mutation.isPending}
+        onCancel={() => setNewVersionOpen(false)}
+        onCreate={onNewVersion}
       />
       {conflict ? (
         <ConflictModal

@@ -1,5 +1,5 @@
 // SOW screen (E6.5): API paths, rules and copy. Plain data and functions, so they are easy to test.
-import type { SowDiff, SowVersionSummary } from "@/contracts";
+import type { SowDiff, SowImpact, SowVersionSummary } from "@/contracts";
 import { API_BASE, type ApiError } from "@/providers/data-provider";
 
 import { problemCode } from "../../workspace-api";
@@ -37,7 +37,6 @@ export const NO_CHANGES = "No changes to save.";
 export const APPROVED_BANNER =
   "Approved — this SOW is read-only. A scope change starts a new version.";
 export const SUPERSEDED_BANNER = "Superseded — a newer version was approved. Read-only.";
-export const NEW_VERSION_SOON = "Creating a new version arrives with SOW approval (E7).";
 export const SOURCE_DELETED = "Source deleted";
 
 export const isLocked = (status: string | undefined): boolean =>
@@ -114,6 +113,49 @@ const APPROVE_MESSAGES: Record<string, string> = {
 };
 export const approveErrorMessage = (error: unknown) =>
   messageOf(error, APPROVE_MESSAGES, "Could not approve.");
+
+// --- scope change (E7.3, the API is E7.2): new version + impact preview --------------------------------
+
+export const newVersionPath = (p: string) => `projects/${p}/sow/new-version`;
+export const impactPath = (p: string, v: number) => `projects/${p}/sow/versions/${v}/impact`;
+export const MAX_REASON = 500;
+export const NO_REBUILD = "No Sub-Skills need rebuild";
+
+/** What is wrong with a scope-change reason, or null (the API checks 1-500 too). */
+export function reasonProblem(reason: string): string | null {
+  if (!reason.trim()) return "Say why the scope changes";
+  if (reason.length > MAX_REASON) return `At most ${MAX_REASON} characters`;
+  return null;
+}
+
+/** A draft made from the approved SOW: approving it invalidates what its impact lists. */
+export const isScopeChange = (
+  approved: SowVersionSummary | null | undefined,
+  version: SowVersionSummary | undefined,
+): boolean =>
+  Boolean(approved && version && version.version > approved.version && !isLocked(version.status));
+
+/** "2 Sub-Skills to rebuild, 1 Macro Skill affected, 1 new module, 14 reused": the API's counts. */
+export function impactSummary(impact: SowImpact): string {
+  const n = (count: number, one: string, many = `${one}s`) =>
+    `${count} ${count === 1 ? one : many}`;
+  const parts = [
+    impact.affected_sub_skills.length
+      ? `${n(impact.affected_sub_skills.length, "Sub-Skill")} to rebuild`
+      : NO_REBUILD,
+    `${n(impact.affected_macro_skills.length, "Macro Skill")} affected`,
+  ];
+  if (impact.added_modules.length) parts.push(n(impact.added_modules.length, "new module"));
+  parts.push(`${impact.reused_sub_skills_count} reused`);
+  return parts.join(", ");
+}
+
+const NEW_VERSION_MESSAGES: Record<string, string> = {
+  DRAFT_EXISTS: "A new version is already open: edit or approve it.",
+  NO_APPROVED_SOW: "Nothing is approved yet: approve a version first.",
+};
+export const newVersionErrorMessage = (error: unknown) =>
+  messageOf(error, NEW_VERSION_MESSAGES, "Could not create a new version.");
 
 export const saveErrorMessage = (error: unknown) =>
   messageOf(error, SAVE_MESSAGES, "Could not save.");
