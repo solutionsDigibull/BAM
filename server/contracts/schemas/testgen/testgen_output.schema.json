@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:testgen/testgen_output:0.1.0",
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "description": "An expectation beyond the terminal state and the output (an `N` assertion: the `ui_updates`\nthe harness must emit, a handoff row, a pass count).",
+      "properties": {
+        "type": {
+          "pattern": "^[a-z][a-z0-9_]{0,59}$",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "CaseKind": {
+      "enum": [
+        "PASS_FIRST",
+        "PASS_AFTER_RETRY",
+        "ESCALATION",
+        "NO_OP",
+        "EDGE",
+        "FDE"
+      ],
+      "title": "CaseKind",
+      "type": "string"
+    },
+    "ExpectedTerminal": {
+      "enum": [
+        "SUCCESS",
+        "ESCALATED",
+        "NO_OP"
+      ],
+      "title": "ExpectedTerminal",
+      "type": "string"
+    },
+    "GeneratedCase": {
+      "additionalProperties": false,
+      "description": "One case of the model's answer: a generated kind and a terminal state that kind can reach.",
+      "properties": {
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "input": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Input",
+          "type": "object"
+        },
+        "initial_state": {
+          "items": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 500,
+          "title": "Initial State",
+          "type": "array"
+        },
+        "state_script": {
+          "items": {
+            "items": {
+              "maxLength": 20000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxItems": 10,
+          "title": "State Script",
+          "type": "array"
+        },
+        "expected_terminal": {
+          "$ref": "#/$defs/ExpectedTerminal"
+        },
+        "expected_output": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Output"
+        },
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "maxItems": 50,
+          "title": "Assertions",
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/CaseKind"
+        }
+      },
+      "required": [
+        "name",
+        "input",
+        "expected_terminal",
+        "kind"
+      ],
+      "title": "GeneratedCase",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "What `sbam-testgen` may answer (E13.4): at least three cases, PASS_FIRST and ESCALATION and\none more of PASS_AFTER_RETRY, NO_OP or EDGE, with distinct names.",
+  "properties": {
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/GeneratedCase"
+      },
+      "maxItems": 8,
+      "minItems": 3,
+      "title": "Cases",
+      "type": "array"
+    }
+  },
+  "required": [
+    "cases"
+  ],
+  "title": "TestgenOutput",
+  "type": "object"
+}

@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:testgen/tests_response:0.1.0",
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "description": "An expectation beyond the terminal state and the output (an `N` assertion: the `ui_updates`\nthe harness must emit, a handoff row, a pass count).",
+      "properties": {
+        "type": {
+          "pattern": "^[a-z][a-z0-9_]{0,59}$",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "CaseKind": {
+      "enum": [
+        "PASS_FIRST",
+        "PASS_AFTER_RETRY",
+        "ESCALATION",
+        "NO_OP",
+        "EDGE",
+        "FDE"
+      ],
+      "title": "CaseKind",
+      "type": "string"
+    },
+    "ExpectedTerminal": {
+      "enum": [
+        "SUCCESS",
+        "ESCALATED",
+        "NO_OP"
+      ],
+      "title": "ExpectedTerminal",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "TestCaseOut": {
+      "additionalProperties": false,
+      "description": "A stored case, as the API answers it.",
+      "properties": {
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "input": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Input",
+          "type": "object"
+        },
+        "initial_state": {
+          "items": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 500,
+          "title": "Initial State",
+          "type": "array"
+        },
+        "state_script": {
+          "items": {
+            "items": {
+              "maxLength": 20000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxItems": 10,
+          "title": "State Script",
+          "type": "array"
+        },
+        "expected_terminal": {
+          "$ref": "#/$defs/ExpectedTerminal"
+        },
+        "expected_output": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Output"
+        },
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "maxItems": 50,
+          "title": "Assertions",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CaseKind"
+        }
+      },
+      "required": [
+        "name",
+        "input",
+        "expected_terminal",
+        "id",
+        "kind"
+      ],
+      "title": "TestCaseOut",
+      "type": "object"
+    },
+    "TestDatasetOut": {
+      "additionalProperties": false,
+      "description": "One version of a Sub-Skill's test data. `synthetic` is always true.",
+      "properties": {
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "synthetic": {
+          "const": true,
+          "default": true,
+          "title": "Synthetic",
+          "type": "boolean"
+        },
+        "edited_by_fde": {
+          "title": "Edited By Fde",
+          "type": "boolean"
+        },
+        "files_keys": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Files Keys",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/TestCaseOut"
+          },
+          "title": "Cases",
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "sha256",
+        "edited_by_fde",
+        "files_keys",
+        "created_at",
+        "cases"
+      ],
+      "title": "TestDatasetOut",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET W/sub-skills/{sub_id}/tests`: the current dataset, or none before generation. `ETag` is\nits `sha256`. (The last Promptfoo results join this answer with E13.6.)",
+  "properties": {
+    "dataset": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TestDatasetOut"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "TestsResponse",
+  "type": "object"
+}
