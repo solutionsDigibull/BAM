@@ -40,9 +40,7 @@ async def assemble(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "assembled"))
 
 
-@activity_for(TaskQueue.BUILD)
-@activity.defn(name="ast_gate")
-@stub_activity
+@activity.defn(name="ast_gate")  # registered by `wiring.py`; the workflow's typed handle
 async def ast_gate(inp: BuildStageInput) -> IdResult:
     """Real (E11/E12): AST checks; raises GateFailed with finding ids."""
     return IdResult(id=stage_stub_id(inp, "ast_gate"))

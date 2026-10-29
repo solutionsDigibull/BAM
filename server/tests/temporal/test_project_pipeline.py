@@ -197,6 +197,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     # the real codegen stages (#355) need a database of manifests and an LLM; the stubs answer
     "generate_bodies": build_stubs.generate_bodies,
     "assemble": build_stubs.assemble,
+    "ast_gate": build_stubs.ast_gate,
     "correct": build_stubs.correct,
 }
 
