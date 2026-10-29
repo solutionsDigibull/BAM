@@ -14,11 +14,16 @@
   version one more than the Sub-Skill's newest) and its cases are inserted in one transaction; its
   sha256 is the shared `dataset_sha256` over the cases and the files' hashes.
 * Idempotency: the stage key names the `llm_calls` replay key, so a retry after the model answered
-  reuses that answer, and a dataset that already has the same hash is found, not written twice. A
-  Sub-Skill whose newest dataset an FDE edited keeps it: a rebuild never overwrites an FDE's cases.
+  reuses that answer, and a dataset that already has the same hash is found, not written twice.
+* Corrections (E11.4b): the newest dataset is reused when it was generated for the same bounds,
+  input schema and tables (`fingerprint`), so a correction that leaves them alone leaves the tests
+  alone; another fingerprint regenerates. An FDE-edited dataset is never overwritten: if its
+  fingerprint no longer matches, the stage fails with `TestDataStale` and the Sub-Skill waits in
+  review.
 """
 
 import csv
+import hashlib
 import io
 import json
 import uuid
@@ -46,6 +51,7 @@ from sbam_contracts.testgen import (
 )
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
 
 from sbam_workers.llm.client import LlmClient, LlmResult
 from sbam_workers.llm.store import LlmScope
@@ -55,6 +61,7 @@ ALIAS: Final = "sbam-testgen"
 PROMPT_ID: Final = "testgen"
 FILE_FORMATS: Final = ("csv", "json", "xlsx")
 SYSTEM_ACTOR: Final = "sbam-worker"
+TEST_DATA_STALE: Final = "TestDataStale"  # error type: an FDE's tests no longer fit the bounds
 FIXED_TIME: Final = datetime(2000, 1, 1, tzinfo=UTC)  # keeps an xlsx's bytes the same every run
 
 
@@ -78,6 +85,14 @@ def request_context(isatvon: Mapping[str, Any]) -> dict[str, str]:
         "tables": json.dumps(declared_tables(isatvon)),
         "limits": json.dumps(limits, sort_keys=True),
     }
+
+
+def fingerprint(isatvon: Mapping[str, Any]) -> str:
+    """What the cases are validated against: the bound, the closed input schema, the tables. A
+    correction that leaves these alone leaves the tests alone (E11.4b)."""
+    context = request_context(isatvon)
+    parts = {key: context[key] for key in ("input_schema", "tables", "limits")}
+    return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
 
 def check_output(isatvon: Mapping[str, Any], out: TestgenOutput) -> tuple[str, ...]:
@@ -159,6 +174,15 @@ def data_files(isatvon: Mapping[str, Any]) -> list[DataFile]:
 # --- storage --------------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class Newest:
+    """The newest dataset: its id, what it was generated for, whether an FDE edited it."""
+
+    id: uuid.UUID
+    generated_for: str | None
+    edited_by_fde: bool
+
+
 class SqlDatasetStore:
     def __init__(self, sessions: sessionmaker[Session], storage: StorageBackend) -> None:
         self.sessions = sessions
@@ -168,17 +192,19 @@ class SqlDatasetStore:
     def _ctx(inp: BuildStageInput) -> TenantContext:
         return TenantContext(inp.tenant_id, inp.project_id)
 
-    def kept(self, inp: BuildStageInput) -> uuid.UUID | None:
-        """The newest dataset when an FDE edited it: a rebuild must not overwrite their cases."""
+    def newest(self, inp: BuildStageInput) -> Newest | None:
         with self.sessions() as session:
             latest = DatasetRepository(session, self._ctx(inp)).latest(inp.sub_skill_id)
-            return latest.id if latest is not None and latest.edited_by_fde else None
+            if latest is None:
+                return None
+            return Newest(latest.id, latest.generated_for, latest.edited_by_fde)
 
     def record(
         self,
         inp: BuildStageInput,
         cases: Sequence[tuple[CaseKind, CaseBody]],
         files: list[DataFile],
+        generated_for: str,
     ) -> uuid.UUID:
         scope = StorageScope(inp.tenant_id, inp.project_id, inp.workflow_id)
         keys = [
@@ -198,6 +224,7 @@ class SqlDatasetStore:
                 sha256=sha,
                 synthetic=True,
                 edited_by_fde=False,
+                generated_for=generated_for,
                 created_by=SYSTEM_ACTOR,
             )
             repo.add(dataset)
@@ -250,10 +277,19 @@ class GenerateTests:
 
     @activity.defn(name=STAGE)
     async def run(self, inp: BuildStageInput) -> IdResult:
-        kept = self.store.kept(inp)
-        if kept is not None:
-            return IdResult(id=kept)
         isatvon = await self.isatvon_of(inp)
+        wanted = fingerprint(isatvon)
+        newest = self.store.newest(inp)
+        if newest is not None and newest.generated_for == wanted:
+            return IdResult(id=newest.id)  # same bounds, same tables: the tests stay as they are
+        if newest is not None and newest.edited_by_fde:
+            if newest.generated_for is None:
+                return IdResult(id=newest.id)  # written before the fingerprint: keep their cases
+            raise ApplicationError(
+                "the FDE's edited tests were written for other bounds",
+                type=TEST_DATA_STALE,
+                non_retryable=True,
+            )
         workflow_id = activity.info().workflow_id
         if workflow_id is None:
             raise RuntimeError(f"{STAGE} runs only inside a workflow")
@@ -262,4 +298,4 @@ class GenerateTests:
             (c.kind, CaseBody.model_validate(c.model_dump(exclude={"kind"})))
             for c in result.output.cases
         ]
-        return IdResult(id=self.store.record(inp, cases, data_files(isatvon)))
+        return IdResult(id=self.store.record(inp, cases, data_files(isatvon), wanted))

@@ -50,6 +50,7 @@ class Harness(ValidateHarness):
                 sha256=sha,
                 synthetic=True,
                 edited_by_fde=False,
+                generated_for="f" * 64,
             )
             s.add(dataset)
             s.flush()
@@ -137,6 +138,7 @@ def test_e13_4_t03_edit_writes_a_new_version_and_keeps_the_old(h: Harness) -> No
     assert res.json()["input"] == changed
     v1, v2 = h.dataset_rows()
     assert (v1.version, v2.version, v2.edited_by_fde) == (1, 2, True)
+    assert v2.generated_for == v1.generated_for == "f" * 64  # an edit is not a new ISATVON
     assert v2.sha256 != v1.sha256 and res.headers["ETag"].strip('"') == v2.sha256
     with h.sessions() as s:
         assert "TEST_CASE_EDIT" in [a.action for a in s.scalars(select(AuditLog))]
