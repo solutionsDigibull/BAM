@@ -58,7 +58,8 @@ run as stubs with their final name and port (TD §20.3.6).
 | `make reset CONFIRM=yes` | **deletes all stack data** (the only destructive command) |
 
 All ports bind to `127.0.0.1` only. `compose.override.yaml` (loaded by `make up`) runs the API and web in dev
-mode with your `server/` and `client/` mounted, so code changes reload without rebuilding images. See
+mode with your `server/` and `client/` mounted, so code changes reload without rebuilding images; the workers
+restart by themselves when a `.py` file under `server/` changes. See
 [DEVELOPER_GUIDE §6](docs/DEVELOPER_GUIDE.md#6-local-development) for more.
 
 ## Develop on the host

@@ -10,6 +10,7 @@ EXPECTED = {
     "ensure_dataset",
     "add",
     "prune",  # #450: remove what a rebuild no longer has in scope
+    "remove_sources",  # #449: the purge removes a deleted document's items
     "cognify",
     "search",
     "graph_page",

@@ -189,7 +189,9 @@ changes don't need image rebuilds:
 
 - **sbam-api** uses the `dev` image target, with `server/` mounted and `uvicorn … --reload`.
 - **sbam-web** uses the `dev` image target, with `client/` mounted (its `node_modules` stays in a named volume) and `next dev`.
-- **workers** use the `dev` image target, with `server/` mounted and restarted on change.
+- **workers** use the `dev` image target, with `server/` mounted and restarted on change: `watchfiles` runs the
+  bootstrap and restarts it when a `.py` file under `server/` changes (polling, because file events don't cross
+  Docker Desktop bind mounts; #198).
 
 Dev, staging and production use `compose.<env>.yaml` with the `prod` image targets and no source mounts (#142).
 

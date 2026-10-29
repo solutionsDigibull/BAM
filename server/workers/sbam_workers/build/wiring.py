@@ -61,6 +61,8 @@ from sbam_workers.build.correct import (
     CorrectionInputs,
     SqlCorrectionStore,
 )
+from sbam_workers.build.gates import ast_gate as ast_gate_stage_module
+from sbam_workers.build.gates.ast_gate import AstGate
 from sbam_workers.isatvon.loop_spec import LoopSpecError, compile_definition
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.registry import PromptRegistry
@@ -186,6 +188,7 @@ class SqlBuildInputs:
                 skeleton=render_manifest(loaded.template, loaded.manifest),
                 loop_spec=loop_spec_of(loaded.sub_skill),
                 manifest_id=loaded.manifest_id,
+                modules=loaded.modules,
             )
 
     def _correction(self, inp: CorrectionInput) -> CorrectionInputs:
@@ -241,6 +244,12 @@ def _correct() -> Correct:
     )
 
 
+@lru_cache(maxsize=1)
+def _ast_gate() -> AstGate:
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    return AstGate(SqlBuildInputs(sessions).assemble, make_backend(settings), sessions)
+
+
 @activity_for(TaskQueue.LLM)
 @activity.defn(name=bodies_stage.STAGE)
 async def generate_bodies_stage(inp: BuildStageInput) -> IdResult:
@@ -253,6 +262,14 @@ async def generate_bodies_stage(inp: BuildStageInput) -> IdResult:
 async def assemble_stage_activity(inp: BuildStageInput) -> IdResult:
     """Skeleton + bodies -> the stored code bundle (E11.3); a syntax failure is GateFailed."""
     return await _assemble().run(inp)
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name=ast_gate_stage_module.STAGE)
+async def ast_gate_stage_activity(inp: BuildStageInput) -> IdResult:
+    """AST syntax, skeleton, manifest conformance and rule checks on the stored bundle (E12.2,
+    E12.3); a failed gate is GateFailed with the attempt id, the verdicts in `gate_results`."""
+    return await _ast_gate().run(inp)
 
 
 @activity_for(TaskQueue.LLM)

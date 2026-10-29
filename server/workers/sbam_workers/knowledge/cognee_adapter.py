@@ -233,6 +233,25 @@ class CogneeAdapter:
         self._log("items pruned", scope, removed=len(stale), kept=len(present) - len(stale))
         return sorted(stale)
 
+    async def remove_sources(self, scope: ProjectScope, source_ids: set[uuid.UUID]) -> list[str]:
+        """Remove every item of these sources (document versions) from the project's dataset, with
+        the graph nodes only they sourced (#449, purge). A project that never built knowledge has
+        nothing to remove. Returns the removed keys, sorted."""
+        dataset, who = await self._authorize(scope)
+        prefixes = tuple(f"{source_id}_" for source_id in source_ids)
+        try:
+            async with _classified():
+                present = await self._backend.item_names(who, dataset)
+                gone = (
+                    {name for name in present if name.startswith(prefixes)} if prefixes else set()
+                )
+                if gone:
+                    await self._backend.remove(who, dataset, gone)
+        except DatasetNotFound:
+            gone = set()
+        self._log("items removed", scope, removed=len(gone))
+        return sorted(gone)
+
     async def cognify(self, scope: ProjectScope) -> None:
         """Build the graph. Can take minutes: the calling activity heartbeats from its own task."""
         dataset, who = await self._authorize(scope)

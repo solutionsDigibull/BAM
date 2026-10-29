@@ -489,3 +489,46 @@ def test_450_prune_of_a_missing_dataset_is_not_found(
 ) -> None:
     with pytest.raises(DatasetNotFound):
         run(adapter(cognee, storage).prune(scope(), set()))
+
+
+# --- #449: remove_sources ---------------------------------------------------------------------
+
+
+def test_449_remove_sources_removes_only_those_versions_items(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    a = adapter(cognee, storage)
+    run(a.ensure_dataset(scope()))
+    gone, kept = uuid.uuid4(), uuid.uuid4()
+    [data] = cognee.data.values()
+    data.update(
+        {f"{gone}_{'a' * 64}": b"x", f"{gone}_{'b' * 64}": b"y", f"{kept}_{'c' * 64}": b"z"}
+    )
+    removed = run(a.remove_sources(scope(), {gone}))
+    assert removed == sorted([f"{gone}_{'a' * 64}", f"{gone}_{'b' * 64}"])
+    assert set(data) == {f"{kept}_{'c' * 64}"}
+
+
+def test_449_remove_sources_without_a_dataset_removes_nothing(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    assert run(adapter(cognee, storage).remove_sources(scope(), {uuid.uuid4()})) == []
+    assert "remove" not in cognee.calls
+
+
+def test_449_remove_sources_checks_the_scope_first(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    with pytest.raises(ScopeError):
+        run(adapter(cognee, storage).remove_sources(scope(T1, P2), {uuid.uuid4()}))
+    assert cognee.calls == []
+
+
+def test_449_remove_sources_with_cognee_down_is_retryable(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    a = adapter(cognee, storage)
+    run(a.ensure_dataset(scope()))
+    cognee.fail = EmbeddingException("Bifrost down")
+    with pytest.raises(CogneeUnavailable):
+        run(a.remove_sources(scope(), {uuid.uuid4()}))
