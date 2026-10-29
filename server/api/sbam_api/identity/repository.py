@@ -16,7 +16,7 @@ from typing import Any
 
 from sbam_contracts.api import PAGE_LIMIT_MAX
 from sbam_contracts.identity import UserStatus
-from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select
+from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import Session
 
@@ -46,6 +46,28 @@ def insert_user_if_new(session: Session, values: dict[str, Any]) -> bool:
         dialect.insert(User)
         .values(row_version=1, **values)
         .on_conflict_do_nothing(index_elements=["keycloak_sub"])
+    )
+    return bool(session.execute(stmt).rowcount)  # type: ignore[attr-defined]
+
+
+def update_user_if(
+    session: Session,
+    row: User,
+    values: dict[str, Any],
+    when: ColumnElement[bool] | None = None,
+) -> bool:
+    """One atomic `UPDATE users SET <values>, row_version + 1 WHERE id = :id AND <when>`, where
+    `when` defaults to "some value differs" (`IS DISTINCT FROM`). True when this call changed the
+    row. Parallel requests never fail on `row_version` (#429): in PostgreSQL a second UPDATE waits
+    for the first's row lock, re-checks `when` against the committed row and changes nothing, so
+    whatever follows a change (an audit event) happens exactly once."""
+    if when is None:
+        when = or_(*(getattr(User, column).is_distinct_from(v) for column, v in values.items()))
+    stmt = (
+        update(User)
+        .where(User.id == row.id, User.tenant_id == row.tenant_id, when)
+        .values(row_version=User.row_version + 1, **values)
+        .execution_options(synchronize_session=False)
     )
     return bool(session.execute(stmt).rowcount)  # type: ignore[attr-defined]
 
