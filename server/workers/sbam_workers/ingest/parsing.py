@@ -53,6 +53,7 @@ from temporalio.exceptions import ApplicationError
 
 from sbam_workers import mirror
 from sbam_workers.ingest.guard import require_clean
+from sbam_workers.ingest.isolation import current_tenant
 from sbam_workers.ingest.loaders import Heartbeat, Parsed, ParseError, loader_for, no_heartbeat
 from sbam_workers.ingest.loaders.base import BEAT_EVERY
 from sbam_workers.registry import activity_for
@@ -125,10 +126,13 @@ def parse_version(deps: ParseDeps, inp: StageRef, beat: Heartbeat = no_heartbeat
         data = deps.storage.get(key)
     except FileNotFoundError:
         raise _gone("stored file") from None
+    tenant = current_tenant.set(str(inp.tenant_id))  # an isolated loader limits one slot per tenant
     try:
         parsed = loader(data, beat)
     except ParseError as exc:
         return _fail(deps, ctx, inp, exc.code, ParseReport(warnings=[str(exc)[:200]]))
+    finally:
+        current_tenant.reset(tenant)
 
     return store_and_finish(deps, ctx, inp, loader_id, parsed, beat)
 

@@ -27,18 +27,26 @@ from sbam_workers.ingest.loaders.code import (
 )
 from sbam_workers.ingest.loaders.email import load_eml, load_msg
 from sbam_workers.ingest.loaders.image import load_image
-from sbam_workers.ingest.loaders.pdf import load_pdf
 from sbam_workers.ingest.loaders.structured import load_json, load_xml, load_yaml
 from sbam_workers.ingest.loaders.tabular import load_csv
 from sbam_workers.ingest.loaders.text import load_markdown, load_text
 from sbam_workers.ingest.loaders.word import load_docx
 from sbam_workers.ingest.loaders.xlsx import load_xlsx
 
+
+def load_pdf_isolated(data: bytes, beat: Heartbeat) -> Parsed:
+    """`load_pdf` in a resource-limited child process. Imported here, not at the top: the isolation
+    module imports this package."""
+    from sbam_workers.ingest.isolation import run_isolated
+
+    return run_isolated("pdf", data, beat)
+
+
 LOADERS: dict[str, Loader] = {
     "md": load_markdown,
     "txt": load_text,
     "csv": load_csv,
-    "pdf": load_pdf,
+    "pdf": load_pdf_isolated,  # a crafted PDF cannot take the shared worker down (A-21b)
     "docx": load_docx,
     "xlsx": load_xlsx,
     "png": load_image,  # images have no text layer: every frame goes to OCR (E4.8)
