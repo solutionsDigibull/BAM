@@ -72,6 +72,16 @@ Production ops access is limited to the platform group. A laptop in `dev-laptops
   3. Put the secret in the sbam-api environment as `KEYCLOAK_ADMIN_CLIENT_SECRET`, with `KEYCLOAK_INTERNAL_URL` pointing at the realm inside the network.
 - **Rotation.** Regenerate the secret in Keycloak, update sbam-api's environment, then restart sbam-api.
 
+## Keycloak sign-in hardening (A-18, #438)
+
+`compose/keycloak/render_realm.py` writes the realm file a deployed environment imports. Besides the public origin it sets the password policy and the second factor (`--mfa admins|all|off`, default `admins`); the committed dev realm has neither, so `keycloak-seed` users keep working. What an operator needs to know:
+
+- **Admins enrol at their next sign-in.** A user holding `sbam-admin` or `super-admin` who has no authenticator is sent to set up TOTP right after the password. Tell them before the first deploy. A user who loses the device is reset in the Keycloak admin console (Users, Credentials, delete the OTP): they enrol again at the next sign-in. Keep a second `super-admin` with its own device so one lost phone never locks the operator out.
+- **The realm is imported once.** `--import-realm` skips a realm that already exists, so a new `passwordPolicy`, flow or role reaches an environment only when its realm is created from the rendered file. For a running realm, apply the policy with `kcadm.sh update realms/bullm -s 'passwordPolicy=length(12) and passwordHistory(5) and notUsername and notEmail and passwordBlacklist(common-passwords.txt)'` and build the `browser-mfa` flow by copying the `browser` flow in the admin console (see the rendered file for the steps and the `mfa-required` role). Scripting this is #543.
+- **The blacklist file and the policy travel together.** `compose.deploy.yaml` mounts `compose/keycloak/password-blacklist.txt` where Keycloak reads it. A policy that names a missing file rejects every password change, and a policy name Keycloak does not know stops the server from starting: change `PASSWORD_POLICY` only with `tests/integration/test_a18_keycloak_hardening.py` (it starts a throwaway Keycloak).
+- **Events.** Keycloak stores login, password and credential events for 30 days and admin events with their representation (secrets are masked by Keycloak), and writes them to its log. Forwarding them into SBAM's audit log is #541.
+- **WebAuthn is not offered yet.** A required TOTP step cannot sit next to an alternative WebAuthn step in one Keycloak flow level; that is #542.
+
 ## KVM host not ready (fallback)
 
 If the sandbox host isn't ready by week 4, sandbox work continues on laptops with `make up PROFILES=sandbox-local`. That runs a `local-docker` sandbox (#42, #123). Runs from it are marked **non-certifying** and can never certify or freeze a version. Certification waits for the real CubeSandbox host (#28).

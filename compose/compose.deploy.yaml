@@ -97,6 +97,9 @@ services:
       - *wrapper-mount
       # The realm file rendered for this environment's public origin (compose/keycloak/render_realm.py).
       - ${SBAM_REALM_FILE:?render it with compose/keycloak/render_realm.py and set the path}:/opt/keycloak/data/import/realm-bullm.json:ro
+      # The password blacklist the rendered realm's password policy names (render_realm.py PASSWORD_POLICY): a
+      # policy that names a missing file would reject every password change.
+      - ./keycloak/password-blacklist.txt:/opt/keycloak/data/password-blacklists/common-passwords.txt:ro
     ports: !override
       - ${SBAM_OPS_BIND:?set the VM Netbird address}:${KEYCLOAK_PORT:-8080}:8080
     secrets:
