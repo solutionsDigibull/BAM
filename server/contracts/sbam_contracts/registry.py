@@ -116,6 +116,7 @@ from sbam_contracts.sow_api import (
     SowVersionList,
 )
 from sbam_contracts.state_machines import StateMachineStates
+from sbam_contracts.testgen import CasePost, CasePut, TestgenOutput, TestsResponse
 
 ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("problem_detail", ProblemDetail),
@@ -220,4 +221,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("knowledge/version_list", KnowledgeVersionList),
     ("knowledge/graph_page", KnowledgeGraphPage),
     ("knowledge/node_detail", KnowledgeNodeDetail),
+    ("testgen/testgen_output", TestgenOutput),
+    ("testgen/tests_response", TestsResponse),
+    ("testgen/case_put", CasePut),
+    ("testgen/case_post", CasePost),
 )

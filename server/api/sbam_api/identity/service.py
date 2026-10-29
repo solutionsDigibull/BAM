@@ -196,13 +196,24 @@ def list_users(
 
 
 def invite_user(session: Session, users: UserAdmin, actor: CurrentUser, body: UserInvite) -> User:
-    if repository.email_taken(session, body.email):  # any tenant; the answer doesn't say which
-        raise user_exists()
+    """Invite `body.email` into the caller's tenant.
+
+    409 USER_EXISTS only when the caller's own tenant has the address (the admin can list those
+    users anyway). An address that exists elsewhere in the Keycloak realm (one person, one tenant)
+    gets the same 201 a free address gets, and nothing is created: any other answer would tell one
+    tenant's admin who is registered in another (A-05). The skipped invite is audited."""
     tenant = session.get(Tenant, actor.tenant_id)
     if tenant is None:
         raise not_found()
+    if repository.email_in_tenant(session, tenant.id, body.email):
+        raise user_exists()
     roles = sorted(map(str, body.roles))
-    kc_id = users.invite(tenant.id, tenant.keycloak_org_id, body.email, roles)
+    try:
+        kc_id = users.invite(tenant.id, tenant.keycloak_org_id, body.email, roles)
+    except ApiError as exc:
+        if exc.code != ErrorCode.USER_EXISTS:
+            raise
+        return _skipped_invite(session, actor, body, roles)
     try:
         row = UserRepository(session, actor.context()).add(
             User(
@@ -223,6 +234,39 @@ def invite_user(session: Session, users: UserAdmin, actor: CurrentUser, body: Us
             raise user_exists() from None
         raise
     return row
+
+
+def _skipped_invite(
+    session: Session, actor: CurrentUser, body: UserInvite, roles: list[str]
+) -> User:
+    """The answer for an address another tenant (or an orphan Keycloak account) already holds: a
+    transient row shaped like a fresh invite, never added to the session, so its id resolves to
+    404 like any unknown id. Only the audit trail records that the invite did nothing."""
+    record(
+        session,
+        tenant_id=actor.tenant_id,
+        actor_id=str(actor.user_id),
+        action="USER_INVITE_SKIPPED",
+        entity_type="user",
+        entity_id=None,
+        before=None,
+        after={"email": body.email, "roles": roles},
+        correlation_id=correlation_id_var.get() or "unknown",
+    )
+    session.commit()
+    kc_id = uuid7()
+    now = datetime.now(UTC)
+    return User(
+        id=kc_id,
+        keycloak_sub=str(kc_id),
+        tenant_id=actor.tenant_id,
+        email=body.email,
+        portal_roles=roles,
+        status=UserStatus.INVITED.value,
+        created_at=now,
+        updated_at=now,
+        row_version=1,
+    )
 
 
 def update_user(

@@ -45,7 +45,8 @@ class Scope:
 
     def __init__(self) -> None:
         self.tenant, self.project, self.user = uuid7(), uuid7(), uuid7()
-        self.secret = env_value("TUSD_HOOK_SECRET")
+        # what the API signs upload tokens with (#444): UPLOAD_TOKEN_KEY, else (dev) the hook secret
+        self.secret = env_value("UPLOAD_TOKEN_KEY", env_value("TUSD_HOOK_SECRET"))
         self.sessions: sessionmaker[Session] = make_sessionmaker(make_engine(url()))
         with self.sessions() as s:
             s.add(Tenant(id=self.tenant, name=f"e4-2-{self.tenant}"))

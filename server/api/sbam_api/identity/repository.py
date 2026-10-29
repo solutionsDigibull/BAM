@@ -72,8 +72,12 @@ def update_user_if(
     return bool(session.execute(stmt).rowcount)  # type: ignore[attr-defined]
 
 
-def email_taken(session: Session, email: str) -> bool:
-    found = session.scalar(select(User.id).where(func.lower(User.email) == email.lower()))
+def email_in_tenant(session: Session, tenant_id: uuid.UUID, email: str) -> bool:
+    """True when the caller's own tenant already has this address. Never look across tenants:
+    the answer to an invite must not say whether another tenant owns the address (A-05)."""
+    found = session.scalar(
+        select(User.id).where(User.tenant_id == tenant_id, func.lower(User.email) == email.lower())
+    )
     return found is not None
 
 

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:219f0c78dc6615f1127881165a7e2c32183be5ac2ee274a78a1f41a20581f4d2
+// source-sha256:5c299a49cc8eae8b22b513f6e41e9211dcf3f806e495dfd6aa8148862839ae62
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -390,6 +390,16 @@ export type CoverageStatus = "COVERED" | "CHUNKS_ONLY" | "FAILED";
  * via the `definition` "SourceStatus".
  */
 export type SourceStatus = "ADDED" | "FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ExpectedTerminal".
+ */
+export type ExpectedTerminal = "SUCCESS" | "ESCALATED" | "NO_OP";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CaseKind".
+ */
+export type CaseKind = "PASS_FIRST" | "PASS_AFTER_RETRY" | "ESCALATION" | "NO_OP" | "EDGE" | "FDE";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -497,6 +507,10 @@ export interface SbamContracts {
   KnowledgeVersionList?: KnowledgeVersionList;
   KnowledgeGraphPage?: KnowledgeGraphPage;
   KnowledgeNodeDetail?: KnowledgeNodeDetail;
+  TestgenOutput?: TestgenOutput;
+  TestsResponse?: TestsResponse;
+  CasePut?: CasePut;
+  CasePost?: CasePost;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -3701,4 +3715,227 @@ export interface SourcePassage {
   location: SbamContracts_Okf__Location;
   text: string;
   truncated?: boolean;
+}
+/**
+ * What `sbam-testgen` may answer (E13.4): at least three cases, PASS_FIRST and ESCALATION and
+ * one more of PASS_AFTER_RETRY, NO_OP or EDGE, with distinct names.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestgenOutput".
+ */
+export interface TestgenOutput {
+  /**
+   * @minItems 3
+   * @maxItems 8
+   */
+  cases:
+    | [GeneratedCase, GeneratedCase, GeneratedCase]
+    | [GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase]
+    | [GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase]
+    | [GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase]
+    | [GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase, GeneratedCase]
+    | [
+        GeneratedCase,
+        GeneratedCase,
+        GeneratedCase,
+        GeneratedCase,
+        GeneratedCase,
+        GeneratedCase,
+        GeneratedCase,
+        GeneratedCase
+      ];
+}
+/**
+ * One case of the model's answer: a generated kind and a terminal state that kind can reach.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GeneratedCase".
+ */
+export interface GeneratedCase {
+  name: string;
+  input: {
+    [k: string]: JsonValue | undefined;
+  };
+  /**
+   * @maxItems 500
+   */
+  initial_state?: string[];
+  /**
+   * @maxItems 10
+   */
+  state_script?:
+    | []
+    | [string[]]
+    | [string[], string[]]
+    | [string[], string[], string[]]
+    | [string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[], string[]];
+  expected_terminal: ExpectedTerminal;
+  expected_output?: {
+    [k: string]: JsonValue | undefined;
+  } | null;
+  /**
+   * @maxItems 50
+   */
+  assertions?: Assertion[];
+  kind: CaseKind;
+}
+/**
+ * An expectation beyond the terminal state and the output (an `N` assertion: the `ui_updates`
+ * the harness must emit, a handoff row, a pass count).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Assertion".
+ */
+export interface Assertion {
+  /**
+   * Pattern: `^[a-z][a-z0-9_]{0,59}$`
+   */
+  type: string;
+  value?: JsonValue;
+}
+/**
+ * `GET W/sub-skills/{sub_id}/tests`: the current dataset, or none before generation. `ETag` is
+ * its `sha256`. (The last Promptfoo results join this answer with E13.6.)
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestsResponse".
+ */
+export interface TestsResponse {
+  dataset?: TestDatasetOut | null;
+}
+/**
+ * One version of a Sub-Skill's test data. `synthetic` is always true.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestDatasetOut".
+ */
+export interface TestDatasetOut {
+  version: number;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+  synthetic?: true;
+  edited_by_fde: boolean;
+  files_keys: string[];
+  created_at: string;
+  cases: TestCaseOut[];
+}
+/**
+ * A stored case, as the API answers it.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestCaseOut".
+ */
+export interface TestCaseOut {
+  name: string;
+  input: {
+    [k: string]: JsonValue | undefined;
+  };
+  /**
+   * @maxItems 500
+   */
+  initial_state?: string[];
+  /**
+   * @maxItems 10
+   */
+  state_script?:
+    | []
+    | [string[]]
+    | [string[], string[]]
+    | [string[], string[], string[]]
+    | [string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[], string[]];
+  expected_terminal: ExpectedTerminal;
+  expected_output?: {
+    [k: string]: JsonValue | undefined;
+  } | null;
+  /**
+   * @maxItems 50
+   */
+  assertions?: Assertion[];
+  id: string;
+  kind: CaseKind;
+}
+/**
+ * `PUT W/sub-skills/{sub_id}/tests/cases/{case_id}` with `If-Match`: the parts of a case an FDE
+ * may change. `name` and `kind` are fixed; at least one field must be sent.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CasePut".
+ */
+export interface CasePut {
+  input?: {
+    [k: string]: JsonValue | undefined;
+  } | null;
+  initial_state?: string[] | null;
+  state_script?:
+    | []
+    | [string[]]
+    | [string[], string[]]
+    | [string[], string[], string[]]
+    | [string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[], string[]]
+    | null;
+  expected_terminal?: ExpectedTerminal | null;
+  expected_output?: {
+    [k: string]: JsonValue | undefined;
+  } | null;
+  assertions?: Assertion[] | null;
+}
+/**
+ * `POST W/sub-skills/{sub_id}/tests/cases` with `If-Match`: a new case; the server sets the
+ * kind (`FDE`), so it is not part of the body.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CasePost".
+ */
+export interface CasePost {
+  name: string;
+  input: {
+    [k: string]: JsonValue | undefined;
+  };
+  /**
+   * @maxItems 500
+   */
+  initial_state?: string[];
+  /**
+   * @maxItems 10
+   */
+  state_script?:
+    | []
+    | [string[]]
+    | [string[], string[]]
+    | [string[], string[], string[]]
+    | [string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[]]
+    | [string[], string[], string[], string[], string[], string[], string[], string[], string[], string[]];
+  expected_terminal: ExpectedTerminal;
+  expected_output?: {
+    [k: string]: JsonValue | undefined;
+  } | null;
+  /**
+   * @maxItems 50
+   */
+  assertions?: Assertion[];
 }
