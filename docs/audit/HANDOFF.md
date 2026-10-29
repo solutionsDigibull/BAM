@@ -15,8 +15,9 @@ Rule from the owner: if a task can't finish in about 5 minutes, defer it, write 
 - Pushing, PRs, and reverting the dirty tree need explicit owner approval.
 
 ## Pending (deferred)
-1. **Real Temporal hung-activity test** (`docs/audit/poc/temporal/audit_real_server_test.py`): was running ~20 min in the background (log `/tmp/audit-out/real-temporal.log`, look for `RESULT`). Kill leftover `pytest ... zz_audit_real_server_test.py` and the local dev server on :57234 if still running; delete `server/tests/temporal/zz_audit_real_server_test.py` from the audit worktree (it is copied into poc/).
-2. **Cognee live (done, needs doc entry):** with real Cognee 1.6.2 + the repo's LLM mock: F-27 confirmed live (removed doc A still returned by search and still in graph after rebuild); project isolation held; default `COGNEE_USER_SECRET` derives the same project password as a deployed default (F-09 confirmed); `delete_dataset` works. Script: `poc/temporal/cognee_live.py`. Add to `01-findings.md` and comment on #450 and #435.
-3. Real-model prompt injection and CubeSandbox: blocked (no model path, sandbox not built).
-4. Decide: push audit branch + docdrift branch? Open an issue and PR for the doc fix? Revert the old dirty tree?
-5. Cleanup: stop llm-mock (pid in /tmp/audit-cognee/mock.pid) if running.
+Done 2026-10-29: real Temporal hung-activity test (result in 01-findings.md, round 4), Cognee live results in 01-findings.md,
+leftover `zz_audit_real_server_test.py` removed (copy kept in poc/), llm-mock confirmed not running.
+Still open:
+1. Needs owner approval: comment on #450 and #435 with the Cognee live results (F-27, F-09).
+2. Blocked: real-model prompt injection and CubeSandbox (no model path, sandbox not built).
+3. Needs owner approval: push the audit and docdrift branches, open the doc-fix issue and PR, revert the old dirty tree.

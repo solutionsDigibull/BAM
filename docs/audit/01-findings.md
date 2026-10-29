@@ -406,7 +406,18 @@ Run in the repo's Temporal time-skipping harness (`poc/temporal/audit_failure_te
 - Continue-as-new while waiting for a rebuild (history padded with ignored duplicate signals, clock advanced past the 3-day reminder): the run really continued as new, a later rebuild signal was accepted, and the pipeline reached DONE. A reviewer's claim that the `generate`/`rebuilds` state is lost is **refuted**: `generate` is only read in the build stage, which a resumed wait never re-enters.
 - Cancel on the continued run: CANCELLED correctly. Two `generate` signals with different keys: each sub-skill built exactly once.
 - Knowledge activity failing transiently 3 times: recovered on attempt 4 and reached the SOW wait. Failing every time: 5 attempts, then FAILED with `KNOWLEDGE_FAILED`, a `pipeline.failed` notification and a FAILED mirror row, as designed.
-- Not testable here: a truly hung activity (needs a real Temporal server with real timers; the time-skipping harness cannot expire it), worker process kills, and a real Cognee (needs a model). F-27 was reproduced at adapter level with the repo's fake (`poc/temporal/audit_f27_test.py`).
+- **Hung activity, real Temporal dev server (real timers):** a `build_knowledge` activity that sleeps forever and never
+  heartbeats was detected by the 2-minute heartbeat timeout and retried with the 30/60/120 s backoff (observed gaps 150,
+  180, 240 s; the fourth gap read 3293 s because the host suspended mid-run, expected ~360 s). After 5 attempts the
+  pipeline ended FAILED with `KNOWLEDGE_FAILED`, a `pipeline.failed` notification and a FAILED mirror row. The heartbeat
+  setting in `project_pipeline.py` (`TUNED`) works as designed. `poc/temporal/audit_real_server_test.py`.
+- **Cognee 1.6.2 live** (real library, the repo's LLM mock, `poc/temporal/cognee_live.py`):
+  - **F-27 confirmed live:** after document A left the scope and the dataset was rebuilt, search still returned A and the
+    graph still held its nodes (build 1: 19 nodes / 42 edges).
+  - Project isolation held: a project-2 principal got `DatasetNotFound` for project 1's dataset.
+  - **F-09 confirmed live:** the default `COGNEE_USER_SECRET` derives the same per-project password as the deployed adapter.
+  - `delete_dataset` works (dataset gone, orphaned nodes removed), so the F-27 fix has a working primitive.
+- Not testable here: worker process kills, and real-model behaviour (needs a model path).
 
 ## 5. What is already good (keep it)
 
