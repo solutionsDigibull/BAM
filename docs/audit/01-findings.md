@@ -29,7 +29,7 @@ P3 = hygiene.
 | Knowledge/Cognee internals, SOW editor and Monaco code viewer UI, remaining client pages | **Not reviewed in depth** (tracked as spike issues) |
 | Temporal (real server, workers, replay under failure), Cognee/knowledge live, CubeSandbox (not built) | **Not tested live** |
 | LLM prompt injection (documents to SOW to codegen) | **Not tested** |
-| Branches | `dev` only (`main` is 459 commits behind). `353-fde-citations` skimmed (N-07). `95-*` are already in `dev`. 33 local-only branches not reviewed. |
+| Branches | `dev` plus the four gate branches (F-36); 20 of the 33 local branches still carry commits not in `dev` but are mostly stacked or squash-merged feature work and were not otherwise reviewed. Earlier: `dev` only (`main` is 459 commits behind). `353-fde-citations` skimmed (N-07). `95-*` are already in `dev`. 33 local-only branches not reviewed. |
 | Endpoints | All 79 inventoried (`05`); live-tested and read counts in that file |
 
 Scanner results were mostly clean: bandit 1 MEDIUM (false positive: a temp path), semgrep 3 findings (2 false
@@ -67,6 +67,7 @@ injection bugs.
 | N-07 | FDE citation attribution forgeable (unmerged branch) | Code | block merge |
 | F-34 | Schema-SQL validator reads the first `LANGUAGE` anywhere in the text (comment trick accepted); not exploitable with the current scratch image | **PoC** | P3 |
 | F-35 | A stolen session cookie keeps working about 5 minutes after sign-out | **PoC** | P3 |
+| F-36 | Unmerged AST gate stack is bypassed by module attribute chains to `sys.modules` (os.execv, socket, environ) | **PoC** | P1 pre-merge (#460) |
 | F-11 | CSP has no `script-src`; blocklist HTML paste filter | Code | P3 |
 | F-12 | Auth path opens 2 sessions per request | Code | P3 |
 | F-13 | Keycloak calls inside a DB transaction holding the tenant lock | Code | P3 |
@@ -392,6 +393,9 @@ for admins consider a shorter access token or a server-side session denylist.
   escapes it).
 - **SOW exports:** a SOW full of hostile Markdown/HTML/raw-attribute/XXE-looking text produced inert md/html/docx/pdf: no
   active tags, no external relationships, no field codes, and a canary listener saw **0** outbound connections.
+
+### F-36 The unmerged AST gate stack can be bypassed with an attribute chain `PoC` · P1 pre-merge
+Local branches `117-ast-gate`, `118-ast-rules-pr`, `119-static-gate`, `120-import-resolution` (PRs #382 and #383 merged into a stacked branch, **not** into `dev`; `build/gates/` does not exist on `dev`, so F-02 stands). Run against my escape payloads, the gate blocks 8 of 10, but `json.codecs.sys.modules['os'].execv(...)`, `.listdir('/')`, `.environ` and `json.codecs.sys.modules['socket'].create_connection(...)` produce no findings using only allowed modules; `range(10**12)` and `'a'*10**11` also pass. Filed as #460, with comments on #118 and #120.
 
 ## 5. What is already good (keep it)
 
