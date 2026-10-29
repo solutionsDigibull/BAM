@@ -5,6 +5,7 @@ run on it, or on it after the stored bytes or the row were tampered with.
 """
 
 import asyncio
+import logging
 import uuid
 from dataclasses import replace
 from pathlib import Path
@@ -26,12 +27,8 @@ from sbam_workers.build.assemble import Assemble, AssembleInputs, SqlBundleStore
 from sbam_workers.build.codegen import LoadedTemplate, load_template, render_skeleton
 from sbam_workers.build.codegen.bundle import deterministic_tar
 from sbam_workers.build.gates.ast_checks import CONFIG_SHA256, GATE_VERSION
-from sbam_workers.build.gates.ast_gate import (
-    BUNDLE_TAMPERED,
-    GATES,
-    INPUT_MISMATCH,
-    AstGate,
-)
+from sbam_workers.build.gates.ast_gate import GATES, INPUT_MISMATCH, AstGate
+from sbam_workers.build.gates.errors import BUNDLE_TAMPERED
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.exceptions import ApplicationError
@@ -116,6 +113,10 @@ def test_e12_2_stage_passing_bundle_records_three_passed_verdicts(
     # every verdict points at the attempt whose (single, immutable) bundle it judged, and is keyed
     # by the build stage key the LIBRARIES gate uses
     assert {r.code_attempt_id for r in rows} == {attempt_id}
+    with sessions() as session:  # and carries the sha256 of the bundle it judged
+        attempt = CodeAttemptRepository(session, ctx(inp)).get(attempt_id)
+        assert attempt is not None and attempt.bundle_sha256
+        assert {r.bundle_sha256 for r in rows} == {attempt.bundle_sha256}
     assert {(r.sub_skill_id, r.build_no, r.cycle, r.attempt) for r in rows} == {
         (inp.sub_skill_id, inp.build_no, inp.cycle, inp.attempt)
     }
@@ -244,6 +245,58 @@ def test_e12_2_stage_a_verdict_about_another_attempt_is_never_reused(
         run(gate_stage(template, sessions, storage), inp)
     assert caught.value.type == INPUT_MISMATCH and caught.value.non_retryable
     assert len(results(sessions, inp)) == 1  # nothing else was written; the stale row is untouched
+
+
+def test_e12_2_stage_a_verdict_about_another_bundle_is_never_reused(
+    template: LoadedTemplate, tmp_path: Path
+) -> None:
+    """Same attempt, same stage key, but the row was written for other bytes: it is not this
+    bundle's verdict, whatever it says (here: a pass)."""
+    sessions, storage, inp = db(), LocalDiskBackend(tmp_path), stage_input()
+    attempt_id = assembled(template, sessions, storage, inp)
+    with sessions() as session:
+        GateResultRepository(session, ctx(inp)).record_stage(
+            {
+                "sub_skill_id": inp.sub_skill_id,
+                "code_attempt_id": attempt_id,
+                "gate": GateName.AST_SYNTAX.value,
+                "status": GateStatus.PASSED.value,
+                "findings": [],
+                "tool_version": GATE_VERSION,
+                "config_sha256": CONFIG_SHA256,
+                "build_no": inp.build_no,
+                "cycle": inp.cycle,
+                "attempt": inp.attempt,
+                "bundle_sha256": "0" * 64,  # not the assembled bundle's hash
+                "created_by": "SYSTEM",
+            }
+        )
+        session.commit()
+    with pytest.raises(ApplicationError) as caught:
+        run(gate_stage(template, sessions, storage), inp)
+    assert caught.value.type == INPUT_MISMATCH and caught.value.non_retryable
+    assert len(results(sessions, inp)) == 1  # nothing was written next to the stale row
+
+
+def test_e12_2_stage_the_failure_log_carries_the_ids(
+    template: LoadedTemplate, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    sessions, storage, inp = db(), LocalDiskBackend(tmp_path), stage_input()
+    assembled(template, sessions, storage, inp)
+    skeleton = render_skeleton(template, ms01_params())
+    files = dict(skeleton.files)
+    files["server.py"] = files["server.py"].replace("mcp.tool(", "mcp.resource(", 1)
+    stage = gate_stage(template, sessions, storage, skeleton=replace(skeleton, files=files))
+    caplog.set_level(logging.INFO)
+    with pytest.raises(ApplicationError):
+        run(stage, inp)
+    [record] = [r for r in caplog.records if "failed the AST gate" in r.getMessage()]
+    assert record.tenant_id == str(inp.tenant_id)  # type: ignore[attr-defined]
+    assert record.project_id == str(inp.project_id)  # type: ignore[attr-defined]
+    assert record.workflow_id == str(inp.workflow_id)  # type: ignore[attr-defined]
+    assert record.sub_skill_id == str(inp.sub_skill_id)  # type: ignore[attr-defined]
+    assert record.correlation_id == inp.correlation_id  # type: ignore[attr-defined]
+    assert "AST_SKELETON" in record.gates  # type: ignore[attr-defined]
 
 
 def test_e12_2_stage_verdicts_are_tenant_scoped(template: LoadedTemplate, tmp_path: Path) -> None:

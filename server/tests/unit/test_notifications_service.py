@@ -260,6 +260,29 @@ def test_a20_a_held_isatvon_patch_tells_the_fde_the_sub_skill_needs_review() -> 
     assert admin not in {r.user_id for r in rows(sessions)}
 
 
+def test_e12_2_a_build_error_reaches_fdes_and_admins_with_the_cause() -> None:
+    """#117: a platform defect stopped the build (BUILD_ERROR); an admin fixes it and retries."""
+    sessions = notification_sessions()
+    fde = add_user(sessions, TENANT)
+    admin = add_user(sessions, TENANT, roles=[ADMIN_ROLE])
+    project = add_project(sessions, TENANT, members=[fde])
+    payload = {
+        "project_id": str(project),
+        "entity_id": str(uuid.uuid4()),
+        "error": "BUNDLE_TAMPERED",
+        "stage": "code build",
+    }
+    sink = InAppSink(sessions)
+    sink.send(OutboxItem(uuid.uuid4(), TENANT, "sub_skill.template_error", payload))
+    assert rows(sessions) == []  # the state change alone is audit and analytics
+    sink.send(OutboxItem(uuid.uuid4(), TENANT, "sub_skill.build_error", payload))
+    by_user = {r.user_id: r for r in rows(sessions)}
+    assert set(by_user) == {fde, admin}
+    for row in by_user.values():
+        assert row.type == "GENERATION_FAILED" and "failed at code build" in row.body
+        assert "BUNDLE_TAMPERED" in row.body
+
+
 def test_e10_4_every_notification_type_has_a_template_and_a_producer() -> None:
     assert set(service.TEMPLATES) == set(NotificationType)
     assert {k.type for k in KINDS.values()} == set(NotificationType)

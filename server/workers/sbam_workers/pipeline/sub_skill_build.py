@@ -68,6 +68,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.runs import TaskQueue
     from sbam_contracts.state_machines import Actor, MachineName, SubSkillState
 
+    from sbam_workers.build.gates.errors import BUNDLE_TAMPERED, GATE_INPUT_MISMATCH
     from sbam_workers.build.libraries import check_libraries
     from sbam_workers.build.manifest import build_manifest
     from sbam_workers.build.stubs import (
@@ -118,6 +119,10 @@ GENERATION_FAILED = "GenerationFailed"  # internal failure kind
 GENERATION_PATCH = "e11-2c-generation-failed"
 FINDINGS_PATCH = "e11-4-cycle-findings"
 REVIEW_PATCH = "a20-isatvon-patch-review"
+PLATFORM_PATCH = "e12-2-gate-platform-defect"
+# #117: an integrity or wiring defect in a gate is a platform defect (BUILD_ERROR, an admin fixes
+# it), not a crashed workflow nobody hears about. The other stages' wiring errors still fail loudly.
+PLATFORM_DEFECTS = frozenset({BUNDLE_TAMPERED, GATE_INPUT_MISMATCH})
 MAX_SUMMARY_PATHS = 10
 SPECS: dict[BuildStage, _Spec] = {
     BuildStage.BUILD_MANIFEST: _Spec(TaskQueue.BUILD, 2 * _MIN, 3),
@@ -289,7 +294,11 @@ class SubSkillBuild:
         while failure is not None:
             if failure.kind == TEMPLATE_ERROR:  # a platform defect: an admin fixes and retries
                 await self._apply("template_error")
-                await self._notify("sub_skill.build_error")
+                await self._notify(
+                    "sub_skill.build_error",
+                    error=failure.cause or failure.kind,  # the error type, never its message
+                    stage="code build",
+                )
                 return False
             if failure.kind == GENERATION_FAILED:  # the model could not answer: not a correction
                 await self._generation_failed(failure)
@@ -500,6 +509,12 @@ class SubSkillBuild:
                 TEMPLATE_ERROR,
             ):
                 raise _Failure(cause.type, stage, _finding_ids(cause)) from None
+            if (
+                isinstance(cause, ApplicationError)
+                and cause.type in PLATFORM_DEFECTS
+                and workflow.patched(PLATFORM_PATCH)
+            ):
+                raise _Failure(TEMPLATE_ERROR, stage, [], cause.type) from None
             if stage in MODEL_STAGES and workflow.patched(GENERATION_PATCH):
                 code = _model_failure(cause)
                 if code is not None:

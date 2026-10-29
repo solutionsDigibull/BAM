@@ -329,3 +329,19 @@ def test_e12_2_gate_results_carry_the_contract_shape(
     _, _, conformance = gate(template, files)
     parsed: list[Any] = [Finding.model_validate(f.as_dict()) for f in conformance.findings]
     assert parsed and all(p.gate is GateName.AST_CONFORMANCE for p in parsed)
+
+
+def test_e12_2_formatting_changes_neither_fail_the_gate_nor_hide_an_edit(
+    template: LoadedTemplate, good: dict[str, bytes]
+) -> None:
+    """The skeleton is compared as an AST without positions, so reformatting a non-slot region (a
+    comment, blank lines, spacing, a split call with a trailing comma) is not a mismatch, and the
+    same reformatting does not hide a real change to the code under it."""
+    original = f'@mcp.tool(name="{CHECK}")'
+    reformatted = f'@mcp.tool(\n    name = "{CHECK}",\n)  # reformatted'
+    files = edit(good, "server.py", original, reformatted)
+    files = {**files, "server.py": b"# a comment\n\n\n" + files["server.py"]}
+    assert statuses(gate(template, files)) == [GateStatus.PASSED] * 3
+    renamed = edit(good, "server.py", original, reformatted.replace(CHECK, "renamed"))
+    _, skeleton, _ = gate(template, renamed)
+    assert skeleton.status is GateStatus.FAILED and codes(skeleton) == {"SKELETON_MISMATCH"}

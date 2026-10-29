@@ -35,6 +35,8 @@
 | E28 | Temporal unavailable                                                          | API                    | —                                   | 503                                        | Retry later                             |
 | E29 | Worker crash                                                                  | Heartbeat timeout      | Activity retry (idempotent)          | —                                         | None                                    |
 | E30 | Disk full                                                                     | Storage metrics        | —                                   | Writes fail (503)                          | Operator expands volume                 |
+| E31 | Stored code bundle no longer matches what `assemble` recorded                 | AST gate (hash check)  | — (non-retryable)                   | `BUILD_ERROR`                              | Platform investigates, then Retry       |
+| E32 | A code gate is given inputs that are not the attempt's (attempt, template, manifest or bundle) | AST gate               | — (non-retryable)                   | `BUILD_ERROR`                              | Platform fixes the wiring, then Retry   |
 
 Rules: failures never advance state; only transient errors are retried automatically; evidence of failed attempts is kept; every failure produces an in-app notification with the reason and the next action.
 
