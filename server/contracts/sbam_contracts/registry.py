@@ -55,6 +55,7 @@ from sbam_contracts.knowledge import (
     KnowledgeVersionList,
 )
 from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
+from sbam_contracts.manifest_api import ManifestVersionList, ManifestView
 from sbam_contracts.masters import (
     AgentsPayload,
     FiletypePayload,
@@ -141,6 +142,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("manifest/skill_manifest", SkillManifest),
     ("manifest/workflow_manifest", WorkflowManifest),
     ("manifest/loop_spec", LoopSpec),
+    ("manifest/manifest_version_list", ManifestVersionList),
+    ("manifest/manifest_view", ManifestView),
     ("masters/readme", ReadmeTab),
     ("masters/organization", OrganizationPayload),
     ("masters/rules", RulesPayload),

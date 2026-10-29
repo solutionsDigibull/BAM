@@ -693,6 +693,56 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # Manifest viewer reads (E9.6). The world seeds no manifests or Sub-Skills: an assigned FDE
+  # reaches the handler and gets 404 (or the Workflow's empty list); the others are refused first.
+  sub_skill_manifests_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_skill_id__manifests_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_skill_id}/manifests
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_skill_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  sub_skill_manifest_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_skill_id__manifest_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_skill_id}/manifest
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_skill_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  workflow_manifests_api_v1_projects__project_id__workflows__workflow_id__manifests_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/manifests
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  workflow_manifest_api_v1_projects__project_id__workflows__workflow_id__manifest_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/manifest
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  # Describes the model, carries no tenant data: any signed-in user may read it (E9.6).
+  manifest_schema_api_v1_schemas_manifest__name__get:
+    request: {method: GET, path: "/api/v1/schemas/manifest/{name}", params: {name: "skill_manifest"}}
+    expect:
+      anon: "401 UNAUTHENTICATED"
+      super_admin: "200"
+      admin_a: "200"
+      admin_b: "200"
+      fde_a_assigned: "200"
+      fde_a_unassigned: "200"
+      fde_b: "200"
+
   # ---- isatvon ------------------------------------------------------------------------------
   # Describes the model, carries no tenant data: any signed-in user may read it (E8.6).
   isatvon_schema_api_v1_schemas_isatvon__version__get:
