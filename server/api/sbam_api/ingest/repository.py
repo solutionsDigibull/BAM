@@ -210,6 +210,13 @@ def abandoned_reservations(
     return list(session.scalars(query.order_by(order).limit(limit)))
 
 
+def reservation_by_id(session: Session, slot_id: uuid.UUID) -> UploadReservation | None:
+    """System job only (the tusd post-finish hook): a reservation by its id, any tenant. The caller
+    reads the tenant and project from the row and works through the scoped repositories from there.
+    """
+    return session.get(UploadReservation, slot_id)
+
+
 def known_reservation_ids(session: Session, ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
     """System job only: which of these ids are the id of an upload reservation (any tenant, any
     status). Used to tell a staged file that belongs to someone from an orphan."""

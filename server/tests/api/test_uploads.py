@@ -102,6 +102,11 @@ class Harness(ProjectsHarness):
         }
         return self.hook({"Type": "post-finish", "Event": {"Upload": upload}})
 
+    def post_finish_with(self, upload_id: str, meta: dict[str, str], size: int) -> Any:
+        """post-finish as tusd sends it: the metadata it stored, whatever pre-create made of it."""
+        upload = {"ID": upload_id, "Size": size, "Offset": size, "MetaData": meta}
+        return self.hook({"Type": "post-finish", "Event": {"Upload": upload}})
+
     def stage(self, upload_id: str, data: bytes) -> Path:
         path = self.tmp / "uploads" / upload_id
         path.parent.mkdir(exist_ok=True)
@@ -619,3 +624,78 @@ def test_a14_t05_the_hook_secret_alone_cannot_mint_an_upload_token(h: Harness) -
     h.client.app.state.settings.upload_token_key = None  # type: ignore[attr-defined]
     h.client.app.state.settings.tusd_hook_secret = None  # type: ignore[attr-defined]
     assert h.announce(h.files("a.pdf")).status_code == 503
+
+
+# --- A-33: the token is not kept in the stored upload metadata ----------------------------------
+
+
+def _created(h: Harness, name: str = "a.pdf", data: bytes = PDF) -> tuple[str, dict[str, str], str]:
+    """(upload id, the metadata pre-create tells tusd to store, the token the client sent)."""
+    token = h.announce(h.files(name, size=len(data))).json()["token"]
+    change = h.pre_create(token, name, len(data)).json()["ChangeFileInfo"]
+    return change["ID"], change["MetaData"], token
+
+
+def test_a33_t01_pre_create_replaces_the_stored_metadata_and_drops_the_token(h: Harness) -> None:
+    upload_id, meta, token = _created(h)
+    assert set(meta) == {"filename", "project_id", "proof"}
+    assert meta["filename"] == "a.pdf" and meta["project_id"] == h.project
+    assert token not in json.dumps(meta) and "token" not in meta  # what a HEAD would reveal
+    assert uuid.UUID(upload_id)
+
+
+def test_a33_t02_an_upload_finishes_from_the_stored_metadata_alone(h: Harness) -> None:
+    upload_id, meta, _ = _created(h)
+    h.stage(upload_id, PDF)
+    assert h.post_finish_with(upload_id, meta, len(PDF)).status_code == 200
+    (version,) = h.versions()
+    assert str(version.id) == upload_id and version.state == "UPLOADED"
+    assert [r.status for r in h.reservations()] == ["FINISHED"]
+    assert h.audit_actions(upload_id) == ["UPLOAD_ACCEPTED", "upload", "DOCUMENT_UPLOADED"]
+
+
+@pytest.mark.parametrize("tamper", ["missing", "other-slot", "garbage", "other-project"])
+def test_a33_t03_a_post_finish_without_a_valid_proof_registers_nothing(
+    h: Harness, tamper: str
+) -> None:
+    upload_id, meta, _ = _created(h, "a.pdf")
+    other_id, other_meta, _ = _created(h, "b.pdf", PDF + b"b")
+    h.stage(upload_id, PDF)
+    bad = dict(meta)
+    if tamper == "missing":
+        bad.pop("proof")
+    elif tamper == "other-slot":
+        bad["proof"] = other_meta["proof"]  # a valid proof, for another slot
+    elif tamper == "garbage":
+        bad["proof"] = "AAAA"
+    else:
+        bad["project_id"] = str(uuid.uuid4())
+    assert h.post_finish_with(upload_id, bad, len(PDF)).status_code == 200  # tusd gets no error
+    assert h.versions() == [] and other_id != upload_id
+
+
+def test_a33_t04_the_proof_is_not_a_token(h: Harness) -> None:
+    _, meta, _ = _created(h)
+    assert rejected(h.pre_create(meta["proof"], "c.pdf", len(PDF)))["status"] == 403
+
+
+def test_a33_t05_an_upload_created_before_the_change_still_finishes_with_its_token(
+    h: Harness,
+) -> None:
+    token = h.announce(h.files("old.pdf")).json()["token"]
+    upload_id = h.pre_create(token, "old.pdf", len(PDF)).json()["ChangeFileInfo"]["ID"]
+    h.stage(upload_id, PDF)
+    legacy_meta = {"token": token, "project_id": h.project}  # what tusd stored before this change
+    assert h.post_finish_with(upload_id, legacy_meta, len(PDF)).status_code == 200
+    assert len(h.versions()) == 1
+
+
+def test_a33_t06_a_proof_of_a_deleted_project_slot_cannot_be_replayed_across_projects(
+    h: Harness,
+) -> None:
+    upload_id, meta, _ = _created(h)
+    other_project = h.create("Other Bot")["id"]
+    h.stage(upload_id, PDF)
+    swapped = {**meta, "project_id": other_project}
+    h.post_finish_with(upload_id, swapped, len(PDF))
+    assert h.versions() == []  # the proof binds the slot to its own project

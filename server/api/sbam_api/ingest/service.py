@@ -48,6 +48,7 @@ from sbam_api.ingest.repository import (
     DocumentRepository,
     DocumentVersionRepository,
     ReservationRepository,
+    reservation_by_id,
 )
 from sbam_api.ingest.rules import UPLOAD_HOLD, is_allowed
 from sbam_api.projects.repository import ProjectRepository
@@ -205,6 +206,7 @@ class Decision:
     status: int = 200
     detail: str = ""
     upload_id: str | None = None
+    metadata: dict[str, str] | None = None  # replaces the client's metadata (no token kept)
 
 
 def _deny(status: int, code: ErrorCode, detail: str) -> Decision:
@@ -265,7 +267,14 @@ def pre_create(
     slot.status = ReservationStatus.CREATED.value
     slot.expires_at = now + UPLOAD_HOLD  # a started upload keeps its slot for a long upload
     session.commit()
-    return Decision(upload_id=str(slot.id))
+    return Decision(
+        upload_id=str(slot.id),
+        metadata={
+            "filename": name,
+            "project_id": str(claims.project_id),
+            "proof": tokens.proof(secret, slot.id, claims.project_id),
+        },
+    )
 
 
 @dataclass(frozen=True)
@@ -275,6 +284,27 @@ class Registered:
     project_id: uuid.UUID
     user_id: uuid.UUID
     duplicate: bool
+
+
+def _finish_claims(
+    session: Session, secret: str, upload_id: str, meta: dict[str, str]
+) -> tokens.UploadClaims | None:
+    """Who a finished upload belongs to. Uploads created now carry a `proof` for their slot (the
+    token is not kept in the stored metadata); one created before that change still carries its
+    token, which is checked as before."""
+    try:
+        slot_id = uuid.UUID(upload_id)
+        if "token" in meta:  # created before A-33: keep finishing it
+            return tokens.verify(secret, meta["token"], check_expiry=False)
+        project_id = uuid.UUID(meta.get("project_id", ""))
+    except (tokens.TokenError, ValueError):
+        return None
+    if not tokens.proof_valid(secret, slot_id, project_id, meta.get("proof", "")):
+        return None
+    slot = reservation_by_id(session, slot_id)  # system lookup: the hook has no tenant yet
+    if slot is None or slot.project_id != project_id:
+        return None
+    return tokens.UploadClaims(slot.tenant_id, slot.project_id, slot.user_id, slot.batch_id, 0)
 
 
 def post_finish(
@@ -289,12 +319,11 @@ def post_finish(
 ) -> Registered | None:
     """Register a finished upload. None = nothing to register (unknown, not complete, replay of
     something already refused); the cases that matter are logged."""
-    try:
-        claims = tokens.verify(secret, meta.get("token", ""), check_expiry=False)
-        slot_id = uuid.UUID(upload_id)
-    except (tokens.TokenError, ValueError):
+    claims = _finish_claims(session, secret, upload_id, meta)
+    if claims is None:
         log.warning("post-finish ignored: unknown upload")
         return None
+    slot_id = uuid.UUID(upload_id)
     ctx = TenantContext(claims.tenant_id, claims.project_id)
     slot = ReservationRepository(session, ctx).get_for_update(slot_id)
     if slot is None or slot.user_id != claims.user_id or slot.batch_id != claims.batch_id:

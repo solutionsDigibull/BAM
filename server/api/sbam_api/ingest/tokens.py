@@ -14,6 +14,7 @@ import uuid
 from dataclasses import dataclass
 
 _CONTEXT = b"sbam-upload-token-v1"
+_PROOF_CONTEXT = b"sbam-upload-proof-v1"
 
 
 class TokenError(ValueError):
@@ -75,3 +76,16 @@ def verify(
     if check_expiry and (time.time() if now is None else now) >= claims.expires_at:
         raise TokenError("expired")
     return claims
+
+
+def proof(secret: str, slot_id: uuid.UUID, project_id: uuid.UUID) -> str:
+    """What pre-create leaves in the stored metadata instead of the token (A-33): an HMAC of
+    the slot and project, good for the post-finish of that one slot and nothing else. Anyone who can
+    read it (tusd answers an unauthenticated HEAD with the metadata) cannot start an upload with it.
+    """
+    key = hmac.new(secret.encode(), _PROOF_CONTEXT, hashlib.sha256).digest()
+    return _b64(hmac.new(key, f"{slot_id}:{project_id}".encode(), hashlib.sha256).digest())
+
+
+def proof_valid(secret: str, slot_id: uuid.UUID, project_id: uuid.UUID, supplied: str) -> bool:
+    return hmac.compare_digest(supplied, proof(secret, slot_id, project_id))

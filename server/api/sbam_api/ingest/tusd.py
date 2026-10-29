@@ -29,9 +29,16 @@ class HookRequest(_Wire):
     event: HookEvent = Field(default_factory=HookEvent, alias="Event")
 
 
-def accept(upload_id: str | None = None) -> dict[str, Any]:
-    """Let the upload go on. A pre-create answer can choose the upload id."""
-    return {"ChangeFileInfo": {"ID": upload_id}} if upload_id else {}
+def accept(upload_id: str | None = None, metadata: dict[str, str] | None = None) -> dict[str, Any]:
+    """Let the upload go on. A pre-create answer can choose the upload id and replace the stored
+    metadata: what the client sent (the upload token included) is dropped, because tusd echoes the
+    metadata to anyone who asks with a HEAD (A-33)."""
+    change: dict[str, Any] = {}
+    if upload_id:
+        change["ID"] = upload_id
+    if metadata is not None:
+        change["MetaData"] = metadata
+    return {"ChangeFileInfo": change} if change else {}
 
 
 def reject(status: int, code: ErrorCode, detail: str, correlation_id: str) -> dict[str, Any]:
