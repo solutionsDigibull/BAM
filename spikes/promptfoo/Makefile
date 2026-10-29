@@ -4,9 +4,11 @@
 #   t02    E0.12-T02          output without state_handoff_id -> wrapper exits 1 naming output_schema
 #   t03    E0.12-T03          tool prints plain text -> is-json fails, no crash (exit 1)
 #   t04    E0.12-T04          empty suite -> rejected before Promptfoo runs (exit 2)
-#   t06    E0.12-T06          the promptfoo container cannot reach the internet
+#   t06    E0.12-T06          neither container (promptfoo, tool) can reach the internet
 #   local  same as run, without Docker (needs uv + Node >= 22.22)
 COMPOSE := docker compose
+# Git Bash rewrites container paths such as /spike/empty_suite.yaml into Windows paths (#204).
+export MSYS_NO_PATHCONV := 1
 UV_TOOL := uv run -q --no-project --python 3.12 --with fastmcp==4.1.0 python tool/harness.py
 
 .PHONY: build run t02 t03 t04 t06 local clean
@@ -34,7 +36,8 @@ t04: build
 	$(COMPOSE) run --rm promptfoo /spike/empty_suite.yaml; test $$? -eq 2 && echo "T04 OK: empty suite rejected"
 
 t06: build
-	$(COMPOSE) run --rm --entrypoint node promptfoo -e "fetch('https://example.com').then(() => { console.log('NETWORK REACHABLE'); process.exit(1) }, (e) => console.log('T06 OK: no network:', e.cause?.code ?? e.message))"
+	$(COMPOSE) run --rm --entrypoint node promptfoo -e "fetch('https://example.com').then(() => { console.log('NETWORK REACHABLE'); process.exit(1) }, (e) => console.log('T06 OK: promptfoo has no network:', e.cause?.code ?? e.message))"
+	$(COMPOSE) run --rm --entrypoint python tool -c "import socket; socket.create_connection(('example.com', 443), 5)" && { echo 'NETWORK REACHABLE from tool'; exit 1; } || echo 'T06 OK: tool has no network'
 
 local:
 	npm --prefix promptfoo install --no-audit --no-fund --loglevel=error

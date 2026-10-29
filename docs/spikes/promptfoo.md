@@ -33,7 +33,21 @@ grades data the harness already wrote.
 | E0.12-T06 | `--network none` | the suite needs no network by design (echo provider). `make t06` checks that the container cannot reach the internet. |
 
 T01–T05 were measured with `make local` (Windows 11, Node 24, uv). The Docker targets (`run`, `t02`–`t04`,
-`t06`) run the same files inside the two images. Record their output in the PR.
+`t06`) run the same files inside the two images.
+
+**Docker results (E0.19, #204).** Run on 2026-10-29: Docker Engine 29.9.2, Compose v5.6.1, Windows 11 with
+Git Bash, both containers `network_mode: none`. They match `make local`:
+
+| Target | Result in Docker | Same as `make local` |
+|---|---|---|
+| `make run` (T01) | `status=PASSED total=3 passed=3 failed=0`, exit 0, `duration_ms` ≈ 3700 (cold image) | yes |
+| `make t02` | exit 1: `output_schema: … must have required property 'state_handoff_id'` | yes |
+| `make t03` | exit 1: `output_schema: Expected output to be valid JSON`; the other assertions report the parse error, no crash | yes |
+| `make t04` | exit 2: `status=INVALID_SUITE total=0`, Promptfoo not started | yes |
+| `make t06` | **promptfoo**: `fetch` fails with `EAI_AGAIN`; **tool**: `urlopen` fails with *Temporary failure in name resolution*. Neither container has a route out | yes (the tool container is now checked too) |
+
+Same `suite_sha256` (`b8d85c2f…`) in Docker and locally for the 3-case suite. Git Bash rewrites the container
+path `/spike/empty_suite.yaml` into a Windows path, so the Makefile sets `MSYS_NO_PATHCONV=1`.
 
 What we learned:
 
