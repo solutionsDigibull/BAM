@@ -1,0 +1,46 @@
+{
+  "entries": [
+    {
+      "package": "diskcache",
+      "ids": [
+        "PYSEC-2026-2447"
+      ],
+      "reason": "No fixed release exists. cognee declares diskcache but nothing installed imports it (grep of site-packages, 2026-10-30), so no cache is ever read. Keep it that way: do not add an import, and do not mount a shared writable directory for it.",
+      "reviewed": "2026-10-30",
+      "expires": "2027-01-28",
+      "tracking": "#437"
+    },
+    {
+      "package": "filelock",
+      "ids": [
+        "CVE-2026-112940",
+        "CVE-2026-112913",
+        "CVE-2026-112907",
+        "CVE-2026-112938",
+        "CVE-2026-112936",
+        "CVE-2026-112910",
+        "CVE-2026-112909",
+        "CVE-2026-112911",
+        "CVE-2026-112939",
+        "CVE-2026-112915",
+        "CVE-2026-112935",
+        "CVE-2026-112912",
+        "CVE-2026-112908"
+      ],
+      "reason": "Fixed only in 4.x, which cognee forbids (filelock<4). Every advisory is in ReadWriteLock; no installed package outside filelock itself uses it (grep of site-packages, 2026-10-30). cognee and huggingface-hub use plain FileLock.",
+      "reviewed": "2026-10-30",
+      "expires": "2027-01-28",
+      "tracking": "#437"
+    },
+    {
+      "package": "litellm",
+      "ids": [
+        "CVE-2026-114612"
+      ],
+      "reason": "Affects the LiteLLM proxy server (salt-key reuse). We never run or import litellm.proxy: SBAM's LLM calls go through Bifrost, litellm is only cognee's client library. Fixed in 1.100.4+, but cognee 1.6.2 caps litellm<1.97; cognee 1.6.5 lifts the cap. Bump cognee in a knowledge-lane change that runs the live Cognee suite.",
+      "reviewed": "2026-10-30",
+      "expires": "2027-01-28",
+      "tracking": "#437"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+# Weekly dependency PRs (A-10, #437). Security fixes still arrive immediately; this keeps the rest from
+# ageing. Grouped so a week is one PR per ecosystem, not forty. Digest-pinned Docker bases are bumped too:
+# review the digest, then let CI (image-scan, compose-smoke) judge it.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /server
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 3
+    groups:
+      python: { patterns: ["*"], update-types: [minor, patch] }
+  - package-ecosystem: npm
+    directory: /client
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 3
+    groups:
+      node: { patterns: ["*"], update-types: [minor, patch] }
+  - package-ecosystem: docker
+    directory: /compose/docker
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 3
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 3
+    groups:
+      actions: { patterns: ["*"] }

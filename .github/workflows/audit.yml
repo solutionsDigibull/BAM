@@ -1,0 +1,55 @@
+# Dependency advisories (A-10, #437): fail on a runtime advisory nobody has reviewed.
+# pip-audit scans the locked runtime set of server/uv.lock (the dev group is not shipped); pnpm audit scans
+# the production tree of client/pnpm-lock.yaml. scripts/dependency_audit.py applies the reviewed allowlist
+# (scripts/dependency-audit-allowlist.json: package, advisory ids, reason, reviewer date, expiry), so a NEW
+# advisory on an allowed package still fails and an expired review fails again. Make `dependency-audit` a
+# required check in branch protection. The nightly run catches advisories published after the last merge
+# (a schedule only fires from the default branch, #357).
+name: audit
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PIP_AUDIT: pip-audit==2.10.1
+
+jobs:
+  dependency-audit: # required-check name
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with: { version: 10.33.2 } # = client/package.json packageManager
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: client/.nvmrc
+      - name: Python runtime set (locked, no dev group)
+        run: |
+          cd server
+          uv export --frozen --no-dev --no-hashes --all-packages --no-emit-workspace -o "$RUNNER_TEMP/req.txt"
+          uvx --from "$PIP_AUDIT" pip-audit -r "$RUNNER_TEMP/req.txt" --no-deps --disable-pip \
+            -f json -o "$RUNNER_TEMP/py.json" || test -s "$RUNNER_TEMP/py.json"
+      - name: Node production tree (locked)
+        run: |
+          cd client
+          pnpm audit --prod --json > "$RUNNER_TEMP/node.json" || test -s "$RUNNER_TEMP/node.json"
+      - name: Judge against the reviewed allowlist
+        run: python3 scripts/dependency_audit.py --python "$RUNNER_TEMP/py.json" --node "$RUNNER_TEMP/node.json"
