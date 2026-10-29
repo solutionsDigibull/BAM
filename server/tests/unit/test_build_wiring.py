@@ -248,6 +248,17 @@ def test_e11_2b_t02_assemble_reads_the_manifest_of_the_code_attempt_not_this_pas
     assert given.loop_spec == loop_spec_of(structured())
 
 
+def test_e12_2_the_assemble_inputs_carry_the_libraries_modules_for_the_imports_rule() -> None:
+    """The AST imports rule allows the template's imports and the pinned libraries' modules."""
+    world = World()
+    world.add_registry()
+    first = world.add_manifest(0)
+    world.add_code_attempt(0, manifest_id=first)
+    given = world.assemble(world.stage())
+    assert given.modules == world.bodies(world.stage()).modules
+    assert given.modules and list(given.modules) == sorted(given.modules)
+
+
 def test_e11_2b_t03_assemble_compiles_the_newest_patched_isatvon_of_the_cycle() -> None:
     world = World()
     world.add_registry()
@@ -341,6 +352,7 @@ def test_e11_2b_t05_a_loop_spec_that_does_not_compile_is_not_retried() -> None:
         ("generate_bodies", TaskQueue.LLM),
         ("correct", TaskQueue.LLM),
         ("assemble", TaskQueue.BUILD),
+        ("ast_gate", TaskQueue.BUILD),
     ],
 )
 def test_e11_2b_t06_each_stage_is_registered_once_on_its_queue_by_the_wiring(
