@@ -7,6 +7,8 @@ const stack = Boolean(process.env.E2E_STACK);
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
+  // The real-stack scenarios share one stack (and its workers): one at a time keeps them stable.
+  workers: stack ? 1 : undefined,
   use: {
     baseURL,
     // E15.1: what a failed run leaves behind (CI keeps report + traces + videos 14 days)
