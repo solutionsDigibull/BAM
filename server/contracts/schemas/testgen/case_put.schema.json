@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:testgen/case_put:0.1.0",
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "description": "An expectation beyond the terminal state and the output (an `N` assertion: the `ui_updates`\nthe harness must emit, a handoff row, a pass count).",
+      "properties": {
+        "type": {
+          "pattern": "^[a-z][a-z0-9_]{0,59}$",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "ExpectedTerminal": {
+      "enum": [
+        "SUCCESS",
+        "ESCALATED",
+        "NO_OP"
+      ],
+      "title": "ExpectedTerminal",
+      "type": "string"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "`PUT W/sub-skills/{sub_id}/tests/cases/{case_id}` with `If-Match`: the parts of a case an FDE\nmay change. `name` and `kind` are fixed; at least one field must be sent.",
+  "properties": {
+    "input": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input"
+    },
+    "initial_state": {
+      "anyOf": [
+        {
+          "items": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Initial State"
+    },
+    "state_script": {
+      "anyOf": [
+        {
+          "items": {
+            "items": {
+              "maxLength": 20000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxItems": 10,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "State Script"
+    },
+    "expected_terminal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExpectedTerminal"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "expected_output": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Output"
+    },
+    "assertions": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assertions"
+    }
+  },
+  "title": "CasePut",
+  "type": "object"
+}
