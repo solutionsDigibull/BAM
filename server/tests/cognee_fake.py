@@ -45,6 +45,12 @@ class FakeCognee:
         self._call("add")
         self._ds(who, dataset)[name] = data
 
+    async def remove(self, who: Principal, dataset: str, names: set[str]) -> None:
+        self._call("remove")
+        items = self._ds(who, dataset)
+        for name in names:
+            items.pop(name, None)
+
     async def cognify(self, who: Principal, dataset: str) -> None:
         self._call("cognify")
         self._ds(who, dataset)

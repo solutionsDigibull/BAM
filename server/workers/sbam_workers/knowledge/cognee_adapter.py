@@ -112,6 +112,10 @@ class CogneeBackend(Protocol):
 
     async def add(self, who: Principal, dataset: str, name: str, data: bytes) -> None: ...
 
+    async def remove(self, who: Principal, dataset: str, names: set[str]) -> None:
+        """Delete the items with these names, with the graph nodes and edges only they sourced."""
+        ...
+
     async def cognify(self, who: Principal, dataset: str) -> None: ...
 
     async def search(
@@ -216,6 +220,18 @@ class CogneeAdapter:
             added.append(key)
         self._log("items added", scope, added=len(added), skipped=len(skipped))
         return AddResult(added=added, skipped=skipped)
+
+    async def prune(self, scope: ProjectScope, keep: set[str]) -> list[str]:
+        """Remove every item of the project's dataset whose key is not in `keep` (#450): a deleted
+        or replaced document, an older master snapshot. Returns the removed keys, sorted."""
+        dataset, who = await self._authorize(scope)
+        async with _classified():
+            present = await self._backend.item_names(who, dataset)
+            stale = present - keep
+            if stale:
+                await self._backend.remove(who, dataset, stale)
+        self._log("items pruned", scope, removed=len(stale), kept=len(present) - len(stale))
+        return sorted(stale)
 
     async def cognify(self, scope: ProjectScope) -> None:
         """Build the graph. Can take minutes: the calling activity heartbeats from its own task."""
