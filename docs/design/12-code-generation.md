@@ -91,6 +91,15 @@ a notification names the cause (E31, E32).
 | IMPORT_RESOLUTION | Import all modules in`skill-runtime`                                                        | Any ImportError                                                                                                                          |
 | SCHEMA_SQL        | Parse DDL (`sqlglot`, postgres dialect) against a DDL allowlist and apply it to a throwaway database on the isolated `schema-check` PostgreSQL (E9.4) | Parse/apply error; forbidden statement; declared table missing; two Sub-Skills defining one table differently; handoff table without the insert-only guard (a trigger rejecting UPDATE/DELETE and one rejecting TRUNCATE) |
 
+How E12.4 runs the first five gates (`static_gate`, `sbam_workers/build/gates/static_gate.py`):
+
+- **Input.** The stored bundle of the code attempt, re-read and checked against the hashes `assemble` recorded (a mismatch is `BUNDLE_TAMPERED`, E31). Each verdict is a `gate_results` row on that `bundle_sha256`.
+- **Tools.** Nothing executes generated code. Black runs in process; Ruff, MyPy (`--strict`, `--no-site-packages`) and Bandit run as separate Python processes on a scratch copy, with an empty environment and a timeout. Their versions are pinned in the worker's lockfile and the configs (`ruff.toml`, `mypy.ini`, the Black mode) are stored by sha256 as `config_sha256`, so a run can be reproduced. Findings are normalised to `{gate, code, file, line, severity, message}` and sorted. Ruff, Black and MyPy findings are HIGH; Bandit keeps its own severity.
+- **Blocking.** Any Ruff, Black or MyPy finding, a Bandit HIGH, any ClamAV detection. A Bandit MEDIUM or LOW is reported on a passing verdict. A blocking failure raises `GateFailed` with the attempt id and the build corrects it from the stored findings.
+- **ClamAV.** Every file of the bundle goes to clamd (INSTREAM) after a VERSION check; signatures older than 24 hours are an infrastructure error. A detection also copies the bundle to quarantine storage, writes a `BUNDLE_QUARANTINED` audit row and logs an operator alert.
+- **No verdict.** A tool timeout or crash, clamd unreachable or stale signatures raise a retryable `STATIC_GATE_INFRA` (2 attempts). It never reaches the correction loop; after the retries the build stops as `BUILD_ERROR` with a notification (E33). Nothing is recorded for a gate that gave no verdict.
+- **Not here.** `IMPORT_RESOLUTION` needs the `skill-runtime` image and is its own stage. The network-less, read-only, non-root toolchain container of the issue text is a deployment hardening of the worker, tracked separately; the tools here already need no network and run in a scratch directory with an empty environment.
+
 **Foundational schema (ISA14 "Contract-Driven Development"):** ISA14 states that ISATVON is fed to coding agents "alongside a foundational PostgreSQL .sql schema file". SBAM handles this as follows (O-16, built in E9.4):
 
 1. If the FDE uploaded a `.sql` file (Filetype master supports `.sql`), it becomes the base schema.

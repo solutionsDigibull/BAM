@@ -68,7 +68,11 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.runs import TaskQueue
     from sbam_contracts.state_machines import Actor, MachineName, SubSkillState
 
-    from sbam_workers.build.gates.errors import BUNDLE_TAMPERED, GATE_INPUT_MISMATCH
+    from sbam_workers.build.gates.errors import (
+        BUNDLE_TAMPERED,
+        GATE_INPUT_MISMATCH,
+        STATIC_GATE_INFRA,
+    )
     from sbam_workers.build.libraries import check_libraries
     from sbam_workers.build.manifest import build_manifest
     from sbam_workers.build.stubs import (
@@ -122,7 +126,9 @@ REVIEW_PATCH = "a20-isatvon-patch-review"
 PLATFORM_PATCH = "e12-2-gate-platform-defect"
 # #117: an integrity or wiring defect in a gate is a platform defect (BUILD_ERROR, an admin fixes
 # it), not a crashed workflow nobody hears about. The other stages' wiring errors still fail loudly.
-PLATFORM_DEFECTS = frozenset({BUNDLE_TAMPERED, GATE_INPUT_MISMATCH})
+# #119: a static tool or clamd that still gives no verdict after the activity's retries is the
+# same kind of defect (no correction can fix it).
+PLATFORM_DEFECTS = frozenset({BUNDLE_TAMPERED, GATE_INPUT_MISMATCH, STATIC_GATE_INFRA})
 MAX_SUMMARY_PATHS = 10
 SPECS: dict[BuildStage, _Spec] = {
     BuildStage.BUILD_MANIFEST: _Spec(TaskQueue.BUILD, 2 * _MIN, 3),

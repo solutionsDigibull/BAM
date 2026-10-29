@@ -46,11 +46,9 @@ async def ast_gate(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "ast_gate"))
 
 
-@activity_for(TaskQueue.BUILD)
-@activity.defn(name="static_gate")
-@stub_activity
+@activity.defn(name="static_gate")  # registered by `wiring.py`; the workflow's typed handle
 async def static_gate(inp: BuildStageInput) -> IdResult:
-    """Real (E11/E12): static analysis; raises GateFailed with finding ids."""
+    """Real (E12.4): Ruff, Black, MyPy, Bandit, ClamAV; raises GateFailed with the attempt id."""
     return IdResult(id=stage_stub_id(inp, "static_gate"))
 
 

@@ -36,6 +36,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.manifests.repository import SubSkillManifestRepository
 from sbam_api.registry.repository import registry_for_digest
+from sbam_api.scan.clamd import ClamdClient
 from sbam_api.storage.factory import make_backend
 from sbam_contracts.build import BuildStageInput, CorrectionInput, CorrectionResult
 from sbam_contracts.isatvon14 import SubSkill
@@ -62,7 +63,9 @@ from sbam_workers.build.correct import (
     SqlCorrectionStore,
 )
 from sbam_workers.build.gates import ast_gate as ast_gate_stage_module
+from sbam_workers.build.gates import static_gate as static_gate_stage_module
 from sbam_workers.build.gates.ast_gate import AstGate
+from sbam_workers.build.gates.static_gate import StaticGate
 from sbam_workers.isatvon.loop_spec import LoopSpecError, compile_definition
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.registry import PromptRegistry
@@ -216,6 +219,7 @@ class SqlBuildInputs:
 # --- the registered stages ------------------------------------------------------------------------
 # Built on first use, one stage at a time, so a worker only needs what its queue's stages need.
 
+
 def _llm(settings: WorkerSettings, sessions: sessionmaker[Session]) -> LlmClient:
     return LlmClient(settings, PromptRegistry(), SqlCallStore(sessions), LangfuseTracer(settings))
 
@@ -264,12 +268,27 @@ async def assemble_stage_activity(inp: BuildStageInput) -> IdResult:
     return await _assemble().run(inp)
 
 
+@lru_cache(maxsize=1)
+def _static_gate() -> StaticGate:
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    clamd = ClamdClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout_seconds)
+    return StaticGate(make_backend(settings), sessions, clamd)
+
+
 @activity_for(TaskQueue.BUILD)
 @activity.defn(name=ast_gate_stage_module.STAGE)
 async def ast_gate_stage_activity(inp: BuildStageInput) -> IdResult:
     """AST syntax, skeleton, manifest conformance and rule checks on the stored bundle (E12.2,
     E12.3); a failed gate is GateFailed with the attempt id, the verdicts in `gate_results`."""
     return await _ast_gate().run(inp)
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name=static_gate_stage_module.STAGE)
+async def static_gate_stage_activity(inp: BuildStageInput) -> IdResult:
+    """Ruff, Black, MyPy, Bandit and ClamAV on the stored bundle (E12.4); a blocking finding is
+    GateFailed with the attempt id, a tool that gives no verdict is retried, never corrected."""
+    return await _static_gate().run(inp)
 
 
 @activity_for(TaskQueue.LLM)

@@ -198,6 +198,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "generate_bodies": build_stubs.generate_bodies,
     "assemble": build_stubs.assemble,
     "ast_gate": build_stubs.ast_gate,
+    "static_gate": build_stubs.static_gate,
     "correct": build_stubs.correct,
 }
 
