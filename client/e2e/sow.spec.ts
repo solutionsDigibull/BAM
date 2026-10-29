@@ -670,10 +670,7 @@ test("e7_3_t08 create new version: a reason, then v4 opens in the editor with it
   await expect(page.getByTestId("impact-none")).toHaveText("No Sub-Skills need rebuild");
 });
 
-test("e7_3 a draft already open: Create new version is off", async ({
-  page,
-  baseURL,
-}) => {
+test("e7_3 a draft already open: Create new version is off", async ({ page, baseURL }) => {
   const f = fake(draftV4(), { impact: impactOf([]) });
   await open(page, baseURL!, f);
   await page.getByRole("tab", { name: "Versions (4)" }).click();
