@@ -154,6 +154,8 @@ export function SowScreen({ projectId }: { projectId: string }) {
     method: "get",
     queryOptions: { enabled: scopeChange, retry: false },
   });
+  // the response itself: `result.data` is `{}` until one arrives
+  const impactData = impact.query.data?.data;
 
   const [shown, setShown] = useState<number | undefined>();
   const shownVersion = shown ?? current?.version;
@@ -690,7 +692,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
                         label: "Impact",
                         children: (
                           <ImpactPanel
-                            impact={impact.result.data}
+                            impact={impactData}
                             loading={impact.query.isLoading}
                             error={impact.query.error}
                             onRetry={() => void impact.query.refetch()}
@@ -717,7 +719,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
           open={approveOpen}
           version={version.version}
           sha256={version.sha256}
-          impact={scopeChange && isCurrent ? impact.result.data : undefined}
+          impact={scopeChange && isCurrent ? impactData : undefined}
           busy={approve.mutation.isPending}
           onConfirm={() => onApprove(version.version, version.sha256 ?? "")}
           onCancel={() => setApproveOpen(false)}

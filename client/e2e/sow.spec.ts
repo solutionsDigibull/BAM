@@ -629,7 +629,9 @@ test("e7_3_t03 the impact preview lists the API's affected Sub-Skills", async ({
   const panel = page.getByTestId("sow-impact");
   await expect(panel).toContainText("v4 against approved v3");
   await expect(panel).toContainText("2 Sub-Skills to rebuild, 1 Macro Skill affected, 12 reused");
-  const ids = panel.getByTestId("impact-sub-skills").locator(".ant-table-row td:first-child");
+  const ids = panel
+    .getByTestId("impact-sub-skills")
+    .locator(".ant-table-row .ant-table-cell:first-child"); // virtual rows are divs
   await expect(ids).toHaveText(["MS01.2", "MS01.4"]); // the same skill_ids as the API answer
   await expect(panel.locator('[data-item="F-OTP"]')).toBeVisible();
   await expect(panel.locator('[data-section="overview"]')).toHaveCount(0); // unchanged: not listed
@@ -668,7 +670,7 @@ test("e7_3_t08 create new version: a reason, then v4 opens in the editor with it
   await expect(page.getByTestId("impact-none")).toHaveText("No Sub-Skills need rebuild");
 });
 
-test("e7_3 a draft already open: Create new version is off; the API's 409 says why", async ({
+test("e7_3 a draft already open: Create new version is off", async ({
   page,
   baseURL,
 }) => {
