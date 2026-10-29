@@ -338,6 +338,8 @@ services:
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
       # Uploads (#61): tusd's hook secret (also signs upload tokens) and the URL the browser uploads to.
       TUSD_HOOK_SECRET: ${TUSD_HOOK_SECRET:?is required - set it in compose/.env (copy compose/.env.example)}
+      # Upload tokens are signed with their own key (A-14). Empty = dev falls back to the hook secret.
+      UPLOAD_TOKEN_KEY: ${UPLOAD_TOKEN_KEY:-}
       TUSD_PUBLIC_URL: ${TUSD_PUBLIC_URL:-http://localhost:${TUSD_PORT:-1080}/files/}
       MAX_BODY_BYTES: ${MAX_BODY_BYTES:-10485760}
       # The masters workbook import (#56) scans uploads with clamd; down = the import answers 503.

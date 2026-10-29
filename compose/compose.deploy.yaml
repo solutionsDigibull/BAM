@@ -194,11 +194,13 @@ services:
       STORAGE_SIGNING_KEY: !reset null
       KEYCLOAK_ADMIN_CLIENT_SECRET: !reset null
       TUSD_HOOK_SECRET: !reset null
+      UPLOAD_TOKEN_KEY: !reset null
       DATABASE_URL_TEMPLATE: postgresql://sbam:__SBAM_DB_PASSWORD__@postgres:5432/sbam
       SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
       STORAGE_SIGNING_KEY_FILE: /run/secrets/storage_signing_key
       KEYCLOAK_ADMIN_CLIENT_SECRET_FILE: /run/secrets/keycloak_admin_client_secret
       TUSD_HOOK_SECRET_FILE: /run/secrets/tusd_hook_secret
+      UPLOAD_TOKEN_KEY_FILE: /run/secrets/upload_token_key
       LLM_PROVIDER: ${LLM_PROVIDER:-bifrost}
       ENABLE_PING: "false" # sample command: local stack only
       KEYCLOAK_ISSUER: https://${SBAM_AUTH_HOST:?set the public Keycloak hostname}/realms/bullm
@@ -211,6 +213,7 @@ services:
       - { source: storage_signing_key, target: storage_signing_key, uid: "10001", gid: "10001", mode: 0400 }
       - { source: keycloak_admin_client_secret, target: keycloak_admin_client_secret, uid: "10001", gid: "10001", mode: 0400 }
       - { source: tusd_hook_secret, target: tusd_hook_secret, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: upload_token_key, target: upload_token_key, uid: "10001", gid: "10001", mode: 0400 }
 
   worker-ingest:
     <<: *worker-deploy
@@ -340,6 +343,7 @@ secrets:
   keycloak_admin_password: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/keycloak_admin_password" }
   keycloak_admin_client_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/keycloak_admin_client_secret" }
   tusd_hook_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/tusd_hook_secret" }
+  upload_token_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/upload_token_key" }
   storage_signing_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/storage_signing_key" }
   auth_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/auth_secret" }
   openrouter_api_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/openrouter_api_key" }
