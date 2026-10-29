@@ -296,6 +296,7 @@ def transitions(path: Path) -> set[str]:
     "path_name, marker",
     [
         ("correction exhaustion", "attempts_exhausted"),
+        ("model failure", "generation_failed"),
         ("cancel", "signal:cancel"),
         ("TESTING_BLOCKED", "sandbox_unavailable"),
         ("FDE retry", "signal:retry"),

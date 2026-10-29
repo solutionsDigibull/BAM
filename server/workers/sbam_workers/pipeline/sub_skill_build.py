@@ -13,7 +13,9 @@ again; a corrector that changed the ISATVON is picked up by the re-manifest). Af
 MAX_CORRECTIONS corrections the Sub-Skill goes to NEEDS_FDE_REVIEW and the workflow waits for the
 `retry` signal, which opens a new cycle (counter reset) from the manifest. Missing libraries go
 DEPENDENCY_FAILED and are corrected the same way. Sandbox infrastructure failures never touch
-the counter: TESTING_BLOCKED, then `retry` re-runs only the sandbox tests.
+the counter: TESTING_BLOCKED, then `retry` re-runs only the sandbox tests. A model that cannot
+answer in a model stage (the re-asks or the transport retries are spent) is neither: the Sub-Skill
+is fine, so `generation_failed` parks it in NEEDS_FDE_REVIEW and `retry` opens a new cycle (#483).
 
 Rules (.claude/rules/temporal.md): deterministic (no clock, randomness, I/O); everything else is an
 activity. The counters live in workflow state and survive replay. State changes go through the
@@ -94,6 +96,23 @@ class _Spec:
 
 _MIN = timedelta(minutes=1)
 _LLM_ERRORS = ("SchemaInvalidAfterRetries",)
+# #483: stages whose activity asks a model, and the ways the model side can fail once the activity's
+# own retries are spent (the error type names; a wrong alias, a missing prompt or a wiring mismatch
+# are platform defects and still fail the workflow loudly). `correct` has its own handling.
+MODEL_STAGES = frozenset({BuildStage.GENERATE_BODIES, BuildStage.GENERATE_TESTS})
+MODEL_FAILURES = frozenset(
+    {
+        "SchemaInvalidAfterRetries",  # the model never returned valid output
+        "LlmTransportError",  # Bifrost unreachable, 5xx or unreadable
+        "LlmRequestRejected",  # Bifrost refused the request
+        "BudgetExceeded",  # the LLM budget is spent
+        "ContextTooLarge",  # the Sub-Skill does not fit the prompt: the FDE can shrink it
+    }
+)
+TIMED_OUT = "ActivityTimeout"
+GENERATION_FAILED = "GenerationFailed"  # internal failure kind
+GENERATION_PATCH = "e11-2c-generation-failed"
+FINDINGS_PATCH = "e11-4-cycle-findings"
 SPECS: dict[BuildStage, _Spec] = {
     BuildStage.BUILD_MANIFEST: _Spec(TaskQueue.BUILD, 2 * _MIN, 3),
     BuildStage.CHECK_LIBRARIES: _Spec(TaskQueue.BUILD, 5 * _MIN, 3),
@@ -126,6 +145,7 @@ TARGET: dict[str, SubSkillState] = {
     "template_error": SubSkillState.BUILD_ERROR,
     "correction_applied": SubSkillState.BUILDING,
     "attempts_exhausted": SubSkillState.NEEDS_FDE_REVIEW,
+    "generation_failed": SubSkillState.NEEDS_FDE_REVIEW,
     "sandbox_unavailable": SubSkillState.TESTING_BLOCKED,
 }
 WAITING_STATES = frozenset(
@@ -140,11 +160,14 @@ WAITING_STATES = frozenset(
 class _Failure(Exception):  # noqa: N818 - control flow inside the workflow, never escapes run()
     """A stage failed in a way the correction loop (or the end of the build) handles."""
 
-    def __init__(self, kind: str, gate: BuildStage, finding_ids: list[UUID]) -> None:
+    def __init__(
+        self, kind: str, gate: BuildStage, finding_ids: list[UUID], cause: str = ""
+    ) -> None:
         super().__init__(kind)
         self.kind = kind
         self.gate = gate
         self.finding_ids = finding_ids
+        self.cause = cause  # GenerationFailed: the error type, never its message
 
 
 class _CancelRequested(Exception):  # noqa: N818 - control flow inside the workflow
@@ -165,6 +188,16 @@ def _finding_ids(error: ApplicationError) -> list[UUID]:
     return ids
 
 
+def _model_failure(cause: BaseException | None) -> str | None:
+    """The error type when the model side failed (see MODEL_FAILURES), else None. Only the type:
+    a message may hold model output."""
+    if isinstance(cause, ApplicationError) and cause.type in MODEL_FAILURES:
+        return cause.type
+    if isinstance(cause, ActivityTimeout):
+        return TIMED_OUT
+    return None
+
+
 @workflow_for(TaskQueue.BUILD)
 @workflow.defn(name=SUB_SKILL_BUILD)
 class SubSkillBuild:
@@ -176,6 +209,7 @@ class SubSkillBuild:
         self.attempt = 0
         self.corrections = 0
         self.findings: list[UUID] = []
+        self.cycle_findings: list[UUID] = []  # every attempt's, for the escalation (#115)
         self.waiting = False
         self.pending_retry: SubSkillRetry | None = None
         self.retry_keys: list[str] = []
@@ -242,6 +276,11 @@ class SubSkillBuild:
                 await self._apply("template_error")
                 await self._notify("sub_skill.build_error")
                 return False
+            if failure.kind == GENERATION_FAILED:  # the model could not answer: not a correction
+                await self._generation_failed(failure)
+                self._start_cycle(self.cycle + 1)
+                failure = await self._pass()
+                continue
             await self._enter_correction(failure)
             if self.corrections < MAX_CORRECTIONS and await self._correct(failure):
                 self.attempt += 1
@@ -258,6 +297,7 @@ class SubSkillBuild:
         self.attempt = 0
         self.corrections = 0
         self.findings = []
+        self.cycle_findings = []
 
     async def _pass(self) -> _Failure | None:
         """One build pass; None when it certified."""
@@ -265,6 +305,10 @@ class SubSkillBuild:
             await self._attempt()
         except _Failure as failure:
             self.findings = failure.finding_ids
+            if workflow.patched(FINDINGS_PATCH):
+                self.cycle_findings += [
+                    f for f in failure.finding_ids if f not in self.cycle_findings
+                ]
             return failure
         return None
 
@@ -342,12 +386,25 @@ class SubSkillBuild:
         FDE which findings to look at and that `retry` is the next action."""
         if self.state is SubSkillState.CORRECTING:
             await self._apply("attempts_exhausted")
+        if workflow.patched(FINDINGS_PATCH):
+            self.findings = list(self.cycle_findings)  # all attempts' findings, not the last pass's
         kind = (
             "sub_skill.dependency_failed"
             if self.state is SubSkillState.DEPENDENCY_FAILED
             else "sub_skill.needs_fde_review"
         )
         await self._notify(kind)
+
+    async def _generation_failed(self, failure: _Failure) -> None:
+        """The model could not answer: NEEDS_FDE_REVIEW, tell the FDE why (the error type) and that
+        `retry` is the next action, then wait for it. No code attempt exists to clean up: the stage
+        writes its row only after the model answered."""
+        await self._apply("generation_failed")
+        stage = (
+            "test generation" if failure.gate is BuildStage.GENERATE_TESTS else "body generation"
+        )
+        await self._notify("sub_skill.generation_error", error=failure.cause, stage=stage)
+        await self._wait_retry()
 
     async def _wait_retry(self) -> None:
         """Wait for `retry` (or `cancel`), then apply it in the FDE's name."""
@@ -422,6 +479,10 @@ class SubSkillBuild:
                 TEMPLATE_ERROR,
             ):
                 raise _Failure(cause.type, stage, _finding_ids(cause)) from None
+            if stage in MODEL_STAGES and workflow.patched(GENERATION_PATCH):
+                code = _model_failure(cause)
+                if code is not None:
+                    raise _Failure(GENERATION_FAILED, stage, [], code) from None
             raise
 
     async def _apply(self, event: str, actor: Actor = Actor.SYSTEM, actor_id: str = SYSTEM) -> None:
@@ -451,9 +512,10 @@ class SubSkillBuild:
         else:
             self.state = TARGET[event]
 
-    async def _notify(self, kind: str) -> None:
+    async def _notify(self, kind: str, **extra: str) -> None:
         inp = self._need_input()
         payload = {
+            **extra,
             "workflow_id": str(inp.workflow_id),
             "build_no": str(inp.build_no),
             "state": self.state.value,
