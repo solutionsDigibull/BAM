@@ -9,9 +9,14 @@ Same flow as `sow/regenerate.py`: replay of a repeated Idempotency-Key, row lock
 then the database. 404 for another tenant's, an unassigned or a foreign-Workflow entity; 409 / 423
 by the Workflow's state (`editable_workflow`); 409 when a Sub-Skill of the Macro Skill is certified
 or frozen. The hint's control characters are removed and only its length is audited.
+
+The run is recorded under the Macro Skill, so a repeated Idempotency-Key replays on both routes;
+the same key for a different target (another Sub-Skill, or the Macro Skill) is 422
+`IDEMPOTENCY_KEY_REUSED`.
 """
 
 import asyncio
+import functools
 import uuid
 from collections.abc import Awaitable, Callable
 
@@ -53,12 +58,33 @@ def _running() -> ApiError:
 
 
 def _prior(
-    session: Session, user: CurrentUser, project_id: uuid.UUID, entity_id: uuid.UUID, key: str
+    session: Session,
+    user: CurrentUser,
+    project_id: uuid.UUID,
+    workflow_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    key: str,
+    *,
+    is_sub: bool,
 ) -> Run | None:
+    """The run a repeated key already started. `_commit` records it under the Macro Skill, so a
+    Sub-Skill's id is first turned into its macro's; the key may only repeat the same target."""
     ctx = user.context(project_id)
-    prior = find_by_key(session, ctx.tenant_id, "macro_skill", str(entity_id), KEY_PREFIX + key)
+    macro_id, sub_id = entity_id, None
+    if is_sub:
+        sub = SubSkillRepository(session, ctx).get(entity_id)
+        if sub is None or sub.workflow_id != workflow_id:
+            return None  # `_check` answers 404
+        macro_id, sub_id = sub.macro_skill_id, sub.id
+    prior = find_by_key(session, ctx.tenant_id, "macro_skill", str(macro_id), KEY_PREFIX + key)
     if prior is None or prior.action != REGENERATE_STARTED or not prior.after:
         return None
+    if prior.after.get("sub_skill_id") != (str(sub_id) if sub_id else None):
+        raise ApiError(
+            422,
+            ErrorCode.IDEMPOTENCY_KEY_REUSED,
+            "Idempotency-Key already used with a different request",
+        )
     row = TemporalRunRepository(session, ctx).get(uuid.UUID(prior.after["run_id"]))
     return to_run(row) if row is not None else None
 
@@ -146,7 +172,16 @@ async def start_regenerate(
         try:
             if idempotency_key:
                 replay = await asyncio.to_thread(
-                    _prior, session, user, project_id, entity_id, idempotency_key
+                    functools.partial(
+                        _prior,
+                        session,
+                        user,
+                        project_id,
+                        workflow_id,
+                        entity_id,
+                        idempotency_key,
+                        is_sub=is_sub,
+                    )
                 )
                 if replay is not None:
                     return replay
