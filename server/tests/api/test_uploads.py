@@ -699,3 +699,22 @@ def test_a33_t06_a_proof_of_a_deleted_project_slot_cannot_be_replayed_across_pro
     swapped = {**meta, "project_id": other_project}
     h.post_finish_with(upload_id, swapped, len(PDF))
     assert h.versions() == []  # the proof binds the slot to its own project
+
+
+def test_a33_t07_with_separate_keys_an_in_flight_upload_survives_a_hook_secret_rotation(
+    h: Harness,
+) -> None:
+    _separate_keys(h)
+    upload_id, meta, _ = _created(h)
+    h.stage(upload_id, PDF)
+    h.client.app.state.settings.tusd_hook_secret = SecretStr("rotated-hook-secret-2")  # type: ignore[attr-defined]
+    done = h.hook(
+        {
+            "Type": "post-finish",
+            "Event": {
+                "Upload": {"ID": upload_id, "Size": len(PDF), "Offset": len(PDF), "MetaData": meta}
+            },
+        },
+        "rotated-hook-secret-2",
+    )
+    assert done.status_code == 200 and len(h.versions()) == 1  # the proof is tied to the token key
