@@ -90,6 +90,17 @@ class CogneeLibrary:
             path.write_bytes(data)
             await cognee.add(str(path), dataset_name=dataset, user=await self._user(who))
 
+    async def remove(self, who: Principal, dataset: str, names: set[str]) -> None:
+        """`datasets.delete_data` per item (soft mode: Cognee's documented default; it removes
+        the nodes and edges the item alone sourced, through its provenance ledger)."""
+        import cognee
+
+        found = await self._dataset(who, dataset, "delete")
+        user = await self._user(who)
+        for row in await cognee.datasets.list_data(found.id, user):
+            if str(row.name) in names:
+                await cognee.datasets.delete_data(found.id, row.id, user)
+
     async def cognify(self, who: Principal, dataset: str) -> None:
         import cognee
 

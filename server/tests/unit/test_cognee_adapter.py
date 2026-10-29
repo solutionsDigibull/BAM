@@ -440,3 +440,52 @@ def test_e3_8b_a_master_document_with_a_wrong_hash_is_rejected(
     wrong = item.model_copy(update={"sha256": hashlib.sha256(b"other").hexdigest()})
     with pytest.raises(ItemRejected, match="sha256"):
         run(adapter(cognee, storage, {item.source_id}).add(scope(), [wrong]))
+
+
+# --- #450: prune ---------------------------------------------------------------------------------
+
+
+def test_450_prune_removes_only_the_items_outside_keep(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    a = adapter(cognee, storage)
+    run(a.ensure_dataset(scope()))
+    [data] = cognee.data.values()
+    data.update({"kept_1": b"x", "stale_1": b"y", "stale_2": b"z"})
+    assert run(a.prune(scope(), {"kept_1", "not_present"})) == ["stale_1", "stale_2"]
+    assert set(data) == {"kept_1"}
+
+
+def test_450_prune_with_nothing_stale_calls_no_delete(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    a = adapter(cognee, storage)
+    run(a.ensure_dataset(scope()))
+    assert run(a.prune(scope(), set())) == []
+    assert "remove" not in cognee.calls
+
+
+def test_450_prune_checks_the_scope_before_touching_cognee(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    calls_before = list(cognee.calls)
+    with pytest.raises(ScopeError):
+        run(adapter(cognee, storage).prune(scope(T1, P2), set()))  # P2 is T2's project
+    assert cognee.calls == calls_before
+
+
+def test_450_prune_with_cognee_down_is_retryable(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    a = adapter(cognee, storage)
+    run(a.ensure_dataset(scope()))
+    cognee.fail = EmbeddingException("Bifrost down")
+    with pytest.raises(CogneeUnavailable):
+        run(a.prune(scope(), set()))
+
+
+def test_450_prune_of_a_missing_dataset_is_not_found(
+    cognee: FakeCognee, storage: LocalDiskBackend
+) -> None:
+    with pytest.raises(DatasetNotFound):
+        run(adapter(cognee, storage).prune(scope(), set()))

@@ -1,5 +1,6 @@
 """E5.2 `build_knowledge`: the real adapter and DB guard over a fake Cognee, SQLite, storage."""
 
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,9 @@ from knowledge_db import (
     sources,
     versions,
 )
+from sbam_api.ingest.models import DocumentVersion
 from sbam_contracts.knowledge import KnowledgeCoverage
+from sbam_contracts.state_machines import DocumentVersionState
 from sbam_workers.knowledge.build import (
     BUILD_KNOWLEDGE_ATTEMPTS,
     COGNEE_UNAVAILABLE,
@@ -270,3 +273,106 @@ def test_e3_8b_the_snapshot_pinned_for_the_build_lists_the_master_document(w: Wo
         [snap] = s.scalars(select(MasterSnapshot)).all()
         assert [d["document_id"] for d in snap.documents] == [str(master)]
         assert snap.documents[0]["title"] == "costing.pdf"
+
+
+# --- #450: a rebuild prunes the dataset to its scope ------------------------------------------
+
+
+def delete_version(w: World, version_id: uuid.UUID) -> None:
+    """What deleting a document leaves behind: the version is no longer active."""
+    with w.sessions() as s:
+        row = s.get(DocumentVersion, version_id)
+        assert row is not None
+        row.state = DocumentVersionState.DELETED.value
+        s.commit()
+
+
+def keys_of(w: World) -> set[str]:
+    return {name for data in w.cognee.data.values() for name in data}
+
+
+def owners(w: World) -> set[str]:
+    """The source id of every item in the dataset (item key = `<source_id>_<sha256>`)."""
+    return {name.rsplit("_", 1)[0] for name in keys_of(w)}
+
+
+def test_450_t01_a_deleted_document_leaves_the_graph_on_the_next_build(w: World) -> None:
+    keep, gone = w.docs("RFQ ZEBRA-7731", "BOM to delete")
+    w.build_all(w.run_input())
+    assert {str(keep), str(gone)} <= owners(w)
+    delete_version(w, gone)
+    w.build_all(w.run_input())
+    assert str(gone) not in owners(w)  # its item, and the nodes only it sourced, are removed
+    assert str(keep) in owners(w)
+    assert w.cognee.calls.index("remove") < len(w.cognee.calls) - w.cognee.calls[::-1].index(
+        "cognify"
+    )  # pruned before the graph was rebuilt
+
+
+def test_450_a_replaced_document_keeps_only_its_new_version(w: World) -> None:
+    (old,) = w.docs("Spec revision A")
+    w.build_all(w.run_input())
+    delete_version(w, old)  # a new upload replaces it
+    (new,) = w.docs("Spec revision B")
+    w.build_all(w.run_input())
+    assert str(old) not in owners(w) and str(new) in owners(w)
+
+
+def test_450_an_item_from_an_older_snapshot_or_anything_out_of_scope_is_pruned(
+    w: World,
+) -> None:
+    w.docs("RFQ")
+    w.build_all(w.run_input())
+    [dataset] = w.cognee.data.values()
+    stale = f"{uuid.uuid4()}_{'a' * 64}"  # e.g. masters.jsonl of an earlier snapshot
+    dataset[stale] = b"old masters context"
+    w.build_all(w.run_input())
+    assert stale not in keys_of(w)
+
+
+def test_450_a_master_document_in_scope_is_kept(w: World) -> None:
+    w.docs("RFQ")
+    master = w.master_doc("Costing standard: scrap is 1.5 percent, APPROVED by Finance")
+    w.build_all(w.run_input())
+    w.build_all(w.run_input())
+    assert str(master) in owners(w)
+
+
+def test_450_a_build_that_adds_nothing_prunes_nothing(w: World) -> None:
+    (doc,) = w.docs("RFQ")
+    w.build_all(w.run_input())
+    before = keys_of(w)
+    delete_version(w, doc)  # nothing left to add: EmptyCorpus
+    with pytest.raises(ApplicationError) as err:
+        w.build(w.run_input())
+    assert err.value.type == EMPTY_CORPUS
+    assert keys_of(w) == before  # the READY version's graph is untouched
+    assert "remove" not in w.cognee.calls
+
+
+def test_450_cognee_down_while_pruning_is_retryable_and_the_retry_finishes(w: World) -> None:
+    keep, gone = w.docs("RFQ", "BOM")
+    w.build_all(w.run_input())
+    delete_version(w, gone)
+    inp = w.run_input()
+    original = w.cognee.remove
+
+    async def down(who: Principal, dataset: str, names: set[str]) -> None:
+        raise EmbeddingException("Bifrost down")
+
+    w.cognee.remove = down  # type: ignore[method-assign]
+    with pytest.raises(ApplicationError) as err:
+        w.build(inp, 1)
+    assert err.value.type == COGNEE_UNAVAILABLE and not err.value.non_retryable
+    w.cognee.remove = original  # type: ignore[method-assign]
+    w.bundle(inp, w.build(inp, 2))
+    assert str(gone) not in owners(w) and str(keep) in owners(w)
+
+
+def test_450_the_prune_never_leaves_the_projects_dataset(w: World) -> None:
+    w.docs("RFQ")
+    w.build_all(w.run_input())
+    other = ("p-other-project@example.test", "sbam_other_dataset")  # another project's user
+    w.cognee.data[other] = {"foreign_item": b"x"}
+    w.build_all(w.run_input())
+    assert w.cognee.data[other] == {"foreign_item": b"x"}

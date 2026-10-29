@@ -10,8 +10,12 @@ a fake Cognee and a temp-dir storage; the activity only builds the real ones. Fo
      derivative; the rest are FAILED in the coverage with a reason;
   4. add each document on its own: one that Cognee refuses is FAILED, the others go on. Cognee
      or Bifrost down (`CogneeUnavailable`) fails the attempt, which Temporal retries;
-  5. cognify (heartbeating from a separate task: it runs for minutes), then count the entities;
-  6. save the coverage; the version stays BUILDING. `build_okf_bundle` (E5.3) makes it READY once
+  5. prune the project's dataset to this build's scope (#450): every item that is not one of
+     these documents, this snapshot or its master documents is removed (a deleted or replaced
+     document, an older snapshot), with the graph nodes only it sourced. Only once something
+     was added: a build that fails before that never strips the graph the READY version uses;
+  6. cognify (heartbeating from a separate task: it runs for minutes), then count the entities;
+  7. save the coverage; the version stays BUILDING. `build_okf_bundle` (E5.3) makes it READY once
      its bundle validates. A retry after this point returns at once (no second cognify).
 No document added, or no entity after cognify: FAILED, non-retryable `EmptyCorpus`. Cognee still
 down on the last attempt: FAILED. A FAILED build leaves the previous READY version usable.
@@ -64,7 +68,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from sbam_workers import mirror
-from sbam_workers.knowledge.cognee_adapter import CogneeAdapter, CogneeUnavailable
+from sbam_workers.knowledge.cognee_adapter import CogneeAdapter, CogneeUnavailable, item_key
 from sbam_workers.knowledge.derivatives import DOC_MD, Derivative, derivatives_of
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
@@ -305,6 +309,7 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
         await asyncio.to_thread(_record, deps, inp, version.id, coverage.documents, sha)
         if not any(e.status is SourceStatus.ADDED for e in entries):
             raise EmptyCorpus("no document could be added")
+        await deps.adapter.prune(scope, {item_key(i) for i in (*items, masters, *master_docs)})
         await _heartbeating(deps, deps.adapter.cognify(scope))
         page = await deps.adapter.graph_page(scope, None, 1)
         coverage = coverage.model_copy(update={"entities": page.total_nodes})
