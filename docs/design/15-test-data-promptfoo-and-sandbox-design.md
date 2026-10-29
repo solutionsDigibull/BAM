@@ -16,6 +16,13 @@
 
 Rules: at least 3 cases (as above), all must pass, data is always flagged `synthetic`, and the dataset and suite are hashed and stored.
 
+How E13.4 builds and edits it (`generate_tests`, `sbam_workers/test/testgen.py`; `sbam_api/testgen/`):
+
+- **Generation.** The context is this Sub-Skill's ISATVON, its closed input schema, its tables and the allowed kinds, as `<data>` blocks; nothing else reaches the model. The answer type has no `synthetic`, status or `FDE` kind. Every case is checked with the rules the API applies to an FDE edit (input against `input_schema`, seed-SQL allowlist, 500-row budget, a terminal its kind can reach); a bad case is re-asked (case index and field path only, at most 3 times) and never stored. `max_iterations = 1` removes `PASS_AFTER_RETRY`. Failure to get valid cases is `SchemaInvalidAfterRetries`, which `SubSkillBuild` parks in `NEEDS_FDE_REVIEW`.
+- **Seed SQL.** One `INSERT ... VALUES` or `UPDATE` per entry on a table in `v_variables.tables`, literals only (casts allowed), no schema-qualified names, subqueries, `RETURNING` or functions; parsed with sqlglot (postgres). Enforced on the FDE edit endpoints and on the model's answer, so a refused statement never reaches the sandbox.
+- **Dataset.** `test_datasets` rows are only inserted: version one more than the Sub-Skill's newest, `synthetic` always true (a CHECK), `sha256` the shared `dataset_sha256` over the cases and the files' hashes. Files for FILE references are written by the platform (csv, json, xlsx; at most 5 MiB) and stored content-addressed; their keys are on the row.
+- **FDE edits.** `PUT/POST/DELETE .../sub-skills/{id}/tests/cases[/{case_id}]` write a new version (the cases copied with the change, `edited_by_fde`), keep the old one, and use the dataset's sha256 as the `ETag` (`If-Match` required, 428/412). A certified, frozen or superseded Sub-Skill is 423 `RESOURCE_LOCKED`. Case ids belong to a version: use the id the response returns. A rebuild keeps a dataset an FDE edited.
+
 ## 15.2 Sandbox execution
 
 ```text
