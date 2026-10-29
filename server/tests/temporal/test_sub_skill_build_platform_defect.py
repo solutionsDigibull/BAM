@@ -12,7 +12,11 @@ from typing import Any
 
 import pytest
 from sbam_contracts.runs import build_workflow_id
-from sbam_workers.build.gates.errors import BUNDLE_TAMPERED, GATE_INPUT_MISMATCH
+from sbam_workers.build.gates.errors import (
+    BUNDLE_TAMPERED,
+    GATE_INPUT_MISMATCH,
+    STATIC_GATE_INFRA,
+)
 from sbam_workers.pipeline.sub_skill_build import SubSkillBuild
 from temporalio.client import WorkflowFailureError, WorkflowHistory
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -54,6 +58,29 @@ def test_e12_2_a_gate_platform_defect_is_a_build_error_with_a_notification(kind:
     assert said["error"] == kind and said["stage"] == "code build"  # the type, never the message
     assert "secret detail" not in json.dumps(said)
     assert corrections == []  # a platform defect is not something the corrector can fix
+
+
+def test_e12_4_t07_a_static_tool_with_no_verdict_is_retried_then_a_build_error() -> None:
+    """clamd down or a tool that keeps timing out: two attempts, no correction is consumed, then
+    BUILD_ERROR with a notification an operator can act on."""
+    calls: list[Any] = []
+    corrections: list[Any] = []
+
+    def no_verdict(inp: Any) -> None:
+        calls.append(inp.attempt)
+        raise ApplicationError("cannot reach clamd (host)", type=STATIC_GATE_INFRA)
+
+    async def scenario(build: Build) -> Any:
+        return await build.finish(), build.state(), notice(build)
+
+    result, state, said = run(
+        scenario,
+        static_gate=traced("static_gate", [], no_verdict),
+        correct=traced("correct", corrections),
+    )
+    assert not result.certified and state == "BUILD_ERROR"
+    assert len(calls) == 2 and corrections == []  # retried by Temporal, never corrected
+    assert said["error"] == STATIC_GATE_INFRA and "host" not in json.dumps(said)
 
 
 def test_e12_2_a_template_error_names_itself_in_the_notification_too() -> None:

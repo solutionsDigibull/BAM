@@ -31,7 +31,6 @@ WF = WorkflowRef(**_COMMON)
 # every stub family: (activity, input)
 STUBS = [
     (build_stubs.render_skeleton, STAGE),
-    (build_stubs.static_gate, STAGE),
     (test_stubs.generate_tests, STAGE),
     (test_stubs.build_promptfoo_suite, STAGE),
     (test_stubs.run_sandbox_tests, STAGE),
