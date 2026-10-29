@@ -347,6 +347,10 @@ SUB_SKILL: Final = Machine(
         (K.BUILDING, "generation_failed", K.NEEDS_FDE_REVIEW, S),
         (K.CORRECTING, "correction_applied", K.BUILDING, S),
         (K.CORRECTING, "attempts_exhausted", K.NEEDS_FDE_REVIEW, S),
+        # A correction changed what the Sub-Skill means (#446): not certified on its own say-so. The
+        # patch stays in the isatvon_corrected audit row; the FDE's `retry` runs a new cycle from
+        # the approved ISATVON. (DEPENDENCY_FAILED, a failure state, only leaves to BUILDING.)
+        (K.CORRECTING, "isatvon_review_required", K.NEEDS_FDE_REVIEW, S),
         (K.NEEDS_FDE_REVIEW, "retry", K.BUILDING, F),
         (K.TESTING, "tests_passed", K.CERTIFIED, S),
         (K.TESTING, "tests_failed", K.CORRECTING, S),

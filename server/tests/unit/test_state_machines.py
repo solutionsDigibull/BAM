@@ -315,6 +315,36 @@ def test_e11_2c_a_model_failure_waits_for_the_fde_in_needs_fde_review() -> None:
     )
 
 
+def test_e11_4_446_a_behaviour_changing_patch_waits_for_the_fde() -> None:
+    """#446: the system, not the corrector, holds a Sub-Skill whose correction changed what it
+    means. Only from CORRECTING, and only the system may say so."""
+    sub = MachineName.SUB_SKILL
+    review, correcting = SubSkillState.NEEDS_FDE_REVIEW, SubSkillState.CORRECTING
+    assert can_transition(sub, correcting, "isatvon_review_required", Actor.SYSTEM) == review
+    for actor in (Actor.FDE, Actor.ADMIN):
+        assert (
+            code_of(sub, correcting, "isatvon_review_required", actor)
+            == InvalidTransitionCode.FORBIDDEN_ACTOR
+        )
+    # not from a failure state (DEPENDENCY_FAILED only leaves to BUILDING), nor from anywhere else
+    for source in (
+        SubSkillState.DEPENDENCY_FAILED,
+        SubSkillState.BUILDING,
+        SubSkillState.TESTING,
+        SubSkillState.CERTIFIED,
+    ):
+        assert (
+            code_of(sub, source, "isatvon_review_required", Actor.SYSTEM)
+            == InvalidTransitionCode.NOT_ALLOWED
+        )
+    # the ways out and the existing ways through CORRECTING are unchanged
+    assert can_transition(sub, review, "retry", Actor.FDE) == SubSkillState.BUILDING
+    assert can_transition(sub, correcting, "correction_applied", Actor.SYSTEM) == (
+        SubSkillState.BUILDING
+    )
+    assert can_transition(sub, correcting, "attempts_exhausted", Actor.SYSTEM) == review
+
+
 # --- T09: manifest status mapping -----------------------------------------------------------------
 
 

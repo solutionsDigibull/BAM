@@ -14,7 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sbam_contracts.pipeline import ActorId, WorkflowRef
+from sbam_contracts.pipeline import ActorId, IdResult, WorkflowRef
 from sbam_contracts.state_machines import SubSkillState
 
 MAX_CORRECTIONS: Final = 2  # TD §13.2: at most 2 correction attempts per build cycle
@@ -68,6 +68,36 @@ class CorrectionInput(BuildStageInput):
 
     failed_gate: Annotated[str, Field(min_length=1, max_length=100)]
     finding_ids: list[UUID] = Field(default_factory=list)
+
+
+class IsatvonPatchClass(StrEnum):
+    """What a correction did to the Sub-Skill's ISATVON (#446).
+
+    The corrector may patch `/isatvon_definition` to fix a defect. The tests were generated from the
+    approved definition, so a patch that changes what the Sub-Skill means (a looser bound, a weaker
+    gate) could make failing tests pass: it must not certify without the FDE. A patch that does not
+    change what it does (a library the runtime lacks, for one) carries on as before."""
+
+    NONE = "NONE"  # no ISATVON patch: bodies only, or an empty patch
+    NEUTRAL = "NEUTRAL"  # does not change what the Sub-Skill does: the loop carries on
+    BEHAVIOUR = "BEHAVIOUR"  # changes what it does: NEEDS_FDE_REVIEW, the FDE decides
+
+
+MAX_CHANGED_PATHS: Final = 50
+
+
+class CorrectionResult(IdResult):
+    """What `correct` returns: the new attempt's id, and what the correction did to the ISATVON.
+
+    It extends `IdResult`, and the new fields default to "no patch", so a result recorded before
+    this existed (`{"id": ...}`) still decodes. `changed_paths` names the changed JSON-pointer
+    paths (never their values: the before and after are in the `isatvon_corrected` audit row);
+    it is bounded, and empty for NONE."""
+
+    isatvon_patch: IsatvonPatchClass = IsatvonPatchClass.NONE
+    changed_paths: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        default_factory=list, max_length=MAX_CHANGED_PATHS
+    )
 
 
 class SubSkillRetry(_Dto):
