@@ -94,6 +94,7 @@ class InfraReason(StrEnum):
     EGRESS_LOG_UNAVAILABLE = "EGRESS_LOG_UNAVAILABLE"  # certifying mode without an evidence source
     DESTROY_FAILED = "DESTROY_FAILED"
     CANCELLED = "CANCELLED"
+    SUPERSEDED = "SUPERSEDED"  # a retry of the activity took the run over; this one lost
 
 
 class SandboxRunStatus(StrEnum):
