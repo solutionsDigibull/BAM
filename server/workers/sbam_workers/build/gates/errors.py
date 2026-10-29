@@ -13,3 +13,6 @@ GATE_INPUT_MISMATCH: Final = "AST_GATE_INPUT_MISMATCH"
 # signatures are stale): retried by Temporal, never a correction. After the retries it is a platform
 # defect (BUILD_ERROR, an operator fixes it).
 STATIC_GATE_INFRA: Final = "STATIC_GATE_INFRA"
+# The import gate could not start its container (no docker, the daemon or the pinned image is
+# unavailable): retried by Temporal, never a correction and never a verdict on the code.
+IMPORT_GATE_INFRA: Final = "IMPORT_GATE_INFRA"
