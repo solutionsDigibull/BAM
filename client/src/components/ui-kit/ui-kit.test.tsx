@@ -32,6 +32,14 @@ describe("HashChip", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(value));
   });
 
+  test("e9_6 without a clipboard the full hash is shown selected to copy by hand", async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    render(<HashChip value={value} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy hash" }));
+    const box = await screen.findByLabelText("Hash to copy");
+    expect((box as HTMLInputElement).value).toBe(value);
+  });
+
   test("e1_13_t05 rejects a malformed hash", () => {
     render(<HashChip value="sha256:not-a-hash" />);
     expect(screen.getByText("invalid hash")).toBeDefined();
