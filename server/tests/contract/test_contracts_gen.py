@@ -33,6 +33,7 @@ from sbam_contracts import (
     notifications,
     okf,
     projects,
+    promptfoo,
     runs,
     runtime_registry,
     schema_sql,
@@ -238,6 +239,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("runtime_registry", runtime_registry),
             ("state_machines", state_machines),
             ("testgen", testgen),
+            ("promptfoo", promptfoo),
         )
         for stem in module.schemas()
     }
