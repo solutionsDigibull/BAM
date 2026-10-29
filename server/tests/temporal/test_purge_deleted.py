@@ -10,6 +10,7 @@ against the real Temporal in tests/integration/test_purge_schedule_stack.py (nee
 """
 
 import asyncio
+import json
 import os
 import tempfile
 import uuid
@@ -23,10 +24,12 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from cognee_fake import FakeCognee
 from sbam_api.audit.models import AuditLog, NotificationOutbox
 from sbam_api.core.auth import CurrentUser
 from sbam_api.ingest import retention
 from sbam_api.ingest.models import Document, DocumentVersion, UploadReservation
+from sbam_api.masters.models import MasterDocument
 from sbam_api.projects.models import Project
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope, StorageUnavailable
 from sbam_api.storage.local import LocalDiskBackend
@@ -35,12 +38,17 @@ from sbam_contracts.documents import (
     PURGE_DELETED,
     PURGE_RETENTION_DAYS,
     PURGE_SCHEDULE_ID,
+    PurgeRequest,
     PurgeResult,
+    PurgeTarget,
 )
+from sbam_contracts.knowledge import ProjectScope
 from sbam_contracts.runs import TaskQueue
 from sbam_workers import mirror, registry
 from sbam_workers.ingest import purge_activities
 from sbam_workers.ingest.purge_schedule import ensure_purge_schedule, purge_schedule
+from sbam_workers.knowledge import purge as knowledge_purge
+from sbam_workers.knowledge.cognee_adapter import CogneeAdapter
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import (
@@ -50,6 +58,7 @@ from temporalio.client import (
     ScheduleOverlapPolicy,
     ScheduleSpec,
     ScheduleState,
+    WorkflowFailureError,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError
@@ -67,6 +76,7 @@ USER = CurrentUser(
     assigned_project_ids=frozenset({PROJECT}),
 )
 DAY = timedelta(days=1)
+DATASET = f"sbam_{TENANT}_{PROJECT}"
 PDF = b"%PDF-1.7 a small test document\n" * 40
 PARSED = b"parsed text of the document\n" * 10
 
@@ -81,6 +91,7 @@ def make_sessions() -> sessionmaker[Session]:
         execution_options={"schema_translate_map": {"sbam": None}},
     )
     for model in (
+        MasterDocument,  # DerivedFiles checks whether a master document shares a derivative
         AuditLog,
         NotificationOutbox,
         Project,
@@ -128,13 +139,34 @@ class FlakyStorage:
         return getattr(self.inner, name)
 
 
+class AnyProject:
+    """The adapter's scope guard: the test project belongs to the test tenant."""
+
+    def project_in_tenant(self, scope: Any) -> bool:
+        return bool(scope.tenant_id == TENANT and scope.project_id == PROJECT)
+
+    def eligible_versions(self, scope: Any, ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        return ids
+
+    def eligible_master_documents(self, scope: Any, ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        return ids
+
+
 @dataclass
 class World:
     sessions: sessionmaker[Session]
     storage: LocalDiskBackend
-    cleanup: FakeCleanup
+    cleanup: Any
     root: Path
     docs: list[uuid.UUID] = field(default_factory=list)
+    cognee: FakeCognee = field(default_factory=FakeCognee)
+
+    def adapter(self) -> CogneeAdapter:
+        return CogneeAdapter(self.cognee, AnyProject(), self.storage, "s" * 32)
+
+    def knowledge_items(self) -> set[str]:
+        """The names in the project's Cognee dataset (empty when it has none)."""
+        return {n for (_, ds), items in self.cognee.data.items() for n in items if ds == DATASET}
 
     def add_document(self, title: str = "spec.pdf", data: bytes = PDF) -> uuid.UUID:
         """An uploaded document with its file and one derived file, like a parsed upload."""
@@ -166,7 +198,8 @@ class World:
                 )
             )
             s.commit()
-            self.cleanup.derived[document.id] = [derived.storage_key]
+            if isinstance(self.cleanup, FakeCleanup):  # the real one reads the version
+                self.cleanup.derived[document.id] = [derived.storage_key]
             self.docs.append(document.id)
             return document.id
 
@@ -211,6 +244,7 @@ async def environment(
     registry.load_all()
     mirror.configure(world.sessions)
     purge_activities.configure(storage=storage or world.storage, cleanup=world.cleanup)
+    knowledge_purge.configure(world.adapter)
     env = await WorkflowEnvironment.start_time_skipping(data_converter=pydantic_data_converter)
     workflows, activities = registry.collect(TaskQueue.INGEST)
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -222,6 +256,11 @@ async def environment(
                 workflows=workflows,
                 activities=activities,
                 activity_executor=executor,
+            ),
+            Worker(  # #449: the Cognee items go on the knowledge queue, as on worker-knowledge
+                env.client,
+                task_queue=TaskQueue.KNOWLEDGE.value,
+                activities=[knowledge_purge.remove_document_knowledge],
             ),
         ):
             yield env
@@ -507,3 +546,196 @@ def test_e4_9_purge_without_storage_settings_fails_without_retrying(
     with pytest.raises(ApplicationError) as failure:
         purge_activities._backend()
     assert failure.value.non_retryable
+
+
+# --- #449: derivatives and Cognee items go with the document ----------------------------------
+
+
+def parsed(world: World, document_id: uuid.UUID, md: bytes, js: bytes) -> tuple[str, str]:
+    """What parsing leaves on the version: content-addressed doc.md / doc.json keys."""
+    scope = StorageScope(TENANT, PROJECT)
+    md_key = world.storage.put(md, scope, Kind.DERIVED, "text/markdown").storage_key
+    js_key = world.storage.put(js, scope, Kind.DERIVED, "application/json").storage_key
+    with world.sessions() as s:
+        version = s.scalars(
+            select(DocumentVersion).where(DocumentVersion.document_id == document_id)
+        ).one()
+        version.derived_md_key, version.derived_json_key = md_key, js_key
+        s.commit()
+    return md_key, js_key
+
+
+def version_of(world: World, document_id: uuid.UUID) -> uuid.UUID:
+    with world.sessions() as s:
+        found: uuid.UUID = s.scalars(
+            select(DocumentVersion.id).where(DocumentVersion.document_id == document_id)
+        ).one()
+        return found
+
+
+def project_scope() -> ProjectScope:
+    return ProjectScope(tenant_id=TENANT, project_id=PROJECT)
+
+
+def in_cognee(world: World, *documents: uuid.UUID) -> None:
+    """Each document's version as a Cognee item, the way a knowledge build leaves it."""
+    user = world.adapter()._principal(project_scope()).email
+    items = world.cognee.data.setdefault((user, DATASET), {})
+    for document in documents:
+        items[f"{version_of(world, document)}_{'a' * 64}"] = b"graph source"
+
+
+def real_cleanup(tmp_path: Path) -> World:
+    return World(make_sessions(), LocalDiskBackend(tmp_path), retention.DerivedFiles(), tmp_path)
+
+
+def test_a23_t01_purge_removes_derivatives(tmp_path: Path) -> None:
+    async def scenario(world: World) -> None:
+        document = world.add_document()
+        md, js = parsed(world, document, b"# parsed text", b'{"blocks": []}')
+        world.delete(document)
+        async with environment(world) as env:
+            result = await tick(env, after=timedelta(days=PURGE_RETENTION_DAYS) + DAY)
+        assert result.purged == 1
+        assert not world.exists(md) and not world.exists(js)  # no object under its keys remains
+
+    asyncio.run(scenario(real_cleanup(tmp_path)))
+
+
+def test_a23_a_derivative_another_document_still_uses_is_kept(tmp_path: Path) -> None:
+    async def scenario(world: World) -> None:
+        gone, kept = world.add_document("a.pdf"), world.add_document("b.pdf", PDF + b"other")
+        md, js = parsed(world, gone, b"# same text", b"{}")
+        assert parsed(world, kept, b"# same text", b"{}") == (md, js)  # same content, same keys
+        world.delete(gone)
+        async with environment(world) as env:
+            await tick(env, after=timedelta(days=PURGE_RETENTION_DAYS) + DAY)
+        assert world.state(gone) == "PURGED"
+        assert world.exists(md) and world.exists(js)  # the live document still reads them
+
+    asyncio.run(scenario(real_cleanup(tmp_path)))
+
+
+def test_a23_a_derivative_a_master_document_uses_is_kept(tmp_path: Path) -> None:
+    async def scenario(world: World) -> None:
+        document = world.add_document()
+        md, js = parsed(world, document, b"# costing standard", b"{}")
+        with world.sessions() as s:
+            s.add(
+                MasterDocument(
+                    tenant_id=TENANT,
+                    project_id=PROJECT,
+                    title="Costing standard",
+                    filetype_row_label="FT-1",
+                    intent_class="standard",
+                    master_type="RULES",
+                    route_source="DEFAULT_BY_FILETYPE",
+                    storage_key="k",
+                    sha256="0" * 64,
+                    size=1,
+                    mime="text/plain",
+                    derived_md_key=md,
+                )
+            )
+            s.commit()
+        world.delete(document)
+        async with environment(world) as env:
+            await tick(env, after=timedelta(days=PURGE_RETENTION_DAYS) + DAY)
+        assert world.exists(md) and not world.exists(js)  # only the shared one is kept
+
+    asyncio.run(scenario(real_cleanup(tmp_path)))
+
+
+def test_a23_t02_purge_removes_cognee_items(tmp_path: Path) -> None:
+    async def scenario(world: World) -> None:
+        gone, live = world.add_document("a.pdf"), world.add_document("b.pdf", PDF + b"other")
+        in_cognee(world, gone, live)
+        world.delete(gone)
+        async with environment(world) as env:
+            await tick(env, after=timedelta(days=PURGE_RETENTION_DAYS) + DAY)
+        owners = {name.split("_")[0] for name in world.knowledge_items()}
+        assert owners == {str(version_of(world, live))}  # only the purged document's items went
+        assert world.cognee.calls.count("remove") == 1
+
+    run(scenario, tmp_path)
+
+
+def test_a23_cognee_down_leaves_the_document_unpurged_and_the_next_run_finishes(
+    tmp_path: Path,
+) -> None:
+    async def scenario(world: World) -> None:
+        document = world.add_document()
+        keys = world.keys(document)
+        in_cognee(world, document)
+        world.delete(document)
+        world.cognee.fail = ConnectionError("Cognee down")  # CogneeUnavailable: retried
+        async with environment(world) as env:
+            with pytest.raises(WorkflowFailureError) as failed:
+                await tick(env, after=timedelta(days=PURGE_RETENTION_DAYS) + DAY)
+            cause = failed.value.cause
+            assert isinstance(cause, ApplicationError) and cause.type == "PurgeIncomplete"
+            assert world.state(document) == "DELETED"  # not reported as purged
+            assert all(world.exists(k) for k in keys) and world.knowledge_items()
+            world.cognee.fail = None
+            result = await tick(env, after=DAY)  # tomorrow's run
+        assert result.purged == 1 and world.state(document) == "PURGED"
+        assert world.knowledge_items() == set()
+
+    run(scenario, tmp_path)
+
+
+def test_a23_a_project_without_knowledge_purges_normally(tmp_path: Path) -> None:
+    async def scenario(world: World) -> None:
+        document = world.add_document()
+        world.delete(document)  # never built: no Cognee dataset at all
+        async with environment(world) as env:
+            result = await tick(env, after=timedelta(days=PURGE_RETENTION_DAYS) + DAY)
+        assert result.purged == 1
+
+    run(scenario, tmp_path)
+
+
+def test_a23_a_document_not_due_yet_keeps_its_knowledge(tmp_path: Path) -> None:
+    world = World(make_sessions(), LocalDiskBackend(tmp_path), FakeCleanup(), tmp_path)
+    document = world.add_document()
+    in_cognee(world, document)
+    world.delete(document)
+    target = PurgeTarget(tenant_id=TENANT, project_id=PROJECT, document_id=document)
+    soon = datetime.now(UTC) + DAY  # deleted, but not due for 90 days (or restored meanwhile)
+    request = PurgeRequest(target=target, as_of=soon)
+    removed = asyncio.run(
+        knowledge_purge.remove_knowledge(world.adapter(), world.sessions, request)
+    )
+    assert removed == 0 and world.knowledge_items()
+    assert "remove" not in world.cognee.calls
+
+
+# --- replay history (TD §13.4) -------------------------------------------------------------------
+
+HISTORIES = Path(__file__).parent / "histories"
+
+
+@pytest.mark.skipif(not os.environ.get("RECORD_HISTORY"), reason="RECORD_HISTORY=1 to re-record")
+def test_record_purge_history(tmp_path: Path) -> None:  # pragma: no cover - maintenance helper
+    """One run that purges one document. `PURGE_HISTORY_NAME` picks the file (default
+    `purge_deleted.json`); keep the previous one as `purge_deleted_before_<change>.json`."""
+
+    async def scenario(world: World) -> dict[str, Any]:
+        document = world.add_document()
+        world.delete(document)
+        async with environment(world) as env:
+            await env.sleep(timedelta(days=PURGE_RETENTION_DAYS) + DAY)
+            handle = await env.client.start_workflow(
+                PURGE_DELETED,
+                id=f"{PURGE_SCHEDULE_ID}-recorded",
+                task_queue=TaskQueue.INGEST.value,
+                result_type=PurgeResult,
+            )
+            await handle.result()
+            data: dict[str, Any] = json.loads((await handle.fetch_history()).to_json())
+            return data
+
+    name = os.environ.get("PURGE_HISTORY_NAME", "purge_deleted.json")
+    (HISTORIES / name).write_text(
+        json.dumps(run(scenario, tmp_path), indent=1) + "\n", encoding="utf-8"
+    )

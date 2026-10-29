@@ -6,6 +6,11 @@ passes it to the activities, which do all the work (`purge_activities`). It asks
 documents and purges each in its own activity (a failure is counted, not fatal, and that document is
 not asked for again in this run), and repeats until none are left. A run that left documents behind
 fails, so it is visible; the next day's run tries them again.
+
+Before a document's files go, its Cognee items are removed on the knowledge queue (#449,
+`remove_document_knowledge`): only worker-knowledge has Cognee. If that fails after its retries,
+the document is not purged; it stays DELETED and the next run tries again. Runs started before
+this change replay unchanged (`workflow.patched`).
 """
 
 import asyncio
@@ -26,8 +31,10 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.runs import TaskQueue
 
     from sbam_workers.ingest.purge_activities import list_purgeable_documents, purge_document
+    from sbam_workers.knowledge.purge import remove_document_knowledge
     from sbam_workers.registry import workflow_for
 
+REMOVE_KNOWLEDGE = "purge-removes-knowledge-449"  # workflow.patched id
 MAX_ROUNDS = 20  # x LIST_LIMIT documents per run; anything left is picked up tomorrow
 PARALLEL = 10
 PURGE_RETRY = RetryPolicy(
@@ -77,9 +84,18 @@ class PurgeDeleted:
         return result
 
     async def _purge(self, target: PurgeTarget, as_of: datetime) -> PurgeOutcome:
+        request = PurgeRequest(target=target, as_of=as_of)
+        if workflow.patched(REMOVE_KNOWLEDGE):
+            await workflow.execute_activity(
+                remove_document_knowledge,
+                request,
+                task_queue=TaskQueue.KNOWLEDGE.value,
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=PURGE_RETRY,
+            )
         outcome: PurgeOutcome = await workflow.execute_activity(
             purge_document,
-            PurgeRequest(target=target, as_of=as_of),
+            request,
             start_to_close_timeout=timedelta(minutes=5),
             retry_policy=PURGE_RETRY,
         )
