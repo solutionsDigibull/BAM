@@ -290,6 +290,31 @@ def test_e0_6_t08_export_shape() -> None:
         assert all(set(t) == {"from", "event", "to", "actor"} for t in table["transitions"]), name
 
 
+# --- E11.2c (#483): a model failure -----------------------------------------------------------
+
+
+def test_e11_2c_a_model_failure_waits_for_the_fde_in_needs_fde_review() -> None:
+    """#483: the model could not answer. The system parks the Sub-Skill for review (nothing is
+    wrong with it), only the system may say so, and the FDE's `retry` tries again."""
+    sub = MachineName.SUB_SKILL
+    building, review = SubSkillState.BUILDING, SubSkillState.NEEDS_FDE_REVIEW
+    assert can_transition(sub, building, "generation_failed", Actor.SYSTEM) == review
+    for actor in (Actor.FDE, Actor.ADMIN):
+        assert (
+            code_of(sub, building, "generation_failed", actor)
+            == InvalidTransitionCode.FORBIDDEN_ACTOR
+        )
+    assert can_transition(sub, review, "retry", Actor.FDE) == building
+    # it is a way into review from BUILDING only; the correction loop's exit is unchanged
+    assert (
+        can_transition(sub, SubSkillState.CORRECTING, "attempts_exhausted", Actor.SYSTEM) == review
+    )
+    assert (
+        code_of(sub, SubSkillState.TESTING, "generation_failed", Actor.SYSTEM)
+        == InvalidTransitionCode.NOT_ALLOWED
+    )
+
+
 # --- T09: manifest status mapping -----------------------------------------------------------------
 
 

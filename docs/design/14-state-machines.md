@@ -56,6 +56,7 @@ BUILDING: MANIFEST → CODEGEN → AST → STATIC → TESTING (loop harness + Pr
    sandbox infrastructure down → TESTING_BLOCKED ──auto retry / Retry──► TESTING
    library missing from runtime registry → DEPENDENCY_FAILED ──correction / FDE edit──► BUILDING
    template render error (platform defect) → BUILD_ERROR ──platform fix + Retry──► BUILDING
+   the model cannot answer (schema re-asks or transport retries spent) → NEEDS_FDE_REVIEW ──Retry──► BUILDING
 TESTING passes → CERTIFIED (manifest governance.lifecycle.state = APPROVED) ──Workflow freeze──► FROZEN
 scope change touching this Sub-Skill → INVALIDATED → DRAFT (re-extracted) → …
 unchanged on new version → keeps CERTIFIED (reused)
@@ -189,6 +190,7 @@ The machines above are implemented in `server/contracts/sbam_contracts/state_mac
 | BUILDING | `gate_failed` | CORRECTING | SYSTEM |
 | BUILDING | `dependency_missing` | DEPENDENCY_FAILED | SYSTEM |
 | BUILDING | `template_error` | BUILD_ERROR | SYSTEM |
+| BUILDING | `generation_failed` | NEEDS_FDE_REVIEW | SYSTEM |
 | CORRECTING | `correction_applied` | BUILDING | SYSTEM |
 | CORRECTING | `attempts_exhausted` | NEEDS_FDE_REVIEW | SYSTEM |
 | NEEDS_FDE_REVIEW | `retry` | BUILDING | FDE |

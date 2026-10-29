@@ -631,6 +631,12 @@
         "actor": "SYSTEM"
       },
       {
+        "from": "BUILDING",
+        "event": "generation_failed",
+        "to": "NEEDS_FDE_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
         "from": "CORRECTING",
         "event": "correction_applied",
         "to": "BUILDING",
