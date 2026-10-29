@@ -12,6 +12,8 @@
 #   test          pytest for all of the above (23 tests)
 #   lint          ruff + black --check + mypy --strict on the spike code
 #   live          optional: real LLM through Bifrost (needs BIFROST_URL, BIFROST_API_KEY)
+#   live-measure  E0.16: N=20 runs per skill (MS01.1, SK-BOM) through Bifrost -> out/live-measure.json
+#   measure-dry   the same runner against the mock fixtures (no key; proves the accounting)
 
 PINS   := --with jinja2==3.1.6 --with pyyaml==6.0.2 --with fastmcp==4.1.0 --with pydantic-ai-slim==2.50.0
 UV     := cd ../../server && PYTHONPATH=../spikes/codegen uv run -q $(PINS)
@@ -22,7 +24,7 @@ BODIES := ../spikes/codegen/fixtures/mock_bodies
 OUT    := ../spikes/codegen/out
 
 .PHONY: help selfcheck render-twice generate generate-bom t03 t04 t05 t06 t07 t08 t08-recover \
-        test lint live clean
+        test lint live live-measure measure-dry clean
 
 help:
 	@sed -n '1,16p' Makefile
@@ -72,6 +74,18 @@ lint:
 live:
 	@test -n "$$BIFROST_URL" || (echo "set BIFROST_URL (and BIFROST_API_KEY) first"; exit 2)
 	$(CLI) generate --manifest $(MS01) --out $(OUT)/live
+
+N ?= 20
+MEASURE := $(UV) python -m codegen.measure
+
+live-measure:
+	@test -n "$$BIFROST_URL" || (echo "set BIFROST_URL (and BIFROST_API_KEY) first"; exit 2)
+	$(MEASURE) --runs $(N) --manifest $(MS01) --manifest $(BOM) --report $(OUT)/live-measure.json
+
+measure-dry:
+	$(MEASURE) --runs 3 --manifest $(MS01) --bodies $(BODIES)/ms01_1_good.yaml --report $(OUT)/dry-ms01.json
+	$(MEASURE) --runs 3 --manifest $(BOM) --bodies $(BODIES)/sk_bom_good.yaml --report $(OUT)/dry-bom.json
+	$(MEASURE) --runs 2 --manifest $(MS01) --bodies $(BODIES)/t05_while_loop.yaml --report $(OUT)/dry-fail.json
 
 clean:
 	rm -rf out
