@@ -54,7 +54,14 @@ from sbam_contracts.knowledge import (
     KnowledgeNodeDetail,
     KnowledgeVersionList,
 )
-from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
+from sbam_contracts.manifest import (
+    Isa14Manifest,
+    LoopSpec,
+    SkillManifest,
+    SrimDefaultsView,
+    SrimRuntimeDefaults,
+    WorkflowManifest,
+)
 from sbam_contracts.manifest_api import ManifestVersionList, ManifestView
 from sbam_contracts.masters import (
     AgentsPayload,
@@ -144,6 +151,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("manifest/skill_manifest", SkillManifest),
     ("manifest/workflow_manifest", WorkflowManifest),
     ("manifest/loop_spec", LoopSpec),
+    ("manifest/srim_runtime_defaults", SrimRuntimeDefaults),
+    ("manifest/srim_defaults_view", SrimDefaultsView),
     ("manifest/manifest_version_list", ManifestVersionList),
     ("manifest/manifest_view", ManifestView),
     ("masters/readme", ReadmeTab),

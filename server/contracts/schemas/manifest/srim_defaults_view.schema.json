@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:manifest/srim_defaults_view:0.1.0",
+  "$defs": {
+    "Audit": {
+      "additionalProperties": false,
+      "properties": {
+        "telemetry": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Telemetry",
+          "type": "string"
+        }
+      },
+      "required": [
+        "telemetry"
+      ],
+      "title": "Audit",
+      "type": "object"
+    },
+    "Execution": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Engine",
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine"
+      ],
+      "title": "Execution",
+      "type": "object"
+    },
+    "Gateway": {
+      "additionalProperties": false,
+      "properties": {
+        "route_via": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Route Via",
+          "type": "string"
+        }
+      },
+      "required": [
+        "route_via"
+      ],
+      "title": "Gateway",
+      "type": "object"
+    },
+    "Orchestration": {
+      "additionalProperties": false,
+      "properties": {
+        "router": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Router",
+          "type": "string"
+        },
+        "trigger": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        }
+      },
+      "required": [
+        "router",
+        "trigger"
+      ],
+      "title": "Orchestration",
+      "type": "object"
+    },
+    "PersistenceDefaults": {
+      "additionalProperties": false,
+      "description": "`Persistence` without `table`, which is derived from each Sub-Skill's V.tables.",
+      "properties": {
+        "database": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Database",
+          "type": "string"
+        },
+        "action": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database",
+        "action"
+      ],
+      "title": "PersistenceDefaults",
+      "type": "object"
+    },
+    "RuntimeUi": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        },
+        "method": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "method"
+      ],
+      "title": "RuntimeUi",
+      "type": "object"
+    },
+    "SrimRuntimeDefaults": {
+      "additionalProperties": false,
+      "description": "A tenant's SRIM runtime blocks (TD §11.2, O-19): set by an Admin, never by the LLM. Every\nblock is required and every value a non-empty string, so a partial update cannot half-apply.",
+      "properties": {
+        "orchestration": {
+          "$ref": "#/$defs/Orchestration"
+        },
+        "execution": {
+          "$ref": "#/$defs/Execution"
+        },
+        "gateway": {
+          "$ref": "#/$defs/Gateway"
+        },
+        "persistence": {
+          "$ref": "#/$defs/PersistenceDefaults"
+        },
+        "audit": {
+          "$ref": "#/$defs/Audit"
+        },
+        "ui": {
+          "$ref": "#/$defs/RuntimeUi"
+        }
+      },
+      "required": [
+        "orchestration",
+        "execution",
+        "gateway",
+        "persistence",
+        "audit",
+        "ui"
+      ],
+      "title": "SrimRuntimeDefaults",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET/PUT /admin/srim-defaults`: the tenant's values (ISA14's until it sets its own).",
+  "properties": {
+    "defaults": {
+      "$ref": "#/$defs/SrimRuntimeDefaults"
+    },
+    "is_default": {
+      "description": "true while the tenant has not set its own values",
+      "title": "Is Default",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "defaults",
+    "is_default"
+  ],
+  "title": "SrimDefaultsView",
+  "type": "object"
+}
