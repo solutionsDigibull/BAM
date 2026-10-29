@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:bd95f05c69e00d30e915154135d0ca25e430ae4dcfd781b3c993ff4e17baf945
+// source-sha256:0ffd0d26137c99d30fbaf38bbc48c743bea653226e3d0c2e227771269833fa45
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -458,6 +458,8 @@ export interface SbamContracts {
   SkillManifest?: SkillManifest;
   WorkflowManifest?: WorkflowManifest;
   LoopSpec?: LoopSpec;
+  SrimRuntimeDefaults?: SrimRuntimeDefaults;
+  SrimDefaultsView?: SrimDefaultsView;
   ManifestVersionList?: ManifestVersionList;
   ManifestView?: ManifestView;
   ReadmeTab?: ReadmeTab;
@@ -1696,6 +1698,44 @@ export interface LoopSpec {
   escalation_condition: string;
   budget_limit_ms: number;
   ui_update_template: string;
+}
+/**
+ * A tenant's SRIM runtime blocks (TD §11.2, O-19): set by an Admin, never by the LLM. Every
+ * block is required and every value a non-empty string, so a partial update cannot half-apply.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SrimRuntimeDefaults".
+ */
+export interface SrimRuntimeDefaults {
+  orchestration: Orchestration;
+  execution: Execution;
+  gateway: Gateway;
+  persistence: PersistenceDefaults;
+  audit: Audit;
+  ui: RuntimeUi;
+}
+/**
+ * `Persistence` without `table`, which is derived from each Sub-Skill's V.tables.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PersistenceDefaults".
+ */
+export interface PersistenceDefaults {
+  database: string;
+  action: string;
+}
+/**
+ * `GET/PUT /admin/srim-defaults`: the tenant's values (ISA14's until it sets its own).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SrimDefaultsView".
+ */
+export interface SrimDefaultsView {
+  defaults: SrimRuntimeDefaults;
+  /**
+   * true while the tenant has not set its own values
+   */
+  is_default: boolean;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

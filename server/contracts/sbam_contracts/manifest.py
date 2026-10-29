@@ -218,6 +218,57 @@ class SrimRuntimeDefinition(_Strict):
     ui: RuntimeUi
 
 
+class PersistenceDefaults(_Strict):
+    """`Persistence` without `table`, which is derived from each Sub-Skill's V.tables."""
+
+    database: ShortText
+    action: ShortText
+
+
+class SrimRuntimeDefaults(_Strict):
+    """A tenant's SRIM runtime blocks (TD §11.2, O-19): set by an Admin, never by the LLM. Every
+    block is required and every value a non-empty string, so a partial update cannot half-apply."""
+
+    orchestration: Orchestration
+    execution: Execution
+    gateway: Gateway
+    persistence: PersistenceDefaults
+    audit: Audit
+    ui: RuntimeUi
+
+    def runtime_definition(self, table: str) -> SrimRuntimeDefinition:
+        """The manifest block for one Sub-Skill: these defaults plus its derived `table`."""
+        blocks = self.model_dump(mode="json")
+        blocks["persistence"]["table"] = table
+        return SrimRuntimeDefinition.model_validate(blocks)
+
+
+class SrimDefaultsView(_Strict):
+    """`GET/PUT /admin/srim-defaults`: the tenant's values (ISA14's until it sets its own)."""
+
+    defaults: SrimRuntimeDefaults
+    is_default: bool = Field(description="true while the tenant has not set its own values")
+
+
+# The ISA14 sample values (TD §11.1): what a tenant that never set its own gets.
+ISA14_SRIM_DEFAULTS: Final = SrimRuntimeDefaults.model_validate(
+    {
+        "orchestration": {
+            "router": "Dify_Dynamic_Master_Router",
+            "trigger": "HTTP_POST_Payload_plus_Variables",
+        },
+        "execution": {"engine": "FastMCP_Execution_Engine"},
+        "gateway": {"route_via": "MCP_Jungle_Gateway_Reverse_Proxy"},
+        "persistence": {
+            "database": "PostgreSQL_Database_State_Config",
+            "action": "Execute_SQL_Queries_via_Postgres_MCP",
+        },
+        "audit": {"telemetry": "PostgreSQL_Audit_Logs"},
+        "ui": {"target": "SRIM_UI_Canvas", "method": "Embedded_iFrames_Widgets"},
+    }
+)
+
+
 class JsonSchemaObject(_Strict):
     type: Literal["object"]
     properties: dict[str, dict[str, JsonValue]]
@@ -526,6 +577,10 @@ def schemas() -> dict[str, dict[str, Any]]:
         "skill_manifest": contract_schema(SkillManifest, "manifest/skill_manifest"),
         "workflow_manifest": contract_schema(WorkflowManifest, "manifest/workflow_manifest"),
         "loop_spec": contract_schema(LoopSpec, "manifest/loop_spec"),
+        "srim_runtime_defaults": contract_schema(
+            SrimRuntimeDefaults, "manifest/srim_runtime_defaults"
+        ),
+        "srim_defaults_view": contract_schema(SrimDefaultsView, "manifest/srim_defaults_view"),
     }
 
 
