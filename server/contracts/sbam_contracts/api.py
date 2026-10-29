@@ -106,6 +106,8 @@ class ErrorCode(StrEnum):
     LIBRARY_NOT_IN_REGISTRY = "LIBRARY_NOT_IN_REGISTRY"
     TOOLS_NOT_DECOUPLED = "TOOLS_NOT_DECOUPLED"
     WORKFLOW_BUILDING = "WORKFLOW_BUILDING"
+    DAG_CYCLE = "DAG_CYCLE"  # the Workflow's Sub-Skill dependencies loop (E9.5)
+    SCHEMA_SQL_MISSING = "SCHEMA_SQL_MISSING"  # no PASSED schema.sql for the Workflow manifest
     # Tests and sandbox
     MIN_TEST_CASES = "MIN_TEST_CASES"
     MOCK_UNMATCHED = "MOCK_UNMATCHED"

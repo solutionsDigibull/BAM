@@ -183,7 +183,7 @@
     },
     "WorkflowAgent": {
       "additionalProperties": false,
-      "description": "One Agent (TD: Macro Skill) of the Workflow and its certified Sub-Skills.",
+      "description": "One Agent (TD: Macro Skill) of the Workflow and its Sub-Skills, certified once frozen.",
       "properties": {
         "macro_category": {
           "maxLength": 200,
@@ -212,10 +212,17 @@
           "title": "Agent Ref"
         },
         "certification_id": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Certification Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Certification Id"
         },
         "skills": {
           "items": {
@@ -319,15 +326,29 @@
           "type": "string"
         },
         "bundle_sha256": {
-          "pattern": "^(sha256:)?[0-9a-f]{64}$",
-          "title": "Bundle Sha256",
-          "type": "string"
+          "anyOf": [
+            {
+              "pattern": "^(sha256:)?[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bundle Sha256"
         },
         "certification_id": {
-          "maxLength": 200,
-          "minLength": 1,
-          "title": "Certification Id",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Certification Id"
         }
       },
       "required": [
@@ -342,7 +363,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "The final SBAM output for one Workflow (TD §11.3).",
+  "description": "The final SBAM output for one Workflow (TD §11.3). Without `certification` it is the build's\ndraft (E9.5): bundle and certification ids may still be null. Once certified, none may be.",
   "properties": {
     "schema_version": {
       "const": "sbam-workflow-manifest/1.0",
@@ -419,7 +440,15 @@
       "type": "array"
     },
     "certification": {
-      "$ref": "#/$defs/WorkflowCertification"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WorkflowCertification"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "integrity": {
       "$ref": "#/$defs/Integrity"
@@ -437,8 +466,6 @@
     "schema_sql",
     "dag",
     "runtime_image_digest",
-    "evidence_index",
-    "certification",
     "integrity"
   ],
   "title": "WorkflowManifest",
