@@ -214,6 +214,19 @@ def test_e16_3_t04_env_flag_rules(configs: dict[str, dict[str, Any]]) -> None:
 
 
 @needs_docker
+@pytest.mark.parametrize("env", ["prod", "staging"])
+def test_a01_t04_worker_without_sbam_env_fails_lint(
+    configs: dict[str, dict[str, Any]], env: str
+) -> None:
+    cfg = copy.deepcopy(configs[env])
+    cfg["services"]["worker-certify"]["environment"].pop("SBAM_ENV", None)
+    cfg["services"]["worker-build"]["environment"]["SBAM_ENV"] = "development"
+    found = errors(lint.lint_config(cfg, env))
+    assert any("worker-certify" in f and "SBAM_ENV must be" in f for f in found)
+    assert any("worker-build" in f and "SBAM_ENV must be" in f for f in found)
+
+
+@needs_docker
 def test_e16_3_t04_cli_passes_on_repo_and_fails_on_placeholder_release(
     tmp_path: Path,
 ) -> None:
