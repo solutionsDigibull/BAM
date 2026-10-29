@@ -33,10 +33,15 @@ from sbam_api.builds.models import CodeAttempt, CodeAttemptStatus
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.repository import LlmCallRepository
-from sbam_contracts.build import MAX_CORRECTIONS, BuildStageInput, CorrectionInput
+from sbam_contracts.build import (
+    MAX_CORRECTIONS,
+    BuildStageInput,
+    CorrectionInput,
+    CorrectionResult,
+    IsatvonPatchClass,
+)
 from sbam_contracts.canonical import sha256_of
 from sbam_contracts.isatvon14 import DEFAULT_LIBRARY_REGISTRY
-from sbam_contracts.pipeline import IdResult
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -46,7 +51,9 @@ from sbam_workers.build.codegen.correction import (
     ALIAS,
     PATCH_ROOT,
     Correction,
+    PatchOp,
     bodies_diff,
+    classify_patch,
     correct_code,
     intake,
 )
@@ -118,6 +125,27 @@ class SqlCorrectionStore:
                 inp.sub_skill_id, inp.build_no, inp.cycle, inp.attempt + 1
             )
             return None if row is None else row.id
+
+    def result(self, inp: CorrectionInput, attempt_id: uuid.UUID) -> CorrectionResult:
+        """The result of a correction already written (a retried activity). What it did to the
+        ISATVON is in its audit row; no row means no accepted patch (bodies only, or a rejected
+        patch). Rows written before the class was stored are classified from their operations."""
+        with self.sessions() as session:
+            row = audit.find_by_key(
+                session,
+                inp.tenant_id,
+                AUDIT_ENTITY,
+                str(inp.sub_skill_id),
+                stage_key(inp, inp.attempt + 1),
+            )
+            after = None if row is None else row.after
+        if not after:
+            return CorrectionResult(id=attempt_id)
+        if "patch_class" in after:
+            kind, paths = IsatvonPatchClass(after["patch_class"]), tuple(after["changed_paths"])
+        else:
+            kind, paths = classify_patch([PatchOp.model_validate(op) for op in after["patch"]])
+        return CorrectionResult(id=attempt_id, isatvon_patch=kind, changed_paths=list(paths))
 
     def failing(self, inp: CorrectionInput) -> Failing:
         with self.sessions() as session:
@@ -217,6 +245,8 @@ class SqlCorrectionStore:
                             "patch": [
                                 op.model_dump() for op in out.output.isatvon_patch or []
                             ],
+                            "patch_class": out.patch_class.value,
+                            "changed_paths": list(out.changed_paths),
                             "rationale": out.output.rationale,
                             "failed_gate": inp.failed_gate,
                             "attempt": inp.attempt + 1,
@@ -242,12 +272,12 @@ class Correct:
         self.attempts = attempts
 
     @activity.defn(name=STAGE)
-    async def run(self, inp: CorrectionInput) -> IdResult:
+    async def run(self, inp: CorrectionInput) -> CorrectionResult:
         if inp.attempt >= MAX_CORRECTIONS:  # the workflow escalates before this; fail closed
             raise _mismatch(f"attempt {inp.attempt} has no correction left")
         found = self.attempts.find(inp)
         if found is not None:
-            return IdResult(id=found)
+            return self.attempts.result(inp, found)
         failing = self.attempts.failing(inp)
         given = await self.inputs(inp)
         workflow_id = activity.info().workflow_id
@@ -275,5 +305,9 @@ class Correct:
                 "correction rejected",
                 extra={"codes": sorted({f.as_dict()["code"] for f in out.findings})},
             )
-        return IdResult(id=attempt_id)
+        return CorrectionResult(
+            id=attempt_id,
+            isatvon_patch=out.patch_class,
+            changed_paths=list(out.changed_paths),
+        )
 

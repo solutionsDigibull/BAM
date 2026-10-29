@@ -19,7 +19,12 @@ from llm_db import TENANT, completion, llm_sessions, make_client
 from sbam_api.builds.models import CodeAttempt, CodeAttemptStatus
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.db.repository import TenantContext
-from sbam_contracts.build import MAX_CORRECTIONS, CorrectionInput
+from sbam_contracts.build import (
+    MAX_CORRECTIONS,
+    CorrectionInput,
+    CorrectionResult,
+    IsatvonPatchClass,
+)
 from sbam_workers.build.codegen.bodies import CodeBodies
 from sbam_workers.build.codegen.correction import ALIAS as CORRECTOR_ALIAS
 from sbam_workers.build.codegen.store import LoadedTemplate, load_template
@@ -411,3 +416,99 @@ def test_e11_4_t08_exhausted_transport_retries_raise_and_write_no_attempt(
     with sessions() as session:
         rows = CodeAttemptRepository(session, ctx(inp)).list()
         assert [r.attempt for r in rows] == [0]  # no attempt-1 row: the call never answered
+
+
+# --- A-20 (#446): the result says what the correction did to the ISATVON --------------------------
+
+ROUTING = "/isatvon_definition/t_tech_stack/gateway_routing"
+PIN = "/isatvon_definition/t_tech_stack/libraries/0/version_constraint"
+
+
+def run_result(impl: Correct, inp: CorrectionInput) -> CorrectionResult:
+    return asyncio.run(ActivityEnvironment().run(impl.run, inp))
+
+
+def corrected_with(
+    template: LoadedTemplate, patch: list[dict[str, Any]] | None
+) -> tuple[sessionmaker[Session], CorrectionInput, CorrectionResult, Correct]:
+    sessions = db()
+    inp = correction_input(attempt=0, failed_gate="HARNESS")
+    seed_failed_attempt(sessions, template, inp, [finding(code="BUDGET_EXCEEDED")])
+    impl = build(template, sessions, [corrector_reply(isatvon_patch=patch, rationale="why")])
+    return sessions, inp, run_result(impl, inp), impl
+
+
+def audit_after(sessions: sessionmaker[Session], inp: CorrectionInput) -> dict[str, Any] | None:
+    from sbam_api.audit import repository as audit
+
+    with sessions() as session:
+        row = audit.find_by_key(
+            session, inp.tenant_id, AUDIT_ENTITY, str(inp.sub_skill_id), stage_key(inp, 1)
+        )
+        return None if row is None else row.after
+
+
+def test_a20_t01_a_behaviour_patch_is_reported_with_the_paths_it_changed(
+    template: LoadedTemplate,
+) -> None:
+    patch = [{"op": "replace", "path": ROUTING, "value": "MCP_Direct_Gateway"}]
+    sessions, inp, result, _ = corrected_with(template, patch)
+    assert result.isatvon_patch is IsatvonPatchClass.BEHAVIOUR
+    assert result.changed_paths == [ROUTING]
+    after = audit_after(sessions, inp)
+    assert after is not None  # the diff the FDE reviews stays in the audit row
+    assert after["patch_class"] == "BEHAVIOUR" and after["changed_paths"] == [ROUTING]
+    assert after["patch"] == patch and after["isatvon_sha256"]
+
+
+def test_a20_t02_a_library_patch_is_neutral(template: LoadedTemplate) -> None:
+    patch = [{"op": "replace", "path": PIN, "value": ">=2.0,<9"}]
+    sessions, inp, result, _ = corrected_with(template, patch)
+    assert result.isatvon_patch is IsatvonPatchClass.NEUTRAL
+    assert result.changed_paths == [PIN]
+    after = audit_after(sessions, inp)
+    assert after is not None and after["patch_class"] == "NEUTRAL"
+
+
+def test_a20_a_correction_without_a_patch_reports_none(template: LoadedTemplate) -> None:
+    sessions, inp, result, _ = corrected_with(template, None)
+    assert (result.isatvon_patch, result.changed_paths) == (IsatvonPatchClass.NONE, [])
+    assert audit_after(sessions, inp) is None  # nothing was patched, nothing to review
+
+
+def test_a20_a_rejected_patch_reports_none(template: LoadedTemplate) -> None:
+    """A patch the corrector may not make is not accepted, so nothing was changed to hold."""
+    patch = [{"op": "replace", "path": "/skill_metadata/skill_id", "value": "X"}]
+    sessions, inp, result, _ = corrected_with(template, patch)
+    assert result.isatvon_patch is IsatvonPatchClass.NONE
+    assert attempt_row(sessions, inp, 1).status == CodeAttemptStatus.PRECHECK_FAILED
+    assert audit_after(sessions, inp) is None
+
+
+def test_a20_a_retried_activity_reports_the_same_class(template: LoadedTemplate) -> None:
+    """A retry finds the attempt row it already wrote; the class comes back from the audit row, so
+    the workflow still holds the patch."""
+    patch = [{"op": "replace", "path": ROUTING, "value": "MCP_Direct_Gateway"}]
+    _, inp, first, impl = corrected_with(template, patch)
+    assert run_result(impl, inp) == first  # same id, same class, same paths
+
+
+def test_a20_an_audit_row_from_before_the_class_was_stored_is_classified_from_its_patch(
+    template: LoadedTemplate,
+) -> None:
+    from sbam_api.audit import repository as audit
+
+    patch = [{"op": "replace", "path": ROUTING, "value": "MCP_Direct_Gateway"}]
+    sessions, inp, first, impl = corrected_with(template, patch)
+    with sessions() as session:
+        row = audit.find_by_key(
+            session, inp.tenant_id, AUDIT_ENTITY, str(inp.sub_skill_id), stage_key(inp, 1)
+        )
+        assert row is not None and row.after is not None
+        row.after = {
+            k: v for k, v in row.after.items() if k not in ("patch_class", "changed_paths")
+        }
+        session.commit()
+    again = run_result(impl, inp)
+    assert again.isatvon_patch is IsatvonPatchClass.BEHAVIOUR and again.changed_paths == [ROUTING]
+    assert again.id == first.id

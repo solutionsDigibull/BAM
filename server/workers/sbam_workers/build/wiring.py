@@ -37,7 +37,7 @@ from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.manifests.repository import SubSkillManifestRepository
 from sbam_api.registry.repository import registry_for_digest
 from sbam_api.storage.factory import make_backend
-from sbam_contracts.build import BuildStageInput, CorrectionInput
+from sbam_contracts.build import BuildStageInput, CorrectionInput, CorrectionResult
 from sbam_contracts.isatvon14 import SubSkill
 from sbam_contracts.manifest import SkillManifest
 from sbam_contracts.pipeline import IdResult
@@ -257,6 +257,6 @@ async def assemble_stage_activity(inp: BuildStageInput) -> IdResult:
 
 @activity_for(TaskQueue.LLM)
 @activity.defn(name=correct_stage.STAGE)
-async def correct_stage_activity(inp: CorrectionInput) -> IdResult:
+async def correct_stage_activity(inp: CorrectionInput) -> CorrectionResult:
     """The correction written as the next attempt (E11.4)."""
     return await _correct().run(inp)
