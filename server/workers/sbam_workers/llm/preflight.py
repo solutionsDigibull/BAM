@@ -18,7 +18,7 @@ from collections.abc import Callable
 from urllib.parse import urlsplit
 
 import httpx
-from sbam_api.core.settings import MOCK_FORBIDDEN_ENVS, _set
+from sbam_api.core.settings import _set, deployed_env
 from sbam_contracts.runs import TaskQueue
 
 from sbam_workers.registry import PreflightError, preflight_for
@@ -57,8 +57,8 @@ def _projects(s: WorkerSettings) -> httpx.Response:
 
 
 def check_langfuse(s: WorkerSettings, fetch: Fetch = _projects) -> None:
-    env = s.sbam_env.lower()
-    strict = env in MOCK_FORBIDDEN_ENVS
+    env = s.sbam_env.strip().lower()
+    strict = deployed_env(env)
     keys = {
         "LANGFUSE_HOST": s.langfuse_host,
         "LANGFUSE_PUBLIC_KEY": s.langfuse_public_key,

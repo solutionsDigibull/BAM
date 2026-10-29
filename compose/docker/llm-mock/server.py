@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Any
 
 SCENARIOS = ("ok", "schema_invalid", "timeout", "5xx", "5xx_all")
-FORBIDDEN_ENVS = ("staging", "production", "prod")
+ALLOWED_ENVS = ("development", "test", "ci")  # an allowlist: any other spelling counts as deployed
 DEFAULT_PROMPT_ID = "default"
 PORT = 8091
 HOST = "0.0.0.0"  # noqa: S104 - container port, internal network only
@@ -62,8 +62,8 @@ PLAIN_ANSWER = "test"  # Cognee's LLM connection test asks for exactly this
 
 
 def check_env(env: str, provider: str) -> None:
-    """Refuse to run the mock in staging or production (E1.15-T09)."""
-    if provider.lower() == "mock" and env.lower() in FORBIDDEN_ENVS:
+    """Refuse to run the mock anywhere but a dev environment (E1.15-T09, A-27)."""
+    if provider.lower() == "mock" and env.strip().lower() not in ALLOWED_ENVS:
         raise SystemExit(f"LLM_PROVIDER=mock is forbidden when ENV={env}")
 
 

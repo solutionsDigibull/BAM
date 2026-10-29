@@ -214,10 +214,21 @@ def test_e1_15_t09_mock_provider_is_refused_in_staging_and_production(env: str) 
 
 
 @pytest.mark.parametrize(
+    "env",
+    [" production", "production ", "prod-eu", "prd", "live", "stage", "staging-2", "uat", ""],
+)
+def test_a27_t04_mock_is_refused_for_every_non_dev_spelling(env: str) -> None:
+    with pytest.raises(SystemExit, match="forbidden"):
+        srv.check_env(env, "mock")
+
+
+@pytest.mark.parametrize(
     ("env", "provider"),
     [
         ("development", "mock"),
         ("ci", "mock"),
+        ("test", "mock"),
+        (" Development ", "mock"),
         ("production", "bifrost"),
         ("staging", "bifrost"),
     ],
