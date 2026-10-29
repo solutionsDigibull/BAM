@@ -3,8 +3,11 @@
 Real pdfium and Pillow, no model. The image loader (which only counts frames) is tested here too.
 """
 
+import functools
 import io
 import random
+import struct
+import zlib
 
 import pytest
 from fixtures import fixture_path
@@ -254,3 +257,90 @@ def test_e4_8_an_image_with_more_frames_than_the_limit_is_refused(
         load("tiff", data)
     assert caught.value.code is ErrorCode.PARSE_ERROR
     assert MAX_OCR_PAGES == 200  # the real limit is unchanged
+
+
+# --- #451: the pixel budget is checked on the header, before anything is decoded -----------------
+
+
+def _chunk(kind: bytes, data: bytes) -> bytes:
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+
+@functools.lru_cache(maxsize=1)
+def bomb_png(width: int = 16_000, height: int = 11_000) -> bytes:
+    """The audit's PoC: a valid, solid-black RGB PNG of 176 MP in about 0.5 MB. Built from
+    compressed zero rows, so making it allocates one row, never the canvas."""
+    deflate = zlib.compressobj(9)
+    row = b"\0" * (width * 3 + 1)  # filter byte + RGB pixels
+    body = b"".join(deflate.compress(row) for _ in range(height)) + deflate.flush()
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return PNG_MAGIC + _chunk(b"IHDR", header) + _chunk(b"IDAT", body) + _chunk(b"IEND", b"")
+
+
+def _never_decoded(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(self: Image.Image) -> None:
+        raise AssertionError("the image was decoded")
+
+    monkeypatch.setattr(ImageFile.ImageFile, "load", refuse)
+
+
+def test_451_the_audit_bomb_is_refused_from_its_header_without_decoding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = bomb_png()
+    assert len(data) < 1024 * 1024  # a small upload ...
+    assert struct.unpack(">II", data[16:24]) == (16_000, 11_000)  # ... declaring 176 MP
+    _never_decoded(monkeypatch)
+    with pytest.raises(ParseError) as caught:
+        open_source(data, "png")
+    assert caught.value.code is ErrorCode.PARSE_ERROR
+    with pytest.raises(ParseError) as loaded:  # the loader (frame count) refuses it the same way
+        load("png", data)
+    assert loaded.value.code is ErrorCode.PARSE_ERROR
+
+
+def test_451_the_budget_is_40_megapixels_so_a_600_dpi_a4_scan_still_passes() -> None:
+    assert rasterize.MAX_PIXELS == 40_000_000
+    assert 4961 * 7016 <= rasterize.MAX_PIXELS  # A4 at 600 DPI
+    assert Image.MAX_IMAGE_PIXELS == rasterize.MAX_PIXELS  # Pillow's own check, second line
+
+
+@pytest.mark.parametrize("mode", ["L", "RGB", "RGBA", "I;16"])
+def test_451_exactly_at_the_budget_passes_and_one_pixel_more_is_refused(
+    monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    monkeypatch.setattr(rasterize, "MAX_PIXELS", 100 * 100)
+    fmt = "TIFF" if mode == "I;16" else "PNG"
+    source = open_source(encoded(Image.new(mode, (100, 100)), fmt), fmt.lower())
+    try:
+        assert source.render(1).startswith(PNG_MAGIC)
+    finally:
+        source.close()
+    _never_decoded(monkeypatch)
+    with pytest.raises(ParseError) as caught:
+        open_source(encoded(Image.new(mode, (100, 101)), fmt), fmt.lower())
+    assert caught.value.code is ErrorCode.PARSE_ERROR
+
+
+def test_451_a_later_tiff_frame_over_the_budget_is_an_unreadable_page_and_never_decoded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(rasterize, "MAX_PIXELS", 50 * 50)
+    small, huge = Image.new("RGB", (40, 40), (9, 9, 9)), Image.new("RGB", (300, 300))
+    source = open_source(encoded(small, "TIFF", save_all=True, append_images=[huge]), "tiff")
+    try:
+        assert source.pages == 2
+        assert source.render(1).startswith(PNG_MAGIC)  # the first frame is fine
+        copied: list[bool] = []
+        real_copy = Image.Image.copy
+
+        def spy(self: Image.Image) -> Image.Image:
+            copied.append(True)
+            return real_copy(self)
+
+        monkeypatch.setattr(Image.Image, "copy", spy)
+        with pytest.raises(PageUnreadable):
+            source.render(2)  # the document goes on without this page
+        assert copied == []  # refused before the frame was copied (decoded)
+    finally:
+        source.close()
