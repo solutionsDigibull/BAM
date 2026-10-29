@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from sbam_contracts.promptfoo import AssertionType, SuiteAssertion, SuiteBounds, SuiteCase
+from sbam_contracts.testgen import CaseKind
 from sbam_workers.test.assertions import (
     Context,
     Evidence,
@@ -66,7 +67,7 @@ GOOD = {"state_handoff_id": "h-1", "status": "done"}
 def context(*types: str, terminal: str = "SUCCESS", value: Any = None) -> Context:
     case = SuiteCase(
         name="c1",
-        kind="PASS_FIRST",
+        kind=CaseKind.PASS_FIRST,
         input={},
         expected_terminal=terminal,  # type: ignore[arg-type]
         assertions=[SuiteAssertion(type=AssertionType(t), value=value) for t in types],
