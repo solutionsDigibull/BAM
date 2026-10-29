@@ -39,9 +39,10 @@ What is a stub: AST and static gates, test generation and sandbox execution, cer
 
 **Where the flow can fail unsafe or surprising**
 1. Approval to Workflow: signal before commit (F-03), mitigated by the activity re-check.
-2. Correction loop: the LLM can patch the approved ISATVON and the loop then certifies (F-23).
+2. Correction loop: the LLM can patch the approved ISATVON and the loop then certifies (F-23). Latent until #355 wires the real correction code in.
 3. Fail-open stubs would certify in a deployed environment (F-01).
-4. Parsers run in-process in the shared ingest worker with no per-document resource limits, and pypdf is out of date (F-24).
+4. Archived projects stay writable through the ISATVON, workflow and build routes (F-29).
+5. Parsers run in-process in the shared ingest worker with no per-document resource limits, and pypdf is out of date (F-24).
 
 ## 3. Design choices questioned
 

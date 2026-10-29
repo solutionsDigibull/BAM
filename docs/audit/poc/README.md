@@ -12,6 +12,13 @@ scripts at a shared or production environment. They create tenants, users, proje
 | `live/thread_exhaust.py`, `live/hung_clamd.py` | N-02: 45 parallel imports against a hung clamd stall the API |
 | `live/xlsx_dos.py`, `live/impact.py` | N-03: 14 MB workbook cost and effect on other users' latency |
 | `pdf/mk.py`, `pdf/run.py` | F-24: crafted PDFs against pypdf 6.20.1 vs 6.21.2 (`uv run --no-project --with pypdf==<v> python -I run.py x.pdf`) |
+| `png_bomb.py` | F-28: a 532 KB PNG costs 2.3 GB in `ImageSource` (needs the worker venv; writes `/tmp/audit-poc/bomb.png`) |
+| `live/kc_setup.py`, `live/kc_pentest.py`, `live/kc_pentest2.py` | Keycloak: org + users, then password policy, PKCE, redirect URIs, replay, rotation, lockout, events (needs a Keycloak 26 container with the repo realm on :58080) |
+| `live/tus_pentest.py` | real tusd v2.10.1 container with the repo file hooks against the API |
+| `live/seed_wf.py`, `live/modules_pentest.py` | seeded workflows/macros/sub-skills and the ISATVON, builds, workflows, notifications and archived-project tests (F-29, F-32) |
+| `live/e2e.cjs`, `e2e2.cjs`, `e2e3.cjs` | Chromium (Playwright) against the Next.js prod build, real Keycloak and the API: cookies, proxy abuse, CSRF, XSS, portal separation, logout replay (F-35) |
+| `live/caddy_pentest.sh`, `live/Caddyfile.local-fixed` | Caddy 2.11.7 with the repo Caddyfile (one-line fix for F-25 applied): path tricks, headers, rate limit |
+| `live/up.sh`, `live/down.sh` | bring the throwaway Postgres/API/JWKS stack up and down by PID file |
 | `semgrep.json`, `bandit.json`, `pnpm-audit.json`, `pipaudit.json` | Raw scanner output |
 
 ## Harness setup (what the `live/` scripts expect)

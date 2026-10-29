@@ -5,7 +5,7 @@ GitHub issues filed). Read in this order.
 
 | File | What it is | Read it if you want |
 |---|---|---|
-| `01-findings.md` | **Final, merged findings** (F-01..F-24, N-01..N-08), evidence level, priority, fix | the verdict on what is wrong |
+| `01-findings.md` | **Final, merged findings** (F-01..F-35, N-01..N-08), evidence level, priority, fix | the verdict on what is wrong |
 | `02-upgrade-plan.md` | Current design vs proposed change, what it does, why, size, wave order | the roadmap to review and decide on |
 | `03-issue-drafts.md` | 21 issue drafts with comparison, acceptance criteria, owners (not filed) | to approve issues for filing |
 | `04-second-pass.md` | History: what the second pass corrected, live pentest results, severity changes | how confident to be in each finding |
@@ -14,6 +14,8 @@ GitHub issues filed). Read in this order.
 | `poc/` | Scripts and raw scanner output (`poc/README.md` explains the harness) | to reproduce anything |
 
 ## Headline results
+- **Deploy blocker found in round 3:** the shipped Caddyfile is invalid for the pinned Caddy, so the only public service would not start (F-25); the repo's own validation test fails but is skipped in CI.
+- **Round 3 also found:** purge and knowledge rebuild leave deleted documents' data behind (F-26, F-27), a 532 KB PNG needs 2.3 GB (F-28), archived projects stay editable (F-29), the mock-LLM guard is a deny-list (F-30).
 - **Release blocker:** certification, gates, tests and freeze are stubs that always succeed, with no production guard (F-01).
 - **Reachable today:** a crafted PDF costs the shared ingest worker 10 s and 523 MB (F-24); parallel calls after login
   return 500 for ~37% of requests in the repro (N-01).
@@ -23,7 +25,7 @@ GitHub issues filed). Read in this order.
   defence in depth.
 
 ## What this audit does not cover
-Not attacked live: Keycloak, Temporal, tusd, Caddy, the Next.js server. Not tested: LLM prompt injection. Not reviewed
+Live-tested in round 3: Keycloak, tusd, Caddy, the Next.js server (with real Chromium) and the ISATVON/builds/workflows/notifications APIs. Still not tested live: Temporal under failure, Cognee, CubeSandbox (not built), LLM prompt injection. Not reviewed
 in depth: knowledge/Cognee, ISATVON edit APIs, builds router, notifications, most client pages, 33 local-only
 branches. 25 of 79 endpoints are inventoried only (`05`). Findings tagged `Unverified` need confirmation.
 

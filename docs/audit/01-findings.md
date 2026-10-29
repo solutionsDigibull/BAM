@@ -18,13 +18,19 @@ P3 = hygiene.
 | Codegen pre-check, certify/gate stubs | Read; PoC |
 | Masters/Filetype import, clamd client, xlsx export | Read the dangerous parts; live-tested (limits, load) |
 | Ingest parsers (`ingest/loaders/*`, OCR, rasterize) | Read the PDF loader and limits; PoC on pypdf; other loaders not attacked |
-| Compose, Caddy, Dockerfiles, CI workflows, Keycloak realm, Next.js proxy/auth/CSP | Config read; **not attacked live** |
+| Keycloak realm (real instance, repo realm import) | **Live-tested** (PKCE, redirect URIs, code replay, refresh rotation, direct grants, registration, lockout, password policy, events) |
+| tusd v2.10.1 + file hooks + API | **Live-tested** end to end (token/reservation checks, concatenation, over-length, termination, CORS) |
+| Caddy 2.11.7 with the repo Caddyfile | **Live-tested** (after fixing the invalid config in a local copy): Keycloak path-trick deny list, dev pages, headers, rate limit, tusd route |
+| Next.js prod build + Auth.js + proxy + real Chromium | **Live-tested** (login, cookies, token leakage, proxy path/CSRF abuse, portal separation, open redirects, stored XSS, logout replay) |
+| ISATVON edit APIs, builds code view, workflows, notifications | **Live-tested** on seeded data (IDOR, mass assignment, dotted-path abuse, races, archived project) |
+| SOW export (markdown/docx/pdf) | **Live-tested** with hostile content (inert, no network fetches) |
+| Compose, Dockerfiles, CI workflows, staging/obs/analytics/sandbox-local overlays | Config read; overlays skimmed (loopback ports, required secrets, anonymous Grafana disabled) |
 | Dependencies | Scanned (pip-audit, pnpm audit); scanners also: semgrep, bandit |
-| Knowledge/Cognee, ISATVON edit APIs, builds router, notifications, most client pages | **Not reviewed in depth** |
-| Keycloak, Temporal, tusd, Caddy, Next.js server | **Not part of the live run** |
+| Knowledge/Cognee internals, SOW editor and Monaco code viewer UI, remaining client pages | **Not reviewed in depth** (tracked as spike issues) |
+| Temporal (real server, workers, replay under failure), Cognee/knowledge live, CubeSandbox (not built) | **Not tested live** |
 | LLM prompt injection (documents to SOW to codegen) | **Not tested** |
 | Branches | `dev` only (`main` is 459 commits behind). `353-fde-citations` skimmed (N-07). `95-*` are already in `dev`. 33 local-only branches not reviewed. |
-| Endpoints | All 79 inventoried (`05`); 21 live-tested, 33 read, 25 listed only |
+| Endpoints | All 79 inventoried (`05`); live-tested and read counts in that file |
 
 Scanner results were mostly clean: bandit 1 MEDIUM (false positive: a temp path), semgrep 3 findings (2 false
 positives, 1 supply-chain cooldown note). The findings below are mainly architecture and operational gaps, not
@@ -34,9 +40,15 @@ injection bugs.
 
 | ID | Finding | Evidence | Priority |
 |---|---|---|---|
-| F-01 | Certify/gate/test/freeze activities are fail-open stubs with no production guard | Code | **P0** |
+| F-01 | Build, gate, test, certify and freeze activities are fail-open stubs (only `build_manifest` is real) with no production guard | Code | **P0** |
+| F-25 | The shipped Caddyfile is invalid for the pinned Caddy; its validation test is skipped in CI | **PoC** (repo's own test fails) | **P0** deploy blocker |
 | N-01 | Parallel calls right after login return HTTP 500 (user-mirror race): 37.5% in repro | **PoC** | **P1** |
 | F-02 | Codegen pre-check is a denylist (6 Python bypasses); real gates and sandbox do not exist | **PoC** | **P1** before sandbox ships |
+| F-29 | Archived projects stay editable: ISATVON edits, workflow rename, builds and regenerate never check archive status | **PoC** | P2 |
+| F-30 | Mock-LLM guard is a deny-list: 9 spellings of production boot with the mock LLM | **PoC** | P2 |
+| F-31 | Sub-skill regenerate idempotency never replays (lookup by sub id, record by macro id) | **PoC** | P2 |
+| F-32 | Concurrent reorders or deletes in one macro deadlock in Postgres and return 500 | **PoC** | P2 |
+| F-33 | Temporal calls run under open DB transactions and row locks; no `lock_timeout`/`statement_timeout` | Code | P2 |
 | N-02 | Blocking clamd scan in sync handlers: 45 parallel imports stall the API, health stays green | **PoC** | P2 |
 | F-04 | Role demotion not enforced for up to 300 s | **PoC** | P2 |
 | F-08 / N-05 | No rate limiting; 125 requests wrote 725 audit rows | **PoC** | P2 |
@@ -44,12 +56,17 @@ injection bugs.
 | F-07 | Runtime DB role owns tables and can disable immutability triggers | **PoC** | P2 |
 | N-06 | Keycloak realm: no password policy, no MFA, no auth events | Code | P2 |
 | F-09 | Known default `COGNEE_USER_SECRET` passes validation | Code | P2 |
+| F-26 | Purge never deletes parsed derivatives or Cognee data (`NoCleanup` is never replaced) | Code (call graph) | **P1** privacy |
+| F-27 | A knowledge rebuild keeps deleted and replaced documents in the graph (nothing removes dataset items) | Code | **P1** correctness |
+| F-28 | A 532 KB PNG peaks at 2.3 GB in the ingest image path (worker limit 1 GB; prod overlay 2 GB) | **PoC** | **P1** |
 | F-24 | `pypdf 6.20.1` parses uploaded PDFs in the shared ingest worker; a 14 MB crafted PDF costs 10 s and 523 MB | **PoC** | **P1** |
 | F-10 | Other dependency CVEs (1 critical client runtime; otel-api on request path) | Scanner | P2 |
 | F-23 | Corrector LLM may patch the FDE-reviewed ISATVON, then the build certifies without re-review | Code | P2 design |
 | F-03 | Approval signals Temporal before commit (reverse race, lock across call) | Code | P2 |
 | F-06 | No Postgres row-level security (no leak found) | Code + live IDOR | P2 hardening |
 | N-07 | FDE citation attribution forgeable (unmerged branch) | Code | block merge |
+| F-34 | Schema-SQL validator reads the first `LANGUAGE` anywhere in the text (comment trick accepted); not exploitable with the current scratch image | **PoC** | P3 |
+| F-35 | A stolen session cookie keeps working about 5 minutes after sign-out | **PoC** | P3 |
 | F-11 | CSP has no `script-src`; blocklist HTML paste filter | Code | P3 |
 | F-12 | Auth path opens 2 sessions per request | Code | P3 |
 | F-13 | Keycloak calls inside a DB transaction holding the tenant lock | Code | P3 |
@@ -70,6 +87,7 @@ injection bugs.
 `registry.py` refuses stubs outside development, whereas the LLM mock does have such a guard
 (`Settings._refuse_mock_provider_outside_dev`). `compose.deploy.yaml` runs `worker-build`, `worker-test` and
 `worker-certify`, so the stubs would ship.
+**Wider than first reported (third-party review, confirmed):** `SubSkillBuild` imports only `build_manifest` from real code. `check_libraries`, `render_skeleton`, `generate_bodies`, `assemble` and `correct` are also stubs (`build/stubs.py`); the real `GenerateBodies`/`Assemble`/`Correct` code exists but is not registered (issue #355). My first-pass line "skeleton and body generation are real on dev" was wrong. So F-02 and F-23 describe code that is not yet wired into a running worker: they are design-gate defects to fix before #355 lands, not live exposures.
 This is a release blocker for a pre-release product, not an exploitable vulnerability today.
 **Impact:** a deployed worker would "certify and freeze" code that was never gated or tested.
 **Fix:** register stubs only when `SBAM_ENV` is development/test; otherwise raise a non-retryable `NOT_IMPLEMENTED`.
@@ -254,6 +272,126 @@ source" with no bundle evidence; decide whether that is intended.
 - **N-04 Chunked oversize body `PoC`.** 12 MB sent chunked is refused with `400` ("error parsing the body") instead
   of `413 PAYLOAD_TOO_LARGE`; a declared 11 MB `Content-Length` correctly gives 413. The limit holds; the contract
   does not.
+
+
+## 3b. Round-3 findings (live testing of the previously skipped areas, and a third-party review)
+
+A third-party reviewer re-checked this audit and listed extra bugs; each was verified here by reading the code and,
+where possible, executing it. Items not reproduced are marked.
+
+### F-25 The shipped Caddyfile does not load: the public reverse proxy would not start `PoC` · P0 (deploy blocker)
+`compose/proxy/Caddyfile:55` has `handle /files /files/* {`. `handle` takes one matcher; Caddy 2.11.7 (the pinned
+image) refuses it: `parsing caddyfile tokens for 'handle': wrong argument count or unexpected line ending after
+'/files/*'`. Reproduced two ways: `caddy validate` with the pinned image, and the repo's own test
+`SBAM_VALIDATE_PROXY=1 pytest tests/unit/test_e16_3_deploy.py -k caddyfile_validates` (fails). That test is skipped
+unless `SBAM_VALIDATE_PROXY=1`, and CI never sets it, so the defect shipped. Caddy is the only public service in
+staging/production.
+**Fix:** `@files path /files /files/*` followed by `handle @files { ... }` (validated: "Valid configuration", and all
+routing behaved as designed in the live run); run the validation test in CI. The same audit found other opt-in tests
+that never run in CI (`SCHEMA_CHECK_TEST_DSN` schema-SQL tests, a codegen-template contract test skipped for a missing
+`fastmcp`, `SBAM_PERF`).
+
+### F-26 Purge never removes derivatives or knowledge-graph data `Code` · P1 (privacy)
+`ingest/purge_activities.py` defaults to `retention.NoCleanup()` ("Default until knowledge (E5) stores derivatives")
+and `configure()` has no callers anywhere. The parser now stores `doc.md`/`doc.json` per version and Cognee holds
+the content, so a document purged after the 90-day bin leaves its parsed text and graph data behind.
+**Fix:** a real `PurgeCleanup` (derived keys from `document_versions`, Cognee item removal) registered at worker
+startup, and a test that a purged document leaves no object under its tenant/project prefix.
+
+### F-27 Knowledge rebuilds keep removed documents `Code` · P1
+`cognee_adapter.add()` only adds items whose key is absent; `delete_dataset` exists but nothing outside the adapter
+calls it, and `build.py`/`rebuild.py`/`scope.py` never remove items. The dataset is per project, so a deleted or
+replaced document keeps feeding the graph and the SOW context.
+**Fix:** reconcile the dataset to the scope on rebuild (remove items not in scope), or rebuild into a fresh dataset
+and swap. Relates to #421 (incremental rebuild), which does not cover removal.
+
+### F-28 A 532 KB PNG uses 2.3 GB in the ingest worker `PoC` · P1
+`ingest/rasterize.py` sets `Image.MAX_IMAGE_PIXELS = 100_000_000`, but Pillow only warns between 100 MP and 200 MP.
+A solid-colour 16000x11000 RGB PNG (176 MP, 532 KB): decoding the first frame reached **827 MB**, rendering it
+**2317 MB** (`load`, `copy()`, `exif_transpose`, `fit`). `compose.yaml` limits workers to 1 GB; `compose.prod.yaml`
+to 2 GB, so both OOM. Shared worker, any FDE can upload. (`/tmp/audit-poc/png_bomb.py`, in `poc/`.)
+**Fix:** read the declared size from the header and refuse over a pixel budget (for example 40 MP) before decoding;
+treat `DecompressionBombWarning` as an error; decode in a rlimited subprocess (same isolation as F-24).
+
+### F-29 Archived projects remain editable `PoC` · P2
+`ingest`, `knowledge`, `sow/regenerate` and `pipeline` start check archive status; `isatvon/`, `workflows/` and
+`builds/` have none (`grep` confirms). Live, after `POST /admin/projects/{id}/archive`: workflow rename -> 200,
+sub-skill delete -> 204, macro edit -> 200, and sub-skill regenerate reached the Temporal call (503 only because
+Temporal was down), i.e. a billed LLM run would start. Archiving does not remove memberships.
+**Fix:** one dependency/guard (`require_active`) on every project-scoped write; a test that walks all write routes.
+
+### F-30 The "fail-closed" mock-LLM guard is a deny-list `PoC` · P2
+`Settings._refuse_mock_provider_outside_dev` refuses only `staging`, `production` and `prod` (lowercased, not
+stripped). Live: `SBAM_ENV` = ` production`, `production `, `prod-eu`, `prd`, `live`, `stage`, `staging-2`, `uat`
+all boot with `LLM_PROVIDER=mock`; the PostHog-salt check shares the list. `llm-mock/server.py` has the same list.
+Default `SBAM_ENV` is `development`, so a deployed env that forgets the variable also gets the mock.
+**Fix:** allowlist (`development`, `test`, `ci`) for the mock; anything else requires `bifrost`; strip and normalise.
+
+### F-31 Sub-skill regenerate never replays an idempotency key `PoC` · P2
+`isatvon/regenerate.py`: `_commit` records the audit row under `entity_type="macro_skill"`, `entity_id=macro_id`,
+but `_prior` looks up `entity_id` as passed by the sub-skill endpoint (the sub-skill id). Executed against Postgres:
+lookup by sub id -> `None`; lookup by macro id -> found. A client retry with the same key starts a second billed run.
+**Fix:** look up by the macro id (and `sub_skill_id` in `after`), with a test per endpoint.
+
+### F-32 Parallel reorder/delete in one macro returns 500 `PoC` · P2
+Live: 18 parallel reorders of three sub-skills in one macro gave 2 x 500; three racing delete/reorder calls gave 2 x
+500. Postgres logged `deadlock detected` (`_renumber` updates rows in different orders in two transactions), which
+surfaces as an unhandled `OperationalError`. Data stayed consistent (orders 1,2,3).
+**Fix:** lock the parent macro row (`SELECT ... FOR UPDATE`) at the start of every reorder/delete, update rows in a
+fixed order, and map deadlocks/serialization failures to 409 with a retry hint.
+
+### F-33 Temporal calls under open DB transactions; no lock or statement timeouts `Code` · P2
+Same pattern as F-03: `pipeline/service.py` and SOW approval hold project/`sows` row locks across Temporal calls.
+`grep` finds no `lock_timeout`, `statement_timeout` or `idle_in_transaction_session_timeout` in API, workers or
+Compose (only the schema-check applier sets one). A slow Temporal holds a connection and a lock.
+**Fix:** set conservative timeouts on the app role; commit before the Temporal call (outbox) as in F-03.
+
+### F-34 Schema-SQL validator trusts the first `LANGUAGE` it finds `PoC` · P3
+`schema_sql/validate.py` `_LANGUAGE.search(text)`. Executed: `CREATE FUNCTION f() RETURNS trigger AS $$ # LANGUAGE
+plpgsql ... $$ LANGUAGE plpython3u` is **accepted**; a plain `LANGUAGE plpython3u` is refused. A plpgsql body
+containing `pg_sleep(3600)` is accepted (the gate relies on its 30 s throwaway database). Not exploitable as built:
+the scratch image has the `plpython3u` control files but no `plpython` library and no `python3`.
+**Fix:** take the language from the parsed statement, not a regex over the text; add `pg_sleep` and friends to the
+forbidden words or rely on `statement_timeout` explicitly.
+
+### F-35 A stolen session cookie works about 5 minutes after sign-out `PoC` · P3
+Live through the UI: after "Sign out" (RP-initiated logout), replaying the pre-logout cookie returned 200 at t+3 s,
+t+123 s and t+243 s and 401 from t+344 s. Auth.js JWT sessions are stateless and the API verifies the access token
+offline until `exp` (300 s); the refresh token dies with the Keycloak session. Acceptable for most deployments;
+for admins consider a shorter access token or a server-side session denylist.
+
+### Keycloak, tusd, Caddy, Next.js: live results (what held and what did not)
+- **Keycloak (N-06 confirmed live):** passwords `a`, `password` and `12345678` were **accepted** (no policy); no
+  `LOGIN_ERROR` events were stored; MFA is not required. Held: PKCE S256 required (no PKCE and `plain` refused),
+  redirect-URI tricks (foreign host, suffix host, traversal, other portal's callback, scheme change, query) all 400,
+  code replay and wrong verifier refused, refresh rotation with reuse detection, direct grants and client
+  credentials and implicit flow disabled, self-registration off, anonymous dynamic client registration refused
+  (Trusted Hosts), same error for unknown user and wrong password, lockout after repeated failures, account API
+  refused for the FDE token, token carries `aud=sbam-api` only (no account roles).
+- **tusd:** every bypass attempt held (no token, forged token, other project, wrong name or size, deferred length,
+  traversal, over max-size, concatenation `final` refused by the hook, creation-with-upload truncated at the
+  declared length, PATCH beyond length refused, parallel PATCH, download and termination disabled). Low: tusd reflects
+  any `Origin` in CORS (token still required), an unauthenticated `HEAD` on an in-progress upload echoes its metadata
+  including the upload token (the id is the reservation UUID), abandoned partial uploads leave files until the daily
+  cleanup schedule runs.
+- **Caddy (with the F-25 fix applied locally):** all 26 Keycloak path tricks (case, `%61`, `..%2f`, `//`, `/./`,
+  `/resources/../`, `/realms/master`) returned 404; `/dev`, `/DEV`, `/%64ev` blocked; HSTS present, `Server` removed.
+  Not held: no rate limit (300 parallel requests all 200), `TRACE` returns 500 from the app.
+- **Next.js + real Chromium + real Keycloak + API:** end-to-end login worked with real tokens and the tenant claim.
+  Held: httpOnly and SameSite=Lax session cookies, no token in `/api/auth/session`, HTML or RSC, proxy path
+  traversal (`..%2f`, `%2e%2e`, double-encoding, backslash, other base) all 400, client `Authorization` replaced,
+  writes need a same-origin `Origin` (a browser POST from another origin on the same site failed), FDE session
+  refused on `/admin` and an FDE-only user gets no session at the admin login, no open redirect via `callbackUrl`,
+  no script execution or tracking-pixel load from hostile project fields and Markdown notes. Not held: the proxy
+  forwards `/api/v1/openapi.json` and `/docs` to any signed-in user (72 paths); proxied `/me` has no `Cache-Control`.
+- **API modules (seeded two-tenant data):** all IDOR attempts on ISATVON edits, builds code view, workflows and
+  notifications returned 404 or own-scope results; mass assignment (`state`, `content_sha256`, `id`, `tenant_id`,
+  `workflow_id`, ...) refused with 422; 20k-character and 3000-deep dotted paths refused; 3 MB value refused (413);
+  control characters stripped; code-file path traversal 404. Low: `GET .../code/attempts` returns 200 with an empty list
+  for any sub-skill id (own, foreign or random) instead of 404; workflow rename accepts HTML and U+202E (the UI
+  escapes it).
+- **SOW exports:** a SOW full of hostile Markdown/HTML/raw-attribute/XXE-looking text produced inert md/html/docx/pdf: no
+  active tags, no external relationships, no field codes, and a canary listener saw **0** outbound connections.
 
 ## 5. What is already good (keep it)
 
