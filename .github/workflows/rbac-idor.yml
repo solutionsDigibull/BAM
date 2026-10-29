@@ -23,7 +23,7 @@ env:
 jobs:
   rbac-idor: # required-check name (E2.7)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30 # the suite takes 9.5-14 min on the runners (#549); 15 was one slow runner from a false failure
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
