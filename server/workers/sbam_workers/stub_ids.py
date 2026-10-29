@@ -7,7 +7,8 @@ non-retryable NOT_IMPLEMENTED unless `SBAM_ENV` names a dev environment (A-01)."
 
 import functools
 import os
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
+from typing import Any
 from uuid import UUID, uuid5
 
 from sbam_contracts.build import BuildStageInput
@@ -24,7 +25,9 @@ def stub_env() -> str:
     return (os.environ.get("SBAM_ENV") or "development").strip().lower()
 
 
-def stub_activity[**P, R](fn: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+def stub_activity[**P, R](
+    fn: Callable[P, Coroutine[Any, Any, R]],
+) -> Callable[P, Coroutine[Any, Any, R]]:
     """Mark `fn` as a stub activity and refuse it outside `STUB_ENVS` (non-retryable)."""
 
     @functools.wraps(fn)
