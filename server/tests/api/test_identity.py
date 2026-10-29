@@ -324,3 +324,82 @@ def test_e2_3_audit_events_reach_the_json_log(capsys: pytest.CaptureFixture[str]
     assert line["action"] == "TENANT_CREATED" and line["entity"] == "tenant:t1"
     assert line["actor"] == "root"
     assert line["detail"] == {"tenant_id": "None", "before": None, "after": {"a": 1}}
+
+
+# --- A-04: SBAM's database can take a role away before the token expires ---------------
+
+
+def _admin_token(h: Harness, *roles: str, sid: str = "s1") -> str:
+    return h.realm.token(ADMIN_A, realm_access={"roles": list(roles)}, sid=sid)
+
+
+def _set_portal_roles(h: Harness, user_id: uuid.UUID, roles: list[str]) -> None:
+    """What an admin's PATCH /admin/users/{id} writes first (E2.4), before Keycloak catches up."""
+    with h.sessions() as s:
+        row = next(u for u in s.query(User) if u.keycloak_sub == str(user_id))
+        row.portal_roles = roles
+        s.commit()
+
+
+def test_a04_t01_demoted_admin_gets_403_next_request(h: Harness) -> None:
+    token = _admin_token(h, "sbam-admin")  # still unexpired, still says admin
+    assert h.call("GET", "/admin/users", token).status_code == 200
+    _set_portal_roles(h, ADMIN_A, ["sbam-fde"])  # demoted in SBAM
+    problem(h.call("GET", "/admin/users", token), 403, "WRONG_PORTAL")  # the very next request
+    assert h.call("GET", "/me", token).json()["roles"] == []  # and /me tells the same story
+
+
+def test_a04_t02_a_role_only_the_database_has_is_never_granted(h: Harness) -> None:
+    token = h.realm.token(FDE_A1, sid="s1")  # the token says sbam-fde only
+    assert h.call("GET", "/me", token).status_code == 200
+    _set_portal_roles(h, FDE_A1, ["sbam-fde", "sbam-admin"])  # the row says more
+    assert h.call("GET", "/me", token).json()["roles"] == ["sbam-fde"]
+    problem(h.call("GET", "/admin/users", token), 403, "WRONG_PORTAL")
+
+
+def test_a04_t03_other_realm_roles_pass_through_untouched() -> None:
+    from sbam_api.core.auth import effective_roles
+
+    token = frozenset({"sbam-admin", "super-admin", "offline_access", "uma_authorization"})
+    assert effective_roles(token, frozenset()) == {"offline_access", "uma_authorization"}
+    assert effective_roles(token, frozenset({"sbam-admin"})) == {
+        "sbam-admin",
+        "offline_access",
+        "uma_authorization",
+    }
+    assert effective_roles(frozenset({"sbam-fde"}), frozenset({"sbam-fde", "sbam-admin"})) == {
+        "sbam-fde"
+    }  # a role only the database has is never added
+
+
+def test_a04_t04_a_super_admin_without_a_tenant_is_unaffected(h: Harness) -> None:
+    assert h.call("GET", "/me", h.root()).json()["roles"] == ["super-admin"]
+    assert h.call("GET", "/admin/tenants", h.root()).status_code == 200
+
+
+def test_a04_t05_a_new_login_takes_the_roles_of_the_new_token(h: Harness) -> None:
+    assert h.call("GET", "/me", _admin_token(h, "sbam-admin", sid="s1")).status_code == 200
+    _set_portal_roles(h, ADMIN_A, ["sbam-fde"])  # demoted ...
+    again = _admin_token(h, "sbam-fde", sid="s2")  # ... and Keycloak now issues a token without it
+    assert h.call("GET", "/me", again).json()["roles"] == ["sbam-fde"]
+    old = _admin_token(h, "sbam-admin", sid="s1")  # the old session's token is still refused admin
+    problem(h.call("GET", "/admin/users", old), 403, "WRONG_PORTAL")
+
+
+def test_a04_t06_the_same_token_cannot_win_its_role_back_by_being_replayed(h: Harness) -> None:
+    token = _admin_token(h, "sbam-admin")
+    h.call("GET", "/me", token)
+    _set_portal_roles(h, ADMIN_A, ["sbam-fde"])
+    for _ in range(3):  # repeated requests never write the token's roles back into the row
+        problem(h.call("GET", "/admin/users", token), 403, "WRONG_PORTAL")
+    assert next(u for u in h.users() if u.keycloak_sub == str(ADMIN_A)).portal_roles == ["sbam-fde"]
+
+
+def test_a04_t07_a_deactivated_user_is_still_401(h: Harness) -> None:
+    token = _admin_token(h, "sbam-admin")
+    h.call("GET", "/me", token)
+    with h.sessions() as s:
+        row = next(u for u in s.query(User) if u.keycloak_sub == str(ADMIN_A))
+        row.status = "DEACTIVATED"
+        s.commit()
+    assert h.call("GET", "/admin/users", token).status_code == 401

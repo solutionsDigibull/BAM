@@ -34,6 +34,9 @@ JWKS_LIFESPAN_SECONDS = 600
 UNKNOWN_KID_COOLDOWN_SECONDS = 30  # a forged kid can make us refetch at most this often
 MIN_RSA_BITS = 2048
 ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_FDE = "super-admin", "sbam-admin", "sbam-fde"
+# The roles SBAM's own database also records (`users.portal_roles`). Any other realm role in a token
+# (offline_access, uma_authorization, ...) is passed through untouched.
+PORTAL_ROLE_SET = frozenset({ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_FDE})
 log = logging.getLogger("sbam_api.security")
 
 
@@ -237,13 +240,15 @@ class LogSecurityAudit:
 
 
 class UserDirectory(Protocol):
-    def sync(self, user: CurrentUser) -> None:
-        """Mirror a tenant user on each request; raise 403 for a suspended or mismatched tenant."""
+    def sync(self, user: CurrentUser) -> frozenset[str] | None:
+        """Mirror a tenant user on each request; raise 403 for a suspended or mismatched tenant.
+        Returns the portal roles the database grants the user (A-04), or None when there is no
+        mirror to ask."""
         ...
 
 
 class NoDirectory:
-    def sync(self, user: CurrentUser) -> None:
+    def sync(self, user: CurrentUser) -> frozenset[str] | None:
         return None
 
 
@@ -334,8 +339,17 @@ def current_user(request: Request) -> CurrentUser:
         assigned = auth.memberships.assigned_projects(user.tenant_id, user.user_id)
         user = CurrentUser(**{**user.__dict__, "assigned_project_ids": assigned})
         set_request_context(tenant_id=str(user.tenant_id))  # logs + span, only after verification
-        auth.directory.sync(user)
+        granted = auth.directory.sync(user)
+        if granted is not None:
+            user = CurrentUser(**{**user.__dict__, "roles": effective_roles(user.roles, granted)})
     return user
+
+
+def effective_roles(token_roles: frozenset[str], granted: frozenset[str]) -> frozenset[str]:
+    """What a signed token may do: its portal roles that SBAM's database still grants, plus its
+    other realm roles. A role removed in SBAM (E2.4) is gone on the next request, not when the
+    access token expires (up to 5 minutes); a role only the database has is never added (A-04)."""
+    return (token_roles - PORTAL_ROLE_SET) | (token_roles & PORTAL_ROLE_SET & granted)
 
 
 CurrentUserDep = Annotated[CurrentUser, Depends(current_user)]
