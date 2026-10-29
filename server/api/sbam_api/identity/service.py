@@ -419,32 +419,37 @@ class SqlUserDirectory:
         return created
 
     def _refresh(self, session: Session, row: User, user: CurrentUser, created: bool) -> None:
-        roles = sorted(user.roles & set(PORTAL_ROLES))
+        """Mirror the token onto the row. Each change is one conditional UPDATE (#429), so parallel
+        first requests of a new session all succeed and only the one whose UPDATE changed the row
+        writes its audit event: one LOGIN per new session, one USER_EMAIL_CHANGED per change."""
+        old_email = row.email
+        mirrored = {"email": user.email, "display_name": user.display_name}
+        mirror = any(getattr(row, column) != value for column, value in mirrored.items())
         new_login = (
             not created and user.session_id is not None and user.session_id != row.last_session_id
         )
-        old_email = row.email
-        changed = False
-        fields: list[tuple[str, object]] = [
-            ("email", user.email),
-            ("display_name", user.display_name),
-        ]
-        if created or new_login:
-            fields.append(("portal_roles", roles))
-        if row.status == UserStatus.INVITED:
-            fields.append(("status", UserStatus.ACTIVE.value))
-        for column, value in fields:
-            if getattr(row, column) != value:
-                setattr(row, column, value)
-                changed = True
-        if new_login:
-            row.last_login_at, row.last_session_id = datetime.now(UTC), user.session_id
-        if not (changed or new_login):
-            return  # the usual request: nothing to write
+        invited = row.status == UserStatus.INVITED
+        if not (mirror or new_login or invited):
+            return  # the usual request: nothing to write, no transaction spent
+        email_changed = mirror and repository.update_user_if(session, row, mirrored)
+        logged_in = new_login and repository.update_user_if(
+            session,
+            row,
+            {
+                "last_session_id": user.session_id,
+                "last_login_at": datetime.now(UTC),
+                "portal_roles": sorted(user.roles & set(PORTAL_ROLES)),
+            },
+            User.last_session_id.is_distinct_from(user.session_id),
+        )
+        if invited:
+            repository.update_user_if(
+                session, row, {"status": UserStatus.ACTIVE.value}, User.status == UserStatus.INVITED
+            )
         session.commit()
-        if new_login:
+        if logged_in:
             self._login(user, first=False)
-        if old_email != row.email:  # the old address stays in the audit trail
+        if email_changed and old_email != user.email:  # the old address stays in the audit trail
             self.audit.event(
                 actor=user.keycloak_sub,
                 tenant_id=row.tenant_id,
@@ -452,7 +457,7 @@ class SqlUserDirectory:
                 entity="user",
                 entity_id=str(row.id),
                 before={"email": old_email},
-                after={"email": row.email},
+                after={"email": user.email},
             )
 
     def _login(self, user: CurrentUser, *, first: bool) -> None:
