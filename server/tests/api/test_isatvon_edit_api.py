@@ -9,10 +9,14 @@ from typing import Any
 import pytest
 from runs_db import FakeClient
 from sbam_api.audit.models import AuditLog
+from sbam_api.core.conventions import ApiError
+from sbam_api.isatvon import edits
 from sbam_api.isatvon.models import MacroSkill, SubSkill, SubSkillEdit
+from sbam_api.isatvon.repository import MacroSkillRepository, SubSkillRepository
 from sbam_api.workflows.models import Workflow
 from sbam_contracts.api import API_BASE
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from test_auth import TENANT_B, problem
 from test_isatvon_validate_api import IDEF, sample
 from test_isatvon_validate_api import Harness as ValidateHarness
@@ -370,3 +374,72 @@ def test_e8_4_an_edit_that_breaks_a_cross_field_rule_is_stored_invalid(h: Harnes
     assert res.status_code == 200, res.text
     assert res.json()["state"] == "INVALID"
     assert [e["path"] for e in res.json()["validation_errors"]] == [IDEF + "i_instructions.bound"]
+
+
+# --- A-29 (#455): a reorder or delete takes the Macro Skill's lock before the Sub-Skill's ---------
+
+
+@pytest.fixture
+def locks(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Which rows `get_for_update` locked, in order (SQLite ignores FOR UPDATE, so the order is
+    observed at the repository)."""
+    taken: list[str] = []
+    for name, repo in (("macro", MacroSkillRepository), ("sub", SubSkillRepository)):
+        original = repo.get_for_update
+
+        def wrapped(self: Any, id: uuid.UUID, _o: Any = original, _n: str = name) -> Any:
+            taken.append(_n)
+            return _o(self, id)
+
+        monkeypatch.setattr(repo, "get_for_update", wrapped)
+    return taken
+
+
+def test_a29_t03_reorder_and_delete_lock_the_macro_before_the_sub(
+    h: Harness, locks: list[str]
+) -> None:
+    first = h.add_sub_skill(sample(), order=1)
+    second = h.add_sub_skill(other_skill(2), order=2)
+    assert h.patch(second, {"order": 1}).status_code == 200
+    assert locks == ["macro", "sub"]
+    locks.clear()
+    res = h.call("DELETE", h.sub_path(first), h.fde(), headers={"If-Match": h.etag_of(first)})
+    assert res.status_code == 204, res.text
+    assert locks == ["macro", "sub"]
+
+
+def test_a29_t04_a_content_edit_takes_no_macro_lock(h: Harness, locks: list[str]) -> None:
+    sub = h.add_sub_skill(sample())
+    res = h.patch(sub, {"changes": {BUDGET: B6}})
+    assert res.status_code == 200, res.text
+    assert locks == ["sub"]
+
+
+class _Orig(Exception):  # noqa: N818 - stands in for the driver's error
+    def __init__(self, sqlstate: str) -> None:
+        super().__init__(sqlstate)
+        self.sqlstate = sqlstate
+
+
+@pytest.mark.parametrize("sqlstate", ["40P01", "40001"])  # deadlock detected, serialization failure
+def test_a29_t05_a_deadlock_or_serialization_failure_is_409_with_retry_after(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, sqlstate: str
+) -> None:
+    sub = h.add_sub_skill(sample())
+
+    def lost(*_: Any, **__: Any) -> None:
+        raise OperationalError("UPDATE sub_skills", {}, _Orig(sqlstate))
+
+    monkeypatch.setattr(edits, "edit_sub_skill", lost)
+    res = h.patch(sub, {"order": 1})
+    body = problem(res, 409, "CONFLICT")
+    assert body["title"] == "Edited at the same time"
+    assert res.headers["Retry-After"] == "1"
+
+
+def test_a29_t05_any_other_database_error_is_not_turned_into_a_409() -> None:
+    with pytest.raises(OperationalError), edits.conflicts_are_409():
+        raise OperationalError("SELECT 1", {}, _Orig("08006"))  # connection failure
+    with pytest.raises(ApiError) as err, edits.conflicts_are_409():
+        raise OperationalError("SELECT 1", {}, _Orig("40P01"))
+    assert err.value.status == 409 and err.value.headers == {"Retry-After": "1"}
