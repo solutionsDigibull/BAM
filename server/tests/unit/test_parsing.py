@@ -18,6 +18,7 @@ from sbam_api.audit.models import AuditLog, NotificationOutbox
 from sbam_api.core.ids import uuid7
 from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.ingest.models import Document, DocumentVersion
+from sbam_api.masters.models import MasterDocument
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope, StoredObject
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_contracts.api import ErrorCode
@@ -56,7 +57,7 @@ def sqlite_sessions() -> sessionmaker[Session]:
     engine: Engine = make_engine(
         "sqlite://", poolclass=pool.StaticPool, connect_args={"check_same_thread": False}
     ).execution_options(schema_translate_map={"sbam": None})
-    for table in (Document, DocumentVersion, AuditLog, NotificationOutbox):
+    for table in (Document, DocumentVersion, MasterDocument, AuditLog, NotificationOutbox):
         table.__table__.create(engine)  # type: ignore[attr-defined]
     return make_sessionmaker(engine)
 
