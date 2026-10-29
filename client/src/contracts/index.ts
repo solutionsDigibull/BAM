@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:11fb8199f882d97d6157900d9d9c99afddc601a58b5878addc0608719c14b4af
+// source-sha256:219f0c78dc6615f1127881165a7e2c32183be5ac2ee274a78a1f41a20581f4d2
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -419,6 +419,8 @@ export interface SbamContracts {
   SkillManifest?: SkillManifest;
   WorkflowManifest?: WorkflowManifest;
   LoopSpec?: LoopSpec;
+  ManifestVersionList?: ManifestVersionList;
+  ManifestView?: ManifestView;
   ReadmeTab?: ReadmeTab;
   OrganizationPayload?: OrganizationPayload;
   RulesPayload?: RulesPayload;
@@ -1634,6 +1636,51 @@ export interface LoopSpec {
   escalation_condition: string;
   budget_limit_ms: number;
   ui_update_template: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ManifestVersionList".
+ */
+export interface ManifestVersionList {
+  items: ManifestVersion[];
+}
+/**
+ * One stored manifest: a Sub-Skill build stage key, or a Workflow build.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ManifestVersion".
+ */
+export interface ManifestVersion {
+  version: string;
+  sha256: string;
+  build_no: number;
+  cycle?: number | null;
+  attempt?: number | null;
+  is_frozen: boolean;
+  created_at: string;
+}
+/**
+ * The manifest as stored, rendered read-only by the viewer (never as HTML).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ManifestView".
+ */
+export interface ManifestView {
+  version: string;
+  sha256: string;
+  build_no: number;
+  cycle?: number | null;
+  attempt?: number | null;
+  is_frozen: boolean;
+  created_at: string;
+  schema_version: string;
+  /**
+   * the Sub-Skill was reused, or its hash equals the build before
+   */
+  reused?: boolean;
+  manifest: {
+    [k: string]: JsonValue | undefined;
+  };
 }
 /**
  * The README tab: help text. Only its structure is checked, its content is not interpreted.

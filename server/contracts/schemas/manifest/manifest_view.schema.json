@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:manifest/manifest_view:0.1.0",
+  "$defs": {
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "The manifest as stored, rendered read-only by the viewer (never as HTML).",
+  "properties": {
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    },
+    "build_no": {
+      "title": "Build No",
+      "type": "integer"
+    },
+    "cycle": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cycle"
+    },
+    "attempt": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attempt"
+    },
+    "is_frozen": {
+      "title": "Is Frozen",
+      "type": "boolean"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "schema_version": {
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "reused": {
+      "default": false,
+      "description": "the Sub-Skill was reused, or its hash equals the build before",
+      "title": "Reused",
+      "type": "boolean"
+    },
+    "manifest": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Manifest",
+      "type": "object"
+    }
+  },
+  "required": [
+    "version",
+    "sha256",
+    "build_no",
+    "is_frozen",
+    "created_at",
+    "schema_version",
+    "manifest"
+  ],
+  "title": "ManifestView",
+  "type": "object"
+}
