@@ -55,9 +55,12 @@ class Users:
         self.calls.append(call)
 
     def invite(self, tenant_id: uuid.UUID, org_id: str | None, email: str, roles: list[str]) -> str:
-        if email in self.taken:
+        if self.down:
+            raise idp_unavailable()
+        if email in self.taken:  # one namespace for the whole realm, whichever tenant invited
             raise user_exists()
         self._call("invite", email, *roles)
+        self.taken.add(email)
         return str(uuid.uuid4())
 
     def set_roles(self, user_id: str, before: list[str], after: list[str]) -> None:
@@ -178,17 +181,81 @@ def test_e2_4_t02_duplicate_invite(h: Harness) -> None:
     problem(h.call("POST", "/admin/users/invite", h.admin_a(), json=body), 409, "USER_EXISTS")
 
 
-def test_e2_4_invite_email_of_another_tenant(h: Harness) -> None:
-    body = {"email": "shared@acme.com", "roles": ["sbam-fde"]}
-    assert h.call("POST", "/admin/users/invite", h.admin_a(), json=body).status_code == 201
-    res = h.call("POST", "/admin/users/invite", h.admin_b(), json=body)
-    problem(res, 409, "USER_EXISTS")  # the same answer as within the tenant: nothing leaks
+def invite_as(h: Harness, token: str, email: str) -> Any:
+    return h.call(
+        "POST", "/admin/users/invite", token, json={"email": email, "roles": ["sbam-fde"]}
+    )
 
 
-def test_e2_4_invite_taken_in_keycloak_only(h: Harness) -> None:
+def test_a05_t01_foreign_and_unknown_address_answer_identically(h: Harness) -> None:
+    assert invite_as(h, h.admin_a(), "shared@acme.com").status_code == 201
+    foreign = invite_as(h, h.admin_b(), "shared@acme.com")
+    unknown = invite_as(h, h.admin_b(), "nobody@acme.com")
+    assert foreign.status_code == unknown.status_code == 201
+    assert set(foreign.json()) == set(unknown.json())
+    assert foreign.headers["etag"] == unknown.headers["etag"]
+    for res, email in ((foreign, "shared@acme.com"), (unknown, "nobody@acme.com")):
+        body = res.json()
+        assert body["email"] == email and body["status"] == "INVITED"
+        assert body["portal_roles"] == ["sbam-fde"] and body["row_version"] == 1
+        assert body["last_login_at"] is None and body["display_name"] is None
+
+
+def test_a05_t02_own_tenant_duplicate_is_still_409_ignoring_case(h: Harness) -> None:
+    assert invite_as(h, h.admin_a(), "new@acme.com").status_code == 201
+    problem(invite_as(h, h.admin_a(), "new@acme.com"), 409, "USER_EXISTS")
+    problem(invite_as(h, h.admin_a(), "NEW@ACME.COM"), 409, "USER_EXISTS")
+
+
+def test_a05_t03_foreign_invite_creates_no_row_and_no_keycloak_side_effects(h: Harness) -> None:
+    assert invite_as(h, h.admin_a(), "shared@acme.com").status_code == 201
+    calls_before = list(h.users.calls)
+    assert invite_as(h, h.admin_b(), "shared@acme.com").status_code == 201
+    assert h.users.calls == calls_before  # no role grant, no org member, no delete
+    with h.sessions() as s:
+        rows = list(s.scalars(select(User).where(User.email == "shared@acme.com")))
+    assert [r.tenant_id for r in rows] == [TENANT_A]
+
+
+def test_a05_t04_foreign_invite_is_audited_as_skipped(h: Harness) -> None:
+    assert invite_as(h, h.admin_a(), "shared@acme.com").status_code == 201
+    assert invite_as(h, h.admin_b(), "shared@acme.com").status_code == 201
+    [row] = h.audit_rows("USER_INVITE_SKIPPED")
+    assert row.tenant_id == TENANT_B and row.entity_id is None
+    assert row.after == {"email": "shared@acme.com", "roles": ["sbam-fde"]}
+    assert len(h.audit_rows("USER_INVITED")) == 1  # only tenant A's real invite
+
+
+def test_a05_t05_phantom_id_is_unknown_to_every_tenant(h: Harness) -> None:
+    assert invite_as(h, h.admin_a(), "shared@acme.com").status_code == 201
+    phantom = invite_as(h, h.admin_b(), "shared@acme.com").json()["id"]
+    for token in (h.admin_a(), h.admin_b()):
+        res = h.call(
+            "PATCH",
+            f"/admin/users/{phantom}",
+            token,
+            headers={"if-match": '"1"'},
+            json={"active": False},
+        )
+        problem(res, 404, "NOT_FOUND")
+    listing = h.call("GET", "/admin/users", h.admin_b()).json()["items"]
+    assert phantom not in {u["id"] for u in listing}
+
+
+def test_a05_t06_taken_in_keycloak_only_matches_foreign(h: Harness) -> None:
     h.users.taken.add("kc-only@acme.com")
-    body = {"email": "kc-only@acme.com", "roles": ["sbam-fde"]}
-    problem(h.call("POST", "/admin/users/invite", h.admin_a(), json=body), 409, "USER_EXISTS")
+    res = invite_as(h, h.admin_a(), "kc-only@acme.com")
+    assert res.status_code == 201 and res.json()["status"] == "INVITED"
+    assert len(h.audit_rows("USER_INVITE_SKIPPED")) == 1
+    with h.sessions() as s:
+        assert s.scalar(select(User).where(User.email == "kc-only@acme.com")) is None
+
+
+def test_a05_t07_keycloak_down_answers_503_for_every_address(h: Harness) -> None:
+    assert invite_as(h, h.admin_a(), "shared@acme.com").status_code == 201
+    h.users.down = True
+    for email in ("shared@acme.com", "nobody@acme.com"):
+        problem(invite_as(h, h.admin_b(), email), 503, "IDP_UNAVAILABLE")
 
 
 @pytest.mark.parametrize("roles", [["super-admin"], ["sbam-fde", "super-admin"], []])
