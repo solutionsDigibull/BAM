@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:0ffd0d26137c99d30fbaf38bbc48c743bea653226e3d0c2e227771269833fa45
+// source-sha256:9c60713c9a66a4edec18e5aca4dffae38593f4eb5f5de8c89e288f79bed8b8f5
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -538,6 +538,9 @@ export interface SbamContracts {
   KnowledgeVersionList?: KnowledgeVersionList;
   KnowledgeGraphPage?: KnowledgeGraphPage;
   KnowledgeNodeDetail?: KnowledgeNodeDetail;
+  MockDefinition?: MockDefinition;
+  MockRunSetup?: MockRunSetup;
+  MockJournal?: MockJournal;
   TestgenOutput?: TestgenOutput;
   TestsResponse?: TestsResponse;
   CasePut?: CasePut;
@@ -3803,6 +3806,132 @@ export interface SourcePassage {
   truncated?: boolean;
 }
 /**
+ * The stubs for one API reference (`S.external_data` entry `name`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockDefinition".
+ */
+export interface MockDefinition {
+  name: string;
+  /**
+   * @minItems 1
+   * @maxItems 200
+   */
+  stubs: [MockStub, ...MockStub[]];
+}
+/**
+ * What one route answers. `responses` is the per-call sequence: the first call gets the first
+ * entry, and the last entry answers every call after that.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockStub".
+ */
+export interface MockStub {
+  /**
+   * Pattern: `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`
+   */
+  id: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /**
+   * Pattern: `^/[A-Za-z0-9._~!$&'()*+,;=:@%/{}-]*$`
+   */
+  path: string;
+  /**
+   * only for this case; absent = every case without its own stub
+   */
+  case?: string | null;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  responses:
+    | [MockResponse]
+    | [MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse
+      ]
+    | [
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse
+      ];
+}
+/**
+ * One answer: a status and a JSON body (absent = an empty body).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockResponse".
+ */
+export interface MockResponse {
+  status: number;
+  body?: JsonValue;
+}
+/**
+ * `PUT /_control/runs/{run_id}`: every definition of the dataset, for one sandbox run.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockRunSetup".
+ */
+export interface MockRunSetup {
+  /**
+   * @minItems 1
+   */
+  definitions: [MockDefinition, ...MockDefinition[]];
+}
+/**
+ * `GET /_control/runs/{run_id}/journal`: the run's request journal, stored with its logs.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockJournal".
+ */
+export interface MockJournal {
+  /**
+   * Pattern: `^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$`
+   */
+  run_id: string;
+  entries: JournalEntry[];
+  /**
+   * oldest entries discarded once the journal is full
+   */
+  dropped?: number;
+}
+/**
+ * One request the service saw, in order. Bodies are never recorded.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "JournalEntry".
+ */
+export interface JournalEntry {
+  n: number;
+  case: string | null;
+  method: string;
+  path: string;
+  stub_id: string;
+  response_index: number | null;
+  status: number;
+}
+/**
  * What `sbam-testgen` may answer (E13.4): at least three cases, PASS_FIRST and ESCALATION and
  * one more of PASS_AFTER_RETRY, NO_OP or EDGE, with distinct names.
  *
@@ -3910,6 +4039,10 @@ export interface TestDatasetOut {
   synthetic?: true;
   edited_by_fde: boolean;
   files_keys: string[];
+  /**
+   * the mock definitions of its API references (E13.5)
+   */
+  mocks_keys?: string[];
   created_at: string;
   cases: TestCaseOut[];
 }

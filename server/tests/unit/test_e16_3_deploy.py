@@ -652,6 +652,7 @@ SECRET_NAMES = [
     "keycloak_admin_client_secret",
     "tusd_hook_secret",
     "upload_token_key",
+    "mock_control_token",
     "storage_signing_key",
     "auth_secret",
     "openrouter_api_key",

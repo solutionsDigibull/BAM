@@ -9,6 +9,10 @@
   allowlist, the 500-row budget, a terminal the kind can reach). A reply with a bad case is
   re-asked with the case index and the field path only, at most three times, and a case that never
   validates is never stored. `max_iterations = 1` removes `PASS_AFTER_RETRY` from the allowed kinds.
+* One mock definition is written per API reference that names a route (`test/mocks.py`, E13.5),
+  stored content-addressed like the files and hashed into the dataset: change a stub and the
+  dataset's sha256 changes. A definition that could forward or record is refused before anything
+  is stored.
 * One file is written per FILE reference of the ISATVON (csv, json or xlsx, by the reference's
   extension, at most 5 MiB) and stored content-addressed. The dataset row (always `synthetic`,
   version one more than the Sub-Skill's newest) and its cases are inserted in one transaction; its
@@ -37,7 +41,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_api.testgen.repository import CaseRepository, DatasetRepository
-from sbam_api.testgen.service import files_hashes
+from sbam_api.testgen.service import files_hashes, mocks_hashes
 from sbam_api.testgen.validate import case_errors, declared_tables, input_schema
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.isatvon14 import SubSkill as SubSkillModel
@@ -55,6 +59,7 @@ from temporalio.exceptions import ApplicationError
 
 from sbam_workers.llm.client import LlmClient, LlmResult
 from sbam_workers.llm.store import LlmScope
+from sbam_workers.test.mocks import definition_bytes, mock_definitions
 
 STAGE: Final = "generate_tests"
 ALIAS: Final = "sbam-testgen"
@@ -205,13 +210,21 @@ class SqlDatasetStore:
         cases: Sequence[tuple[CaseKind, CaseBody]],
         files: list[DataFile],
         generated_for: str,
+        mocks: Sequence[Mapping[str, Any]] = (),
     ) -> uuid.UUID:
+        # Linted first: a definition that could forward or record raises here, before anything is
+        # stored, so the dataset is never created (E13.5-T06).
+        stored = [definition_bytes(m) for m in mocks]
         scope = StorageScope(inp.tenant_id, inp.project_id, inp.workflow_id)
         keys = [
             self.storage.put(io.BytesIO(f.content), scope, Kind.TESTS, f.content_type).storage_key
             for f in files
         ]
-        sha = dataset_sha256(cases, files_hashes(keys))
+        mock_keys = [
+            self.storage.put(io.BytesIO(data), scope, Kind.TESTS, "application/json").storage_key
+            for data in stored
+        ]
+        sha = dataset_sha256(cases, files_hashes(keys), mocks_hashes(mock_keys))
         with self.sessions() as session:
             repo = DatasetRepository(session, self._ctx(inp))
             latest = repo.latest(inp.sub_skill_id)
@@ -221,6 +234,7 @@ class SqlDatasetStore:
                 sub_skill_id=inp.sub_skill_id,
                 version=1 if latest is None else latest.version + 1,
                 files_keys=keys,
+                mocks_keys=mock_keys,
                 sha256=sha,
                 synthetic=True,
                 edited_by_fde=False,
@@ -298,4 +312,7 @@ class GenerateTests:
             (c.kind, CaseBody.model_validate(c.model_dump(exclude={"kind"})))
             for c in result.output.cases
         ]
-        return IdResult(id=self.store.record(inp, cases, data_files(isatvon), wanted))
+        mocks = [
+            definition.model_dump(mode="json") for definition in mock_definitions(isatvon, cases)
+        ]
+        return IdResult(id=self.store.record(inp, cases, data_files(isatvon), wanted, mocks))

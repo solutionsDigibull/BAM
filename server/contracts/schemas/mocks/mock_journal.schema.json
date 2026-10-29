@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:mocks/mock_journal:0.1.0",
+  "$defs": {
+    "JournalEntry": {
+      "additionalProperties": false,
+      "description": "One request the service saw, in order. Bodies are never recorded.",
+      "properties": {
+        "n": {
+          "minimum": 1,
+          "title": "N",
+          "type": "integer"
+        },
+        "case": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Case"
+        },
+        "method": {
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "stub_id": {
+          "title": "Stub Id",
+          "type": "string"
+        },
+        "response_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Response Index"
+        },
+        "status": {
+          "title": "Status",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "n",
+        "case",
+        "method",
+        "path",
+        "stub_id",
+        "response_index",
+        "status"
+      ],
+      "title": "JournalEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET /_control/runs/{run_id}/journal`: the run's request journal, stored with its logs.",
+  "properties": {
+    "run_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/JournalEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "dropped": {
+      "default": 0,
+      "description": "oldest entries discarded once the journal is full",
+      "title": "Dropped",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "run_id",
+    "entries"
+  ],
+  "title": "MockJournal",
+  "type": "object"
+}

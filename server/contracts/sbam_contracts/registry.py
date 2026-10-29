@@ -87,6 +87,7 @@ from sbam_contracts.masters_api import (
     MasterTypes,
     MasterVersionCreate,
 )
+from sbam_contracts.mocks import MockDefinition, MockJournal, MockRunSetup
 from sbam_contracts.notifications import Notification
 from sbam_contracts.okf import (
     BundleCoverage,
@@ -231,6 +232,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("knowledge/version_list", KnowledgeVersionList),
     ("knowledge/graph_page", KnowledgeGraphPage),
     ("knowledge/node_detail", KnowledgeNodeDetail),
+    ("mocks/mock_definition", MockDefinition),
+    ("mocks/mock_run_setup", MockRunSetup),
+    ("mocks/mock_journal", MockJournal),
     ("testgen/testgen_output", TestgenOutput),
     ("testgen/tests_response", TestsResponse),
     ("testgen/case_put", CasePut),

@@ -271,6 +271,11 @@ services:
   sbam-mock-api:
     image: ${SBAM_MOCK_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-mock-api@sha256:...)}
     build: !reset null
+    environment:
+      MOCK_CONTROL_TOKEN: !reset null
+      MOCK_CONTROL_TOKEN_FILE: /run/secrets/mock_control_token # the service reads the file itself
+    secrets:
+      - { source: mock_control_token, target: mock_control_token, uid: "10001", gid: "10001", mode: 0400 }
 
   sbam-web:
     image: ${SBAM_WEB_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-web@sha256:...)}
@@ -344,6 +349,7 @@ secrets:
   keycloak_admin_client_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/keycloak_admin_client_secret" }
   tusd_hook_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/tusd_hook_secret" }
   upload_token_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/upload_token_key" }
+  mock_control_token: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/mock_control_token" }
   storage_signing_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/storage_signing_key" }
   auth_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/auth_secret" }
   openrouter_api_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/openrouter_api_key" }

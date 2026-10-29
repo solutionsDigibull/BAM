@@ -160,6 +160,14 @@
           "title": "Files Keys",
           "type": "array"
         },
+        "mocks_keys": {
+          "description": "the mock definitions of its API references (E13.5)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Mocks Keys",
+          "type": "array"
+        },
         "created_at": {
           "format": "date-time",
           "title": "Created At",

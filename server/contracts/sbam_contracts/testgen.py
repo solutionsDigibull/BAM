@@ -164,6 +164,9 @@ class TestDatasetOut(_Strict):
     synthetic: Literal[True] = True
     edited_by_fde: bool
     files_keys: list[str]
+    mocks_keys: list[str] = Field(
+        default_factory=list, description="the mock definitions of its API references (E13.5)"
+    )
     created_at: datetime
     cases: list[TestCaseOut]
 

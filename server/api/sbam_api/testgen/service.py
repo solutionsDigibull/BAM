@@ -65,6 +65,14 @@ def files_hashes(keys: list[str]) -> dict[str, str]:
     return out
 
 
+def mocks_hashes(keys: list[str]) -> dict[str, str]:
+    """sha256 -> sha256 of the dataset's mock definitions, read from their content-addressed keys.
+    Keyed by the hash and not by the storage key, so the dataset hash does not depend on which
+    tenant, project or Workflow folder the same definition sits in."""
+    tails = (key.rsplit("/", 1)[-1] for key in keys)
+    return {tail: tail for tail in tails}
+
+
 def body_of(row: CaseRow) -> CaseBody:
     return CaseBody.model_validate(
         {
@@ -91,6 +99,7 @@ def dataset_out(dataset: DatasetRow, cases: list[CaseRow]) -> TestDatasetOut:
         sha256=dataset.sha256,
         edited_by_fde=dataset.edited_by_fde,
         files_keys=list(dataset.files_keys),
+        mocks_keys=list(dataset.mocks_keys),
         created_at=dataset.created_at,
         cases=[case_out(c) for c in cases],
     )
@@ -172,11 +181,13 @@ class Open:
     ) -> tuple[DatasetRow, list[CaseRow]]:
         """The next version of the dataset with `cases`, and an audit row saying what changed."""
         keys = list(self.dataset.files_keys)
+        mocks = list(self.dataset.mocks_keys)  # an edit to the cases leaves the mocks as they are
         new = DatasetRow(
             sub_skill_id=self.sub.id,
             version=self.dataset.version + 1,
             files_keys=keys,
-            sha256=dataset_sha256(cases, files_hashes(keys)),
+            mocks_keys=mocks,
+            sha256=dataset_sha256(cases, files_hashes(keys), mocks_hashes(mocks)),
             synthetic=True,
             edited_by_fde=True,
             generated_for=self.dataset.generated_for,  # an edit does not change the ISATVON
