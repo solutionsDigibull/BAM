@@ -1,6 +1,7 @@
 """`test_datasets` and `test_cases` (TD §7, E13.4): a Sub-Skill's synthetic test data.
 
-A dataset is one *version* of the data: its cases and the files its FILE refs read. Rows are only
+A dataset is one *version* of the data: its cases, the files its FILE refs read and the mock
+definitions of its API refs. Rows are only
 inserted: an FDE edit writes a new version (a copy of the cases with the change) with a new
 `sha256`, and the previous version stays as evidence. `version` counts from 1 per Sub-Skill. The
 hash is `sbam_contracts.testgen.dataset_sha256`, the one definition the worker and the API share.
@@ -34,6 +35,8 @@ class DatasetRow(ProjectOwned, Base):
     )
     version: Mapped[int] = mapped_column(Integer)
     files_keys: Mapped[list[str]] = mapped_column(Json, default=list)  # content-addressed keys
+    # one stored `MockDefinition` per API reference (E13.5), content-addressed like the files
+    mocks_keys: Mapped[list[str]] = mapped_column(Json, default=list)
     sha256: Mapped[str] = mapped_column(String(64))
     synthetic: Mapped[bool] = mapped_column(Boolean, default=True)
     edited_by_fde: Mapped[bool] = mapped_column(Boolean, default=False)

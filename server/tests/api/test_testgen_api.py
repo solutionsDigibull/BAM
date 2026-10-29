@@ -11,6 +11,7 @@ import pytest
 from sbam_api.audit.models import AuditLog
 from sbam_api.isatvon.models import SubSkill
 from sbam_api.testgen.models import CaseRow, DatasetRow
+from sbam_api.testgen.service import mocks_hashes
 from sbam_contracts.testgen import CaseBody, CaseKind, ExpectedTerminal, dataset_sha256
 from sqlalchemy import select
 from test_auth import TENANT_A, TENANT_B, problem
@@ -37,9 +38,9 @@ class Harness(ValidateHarness):
             table.__table__.create(bind, checkfirst=True)  # type: ignore[attr-defined]
         self.sub = self.add_sub_skill(sample(), state="VALID")
 
-    def seed(self, sub: uuid.UUID | None = None) -> str:
+    def seed(self, sub: uuid.UUID | None = None, mocks: list[str] | None = None) -> str:
         cases = [(kind, body(f"case-{kind.value}", terminal)) for kind, terminal in KINDS]
-        sha = dataset_sha256(cases, {})
+        sha = dataset_sha256(cases, {}, mocks_hashes(mocks or []))
         with self.sessions() as s:
             dataset = DatasetRow(
                 tenant_id=TENANT_A,
@@ -47,6 +48,7 @@ class Harness(ValidateHarness):
                 sub_skill_id=sub or self.sub,
                 version=1,
                 files_keys=[],
+                mocks_keys=mocks or [],
                 sha256=sha,
                 synthetic=True,
                 edited_by_fde=False,
@@ -263,3 +265,38 @@ def test_e13_4_another_tenant_or_workflow_or_unknown_sub_skill_is_404(h: Harness
     problem(h.call("GET", wrong, h.fde()), 404, "NOT_FOUND")
     problem(h.write("PUT", f"/cases/{uuid.uuid4()}", sha, {"input": INPUT}), 404, "NOT_FOUND")
     assert len(h.dataset_rows()) == 1
+
+
+MOCK_KEYS = [f"t/p/w/tests/{'a' * 64}", f"t/p/w/tests/{'b' * 64}"]
+
+
+def test_e13_5_the_dataset_read_lists_its_mock_definitions(h: Harness) -> None:
+    h.seed(mocks=MOCK_KEYS)
+    assert h.tests().json()["dataset"]["mocks_keys"] == MOCK_KEYS
+
+
+def test_e13_5_an_fde_edit_keeps_the_mocks_and_the_new_hash_covers_them(h: Harness) -> None:
+    sha = h.seed(mocks=MOCK_KEYS)
+    cid = h.case_id("case-PASS_FIRST")
+    res = h.write("PUT", f"/cases/{cid}", sha, {"input": {**INPUT, "otp_payload": "654321"}})
+    assert res.status_code == 200, res.text
+    v1, v2 = h.dataset_rows()
+    assert v2.mocks_keys == MOCK_KEYS and v1.mocks_keys == MOCK_KEYS  # the edit leaves them alone
+    cases = [(k, body(f"case-{k.value}", t)) for k, t in KINDS]
+    cases[0] = (
+        cases[0][0],
+        body("case-PASS_FIRST", ExpectedTerminal.SUCCESS).model_copy(
+            update={"input": {**INPUT, "otp_payload": "654321"}}
+        ),
+    )
+    assert v2.sha256 == dataset_sha256(cases, {}, mocks_hashes(MOCK_KEYS))
+    assert v2.sha256 != v1.sha256
+
+
+def test_e13_5_the_mock_hash_ignores_which_folder_a_definition_is_stored_under() -> None:
+    elsewhere = [f"other-tenant/other-project/other-wf/tests/{'a' * 64}", f"x/tests/{'b' * 64}"]
+    assert (
+        mocks_hashes(MOCK_KEYS)
+        == mocks_hashes(elsewhere)
+        == {"a" * 64: "a" * 64, "b" * 64: "b" * 64}
+    )

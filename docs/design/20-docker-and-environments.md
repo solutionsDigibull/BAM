@@ -143,6 +143,7 @@ get an `env_file`**. Each worker variable is passed one by one, so the OpenRoute
 | `POSTHOG_HOST`, `POSTHOG_API_KEY`, `POSTHOG_DISTINCT_ID_SALT` | sbam-api, workers | no | product events (§17.2). Empty = off. The salt is required outside development once PostHog is on |
 | `TUSD_HOOK_SECRET` | tusd → sbam-api hooks | yes | |
 | `UPLOAD_TOKEN_KEY` | signs upload tokens (not the hook secret, A-14) | staging/prod | dev: falls back to `TUSD_HOOK_SECRET` |
+| `MOCK_CONTROL_TOKEN` | sbam-mock-api (control surface, E13.5) | yes | 16+ characters; tools under test never get it. Deployed environments mount the Docker secret `mock_control_token` (`MOCK_CONTROL_TOKEN_FILE`): **provision `/etc/sbam/secrets/mock_control_token` before deploying this release** (`install -m 0400 -o root -g root /dev/stdin /etc/sbam/secrets/mock_control_token <<<"$(openssl rand -hex 32)"`) |
 | `SBAM_DEV_AUTH` | sbam-web | no | `1` enables the dev role picker until Keycloak sign-in (#51); ignored in production builds |
 | `MAX_BODY_BYTES`, `LOG_LEVEL` | sbam-api | no | defaults 10 MiB, `INFO` |
 
@@ -209,7 +210,7 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 | clamav | real: clamd + freshclam, scanned by `worker-ingest` (#62 E4.3); not published | — |
 | workers ×6 | real: Temporal bootstrap `--queues`, sample `PingWorkflow` on every queue (#40 E1.7) | — |
 | api-migrate | real: `alembic upgrade head` (#36 E1.5) | — |
-| sbam-mock-api | health-only HTTP server | #126 E13.5 |
+| sbam-mock-api | real: per-run stubs, request journal, never forwards, stdlib only (#126 E13.5, §15.2) | — |
 | otel-collector / langfuse (obs) | real (`compose.obs.yaml`, #42 E1.11) | — |
 | posthog (analytics) | busybox health endpoint on 8010 | #141 E16.2 / #142 E16.3 |
 | sandbox-runner (sandbox-local) | hardened idle container on internal `sbam_sandbox` (peer: `sbam-mock-api` only), `SANDBOX_MODE=LOCAL_DOCKER_NONCERT` | #123 E13.2 (adapter, `EGRESS_BLOCKED`, non-certifying runs) |

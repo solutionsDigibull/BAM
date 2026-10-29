@@ -446,12 +446,20 @@ services:
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-certify }
 
   sbam-mock-api:
-    # Stub: health-only until #126.
+    # The mock APIs of sandbox tests (E13.5): stubs per run, a request journal, never forwards. Internal
+    # network only, no published port; the control surface needs MOCK_CONTROL_TOKEN, which tools under test
+    # never get (the worker and the sandbox adapter do).
     image: sbam-mock-api:local
     build:
       context: ..
       dockerfile: compose/docker/mock-api.Dockerfile
+    environment:
+      MOCK_CONTROL_TOKEN: ${MOCK_CONTROL_TOKEN:?is required - set it in compose/.env (copy compose/.env.example)}
     networks: [sbam_internal]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
     restart: unless-stopped
 
   sbam-web:
