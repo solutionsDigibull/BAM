@@ -1,11 +1,12 @@
 """Worker settings from env (Compose passes them one by one, never an env_file; ADR 0001)."""
 
+import json
 from decimal import Decimal
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import AnyHttpUrl, Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sbam_api.core.settings import posthog_problem
 
 
@@ -42,8 +43,17 @@ class WorkerSettings(BaseSettings):
     # (C-41: no limit by default): once the recorded spend of a project or tenant reaches one, the
     # next model call is refused (non-retryable) until an admin raises it. Cache hits cost nothing.
     llm_derivative_cache: bool = True
-    llm_project_budget_usd: Decimal | None = Field(default=None, gt=0)
-    llm_tenant_budget_usd: Decimal | None = Field(default=None, gt=0)
+    # `allow_inf_nan=False`: NaN would make every comparison false (a budget that never trips) and
+    # Infinity is a limit that never trips; both are refused at start. Compose passes "" when unset.
+    llm_project_budget_usd: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    llm_tenant_budget_usd: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    # What a call costs when Bifrost reports none (a model its catalogue has no price for): USD per
+    # million tokens, per alias, as JSON: {"sbam-sow": {"in": 2.5, "out": 10}}. Only read while a
+    # budget is set. Without an entry such a call is refused from then on (`BudgetCostUnknown`).
+    # NoDecode: the env value is parsed below, so Compose's empty "" means unset, not a JSON error.
+    llm_price_usd_per_mtok: Annotated[dict[str, dict[str, Decimal]], NoDecode] = Field(
+        default_factory=dict
+    )
     # Transport errors, 5xx and 429s are tried this many times inside the wrapper, then surface as a
     # retryable `LlmTransportError` (the Temporal retry policy takes over).
     llm_transport_attempts: int = Field(default=3, ge=1, le=10)
@@ -65,6 +75,34 @@ class WorkerSettings(BaseSettings):
     posthog_host: str | None = None  # Compose passes "" when unset: a str, not a URL
     posthog_api_key: SecretStr | None = None
     posthog_distinct_id_salt: SecretStr | None = None
+
+    @field_validator("llm_project_budget_usd", "llm_tenant_budget_usd", mode="before")
+    @classmethod
+    def _empty_budget_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("llm_price_usd_per_mtok", mode="before")
+    @classmethod
+    def _prices_from_json(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            try:
+                return json.loads(value) if value.strip() else {}
+            except ValueError:
+                raise ValueError('must be a JSON object: {"alias": {"in": 1, "out": 2}}') from None
+        return value
+
+    @field_validator("llm_price_usd_per_mtok")
+    @classmethod
+    def _prices_are_plain_numbers(
+        cls, value: dict[str, dict[str, Decimal]]
+    ) -> dict[str, dict[str, Decimal]]:
+        for alias, price in value.items():
+            if set(price) != {"in", "out"}:
+                raise ValueError(f"{alias}: give exactly 'in' and 'out' (USD per million tokens)")
+            for side, usd in price.items():
+                if not usd.is_finite() or usd < 0:
+                    raise ValueError(f"{alias}.{side}: must be a finite number of USD, 0 or more")
+        return value
 
     @model_validator(mode="after")
     def _posthog_needs_a_salt(self) -> "WorkerSettings":

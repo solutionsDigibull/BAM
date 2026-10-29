@@ -70,8 +70,8 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # A scratch PostgreSQL 16 for the schema-SQL apply tests (test_e9_4_schema_sql.py, #476). It needs a
-    # superuser: the tests create and drop their own databases.
+    # A scratch PostgreSQL 16 for the tests that need a real database: the schema-SQL apply (#476), the DB
+    # timeouts (#456) and the derivative cache (#420). It needs a superuser: they create and drop their own.
     services:
       postgres:
         image: postgres:16.15-alpine
@@ -109,6 +109,8 @@ jobs:
         env:
           SBAM_VALIDATE_PROXY: "1"
           SCHEMA_CHECK_TEST_DSN: postgresql://postgres:ci@localhost:5432/postgres
+          # also read by the A-30 timeout tests (#456) and the derivative-cache tests (#420)
+          A30_TEST_PG_DSN: postgresql://postgres:ci@localhost:5432/postgres
       # fastmcp is a skill-runtime dependency, not a dev one, so the rendered-template test that needs it
       # skips in the run above. Run it here with the version the runtime image pins, and fail on a skip.
       - name: Codegen template contract with the real fastmcp
@@ -118,7 +120,8 @@ jobs:
             --junitxml=../reports/server-fastmcp.xml
       - name: Opt-in tests must run, not skip (#476)
         run: |
-          uv run scripts/ci_assert_ran.py reports/server-unit.xml test_e9_4_schema_sql
+          uv run scripts/ci_assert_ran.py reports/server-unit.xml test_e9_4_schema_sql \
+            test_a30_db_timeouts test_llm_derivatives_postgres
           uv run scripts/ci_assert_ran.py reports/server-fastmcp.xml test_codegen_templates_contract
       - run: pnpm --dir client test
       - if: always()

@@ -22,7 +22,9 @@ trace id.
   document is a different key, so a stale answer is never served. A hit writes a zero-cost
   `llm_calls` row (model `derivative-cache`) so provenance and the replay key stay whole.
 - Opt-in budgets (`LLM_PROJECT_BUDGET_USD`, `LLM_TENANT_BUDGET_USD`) refuse the next model call,
-  non-retryably, once recorded spend reaches them. Cache hits are still served.
+  non-retryably, once recorded spend reaches them. Cache hits are still served. A budget needs a
+  cost to count: Bifrost's own, else `LLM_PRICE_USD_PER_MTOK` for the alias; an alias whose calls
+  report neither is refused from the second call on, rather than counted as free.
 - Transport errors, 5xx and 429 are tried a few times with backoff, then raised as the retryable
   `LlmTransportError`. Schema failures end in the non-retryable `SchemaInvalidAfterRetries`.
 """
@@ -44,6 +46,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel
 
+from sbam_workers.llm.budget import Budget
 from sbam_workers.llm.reask import Attempt, Message, Reply, run_structured, strip_fences
 from sbam_workers.llm.registry import Prompt, PromptRegistry
 from sbam_workers.llm.store import CallStore, LlmScope
@@ -99,12 +102,6 @@ class UnknownAlias(ValueError):  # noqa: N818 - fixed name in E6.1
 
 
 class ContextTooLarge(Exception):  # noqa: N818 - fixed name in E6.1
-    retryable = False
-
-
-class BudgetExceeded(Exception):  # noqa: N818
-    """Recorded spend reached a configured budget. Retrying cannot help until it is raised."""
-
     retryable = False
 
 
@@ -250,6 +247,7 @@ class LlmClient:
         self.store = store
         self.tracer = tracer
         self.http = http
+        self.budget = Budget(settings, store)
 
     async def run[T: BaseModel](
         self,
@@ -324,7 +322,7 @@ class LlmClient:
                     )
                     return LlmResult(reused, row_id, "", 0, cached=True)
 
-        await self._check_budget(scope)
+        await self.budget.check(scope, alias)
 
         trace_id = new_trace_id()
         shown = trace_view(messages)
@@ -343,10 +341,17 @@ class LlmClient:
         ) -> None:
             nonlocal started_at, spent_in, spent_out, spent_usd
             ended = datetime.now(UTC)
+            cost = (
+                self.budget.cost_of(
+                    alias, reply.tokens_in, reply.tokens_out, Decimal(str(reply.cost_usd))
+                )
+                if reply
+                else Decimal(0)
+            )
             if reply is not None:
                 spent_in += reply.tokens_in
                 spent_out += reply.tokens_out
-                spent_usd += Decimal(str(reply.cost_usd))
+                spent_usd += cost
             output_json: dict[str, Any] | None = None
             if status == "SUCCEEDED" and reply is not None:
                 output_json = output_type.model_validate_json(
@@ -368,7 +373,7 @@ class LlmClient:
                     "prompt_sha256": prompt.sha256,
                     "tokens_in": reply.tokens_in if reply else 0,
                     "tokens_out": reply.tokens_out if reply else 0,
-                    "cost_usd": Decimal(str(reply.cost_usd)) if reply else Decimal(0),
+                    "cost_usd": cost,
                     "latency_ms": latency,
                     "attempt": attempt,
                     "status": status,
@@ -394,7 +399,7 @@ class LlmClient:
                     ended_at=ended,
                     tokens_in=reply.tokens_in if reply else 0,
                     tokens_out=reply.tokens_out if reply else 0,
-                    cost_usd=reply.cost_usd if reply else 0.0,
+                    cost_usd=float(cost),
                     input=shown,
                     output=reply.text if reply else None,
                     error=detail,
@@ -431,10 +436,7 @@ class LlmClient:
         result = await run_structured(
             call, messages, output_type, on_attempt=on_attempt, validate=validate
         )
-        if self._budgeted and spent_usd == 0 and (spent_in or spent_out):
-            log.warning(
-                "llm budget is set but Bifrost reported no cost for %s; spend is untracked", alias
-            )
+        self.budget.note(alias, spent_usd, spent_in, spent_out)
         if self.settings.llm_derivative_cache:
             await asyncio.to_thread(
                 self.store.put_derivative,
@@ -452,26 +454,6 @@ class LlmClient:
                 replace=True,  # reaching here means no usable entry existed (or fresh)
             )
         return LlmResult(result.output, row_ids[-1], trace_id, len(result.attempts))
-
-    @property
-    def _budgeted(self) -> bool:
-        return (
-            self.settings.llm_project_budget_usd is not None
-            or self.settings.llm_tenant_budget_usd is not None
-        )
-
-    async def _check_budget(self, scope: LlmScope) -> None:
-        for limit, tenant, what in (
-            (self.settings.llm_project_budget_usd, False, "project"),
-            (self.settings.llm_tenant_budget_usd, True, "tenant"),
-        ):
-            if limit is None:
-                continue
-            spent = await asyncio.to_thread(self.store.spent, scope, tenant=tenant)
-            if spent >= limit:
-                raise BudgetExceeded(
-                    f"the {what} has spent ${spent:.4f} of its ${limit:.4f} LLM budget"
-                )
 
     async def _post(
         self,

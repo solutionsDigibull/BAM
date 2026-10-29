@@ -33,6 +33,12 @@ x-worker: &worker
     LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
     LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     LANGFUSE_LOG_CONTENT: ${LANGFUSE_LOG_CONTENT:-false}
+    # LLM cost control (#420, ADR 0015): the derivative cache, and the opt-in budgets. Empty = no limit.
+    # The price table is JSON per alias in USD per million tokens, used when Bifrost reports no cost.
+    LLM_DERIVATIVE_CACHE: ${LLM_DERIVATIVE_CACHE:-true}
+    LLM_PROJECT_BUDGET_USD: ${LLM_PROJECT_BUDGET_USD:-}
+    LLM_TENANT_BUDGET_USD: ${LLM_TENANT_BUDGET_USD:-}
+    LLM_PRICE_USD_PER_MTOK: ${LLM_PRICE_USD_PER_MTOK:-}
   depends_on: &worker-depends
     api-migrate: { condition: service_completed_successfully } # temporal_runs (run mirror)
     postgres: { condition: service_healthy }

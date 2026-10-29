@@ -34,9 +34,40 @@ C-41 stays: there is **no budget limit by default**. Two additions reduce spend 
   the next model call with the non-retryable `BudgetExceeded` once recorded spend (`llm_calls.cost_usd`,
   failed attempts included) reaches them. Cache hits are still served.
 
-Not covered: Cognee's own LLM calls (`cognify` goes through Bifrost, not this client), so they are
-neither cached nor counted by the worker-side budget. Cached answers are not purged with `llm_calls`
-yet; add them to retention when that policy is written.
+### Hardening (#420, added 2026-10-30)
+
+- **The limit must be a real number.** `LLM_PROJECT_BUDGET_USD` / `LLM_TENANT_BUDGET_USD` refuse NaN,
+  Infinity, zero and negatives at worker start (NaN would make every comparison false, so the budget
+  would never trip; Infinity is no limit). An empty value, which Compose passes when unset, means no
+  limit.
+- **A budget needs a cost to count.** The cost is Bifrost's own figure; when it reports none (a model
+  its catalogue cannot price) the price in `LLM_PRICE_USD_PER_MTOK` for the alias stands in (JSON, USD per
+  million tokens, `{"alias": {"in": x, "out": y}}`). A call that used tokens and has neither is not
+  counted as free: its alias is refused from the next call on (`BudgetExceeded`, with the reason), once
+  per process it logs an error, and an operator either fixes Bifrost's pricing, adds the price, or declares
+  a free model with `{"in": 0, "out": 0}`. The first such call is not wasted: its answer is stored and
+  returned. Rejected: refusing to start, because whether Bifrost reports a cost is only known after a
+  call.
+- **The budget is a soft limit.** It is checked before a call against *recorded* spend, so calls running
+  at the same time can overshoot it by what is in flight: at most (parallel calls) x (cost of one call).
+  A reservation made before the call (#419) is what makes it a hard limit.
+- **Cognee is metered, not refused.** `cognify` and the embeddings it needs run inside worker-knowledge
+  and reach Bifrost without passing the wrapper. They go through LiteLLM, whose success callback
+  (`llm/meter.py`) now writes one `llm_calls` row per call (`prompt_id = cognee.<call type>`, aliases
+  `sbam-knowledge` / `sbam-embed`) for the tenant and project the Cognee adapter named around the call.
+  The spend therefore counts toward the budgets and the wrapper's next call is refused when it is
+  reached. A `cognify` that has started is not stopped, so it can overshoot by one run. Cognee has no
+  cached answers: its calls are not de-duplicated. Rejected: routing Cognee through `LlmClient` (its
+  calls are made by Cognee's own pipeline, not ours) and polling Bifrost's logs (no tenant or project
+  on them).
+- **Real PostgreSQL coverage.** The migration (`0037`, down and up), the JSONB column and the unique-key
+  race of `put` now have tests on PostgreSQL (`tests/unit/test_llm_derivatives_postgres.py`; they run in
+  CI's unit job, which has a PostgreSQL service, and fail the job if skipped).
+- **Wiring.** `LLM_DERIVATIVE_CACHE`, the two budgets and the price table are passed to the workers by
+  `compose/compose.yaml` (before this, setting them in the environment did nothing) and documented in
+  `compose/.env.example`.
+
+Not covered: cached answers are not purged with `llm_calls` yet (#497).
 
 ## Sources
 
