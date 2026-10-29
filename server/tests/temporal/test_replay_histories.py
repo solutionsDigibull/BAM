@@ -297,6 +297,7 @@ def transitions(path: Path) -> set[str]:
     [
         ("correction exhaustion", "attempts_exhausted"),
         ("model failure", "generation_failed"),
+        ("held ISATVON patch", "isatvon_review_required"),
         ("cancel", "signal:cancel"),
         ("TESTING_BLOCKED", "sandbox_unavailable"),
         ("FDE retry", "signal:retry"),

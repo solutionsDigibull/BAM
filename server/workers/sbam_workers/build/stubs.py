@@ -10,6 +10,7 @@ non_retryable=True)` with the persisted finding ids as details.
 from sbam_contracts.build import (
     BuildStageInput,
     CorrectionInput,
+    CorrectionResult,
 )
 from sbam_contracts.pipeline import IdResult
 from sbam_contracts.runs import TaskQueue
@@ -56,7 +57,7 @@ async def static_gate(inp: BuildStageInput) -> IdResult:
 
 
 @activity.defn(name="correct")  # registered by `wiring.py`; the workflow's typed handle
-async def correct(inp: CorrectionInput) -> IdResult:
+async def correct(inp: CorrectionInput) -> CorrectionResult:
     """Real: LLM (`sbam-corrector`) rewrites the failing bodies from the findings; stores them
-    as the next attempt's bodies and returns their id."""
-    return IdResult(id=stage_stub_id(inp, "correction"))
+    as the next attempt's bodies and returns their id and what it did to the ISATVON."""
+    return CorrectionResult(id=stage_stub_id(inp, "correction"))
