@@ -5,15 +5,18 @@ changing `BUILD_MAX_PARALLEL` mid-run applies only to the next generate. The gra
 here: an edge to an unknown Sub-Skill is `UnknownSubSkill`, a cycle is `DependencyCycle`, both
 non-retryable.
 
-STUB edges: the real `depends_on` + output->input links come from the E9.5 DAG (#105); until then
-every Sub-Skill is independent.
+The edges are the Workflow DAG's data links (E9.5, `dag.data_links`): a Sub-Skill waits for the
+Sub-Skills whose outputs it takes as inputs.
 """
 
+import asyncio
 from collections.abc import Iterable, Mapping
 from uuid import UUID
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sbam_api.db.repository import TenantContext
+from sbam_api.isatvon.repository import MacroSkillRepository, SubSkillRepository
 from sbam_contracts.pipeline import (
     MAX_PARALLEL_BUILDS,
     MAX_PARALLEL_LIMIT,
@@ -21,10 +24,15 @@ from sbam_contracts.pipeline import (
     BuildPlanInput,
 )
 from sbam_contracts.runs import TaskQueue
+from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from sbam_workers import mirror
+from sbam_workers.build.dag import Node, data_links, find_cycle
 from sbam_workers.registry import activity_for
+
+__all__ = ["BuildSettings", "find_cycle", "make_plan", "plan_builds"]
 
 
 class BuildSettings(BaseSettings):
@@ -59,30 +67,27 @@ def make_plan(
     return BuildPlan(max_parallel=max_parallel, depends_on=edges)
 
 
-def find_cycle(edges: Mapping[UUID, list[UUID]]) -> list[UUID]:
-    """One cycle as a path (first id repeated at the end), or [] when the graph is acyclic."""
-    state: dict[UUID, int] = {}  # 1 = on the current path, 2 = finished
-    for root in sorted(edges, key=str):
-        if root in state:
-            continue
-        path: list[UUID] = [root]
-        stack = [iter(edges.get(root, []))]
-        state[root] = 1
-        while stack:
-            nxt = next(stack[-1], None)
-            if nxt is None:
-                state[path.pop()] = 2
-                stack.pop()
-            elif state.get(nxt) == 1:
-                return [*path[path.index(nxt) :], nxt]
-            elif nxt not in state:
-                state[nxt] = 1
-                path.append(nxt)
-                stack.append(iter(edges.get(nxt, [])))
-    return []
-
-
 @activity_for(TaskQueue.BUILD)
 @activity.defn(name="plan_builds")
 async def plan_builds(inp: BuildPlanInput) -> BuildPlan:
-    return make_plan(inp.sub_skill_ids, {}, BuildSettings().max_parallel)
+    edges = await asyncio.to_thread(depends_on, mirror.sessions(), inp)
+    return make_plan(inp.sub_skill_ids, edges, BuildSettings().max_parallel)
+
+
+def depends_on(sessions: sessionmaker[Session], inp: BuildPlanInput) -> dict[UUID, list[UUID]]:
+    """Each Sub-Skill's upstreams, from the stored ISATVON of the Workflow (tenant-scoped)."""
+    ctx = TenantContext(inp.tenant_id, inp.project_id)
+    with sessions() as session:
+        macros = MacroSkillRepository(session, ctx).of_workflow(inp.workflow_id)
+        category = {m.id: m.macro_category for m in macros}
+        nodes = [
+            Node(s.id, s.skill_id, category.get(s.macro_skill_id, ""), s.isatvon)
+            for s in SubSkillRepository(session, ctx).of_workflow(inp.workflow_id)
+        ]
+    planned = set(inp.sub_skill_ids)  # only the run's Sub-Skills are scheduled
+    edges: dict[UUID, list[UUID]] = {}
+    for up, down, _ in data_links([n for n in nodes if n.sub_skill_id in planned]):
+        ups = edges.setdefault(down.sub_skill_id, [])
+        if up.sub_skill_id not in ups:
+            ups.append(up.sub_skill_id)
+    return edges

@@ -34,6 +34,9 @@ from sbam_api.pipeline.service import (
 )
 from sbam_contracts.build import BuildStageInput, LibraryCheckResult, LibraryStatus
 from sbam_contracts.pipeline import (
+    MAX_PARALLEL_BUILDS,
+    BuildPlan,
+    BuildPlanInput,
     Cancel,
     CarryOverInput,
     CreateWorkflowInput,
@@ -53,6 +56,7 @@ from sbam_contracts.pipeline import (
 )
 from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_workflow_id
 from sbam_workers import mirror, registry
+from sbam_workers.build.plan import make_plan
 from sbam_workers.pipeline.project_pipeline import ProjectPipeline
 from sbam_workers.stub_ids import stage_stub_id, stub_id
 from sqlalchemy.orm import Session, sessionmaker
@@ -71,6 +75,7 @@ BEFORE_E5_2 = HISTORY.with_name("project_pipeline_before_e5_2.json")  # no heart
 BEFORE_E10_3 = HISTORY.with_name("project_pipeline_before_e10_3.json")  # no build scheduler patch
 BEFORE_E8_3 = HISTORY.with_name("project_pipeline_before_e8_3.json")  # unbounded pass 2
 BEFORE_E7_2 = HISTORY.with_name("project_pipeline_before_e7_2.json")  # no scope-change carry-over
+BEFORE_E9_5 = HISTORY.with_name("project_pipeline_before_e9_5.json")  # no Workflow manifest draft
 FULL_ORDER = [
     "ingest",
     "knowledge",
@@ -147,6 +152,20 @@ async def schema_sql_stand_in(inp: WorkflowRef) -> IdResult:
     return IdResult(id=stub_id(inp, "schema_sql"))
 
 
+@activity.defn(name="build_workflow_manifest")
+async def workflow_manifest_stand_in(inp: WorkflowRef) -> IdResult:
+    """The real stage (E9.5) reads the Workflow's manifests, bundles and schema.sql from the
+    database; its tests are tests/unit/test_e9_5_workflow_manifest.py."""
+    return IdResult(id=stub_id(inp, "workflow_manifest"))
+
+
+@activity.defn(name="plan_builds")
+async def plan_stand_in(inp: BuildPlanInput) -> BuildPlan:
+    """The real activity (E10.3 + E9.5 edges) reads the Sub-Skills' ISATVON from the database;
+    tests/temporal/test_build_scheduler.py drives the scheduler with its own edges."""
+    return make_plan(inp.sub_skill_ids, {}, MAX_PARALLEL_BUILDS)
+
+
 @activity.defn(name="check_libraries")
 async def libraries_stand_in(inp: BuildStageInput) -> LibraryCheckResult:
     """The real check (E9.3) reads the manifest and the runtime registry from the database; its
@@ -172,6 +191,8 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "build_schema_sql": schema_sql_stand_in,
     "check_libraries": libraries_stand_in,
     "carry_over_workflow": carry_over_stand_in,
+    "build_workflow_manifest": workflow_manifest_stand_in,
+    "plan_builds": plan_stand_in,
 }
 
 
@@ -645,14 +666,15 @@ def test_e10_1_signal_helper_refuses_when_not_waiting() -> None:
 
 @pytest.mark.parametrize(
     "recorded",
-    [HISTORY, BEFORE_E5_2, BEFORE_E10_3, BEFORE_E8_3, BEFORE_E7_2],
-    ids=["current", "before_e5_2", "before_e10_3", "before_e8_3", "before_e7_2"],
+    [HISTORY, BEFORE_E5_2, BEFORE_E10_3, BEFORE_E8_3, BEFORE_E7_2, BEFORE_E9_5],
+    ids=["current", "before_e5_2", "before_e10_3", "before_e8_3", "before_e7_2", "before_e9_5"],
 )
 def test_e10_1_replays_from_recorded_history(recorded: Path) -> None:
     """Determinism guard (TD §13.4): a change that breaks running pipelines fails here. E5.2-T09:
     `before_e5_2` was recorded before the knowledge stage's heartbeat patch, `current` after it.
     E10.3-T06: `before_e10_3` was recorded before the build scheduler patch. E8.3: `before_e8_3`
-    before pass 2 was bounded. E7.2: `before_e7_2` before the scope-change carry-over step."""
+    before pass 2 was bounded. E7.2: `before_e7_2` before the scope-change carry-over step. E9.5:
+    `before_e9_5` before the Workflow manifest draft."""
     workflow_id = pipeline_workflow_id(uuid.UUID(int=0))
     history = WorkflowHistory.from_json(workflow_id, json.loads(recorded.read_text("utf-8")))
     replayer = Replayer(workflows=[ProjectPipeline], data_converter=pydantic_data_converter)

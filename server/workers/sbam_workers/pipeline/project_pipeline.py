@@ -7,6 +7,8 @@
 
 E10.3 (behind `workflow.patched(SCHEDULER_PATCH)`): the build limit and the Sub-Skill dependency
 graph come from `plan_builds`, read once per generate; upstream Sub-Skills build first.
+E9.5 (behind `workflow.patched(MANIFEST_DRAFT_PATCH)`): once every Sub-Skill is built, the Workflow
+manifest draft (`build_workflow_manifest`) before certify_macros.
 
 Rules this file keeps (.claude/rules/temporal.md):
   * Deterministic: no clock, randomness, env or I/O here. Everything with side effects is an
@@ -69,6 +71,7 @@ with workflow.unsafe.imports_passed_through():
 
     from sbam_workers.build.plan import plan_builds
     from sbam_workers.build.schema_sql.activity import build_schema_sql
+    from sbam_workers.build.workflow_manifest import build_workflow_manifest
     from sbam_workers.certify.stubs import (
         certify_macros,
         certify_workflow,
@@ -111,6 +114,7 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "extract_sub_skills": LLM,
     "build_schema_sql": (TaskQueue.BUILD, timedelta(minutes=5), 2),
     "plan_builds": (TaskQueue.BUILD, timedelta(minutes=1), 3),
+    "build_workflow_manifest": (TaskQueue.BUILD, timedelta(minutes=2), 3),
     "certify_macros": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "validate_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "certify_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
@@ -130,6 +134,8 @@ EXTRACTION_PATCH = "e8-3-bounded-extraction"
 # E7.2: after creating the Workflow, copy what a scope change left untouched from the previous
 # version (a no-op on a first approval). Older runs: nothing copied.
 CARRY_OVER_PATCH = "e7-2-scope-change-carry-over"
+# E9.5: the Workflow manifest draft once the Sub-Skills are built. Older runs: no draft.
+MANIFEST_DRAFT_PATCH = "e9-5-workflow-manifest-draft"
 MAX_PARALLEL_EXTRACTIONS = 4
 WAITING_FOR = {
     PipelineStage.WAIT_SOW_APPROVAL: "sow_approved",
@@ -398,6 +404,8 @@ class ProjectPipeline:
 
     async def _stage_certify_macros(self) -> None:
         await self._enter(PipelineStage.CERTIFY_MACROS)
+        if workflow.patched(MANIFEST_DRAFT_PATCH):
+            await self._attempt(build_workflow_manifest, self._workflow_ref(), IdResult, None)
         await self._attempt(certify_macros, self._workflow_ref(), IdsResult, None)
 
     async def _stage_validate_workflow(self) -> None:

@@ -96,6 +96,11 @@ WorkflowManifest (schema_version = "sbam-workflow-manifest/1.0")
 └── integrity: {content_sha256}
 ```
 
+**Draft (E9.5).** Once every Sub-Skill is built, the build stage `build_workflow_manifest` writes the draft to `workflow_manifests` (one row per `workflow_id` + `build_no`, `is_frozen = false`):
+- **Not filled yet:** it has no `certification`, and its bundle and certification ids may be null until codegen and E14 certification. Once `certification` is set, none may be null.
+- **DAG:** built by the platform from the stored ISATVON (`sbam_workers/build/dag.py`), never from LLM text. Its edges are `contains` (Agent → Sub-Skill), `next` (`n_notification.next`) and `data` (an upstream's `o_outcome` field that a downstream lists in `s_source.required_inputs`). The data edges are also the build dependencies `plan_builds` schedules by.
+- **Refusals:** a loop in the data edges is `DAG_CYCLE`, and a Workflow without a PASSED schema.sql is `SCHEMA_SQL_MISSING`.
+
 ## 11.4 Versioning (C-32)
 
 - Format `MAJOR.0.PATCH`, stored as string in `skill_metadata.version` and as numbers in `governance.versioning` (`minor` is always 0).

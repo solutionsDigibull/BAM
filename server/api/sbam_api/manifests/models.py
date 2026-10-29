@@ -9,12 +9,17 @@ the repository maps to 423 RESOURCE_LOCKED.
 ISATVON_CONTRACT when a Sub-Skill fails the TD §10.4 validator at build time; the code gates (E12)
 add theirs with `code_attempt_id`. A Workflow-level gate (SCHEMA_SQL, E9.4) has `workflow_id` and no
 Sub-Skill; every row has one or the other.
+
+`workflow_manifests` (E9.5): the Workflow manifest (TD §11.3) of each build, one row per
+(workflow_id, build_no), with `integrity.content_sha256`. A draft until certification; frozen rows
+can't change, like the Sub-Skill manifests.
 """
 
 import uuid
 from typing import Any
 
 from sbam_contracts.build_dashboard import GateName, GateStatus
+from sbam_contracts.manifest import WORKFLOW_SCHEMA_VERSION
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -110,3 +115,24 @@ def _sqlite_frozen_guard(target: Table, connection: Connection, **_: object) -> 
 
 
 event.listen(SubSkillManifest.__table__, "after_create", _sqlite_frozen_guard)
+
+
+class WorkflowManifestRow(ProjectOwned, Base):
+    """The Workflow manifest (TD §11.3) of one build: the E9.5 draft until certification (E14)."""
+
+    __tablename__ = "workflow_manifests"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "workflow_id", "build_no", name="uq_workflow_manifests_build"
+        ),
+    )
+
+    workflow_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.workflows.id"), index=True)
+    build_no: Mapped[int] = mapped_column(Integer)
+    manifest: Mapped[dict[str, Any]] = mapped_column(Json)
+    sha256: Mapped[str] = mapped_column(String(71))  # integrity.content_sha256
+    schema_version: Mapped[str] = mapped_column(String(40), default=WORKFLOW_SCHEMA_VERSION)
+    is_frozen: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
+event.listen(WorkflowManifestRow.__table__, "after_create", _sqlite_frozen_guard)
