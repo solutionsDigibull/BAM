@@ -99,6 +99,23 @@ class GateResultRepository(TenantScopedRepository[GateResultRow]):
         )
         return self.session.scalars(query).one_or_none()
 
+    def failed_for_pass(
+        self, sub_skill_id: uuid.UUID, build_no: int, cycle: int, attempt: int
+    ) -> list[GateResultRow]:
+        """The gates that FAILED in one build pass, by gate name (the corrector's findings)."""
+        query = (
+            self._scoped()
+            .where(
+                GateResultRow.sub_skill_id == sub_skill_id,
+                GateResultRow.build_no == build_no,
+                GateResultRow.cycle == cycle,
+                GateResultRow.attempt == attempt,
+                GateResultRow.status == "FAILED",
+            )
+            .order_by(GateResultRow.gate)
+        )
+        return list(self.session.scalars(query))
+
     def record_stage(self, values: dict[str, Any]) -> GateResultRow:
         """Insert once per (sub_skill, gate, stage key); a retried activity gets the row it
         already wrote, with the same findings."""

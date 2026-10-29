@@ -33,6 +33,7 @@ from sbam_api.builds.models import CodeAttempt, CodeAttemptStatus
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.repository import LlmCallRepository
+from sbam_api.manifests.repository import GateResultRepository
 from sbam_contracts.build import (
     MAX_CORRECTIONS,
     BuildStageInput,
@@ -160,6 +161,13 @@ class SqlCorrectionStore:
                 source = repo.get(finding_id)  # other tenants' and unknown ids read as None
                 if source is not None and source.sub_skill_id == inp.sub_skill_id:
                     findings.extend(source.findings)
+            # The code gates (AST, static) keep their findings in `gate_results`, not on the code
+            # attempt, and `GateFailed` names only the attempt: read what failed in this pass.
+            gates = GateResultRepository(session, self._ctx(inp))
+            for gate in gates.failed_for_pass(
+                inp.sub_skill_id, inp.build_no, inp.cycle, inp.attempt
+            ):
+                findings.extend({"gate": gate.gate, **f} for f in gate.findings)
             sub_skill: Mapping[str, Any] | None = None
             previous: dict[str, Any] | None = None
             if inp.attempt > 0:

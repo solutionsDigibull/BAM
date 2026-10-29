@@ -15,10 +15,12 @@ from typing import Any
 import pytest
 from codegen_cases import ms01_bodies, ms01_params
 from fixtures import fixture_path
-from llm_db import TENANT, completion, llm_sessions, make_client
+from llm_db import TENANT, FakeBifrost, completion, llm_sessions, make_client
 from sbam_api.builds.models import CodeAttempt, CodeAttemptStatus
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.db.repository import TenantContext
+from sbam_api.manifests.models import GateResultRow
+from sbam_api.manifests.repository import GateResultRepository
 from sbam_contracts.build import (
     MAX_CORRECTIONS,
     CorrectionInput,
@@ -57,6 +59,7 @@ def db() -> sessionmaker[Session]:
     bind = sessions.kw["bind"]
     CodeAttempt.metadata.create_all(bind, tables=[CodeAttempt.__table__])  # type: ignore[list-item]
     AuditLog.metadata.create_all(bind, tables=[AuditLog.__table__])  # type: ignore[list-item]
+    GateResultRow.metadata.create_all(bind, tables=[GateResultRow.__table__])  # type: ignore[list-item]
     return sessions
 
 
@@ -142,12 +145,13 @@ def build(
     bifrost_replies: list[Any],
     *,
     trace: str = "",
+    fake: Any = None,
 ) -> Correct:
     params = ms01_params()
     from sbam_workers.build.codegen.render import render_skeleton
 
     skeleton = render_skeleton(template, params)
-    client, _ = make_client(_fake(bifrost_replies), sessions=sessions)
+    client, _ = make_client(fake or _fake(bifrost_replies), sessions=sessions)
 
     async def inputs(inp: CorrectionInput) -> CorrectionInputs:
         return CorrectionInputs(
@@ -512,3 +516,95 @@ def test_a20_an_audit_row_from_before_the_class_was_stored_is_classified_from_it
     again = run_result(impl, inp)
     assert again.isatvon_patch is IsatvonPatchClass.BEHAVIOUR and again.changed_paths == [ROUTING]
     assert again.id == first.id
+
+
+# --- #514: the findings of the code gates reach the corrector ---------------------------------
+
+
+def gate_row(
+    sessions: sessionmaker[Session],
+    inp: CorrectionInput,
+    gate: str,
+    status: str,
+    findings: list[dict[str, Any]],
+    *,
+    attempt: int | None = None,
+    sub_skill_id: uuid.UUID | None = None,
+    tenant_id: uuid.UUID | None = None,
+) -> None:
+    with sessions() as session:
+        repo = GateResultRepository(
+            session, TenantContext(tenant_id or inp.tenant_id, inp.project_id)
+        )
+        repo.record_stage(
+            {
+                "sub_skill_id": sub_skill_id or inp.sub_skill_id,
+                "gate": gate,
+                "status": status,
+                "findings": findings,
+                "tool_version": "test",
+                "config_sha256": "0" * 64,
+                "build_no": inp.build_no,
+                "cycle": inp.cycle,
+                "attempt": inp.attempt if attempt is None else attempt,
+                "created_by": "SYSTEM",
+            }
+        )
+        session.commit()
+
+
+def failure(code: str, message: str = "a finding") -> dict[str, Any]:
+    return {"code": code, "message": message, "file": "server.py", "line": 7}
+
+
+def sent_to_the_model(fake: FakeBifrost) -> str:
+    assert len(fake.requests) == 1
+    return json.dumps(fake.requests[0])
+
+
+def test_a514_t01_the_findings_of_the_failed_gates_of_this_pass_reach_the_corrector(
+    template: LoadedTemplate,
+) -> None:
+    sessions, fake = db(), FakeBifrost([corrector_reply()])
+    inp = correction_input(attempt=0, failed_gate="ast_gate")
+    attempt_id = seed_failed_attempt(sessions, template, inp, [])  # the AST gate leaves none here
+    inp = inp.model_copy(update={"finding_ids": [attempt_id]})  # what GateFailed carries
+    gate_row(sessions, inp, "AST_SKELETON", "FAILED", [failure("SKELETON_MISMATCH_X")])
+    gate_row(sessions, inp, "AST_NO_MANUAL_LOOP", "FAILED", [failure("WHILE_LOOP_X")])
+    gate_row(sessions, inp, "AST_SYNTAX", "PASSED", [failure("PASSED_GATE_X")])  # not a failure
+    gate_row(sessions, inp, "AST_IMPORTS", "FAILED", [failure("OTHER_PASS_X")], attempt=1)
+    gate_row(
+        sessions, inp, "AST_IMPORTS", "FAILED", [failure("OTHER_SUB_X")], sub_skill_id=uuid.uuid4()
+    )
+    gate_row(
+        sessions, inp, "AST_IMPORTS", "FAILED", [failure("OTHER_TENANT_X")], tenant_id=uuid.uuid4()
+    )
+    run(build(template, sessions, [], fake=fake), inp)
+    sent = sent_to_the_model(fake)
+    assert "SKELETON_MISMATCH_X" in sent and "WHILE_LOOP_X" in sent
+    assert "AST_SKELETON" in sent and "AST_NO_MANUAL_LOOP" in sent  # each finding names its gate
+    for left_out in ("PASSED_GATE_X", "OTHER_PASS_X", "OTHER_SUB_X", "OTHER_TENANT_X"):
+        assert left_out not in sent
+
+
+def test_a514_t02_the_attempts_own_findings_still_reach_it_next_to_the_gates(
+    template: LoadedTemplate,
+) -> None:
+    sessions, fake = db(), FakeBifrost([corrector_reply()])
+    inp = correction_input(attempt=0, failed_gate="ast_gate")
+    attempt_id = seed_failed_attempt(sessions, template, inp, [finding(code="PRECHECK_X")])
+    inp = inp.model_copy(update={"finding_ids": [attempt_id]})
+    gate_row(sessions, inp, "AST_SKELETON", "FAILED", [failure("SKELETON_MISMATCH_X")])
+    run(build(template, sessions, [], fake=fake), inp)
+    sent = sent_to_the_model(fake)
+    assert "PRECHECK_X" in sent and "SKELETON_MISMATCH_X" in sent
+
+
+def test_a514_t03_a_pass_with_no_failed_gate_adds_nothing(template: LoadedTemplate) -> None:
+    sessions, fake = db(), FakeBifrost([corrector_reply()])
+    inp = correction_input(attempt=0, failed_gate="HARNESS")
+    attempt_id = seed_failed_attempt(sessions, template, inp, [finding(code="HARNESS_X")])
+    inp = inp.model_copy(update={"finding_ids": [attempt_id]})
+    gate_row(sessions, inp, "AST_SYNTAX", "PASSED", [])
+    run(build(template, sessions, [], fake=fake), inp)
+    assert "HARNESS_X" in sent_to_the_model(fake)
