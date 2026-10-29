@@ -70,6 +70,15 @@ Correction patches to ISATVON are recorded as edits by `sbam-corrector` and show
 | AST_IMPORTS        | Imports ⊆ template base imports ∪ registry-resolved`libraries`. Forbidden: `eval`, `exec`, `compile`, `__import__`, `os.system`, `subprocess` (unless declared), `pickle`, `marshal`, `ctypes`                                                                                                     |
 | AST_SQL_SAFETY     | SQL is parameterised only (no f-string/concatenated SQL)                                                                                                                                                                                                                                                                 |
 
+The gate re-reads the stored bundle and checks it against the hashes `assemble` recorded before it
+looks at any code, and never imports or runs it. Its verdicts are `gate_results` rows, one per gate
+and build stage key, each carrying the `code_attempt_id` and the `bundle_sha256` it judged; a row
+about another attempt or another bundle is refused, never reused, and a retry reads the rows it
+already wrote. A failed check raises `GateFailed` (the correction loop, §12.4). A bundle that no
+longer matches its recorded hashes (`BUNDLE_TAMPERED`), or a gate handed inputs that are not the
+attempt's (`AST_GATE_INPUT_MISMATCH`), is a platform defect: the Sub-Skill goes to `BUILD_ERROR` and
+a notification names the cause (E31, E32).
+
 ## 12.6 Static and security gate, and schema SQL
 
 | Gate              | Tool                                                                                          | Blocking rule                                                                                                                            |

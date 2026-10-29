@@ -55,7 +55,7 @@ BUILDING: MANIFEST → CODEGEN → AST → STATIC → TESTING (loop harness + Pr
    attempts exhausted → NEEDS_FDE_REVIEW ──FDE fix + Retry──► BUILDING
    sandbox infrastructure down → TESTING_BLOCKED ──auto retry / Retry──► TESTING
    library missing from runtime registry → DEPENDENCY_FAILED ──correction / FDE edit──► BUILDING
-   template render error (platform defect) → BUILD_ERROR ──platform fix + Retry──► BUILDING
+   template render error, or a gate's integrity or wiring defect (platform defect) → BUILD_ERROR ──platform fix + Retry──► BUILDING
    the model cannot answer (schema re-asks or transport retries spent) → NEEDS_FDE_REVIEW ──Retry──► BUILDING
    a correction changed what the Sub-Skill means (a behaviour-changing ISATVON patch) → NEEDS_FDE_REVIEW ──Retry──► BUILDING
 TESTING passes → CERTIFIED (manifest governance.lifecycle.state = APPROVED) ──Workflow freeze──► FROZEN

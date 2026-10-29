@@ -54,6 +54,10 @@ KINDS: dict[str, Kind] = {
     # #446: a correction changed what the Sub-Skill means, so it is held for the FDE instead of
     # certifying. The transition (`sub_skill.isatvon_review_required`) is deliberately not mapped.
     "sub_skill.isatvon_review": Kind(T.SUBSKILL_NEEDS_REVIEW),
+    # #117: a platform defect stopped the build (a template error, a bundle that no longer matches
+    # what was assembled, a gate given the wrong inputs); an admin fixes it and retries. The
+    # cause is the `error` parameter. FDEs and Admins both see it.
+    "sub_skill.build_error": Kind(T.GENERATION_FAILED, "code build"),
     "document_version.malware_detected": Kind(T.DOCUMENT_REJECTED),
     "document_version.type_rejected": Kind(T.DOCUMENT_REJECTED),  # E4.4; the reason is on screen
     "document_version.parse_failed": Kind(T.DOCUMENT_REJECTED),

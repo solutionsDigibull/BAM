@@ -1,14 +1,15 @@
 """The `ast_gate` build stage (E12.2): AST_SYNTAX, AST_SKELETON, AST_CONFORMANCE on a bundle.
 
 The verdicts go into `gate_results`, one row per gate and build stage key (the same table and
-repository as the LIBRARIES gate), each pointing at the code attempt whose bundle it judged. A
-code attempt has one bundle for ever (`assemble` writes it once), so the stage key names the bytes:
-a retry reads the rows it already wrote, and a row that points at another attempt is refused, never
-reused. The stage re-reads the bundle from `StorageBackend` and verifies it against the hashes
-recorded at assembly before looking at a line of code; a bundle that no longer matches fails the
-activity (retryable on a read error, non-retryable `BUNDLE_TAMPERED` on a hash mismatch) and is
-never reported as a pass. Any failed gate raises the non-retryable `GateFailed`, details[0] = the
-attempt id, whose `gate_results` rows hold the findings.
+repository as the LIBRARIES gate), each pointing at the code attempt and the `bundle_sha256` it
+judged. A retry reads the rows it already wrote; a row about another attempt or another bundle is
+refused, never reused. The stage re-reads the bundle from `StorageBackend` and verifies it against
+the hashes recorded at assembly before looking at a line of code; a bundle that no longer matches
+fails the activity (retryable on a read error, non-retryable `BUNDLE_TAMPERED` on a hash mismatch)
+and is never reported as a pass. Any failed gate raises the non-retryable `GateFailed`, details[0] =
+the attempt id, whose `gate_results` rows hold the findings. `BUNDLE_TAMPERED` and a gate given
+inputs that are not the attempt's (`AST_GATE_INPUT_MISMATCH`) are platform defects: the build
+workflow turns them into BUILD_ERROR with a notification.
 
 Registered by `wiring.py` (#117) in place of the stub.
 """
@@ -41,10 +42,10 @@ from sbam_workers.build.gates.ast_checks import (
     run_ast_checks,
 )
 from sbam_workers.build.gates.ast_rules import run_rule_checks
+from sbam_workers.build.gates.errors import BUNDLE_TAMPERED, GATE_INPUT_MISMATCH
 
 STAGE = "ast_gate"
-INPUT_MISMATCH = "AST_GATE_INPUT_MISMATCH"
-BUNDLE_TAMPERED = "BUNDLE_TAMPERED"
+INPUT_MISMATCH = GATE_INPUT_MISMATCH
 RULE_GATES = (
     GateName.AST_DECOUPLING,
     GateName.AST_NO_MANUAL_LOOP,
@@ -83,6 +84,7 @@ class AstGate:
         self,
         inp: BuildStageInput,
         attempt_id: uuid.UUID,
+        bundle_sha: str,
         results: list[CheckResult],
     ) -> list[GateStatus]:
         with self.sessions() as session:
@@ -100,14 +102,18 @@ class AstGate:
                         "build_no": inp.build_no,
                         "cycle": inp.cycle,
                         "attempt": inp.attempt,
+                        "bundle_sha256": bundle_sha,
                         "created_by": "SYSTEM",
                     }
                 )
                 for r in results
             ]
-            if any(row.code_attempt_id != attempt_id for row in stored):
-                # a verdict about another attempt's bundle is never this bundle's verdict
-                message = "a recorded verdict belongs to another attempt"
+            if any(
+                row.code_attempt_id != attempt_id or row.bundle_sha256 != bundle_sha
+                for row in stored
+            ):
+                # a verdict about other bytes is never this bundle's verdict
+                message = "a recorded verdict is about another attempt or another bundle"
                 raise _fail(message, attempt_id, INPUT_MISMATCH)
             session.commit()
             return [GateStatus(row.status) for row in stored]
@@ -164,10 +170,20 @@ class AstGate:
             raise _fail(str(exc), attempt_id, INPUT_MISMATCH) from exc
         results = list(run_ast_checks(files, given.skeleton, given.template, given.params))
         results += self._rules(files, given, results[0])
-        recorded = self._record(inp, attempt_id, results)
+        recorded = self._record(inp, attempt_id, bundle_sha, results)
         if any(s is not GateStatus.PASSED for s in recorded):
             failed = zip(GATES, recorded, strict=True)
             bad = [g.value for g, s in failed if s is not GateStatus.PASSED]
-            activity.logger.info("generated code failed the AST gate", extra={"gates": bad})
+            activity.logger.info(
+                "generated code failed the AST gate",
+                extra={
+                    "gates": bad,
+                    "tenant_id": str(inp.tenant_id),
+                    "project_id": str(inp.project_id),
+                    "workflow_id": str(inp.workflow_id),
+                    "sub_skill_id": str(inp.sub_skill_id),
+                    "correlation_id": inp.correlation_id,
+                },
+            )
             raise gate_failed(attempt_id)
         return IdResult(id=attempt_id)

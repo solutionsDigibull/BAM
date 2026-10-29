@@ -101,6 +101,8 @@ class GateResultRow(ProjectOwned, Base):
     build_no: Mapped[int | None] = mapped_column(Integer)
     cycle: Mapped[int | None] = mapped_column(Integer)
     attempt: Mapped[int | None] = mapped_column(Integer)
+    # The bundle a code gate's verdict is about (E12.2); null for gates that run before one exists.
+    bundle_sha256: Mapped[str | None] = mapped_column(String(64))
 
 
 def _sqlite_frozen_guard(target: Table, connection: Connection, **_: object) -> None:
