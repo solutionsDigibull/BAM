@@ -235,7 +235,7 @@ def hook_secret(
 async def tusd_hook(
     request: Request, _hook: Annotated[str, Depends(hook_secret)], sessions: Sessions
 ) -> dict[str, object]:
-    secret = _token_key(request.app.state.settings)  # verifies the upload token, not the hook
+    secret = _token_key(request.app.state.settings)  # checks upload tokens and proofs, not the hook
     try:
         hook = tusd.HookRequest.model_validate_json(await request.body())
     except ValidationError:
@@ -260,7 +260,7 @@ def _pre_create(
         )
     if decision.code is not None:
         return tusd.reject(decision.status, decision.code, decision.detail, correlation)
-    return tusd.accept(decision.upload_id)
+    return tusd.accept(decision.upload_id, decision.metadata)
 
 
 def _register(

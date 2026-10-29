@@ -31,6 +31,7 @@ from sbam_api.builds.models import CodeAttempt
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.conventions import not_found
+from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.storage.base import StorageBackend
 from sbam_api.workflows.repository import WorkflowRepository
 
@@ -82,6 +83,9 @@ def _rows(
     ctx = user.context(project_id)
     if WorkflowRepository(session, ctx).get(workflow_id) is None:
         raise not_found()
+    sub_skill = SubSkillRepository(session, ctx).get(sub_skill_id)
+    if sub_skill is None or sub_skill.workflow_id != workflow_id:  # own, foreign or invented id
+        raise not_found()  # (A-33: an unknown Sub-Skill used to answer 200 with an empty list)
     return CodeAttemptRepository(session, ctx).of_sub_skill(
         workflow_id, sub_skill_id, build_no, cycle
     )

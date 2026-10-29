@@ -997,3 +997,16 @@ def test_a14_t08_only_the_api_gets_the_upload_token_key_and_tusd_does_not() -> N
     assert "UPLOAD_TOKEN_KEY_FILE: /run/secrets/upload_token_key" in api
     workers = deploy.split("\n  worker-ingest:\n")[1]
     assert "upload_token_key" not in workers.split("\nsecrets:")[0]
+
+
+def test_a33_t07_tusd_allows_cross_origin_calls_only_from_the_portal() -> None:
+    text = (COMPOSE / "compose.yaml").read_text(encoding="utf-8")
+    tusd = text.split("\n  tusd:\n")[1].split("\n  sbam-")[0]
+    flags = re.findall(r"- -cors-allow-origin=(\S+)", tusd)
+    assert len(flags) == 1, "tusd reflects any Origin unless -cors-allow-origin is set"
+    assert not flags[0].endswith(".*") and flags[0] != ".*"
+    default = flags[0].removeprefix("${TUSD_CORS_ORIGIN:-").removesuffix("}")
+    assert default.startswith("^http://localhost:") and default.endswith(
+        "\\z"
+    )  # anchored both ends
+    assert "TUSD_CORS_ORIGIN" in (COMPOSE / ".env.example").read_text(encoding="utf-8")
