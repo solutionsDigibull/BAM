@@ -74,7 +74,7 @@ injection bugs.
 | F-13 | Keycloak calls inside a DB transaction holding the tenant lock | Code | P3 |
 | F-14 | Upload-token key derived from the tusd hook secret | Code | P3 |
 | F-15 | Upload slot limit is check-then-act | Unverified | P3 |
-| F-16 | Client-declared MIME stored; type by extension until parse stage exists | Code | P3 |
+| F-16 | ~~Client-declared MIME stored; type by extension~~ **Refuted** (2026-10-29): file content decides the type; the declared MIME never selects a loader | **PoC** | none |
 | N-03 | Workbook import materialises all rows (14 MB = 18.5 s, +115 MB) | **PoC** | P3 |
 | N-04 | Chunked oversize body answers 400, not 413 | **PoC** | P3 |
 | F-17..F-22, N-08 | Hygiene batch (see section 6) | Code/PoC | P3 |
@@ -264,9 +264,10 @@ source" with no bundle evidence; decide whether that is intended.
   accepted. Fix: independent secrets; hooks on a private network with mTLS or request signing.
 - **F-15 Upload slot limit is check-then-act `Unverified`.** `request_upload` counts then inserts without a lock;
   `pre_create` re-checks, which narrows the window.
-- **F-16 Client-declared MIME `Code`.** `is_allowed(name)` is by extension and the stored `mime` is as declared; the
-  parse stage does exist (`ingest/detect.py`, `type_detection.py`, `loaders/`), so confirm detection by magic bytes
-  decides the loader, not the extension or declared MIME (`Unverified`; not traced).
+- **F-16 Client-declared MIME: refuted `PoC`.** The stored `mime` is as declared, but it never picks a loader.
+  `detect()` (`ingest/detect.py`) rejects a file whose leading bytes do not match its extension. Run live: a PNG or ELF
+  named `.pdf`, a PDF named `.txt`/`.png`/`.xlsx`, a bare ZIP named `.docx` and non-UTF-8 bytes named `.csv` were all
+  rejected (`TYPE_MISMATCH` or `INVALID_ENCODING`). No issue needed.
 - **N-03 Workbook import cost `PoC`.** `masters/importer.py` builds `{title: [list(row) ...]}` for all sheets before
   validating structure. A 14.4 MB workbook (400k rows): **18.5 s**, +115 MB RSS, then 422. Three in parallel raised
   another user's `/me` p95 from **9 ms to 547 ms**. Zip-bomb guard works. Fix: validate sheet names and header rows
