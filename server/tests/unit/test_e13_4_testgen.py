@@ -16,13 +16,16 @@ from sbam_contracts.build import BuildStageInput
 from sbam_contracts.testgen import CaseBody, CaseKind, dataset_sha256
 from sbam_workers.llm.reask import SchemaInvalidAfterRetries
 from sbam_workers.test.testgen import (
+    TEST_DATA_STALE,
     GenerateTests,
     SqlDatasetStore,
     allowed_kinds,
     data_files,
+    fingerprint,
     request_context,
 )
 from sqlalchemy import select
+from temporalio.exceptions import ApplicationError
 from temporalio.testing import ActivityEnvironment
 from test_codegen_assemble import stage_input
 
@@ -242,3 +245,67 @@ def test_e13_4_the_dataset_hash_covers_the_files(tmp_path: Path) -> None:
     plain = World([GOOD])
     plain.run()
     assert dataset.sha256 != plain.datasets()[0].sha256  # same cases, a file more: another hash
+
+
+def after_a_correction(w: World, isatvon: dict[str, Any]) -> None:
+    """The build's next attempt: a new stage key, the Sub-Skill as the corrector left it."""
+    w.isatvon = isatvon
+    w.inp = w.inp.model_copy(update={"attempt": w.inp.attempt + 1})
+
+
+def mark_edited(w: World, dataset_id: uuid.UUID, generated_for: str | None = "keep") -> None:
+    with w.sessions() as s:
+        row = s.get(DatasetRow, dataset_id)
+        assert row is not None
+        row.edited_by_fde = True
+        if generated_for != "keep":
+            row.generated_for = generated_for
+        s.commit()
+
+
+def test_e11_4b_the_dataset_records_what_it_was_generated_for() -> None:
+    w = World([GOOD])
+    w.run()
+    assert w.datasets()[0].generated_for == fingerprint(w.isatvon)
+
+
+def test_e11_4b_a_correction_that_changes_max_iterations_regenerates_the_tests() -> None:
+    w = World([GOOD, {"cases": [*GOOD["cases"][:2], case("nothing", "NO_OP", "NO_OP")]}])
+    first = w.run()
+    after_a_correction(w, sample(**{IDEF + "v_variables.max_iterations": 1}))
+    second = w.run()
+    one, two = w.datasets()
+    assert second != first and (one.version, two.version) == (1, 2)
+    assert one.sha256 != two.sha256 and one.generated_for != two.generated_for
+    newest = {c.kind for c in w.cases() if c.dataset_id == second}
+    assert "PASS_AFTER_RETRY" not in newest and len(w.bifrost.requests) == 2
+
+
+def test_e11_4b_a_correction_that_leaves_the_bounds_alone_leaves_the_tests_alone() -> None:
+    w = World([GOOD])
+    first = w.run()
+    patched = sample()
+    patched["isatvon_definition"]["t_tech_stack"]["fixed_check_tool"] = "other_check_tool"
+    after_a_correction(w, patched)
+    assert fingerprint(patched) == fingerprint(sample())
+    assert w.run() == first
+    assert len(w.bifrost.requests) == 1 and len(w.datasets()) == 1
+
+
+def test_e11_4b_edited_tests_that_no_longer_fit_the_new_bound_wait_for_the_fde() -> None:
+    w = World([GOOD])
+    first = w.run()
+    mark_edited(w, first)
+    after_a_correction(w, sample(**{IDEF + "v_variables.max_iterations": 1}))
+    with pytest.raises(ApplicationError) as caught:
+        w.run()
+    assert caught.value.type == TEST_DATA_STALE and caught.value.non_retryable
+    assert len(w.datasets()) == 1 and len(w.bifrost.requests) == 1  # nothing overwritten
+
+
+def test_e11_4b_edited_tests_from_before_the_fingerprint_are_kept() -> None:
+    w = World([GOOD])
+    first = w.run()
+    mark_edited(w, first, generated_for=None)
+    after_a_correction(w, sample(**{IDEF + "v_variables.max_iterations": 1}))
+    assert w.run() == first and len(w.datasets()) == 1

@@ -179,6 +179,7 @@ class Open:
             sha256=dataset_sha256(cases, files_hashes(keys)),
             synthetic=True,
             edited_by_fde=True,
+            generated_for=self.dataset.generated_for,  # an edit does not change the ISATVON
             created_by=str(self.user.user_id),
         )
         DatasetRepository(self.session, self.ctx).add(new)

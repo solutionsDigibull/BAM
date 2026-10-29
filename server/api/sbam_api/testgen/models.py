@@ -37,6 +37,8 @@ class DatasetRow(ProjectOwned, Base):
     sha256: Mapped[str] = mapped_column(String(64))
     synthetic: Mapped[bool] = mapped_column(Boolean, default=True)
     edited_by_fde: Mapped[bool] = mapped_column(Boolean, default=False)
+    # what the cases were generated for (bounds, input schema, tables); None before E11.4b
+    generated_for: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class CaseRow(ProjectOwned, Base):

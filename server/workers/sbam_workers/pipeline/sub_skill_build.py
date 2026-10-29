@@ -116,6 +116,7 @@ MODEL_FAILURES = frozenset(
         "LlmRequestRejected",  # Bifrost refused the request
         "BudgetExceeded",  # the LLM budget is spent
         "ContextTooLarge",  # the Sub-Skill does not fit the prompt: the FDE can shrink it
+        "TestDataStale",  # #484: the FDE's edited tests were written for other bounds
     }
 )
 TIMED_OUT = "ActivityTimeout"
