@@ -19,8 +19,7 @@ Idempotency (TD §13.4): the stage key names the `attempt + 1` row and the `llm_
 so a retry after the model answered reuses the answer (no second charge) and finds the row. LLM
 errors (transport, schema) propagate before anything is written.
 
-Not registered yet, like `GenerateBodies`: whoever wires the build stages (#107) registers
-`Correct(...).run` with real `inputs` and `client`; `stubs.correct` stays registered meanwhile.
+Registered by `wiring.py` (E11.2b) with the loaders and the worker's `LlmClient`.
 """
 
 import hashlib

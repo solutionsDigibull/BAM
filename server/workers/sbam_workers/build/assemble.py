@@ -9,8 +9,7 @@ upload but before the row update stores nothing new and finds the same `artifact
 A storage failure (e.g. disk full) leaves the row untouched, counts
 `code_bundle_storage_failures_total` for the operator alert and propagates as a retryable error.
 
-Not registered yet, like `GenerateBodies`: whoever wires the build stages (#107) registers
-`Assemble(...).run` with real `inputs` and `storage`; `stubs.assemble` stays registered meanwhile.
+Registered by `wiring.py` (E11.2b) with the loaders and the storage backend of the worker.
 """
 
 import uuid

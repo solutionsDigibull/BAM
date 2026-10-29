@@ -4,9 +4,7 @@ Idempotency (TD §13.4): the stage key `(sub_skill_id, build_no, cycle, attempt)
 `code_attempts` row and is also the `llm_calls` replay key, so a Temporal retry after the model
 answered reuses that answer (no second charge) and finds or writes the same row.
 
-Not registered yet: `build_manifest` and `render_skeleton` are still stubs and no production
-`LlmClient` is built, so `stubs.generate_bodies` stays the registered activity. Whoever wires the
-build stages (#107) registers `GenerateBodies(...).run` with real `inputs` and `client`.
+Registered by `wiring.py` (E11.2b) with the loaders and the worker's `LlmClient`.
 """
 
 import uuid

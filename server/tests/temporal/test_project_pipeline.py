@@ -56,6 +56,7 @@ from sbam_contracts.pipeline import (
 )
 from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_workflow_id
 from sbam_workers import mirror, registry
+from sbam_workers.build import stubs as build_stubs
 from sbam_workers.build.plan import make_plan
 from sbam_workers.pipeline.project_pipeline import ProjectPipeline
 from sbam_workers.stub_ids import stage_stub_id, stub_id
@@ -193,6 +194,10 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "carry_over_workflow": carry_over_stand_in,
     "build_workflow_manifest": workflow_manifest_stand_in,
     "plan_builds": plan_stand_in,
+    # the real codegen stages (#355) need a database of manifests and an LLM; the stubs answer
+    "generate_bodies": build_stubs.generate_bodies,
+    "assemble": build_stubs.assemble,
+    "correct": build_stubs.correct,
 }
 
 
