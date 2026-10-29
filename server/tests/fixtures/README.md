@@ -44,6 +44,7 @@ too_big = blob(15 * 1024 * 1024 + 1)                              # exact size, 
 | File | What it is | Expected outcome |
 |---|---|---|
 | `masters/BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx` | Unmodified copy of the consolidated masters workbook (MSC, BAM 0.2) from `docs/reference` | Byte-identical to the original; the masters contract (E0.4) accepts every row |
+| `masters/structure_changed_rules.xlsx` | The consolidated workbook with the Rules header `Components (BOM)` renamed to `BOM` (openpyxl) | Import is 422 `STRUCTURE_MISMATCH` (renamed); used by the E15.1 E03 scenario |
 
 ## sow/
 

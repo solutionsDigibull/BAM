@@ -345,6 +345,25 @@ jobs:
           seed="$(sed -n 's/^SEED_USER_PASSWORD=//p' "$ENV_FILE")"
           echo "::add-mask::$seed"
           E2E_SEED_PASSWORD="$seed" E2E_BASE_URL=http://localhost:3000 E2E_KEYCLOAK=1             pnpm --dir client exec playwright test --project keycloak
+      # E15.1: scenarios E01-E10 end to end on the same stack (real logins, workers, LLM mock). The
+      # run's projects are named e2e-<run id> and archived by each test.
+      - name: End-to-end scenarios (E01-E10)
+        env:
+          E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          seed="$(sed -n 's/^SEED_USER_PASSWORD=//p' "$ENV_FILE")"
+          echo "::add-mask::$seed"
+          E2E_SEED_PASSWORD="$seed" E2E_BASE_URL=http://localhost:3000 E2E_STACK=1 \
+            pnpm --dir client exec playwright test --project stack
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-stack-report
+          path: |
+            client/playwright-report/
+            client/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
       - if: failure()
         run: |
           docker compose --env-file "$ENV_FILE" -f compose/compose.yaml -f compose/compose.override.yaml ps -a
