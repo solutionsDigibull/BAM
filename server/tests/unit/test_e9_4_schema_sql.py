@@ -79,6 +79,45 @@ def test_e9_4_t06_forbidden_statements_are_found_with_their_index(statement: str
     assert script.problems[0].statement_index == 1
 
 
+_BODY = "BEGIN RETURN NEW; END;"
+_FN = "CREATE FUNCTION f() RETURNS trigger"
+_PLPGSQL = f"{_FN} LANGUAGE plpgsql AS $$"
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        # the audit's trick: a LANGUAGE written inside a body or comment hides the real clause
+        f"{_FN} AS $$ # LANGUAGE plpgsql ... {_BODY} $$ LANGUAGE plpython3u",
+        f"{_FN} AS 'select 1 -- LANGUAGE sql' LANGUAGE plpython3u",
+        f"{_FN} /* LANGUAGE plpgsql */ AS $$ {_BODY} $$ LANGUAGE plpython3u",
+        f"{_FN} AS $$ {_BODY} $$ LANGUAGE plpgsql LANGUAGE c",  # two clauses
+        f'{_FN} AS $$ {_BODY} $$ LANGUAGE "plpython3u"',
+        # a body that stalls or reconfigures the throwaway server
+        f"{_PLPGSQL} BEGIN PERFORM pg_sleep(9); END; $$",
+        f"{_PLPGSQL} BEGIN PERFORM set_config('a','0',false); END; $$",
+        f"{_PLPGSQL} BEGIN PERFORM pg_terminate_backend(1); END; $$",
+    ],
+)
+def test_a31_t01_language_trick_and_stalling_bodies_are_refused(statement: str) -> None:
+    script = check(statement + ";")
+    assert codes(script.problems) == ["FORBIDDEN_STATEMENT"], statement
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        f"{_PLPGSQL} {_BODY} $$",
+        f"{_FN} AS $$ {_BODY} $$ LANGUAGE PLPGSQL",
+        f"{_FN} AS $$ {_BODY} $$ LANGUAGE 'plpgsql'",
+        # a LANGUAGE in a body comment is not a second clause (the old regex refused this one)
+        f"{_FN} AS $$ BEGIN -- LANGUAGE c\n RETURN NEW; END; $$ LANGUAGE plpgsql",
+    ],
+)
+def test_a31_t02_legitimate_function_languages_still_pass(statement: str) -> None:
+    assert check(statement + ";").ok, statement
+
+
 def test_e9_4_foundational_ddl_is_allowed() -> None:
     script = check(
         f"{PROFILES_DDL};\nCREATE INDEX ix ON {PROFILES} (investor_id);\n"

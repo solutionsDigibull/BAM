@@ -19,6 +19,7 @@ import logging
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 import sqlglot
 from sbam_contracts.schema_sql import SchemaFindingCode
@@ -35,11 +36,13 @@ EXTENSIONS = frozenset({"pgcrypto", "uuid-ossp", "citext"})
 FORBIDDEN_WORDS = re.compile(
     r"\b(?:EXECUTE\b(?!\s+(?:FUNCTION|PROCEDURE)\b)|PROGRAM\b|ALTER\s+SYSTEM\b|COPY\b|"
     r"pg_read_(?:binary_)?file\b|pg_ls_dir\b|pg_stat_file\b|lo_import\b|lo_export\b|dblink\w*|"
-    r"SECURITY\s+DEFINER\b|SET\s+ROLE\b|SET\s+SESSION\s+AUTHORIZATION\b|GRANT\b|REVOKE\b)",
+    r"SECURITY\s+DEFINER\b|SET\s+ROLE\b|SET\s+SESSION\s+AUTHORIZATION\b|GRANT\b|REVOKE\b|"
+    # a body must not stall or reconfigure the throwaway server (A-31)
+    r"pg_sleep\w*|pg_terminate_backend\b|pg_cancel_backend\b|pg_reload_conf\b|set_config\b|"
+    r"statement_timeout\b|lock_timeout\b)",
     re.IGNORECASE,
 )
 _FUNCTION = re.compile(r"^CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\b", re.IGNORECASE)
-_LANGUAGE = re.compile(r"\bLANGUAGE\s+'?(\w+)'?", re.IGNORECASE)
 _EXTENSION = re.compile(
     r"^CREATE\s+EXTENSION\s+(?:IF\s+NOT\s+EXISTS\s+)?\"?([\w-]+)\"?\s*$", re.IGNORECASE
 )
@@ -110,6 +113,21 @@ def _has_code(chunk: str) -> bool:
         return bool(chunk.strip())
 
 
+def _languages(text: str) -> list[str]:
+    """Every `LANGUAGE x` clause of a function, read from the token stream. A `$$ … $$` or quoted
+    body is one token, so a `LANGUAGE` written inside a body or a comment is never mistaken for the
+    real clause (A-31)."""
+    try:
+        tokens = Postgres().tokenize(text)
+    except TokenError:
+        return []
+    return [
+        nxt.text.lower()
+        for token, nxt in pairwise(tokens)
+        if token.token_type == TokenType.VAR and token.text.upper() == "LANGUAGE"
+    ]
+
+
 def _allowed(text: str, tree: exp.Expr) -> str | None:
     """None when the statement is allowed, else why not."""
     found = FORBIDDEN_WORDS.search(text)
@@ -124,8 +142,7 @@ def _allowed(text: str, tree: exp.Expr) -> str | None:
         return None
     if isinstance(tree, exp.Command):
         if _FUNCTION.match(text):
-            language = _LANGUAGE.search(text)
-            if language is None or language.group(1).lower() not in {"plpgsql", "sql"}:
+            if _languages(text) not in (["plpgsql"], ["sql"]):
                 return "a function must be LANGUAGE plpgsql or sql"
             return None
         extension = _EXTENSION.match(text)
