@@ -100,7 +100,7 @@ class PurgeCleanup(Protocol):
 
 
 class NoCleanup:
-    """Default until knowledge (E5) stores derivatives and references: there are none to remove."""
+    """Removes nothing besides the upload (tests that only check the upload, and the API side)."""
 
     def derived_keys(
         self, session: Session, ctx: TenantContext, document_id: uuid.UUID
@@ -111,6 +111,46 @@ class NoCleanup:
         self, session: Session, ctx: TenantContext, document_id: uuid.UUID
     ) -> None:
         return None
+
+
+class DerivedFiles:
+    """The worker's cleanup (#449): each pending version's parsed text (`doc.md`, `doc.json`).
+
+    Derivatives are named by their content hash, so a key another record still uses (another
+    version, a master document with the same content) is kept. The Cognee items are not removed
+    here: purge runs on the ingest worker, which has no Cognee, so `PurgeDeleted` removes them
+    on the knowledge queue (`remove_document_knowledge`) before this runs.
+    """
+
+    def derived_keys(
+        self, session: Session, ctx: TenantContext, document_id: uuid.UUID
+    ) -> Sequence[str]:
+        repo = DocumentVersionRepository(session, ctx)
+        pending = [v for v in repo.of_document(document_id) if v.state == S.DELETED.value]
+        ids = [v.id for v in pending]
+        keys = dict.fromkeys(
+            k for v in pending for k in (v.derived_md_key, v.derived_json_key) if k
+        )
+        return [k for k in keys if not repo.derived_key_in_use(k, ids)]
+
+    def remove_references(
+        self, session: Session, ctx: TenantContext, document_id: uuid.UUID
+    ) -> None:
+        return None  # done on the knowledge queue, see the class docstring
+
+
+def due_versions(session: Session, target: PurgeTarget, as_of: datetime) -> list[uuid.UUID] | None:
+    """The DELETED versions of a document that is still deleted and due at `as_of`; None when
+    there is nothing to purge (gone, restored, not due yet, already purged). Read only: the
+    purge itself re-checks under the row lock."""
+    ctx = TenantContext(target.tenant_id, target.project_id)
+    document = DocumentRepository(session, ctx).get(target.document_id, include_deleted=True)
+    if document is None or document.deleted_at is None or document.purge_after is None:
+        return None
+    if _aware(document.purge_after) > _aware(as_of):
+        return None
+    versions = DocumentVersionRepository(session, ctx).of_document(document.id)
+    return [v.id for v in versions if v.state == S.DELETED.value] or None
 
 
 def _correlation() -> str:

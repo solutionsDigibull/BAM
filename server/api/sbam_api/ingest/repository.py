@@ -6,11 +6,12 @@ from datetime import datetime
 
 from sbam_contracts.documents import ScanStatus
 from sbam_contracts.state_machines import DocumentVersionState as S
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from sbam_api.db.repository import TenantScopedRepository
 from sbam_api.ingest.models import Document, DocumentVersion, ReservationStatus, UploadReservation
+from sbam_api.masters.models import MasterDocument
 from sbam_api.state_machine.repository import StatefulRepository
 
 # A rejected, deleted or purged version no longer takes one of the 20 slots.
@@ -91,6 +92,23 @@ class DocumentVersionRepository(StatefulRepository):
             .with_for_update()
         )
         return len(self.session.scalars(query).all())
+
+    def derived_key_in_use(self, key: str, exclude: Sequence[uuid.UUID]) -> bool:
+        """Does another record still point at this derived file (#449)? Derivatives are named by
+        their content hash, so the same text parsed for another version, or for a master document,
+        shares the key. Same rule as `others_using_key`: any state but REJECTED / PURGED counts."""
+        versions = self._scoped(include_deleted=True).where(
+            or_(DocumentVersion.derived_md_key == key, DocumentVersion.derived_json_key == key),
+            DocumentVersion.id.not_in(exclude),
+            DocumentVersion.state.not_in((S.REJECTED.value, S.PURGED.value)),
+        )
+        if self.session.scalars(versions.limit(1)).first() is not None:
+            return True
+        masters = select(MasterDocument.id).where(
+            MasterDocument.tenant_id == self.ctx.tenant_id,
+            or_(MasterDocument.derived_md_key == key, MasterDocument.derived_json_key == key),
+        )
+        return self.session.scalars(masters.limit(1)).first() is not None
 
     def of_documents(self, document_ids: list[uuid.UUID]) -> dict[uuid.UUID, DocumentVersion]:
         """The version of each document (one file per document today), keyed by document id."""

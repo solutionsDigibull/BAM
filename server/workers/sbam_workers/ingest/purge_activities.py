@@ -5,8 +5,9 @@ the others, and Temporal retries just that one. The work itself is
 `sbam_api.ingest.retention.purge_document`: idempotent, and it re-checks under the row lock that the
 document is still deleted and due, so a document restored after it was selected is left alone.
 
-The storage backend and the cleanup of derivatives / Cognee references are module-level seams:
-`configure()` in tests, built from the worker settings on first use otherwise.
+The storage backend and the cleanup of derivatives are module-level seams: `configure()` in
+tests, the worker settings and `retention.DerivedFiles` otherwise. The document's Cognee items are
+removed before this, on the knowledge queue (`knowledge.purge`, #449).
 """
 
 import threading
@@ -30,7 +31,7 @@ LIST_LIMIT = 100  # documents per round; the workflow asks again until none are 
 
 _lock = threading.Lock()
 _storage: StorageBackend | None = None
-_cleanup: retention.PurgeCleanup = retention.NoCleanup()
+_cleanup: retention.PurgeCleanup = retention.DerivedFiles()  # #449; Cognee: knowledge queue
 
 
 def configure(
