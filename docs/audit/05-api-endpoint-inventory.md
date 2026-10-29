@@ -3,7 +3,12 @@
 Source: `discover_routers()` on `origin/dev` @ `d8b0dce`, policy read from each route's dependency chain, 79 routes under `/api/v1` (the two `/health/*` probes are unauthenticated by design and not listed).
 Startup already refuses any route without a policy (`main.unguarded_routes`); this table confirms none is missing: 42 `fde`, 25 `admin`, 6 `authenticated`, 4 `super_admin`, 2 self-authenticating (`internal`).
 
-**Review depth:** `live` = exercised against the running API (rounds 2 and 3); `read` = code read, not run; `listed` = inventoried only, **not reviewed in depth**. live: 38, read: 41.
+**Review depth:** `live` = exercised against the running API (rounds 2 and 3); `read` = code read, not run; `listed` = inventoried only, **not reviewed in depth**. live: 38, read: 41, listed: 0 (every route now has at least a code read).
+
+**2026-10-29 scope check:** read all 41 `read`-depth routes against the documented product direction
+(masters admin, knowledge, SOW, ISATVON, pipeline, temporal). None are dead code, unused, or speculative surface;
+all are load-bearing for the pipeline this product describes. The remaining work is depth (promote `read` to
+`live`), not scope-trimming. See `07-production-readiness.md` §6.
 
 **Write-control column:** `no If-Match` on a write is not automatically a bug (creates and commands use `Idempotency-Key` or are not versioned resources); it is flagged so the owner can confirm against `docs/api-conventions.md`.
 

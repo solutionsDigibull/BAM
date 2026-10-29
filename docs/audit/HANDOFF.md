@@ -22,7 +22,7 @@ Rules from the owner: if a task can't finish in about 5 minutes, defer it, write
 ## Pending
 1. DONE: all 21 drafts are filed (#427-#447), plus A-22..A-35 (#448-#461). Cross-check of every finding ID: all covered; F-16 was traced and refuted (no issue), N-07 is a review note on #353.
 2. DONE: `all-branches/` (427 MB, 42 snapshots of old merged branches, Oct 13). 13,594 of 13,602 files are byte-identical to blobs in git. The other 8: 7 early drafts of the #49 identity work (superseded on `dev`; `0003_identity.py` was renumbered) and `dev/compose/.env.local`, a gitignored file with a REAL OpenRouter key and generated passwords, the only copy. Archived (not deleted) to `/home/Fool/Arch - Work/_archive/BAM-all-branches-2026-10-13.tar.zst` (mode 600, 13,602 files verified, env file checksum matched), then the directory was removed. Owner: rotate that OpenRouter key if it is still live, and delete the archive when no longer wanted.
-3. The 25 endpoints marked `listed` in `05-api-endpoint-inventory.md`: review each against the project direction and decide required vs weeds. (in progress)
-4. Production-readiness view: what to do for the project's future. (after 1-3)
-5. Blocked: real-model prompt injection, CubeSandbox.
+3. DONE: the "25 of 79 inventoried only" line was stale; every route is `read` or `live` (0 `listed`). Reviewed all 41 `read`-depth routes against the product direction: none are weeds, all are load-bearing. Fixed the stale line in README.md and 05's summary.
+4. DONE: `07-production-readiness.md` written - sequencing recommendation (not a new finding): fix F-25 (deploy blocker) now; treat F-01/F-02/F-36 as a blocking dependency of real certification, not independent backlog; F-26/F-27 (data lifecycle) before real customer data; F-09/#437/#440/F-35 hygiene; D-18 and F-23 are owner decisions, not bugs.
+5. Blocked: real-model prompt injection, CubeSandbox (owner: wait until other findings resolved).
 6. Open design questions in `06-flows-and-design-review.md` (e.g. D-18 second approver).

@@ -12,6 +12,7 @@ GitHub issues filed). Read in this order.
 | `05-api-endpoint-inventory.md` | All 79 routes with policy, write controls, review depth | endpoint coverage and gaps |
 | `06-flows-and-design-review.md` | Components, execution flow, 19 design choices questioned, open questions | design-level review |
 | `poc/` | Scripts and raw scanner output (`poc/README.md` explains the harness) | to reproduce anything |
+| `07-production-readiness.md` | Sequencing judgement call: what to fix before what milestone, and why | a recommendation, not a new finding |
 
 ## Headline results
 - **Deploy blocker found in round 3:** the shipped Caddyfile is invalid for the pinned Caddy, so the only public service would not start (F-25); the repo's own validation test fails but is skipped in CI.
@@ -27,7 +28,14 @@ GitHub issues filed). Read in this order.
 ## What this audit does not cover
 Live-tested in round 3: Keycloak, tusd, Caddy, the Next.js server (with real Chromium) and the ISATVON/builds/workflows/notifications APIs. Round 4 added Temporal failure injection (no bug found) and F-27 reproduction. Still not tested: a hung activity or killed worker on a real Temporal server, Cognee live, CubeSandbox (not built), LLM prompt injection (needs a real model and a built codegen path). Issues filed: #427 to #461 on GitHub. Not reviewed
 in depth: knowledge/Cognee, ISATVON edit APIs, builds router, notifications, most client pages, 33 local-only
-branches. 25 of 79 endpoints are inventoried only (`05`). Findings tagged `Unverified` need confirmation.
+branches. Findings tagged `Unverified` need confirmation.
+
+**2026-10-29 follow-up:** the "25 of 79 inventoried only" line above was stale (an earlier draft of `05`); the
+current table has every route at `read` (code-reviewed) or `live` (41 + 38 = 79), none merely `listed`. Reviewed
+the 41 `read`-depth routes against the product direction (`docs/ARCHITECTURE_OVERVIEW.md`): none are dead weight.
+Every one is load-bearing core surface for the documented knowledge -> SOW -> ISATVON -> build pipeline or Admin
+masters management; there is no speculative or unused API to prune. They need a live pentest pass, not a scope
+decision. See `05-api-endpoint-inventory.md` and `07-production-readiness.md` for the fuller write-up.
 
 ## Corrections made along the way (so earlier readers are not misled)
 First pass claims that were wrong or overstated and are fixed here: F-07 (audit trigger exists), F-03 (no phantom
