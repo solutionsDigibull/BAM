@@ -41,7 +41,7 @@ from sbam_api.projects.models import Project
 from sbam_api.projects.repository import ProjectRepository
 from sbam_api.projects.service import pipeline_running, project_archived
 from sbam_api.state_machine import TransitionCommand, apply_transition
-from sbam_api.temporal.client import OrchestratorUnavailable
+from sbam_api.temporal.client import RPC_TIMEOUT, OrchestratorUnavailable
 from sbam_api.temporal.repository import TemporalRunRepository, to_run
 from sbam_api.temporal.service import StartSpec, start_run
 
@@ -178,9 +178,11 @@ async def restart_pipeline(
         raise PipelineBusy(status.stage)
     handle = client.get_workflow_handle(pipeline_workflow_id(pipeline_input.project_id))
     try:
-        described = await handle.describe()
+        described = await handle.describe(rpc_timeout=RPC_TIMEOUT)
         if described.status == WorkflowExecutionStatus.RUNNING:
-            await handle.terminate(reason="replaced by a scope-change approval (E7.2)")
+            await handle.terminate(
+                reason="replaced by a scope-change approval (E7.2)", rpc_timeout=RPC_TIMEOUT
+            )
     except RPCError as exc:
         if exc.status != RPCStatusCode.NOT_FOUND:
             raise OrchestratorUnavailable() from None
@@ -227,7 +229,9 @@ async def signal_pipeline(
         if status is None or status.stage is not expect_stage:
             raise PipelineNotWaiting(expect_stage)
     try:
-        await client.get_workflow_handle(pipeline_workflow_id(project_id)).signal(signal, payload)
+        await client.get_workflow_handle(pipeline_workflow_id(project_id)).signal(
+            signal, payload, rpc_timeout=RPC_TIMEOUT
+        )
     except RPCError as exc:
         if exc.status == RPCStatusCode.NOT_FOUND:
             raise PipelineNotWaiting(expect_stage or PipelineStage.INGEST) from None

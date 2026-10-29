@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sbam_api.db.repository import TenantContext
-from sbam_api.db.session import make_engine, make_sessionmaker
+from sbam_api.db.session import WORKER_TIMEOUTS, make_engine, make_sessionmaker
 from sbam_api.temporal.repository import TemporalRunRepository, unfinished_runs
 from sbam_contracts.runs import MirrorUpdate, RunState, TaskQueue
 from sqlalchemy.orm import Session, sessionmaker
@@ -45,7 +45,8 @@ def configure(sessions: sessionmaker[Session]) -> None:
 def sessions() -> sessionmaker[Session]:
     global _sessions
     if _sessions is None:
-        _sessions = make_sessionmaker(make_engine(WorkerSettings().database_url))  # type: ignore[call-arg]
+        url = WorkerSettings().database_url  # type: ignore[call-arg]
+        _sessions = make_sessionmaker(make_engine(url, timeouts=WORKER_TIMEOUTS))
     return _sessions
 
 

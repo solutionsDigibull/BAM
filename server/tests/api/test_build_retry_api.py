@@ -75,7 +75,7 @@ class FakeBuildHandle:
         assert name == "build_status" and self.owner.current is not None
         return self.owner.current
 
-    async def signal(self, name: str, payload: Any) -> None:
+    async def signal(self, name: str, payload: Any, **_: Any) -> None:
         owner = self.owner
         owner.signals.append((self.id, name, payload))
         assert owner.current is not None

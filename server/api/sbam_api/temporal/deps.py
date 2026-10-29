@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import Client
 
 from sbam_api.core.settings import Settings
-from sbam_api.db.session import make_engine, make_sessionmaker
+from sbam_api.db.session import API_TIMEOUTS, make_engine, make_sessionmaker
 from sbam_api.temporal.client import OrchestratorUnavailable, connect
 
 _lock = asyncio.Lock()
@@ -19,7 +19,9 @@ _lock = asyncio.Lock()
 def session_factory(request: Request) -> sessionmaker[Session]:
     state = request.app.state
     if getattr(state, "sessions", None) is None:
-        state.sessions = make_sessionmaker(make_engine(state.settings.database_url))
+        state.sessions = make_sessionmaker(
+            make_engine(state.settings.database_url, timeouts=API_TIMEOUTS)
+        )
     sessions: sessionmaker[Session] = state.sessions
     return sessions
 

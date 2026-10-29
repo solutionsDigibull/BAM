@@ -52,7 +52,7 @@ class Pipeline:
     async def query(self, name: str, **_: Any) -> PipelineStatus:
         return PipelineStatus(stage=PipelineStage.WAIT_SOW_APPROVAL)
 
-    async def signal(self, name: str, payload: Any) -> None:
+    async def signal(self, name: str, payload: Any, **_: Any) -> None:
         await asyncio.sleep(0.2)  # widen the race: the first holds the row lock meanwhile
         self.signals.append(payload)
 

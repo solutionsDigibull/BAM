@@ -85,7 +85,7 @@ class FakeBuildHandle:
     async def query(self, name: str, **_: Any) -> SubSkillBuildStatus:
         return self.status
 
-    async def signal(self, name: str, payload: Any) -> None:
+    async def signal(self, name: str, payload: Any, **_: Any) -> None:
         self.signals.append((self.id, name, payload))
 
 

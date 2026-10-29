@@ -40,7 +40,7 @@ from sbam_api.pipeline.service import TemporalUnavailable
 from sbam_api.sow.repository import SowExportRepository
 from sbam_api.sow.service import canonical_sha256
 from sbam_api.sow.versions import _version
-from sbam_api.temporal.client import OrchestratorUnavailable
+from sbam_api.temporal.client import RPC_TIMEOUT, OrchestratorUnavailable
 
 # What the browser is told an export is. The worker stores it with the same types (a test keeps
 # them equal).
@@ -123,6 +123,7 @@ async def export_key(
             task_queue=TaskQueue.BUILD.value,
             id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
             result_type=SowExportResult,
+            rpc_timeout=RPC_TIMEOUT,
         )
     except (OrchestratorUnavailable, RPCError):
         raise TemporalUnavailable() from None
