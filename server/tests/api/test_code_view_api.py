@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from sbam_api.builds.models import CodeAttempt
 from sbam_api.core.ids import uuid7
+from sbam_api.isatvon.models import SubSkill
 from sbam_api.storage.base import Kind, StorageScope
 from sbam_contracts.code_view import MAX_VIEW_BYTES
 from sbam_workers.build.codegen.bundle import make_bundle
@@ -31,8 +32,32 @@ class Harness(WorkflowHarness):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
         CodeAttempt.__table__.create(self.sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
+        SubSkill.__table__.create(self.sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
         self.workflow_id = self.workflow()
-        self.sub = uuid7()
+        self.sub = self.sub_skill(self.workflow_id)
+
+    def sub_skill(self, workflow_id: uuid.UUID, *, tenant: uuid.UUID = TENANT_A) -> uuid.UUID:
+        """A Sub-Skill row of that workflow (the attempts view 404s an id it does not know)."""
+        with self.sessions() as s:
+            row = SubSkill(
+                id=uuid7(),
+                tenant_id=tenant,
+                project_id=uuid.UUID(self.project),
+                macro_skill_id=uuid7(),
+                workflow_id=workflow_id,
+                skill_id=f"MS01.{uuid.uuid4().hex[:6]}_Check",
+                skill_name="Check",
+                order=1,
+                isatvon={},
+                isatvon_framework_version="1.4",
+                sow_refs=[],
+                validation_errors=[],
+                content_sha256="0" * 64,
+            )
+            row.state = "VALID"
+            s.add(row)
+            s.commit()
+            return row.id
 
     def attempt(
         self,
@@ -140,7 +165,24 @@ def test_e11_5_t05_other_tenants_unassigned_fdes_and_other_projects_get_404(h: H
     for token in (other, unassigned):
         for tail in ("/attempts", "/attempts/0/files?path=action.py"):
             problem(h.code(tail, token), 404, "NOT_FOUND")
-    assert h.code("/attempts", sub=uuid7()).json() == {"items": []}
+    problem(h.code("/attempts", sub=uuid7()), 404, "NOT_FOUND")  # an invented Sub-Skill id (A-33)
+
+
+def test_a33_t01_a_sub_skill_without_attempts_is_an_empty_list_not_a_404(h: Harness) -> None:
+    assert h.code("/attempts").json() == {"items": []}  # it exists, nothing generated yet
+
+
+def test_a33_t02_a_sub_skill_of_another_workflow_is_404_on_this_one(h: Harness) -> None:
+    other_workflow = h.workflow(2, sow_version=h.generated(h.structured))
+    foreign = h.sub_skill(other_workflow)
+    h.attempt(0, {"action.py": source("        a = 1")}, sub=foreign)
+    problem(h.code("/attempts", sub=foreign), 404, "NOT_FOUND")  # not this workflow's Sub-Skill
+    assert len(h.code("/attempts").json()["items"]) == 0
+
+
+def test_a33_t03_a_sub_skill_of_another_tenant_is_404(h: Harness) -> None:
+    foreign = h.sub_skill(h.workflow_id, tenant=TENANT_B)
+    problem(h.code("/attempts", sub=foreign), 404, "NOT_FOUND")
 
 
 def test_e11_5_t05b_a_workflow_of_another_project_is_404(h: Harness) -> None:

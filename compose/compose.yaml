@@ -281,6 +281,9 @@ services:
       - -max-size=15728640
       - -disable-download
       - -disable-termination
+      # Only the portal may call tusd cross-origin (A-33; tusd reflects any Origin by default). Behind
+      # the proxy the portal and /files/ share an origin, so a deployed stack needs no CORS at all.
+      - -cors-allow-origin=${TUSD_CORS_ORIGIN:-^http://localhost:${WEB_PORT:-3000}\z}
     user: "10001:10001"
     environment:
       TUSD_HOOK_SECRET: ${TUSD_HOOK_SECRET:?is required - set it in compose/.env (copy compose/.env.example)}

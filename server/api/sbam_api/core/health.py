@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from temporalio.client import Client
 
 from sbam_api.core.settings import Settings, jwks_url
-from sbam_api.db.session import make_engine, ping
+from sbam_api.db.session import API_TIMEOUTS, make_engine, ping
 
 Check = Callable[[], Awaitable[bool]]
 CHECK_TIMEOUT_SECONDS = 2.0
@@ -25,7 +25,9 @@ log = logging.getLogger("sbam_api.health")
 def default_checks(settings: Settings) -> dict[str, Check]:
     jwks = jwks_url(settings)
 
-    engine = make_engine(settings.database_url)  # lazy: connects on the first check
+    engine = make_engine(
+        settings.database_url, timeouts=API_TIMEOUTS
+    )  # lazy: connects on the first check
 
     async def database() -> bool:
         return await asyncio.to_thread(ping, engine)

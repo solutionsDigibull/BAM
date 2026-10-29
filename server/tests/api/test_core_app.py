@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from psycopg import errors as psycopg_errors
 from pydantic import BaseModel
 from sbam_api.core.conventions import (
     IdempotencyScope,
@@ -365,3 +366,43 @@ def test_a19_t04_a_chunked_body_exactly_at_the_limit_passes(app_factory: AppFact
         headers={"content-type": "application/json"},
     )
     assert response.status_code == 200
+
+
+# --- A-30: database timeouts are fail-fast problems, not 500s ---------------------------------
+
+
+def _db_failing_app(app_factory: AppFactory, error: Exception) -> TestClient:
+    from sqlalchemy.exc import DBAPIError
+
+    app = app_factory()
+
+    @app.get("/api/v1/_test/db")
+    async def failing() -> None:
+        raise DBAPIError("SELECT 1", {}, error)
+
+    return TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "code", "retry_after"),
+    [
+        (psycopg_errors.LockNotAvailable("lock timeout"), 409, "CONFLICT", "1"),
+        (psycopg_errors.QueryCanceled("statement timeout"), 503, "SERVICE_UNAVAILABLE", "5"),
+        (psycopg_errors.IdleInTransactionSessionTimeout("idle"), 503, "SERVICE_UNAVAILABLE", "5"),
+    ],
+)
+def test_a30_t10_a_database_timeout_is_a_retryable_problem(
+    app_factory: AppFactory, error: Exception, status: int, code: str, retry_after: str
+) -> None:
+    response = _db_failing_app(app_factory, error).get("/api/v1/_test/db")
+    assert response.status_code == status and response.headers["retry-after"] == retry_after
+    body = assert_problem(response.json(), status)
+    assert body.code == code and "x-correlation-id" in response.headers
+    assert "lock timeout" not in response.text and "statement timeout" not in response.text
+
+
+def test_a30_t11_any_other_database_error_is_still_a_generic_500(app_factory: AppFactory) -> None:
+    response = _db_failing_app(app_factory, psycopg_errors.UniqueViolation("dup key secret")).get(
+        "/api/v1/_test/db"
+    )
+    assert response.status_code == 500 and "dup key secret" not in response.text

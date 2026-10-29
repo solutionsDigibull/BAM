@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sbam_contracts.api import PROBLEM_JSON, ErrorCode, FieldError, ProblemDetail
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Send
 
@@ -93,7 +94,43 @@ async def _http_error(_: Request, exc: Exception) -> JSONResponse:
     return problem_response(ApiError(exc.status_code, code, title))
 
 
+# What the server-side timeouts of `db.session.Timeouts` raise (A-30), by SQLSTATE. Anything else is
+# a real fault and stays a 500.
+_DB_TIMEOUTS = {
+    "55P03": ApiError(  # lock_timeout: another request holds the row
+        409,
+        ErrorCode.CONFLICT,
+        "Busy",
+        "Another change to this resource is in progress. Try again in a moment.",
+        headers={"Retry-After": "1"},
+    ),
+    "57014": ApiError(  # statement_timeout
+        503,
+        ErrorCode.SERVICE_UNAVAILABLE,
+        "The database is slow",
+        "The request took too long and was cancelled; nothing was changed. Try again shortly.",
+        headers={"Retry-After": "5"},
+    ),
+    "25P03": ApiError(  # idle_in_transaction_session_timeout: the lock was released by the server
+        503,
+        ErrorCode.SERVICE_UNAVAILABLE,
+        "The request took too long",
+        "The request was cancelled and nothing was changed. Try again shortly.",
+        headers={"Retry-After": "5"},
+    ),
+}
+
+
+async def _db_error(_: Request, exc: Exception) -> JSONResponse:
+    state = getattr(getattr(exc, "orig", None), "sqlstate", None)
+    mapped = _DB_TIMEOUTS.get(state or "")
+    if mapped is None:
+        raise exc  # an unexpected database error: the middleware logs it and answers 500
+    return problem_response(mapped)
+
+
 def install_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(DBAPIError, _db_error)
     app.add_exception_handler(ApiError, _api_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(StarletteHTTPException, _http_error)

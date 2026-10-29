@@ -5,6 +5,8 @@
 `traceparent` from the API request into workflows and activities (E1.7-T08).
 """
 
+from datetime import timedelta
+
 from opentelemetry.trace import Tracer
 from sbam_contracts.api import ErrorCode
 from temporalio.client import Client
@@ -12,6 +14,11 @@ from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 from sbam_api.core.conventions import ApiError
+
+# An API request that holds a database row lock while it calls Temporal must not wait on a hung
+# server (A-30): a call that takes longer fails as OrchestratorUnavailable (503), the request rolls
+# back and the lock is released.
+RPC_TIMEOUT = timedelta(seconds=10)
 
 
 class OrchestratorUnavailable(ApiError):  # noqa: N818 - name from the E1.7 spec
