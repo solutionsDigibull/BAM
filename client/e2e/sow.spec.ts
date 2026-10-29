@@ -72,6 +72,10 @@ type Fake = {
   approve: "ok" | "stale" | "down" | "not_waiting";
   approvals: { version: number; body: Record<string, unknown> }[];
   approveDelayMs?: number;
+  // E7.3 scope change: POST /new-version {reason} and GET /versions/{v}/impact
+  newVersions: Record<string, unknown>[];
+  impact?: unknown;
+  impactAsked: number[];
 };
 
 const fake = (versions: Version[], more: Partial<Fake> = {}): Fake => ({
@@ -83,6 +87,8 @@ const fake = (versions: Version[], more: Partial<Fake> = {}): Fake => ({
   regenerates: [],
   approve: "ok",
   approvals: [],
+  newVersions: [],
+  impactAsked: [],
   ...more,
 });
 
@@ -147,6 +153,25 @@ async function serve(page: Page, f: Fake) {
         approved_by: "fde",
         sha256: v.sha256,
       });
+    }
+    if (path === "/new-version" && req.method() === "POST") {
+      f.newVersions.push(req.postDataJSON());
+      const approved = f.versions.find((v) => v.status === "APPROVED");
+      if (!approved) return problem(route, 409, "NO_APPROVED_SOW", "nothing approved");
+      if (current(f) !== approved) return problem(route, 409, "DRAFT_EXISTS", "a draft is open");
+      const draft = summary(approved.version + 1, "IN_REVIEW", {
+        sha256: approved.sha256,
+        parent_version: approved.version,
+      });
+      f.versions.push(draft);
+      f.pipeline = "SOW_REVIEW";
+      f.etag += 1;
+      return json(route, draft, 201, { etag: `"${f.etag}"` });
+    }
+    const impact = /^\/versions\/(\d+)\/impact$/.exec(path);
+    if (impact) {
+      f.impactAsked.push(Number(impact[1]));
+      return json(route, f.impact);
     }
     const diff = /^\/versions\/(\d+)\/diff\/(\d+)$/.exec(path);
     if (diff) return json(route, f.diff ?? { version: 1, other: 2, sections: [] });
@@ -562,4 +587,120 @@ test("e7_3 a pipeline that isn't waiting says so", async ({ page, baseURL }) => 
   await expect(
     page.getByText("The pipeline is not waiting for an SOW approval right now."),
   ).toBeVisible();
+});
+
+// ---- E7.3 scope change: POST /new-version {reason}, GET /versions/{v}/impact (E7.2) ------------------
+
+const approvedV3 = () => [
+  summary(1, "SUPERSEDED"),
+  summary(2, "SUPERSEDED"),
+  summary(3, "APPROVED"),
+];
+const draftV4 = () => [...approvedV3(), summary(4, "IN_REVIEW", { parent_version: 3 })];
+const impactOf = (subSkills: { skill_id: string; reason: string }[], more = {}) => ({
+  version: 4,
+  base_version: 3,
+  changed_sections: [
+    {
+      section_id: "features",
+      change: "MODIFIED",
+      items: [{ id: "F-OTP", change: "MODIFIED" }],
+    },
+    { section_id: "overview", change: "UNCHANGED", items: [] },
+  ],
+  affected_macro_skills: [{ macro_category: "MS01", reason: "cites F-OTP" }],
+  affected_sub_skills: subSkills,
+  added_modules: [],
+  reused_sub_skills_count: 12,
+  ...more,
+});
+const twoAffected = [
+  { skill_id: "MS01.2", reason: "cites F-OTP (MODIFIED)" },
+  { skill_id: "MS01.4", reason: "cites F-OTP (MODIFIED)" },
+];
+
+test("e7_3_t03 the impact preview lists the API's affected Sub-Skills", async ({
+  page,
+  baseURL,
+}) => {
+  const f = fake(draftV4(), { impact: impactOf(twoAffected) });
+  await open(page, baseURL!, f);
+  await page.getByRole("tab", { name: "Impact" }).click();
+  const panel = page.getByTestId("sow-impact");
+  await expect(panel).toContainText("v4 against approved v3");
+  await expect(panel).toContainText("2 Sub-Skills to rebuild, 1 Macro Skill affected, 12 reused");
+  const ids = panel
+    .getByTestId("impact-sub-skills")
+    .locator(".ant-table-row .ant-table-cell:first-child"); // virtual rows are divs
+  await expect(ids).toHaveText(["MS01.2", "MS01.4"]); // the same skill_ids as the API answer
+  await expect(panel.locator('[data-item="F-OTP"]')).toBeVisible();
+  await expect(panel.locator('[data-section="overview"]')).toHaveCount(0); // unchanged: not listed
+  await expect(page.getByTestId("impact-macros")).toContainText("MS01");
+  expect(f.impactAsked).toContain(4);
+  // and the confirmation names the scope change before anything is signed
+  await approveButton(page).click();
+  await expect(page.getByTestId("approve-impact")).toContainText(
+    "Scope change from v3: 2 Sub-Skills to rebuild",
+  );
+});
+
+test("e7_3_t08 create new version: a reason, then v4 opens in the editor with its impact", async ({
+  page,
+  baseURL,
+}) => {
+  const f = fake(approvedV3(), { pipeline: "SOW_APPROVED", impact: impactOf([]) });
+  await open(page, baseURL!, f);
+  await expect(page.getByTestId("sow-locked")).toBeVisible();
+  await page.getByRole("button", { name: "Create new version" }).click();
+  const dialog = page.getByRole("dialog", { name: "Create a new version" });
+  const create = dialog.getByRole("button", { name: "Create" });
+  await expect(create).toBeDisabled(); // no reason yet
+  const reason = dialog.getByLabel("Reason for the scope change");
+  await reason.fill("x".repeat(501));
+  await expect(dialog.getByTestId("reason-problem")).toHaveText("At most 500 characters");
+  await expect(create).toBeDisabled();
+  await reason.fill("Add OTP device limits");
+  await create.click();
+  await expect(page.getByText("v4 created: edit it, then approve it.")).toBeVisible();
+  expect(f.newVersions).toEqual([{ reason: "Add OTP device limits" }]);
+  await expect(page.getByRole("heading", { name: "SOW v4" })).toBeVisible();
+  await expect(page.getByTestId("sow-screen").locator('[data-status="IN_REVIEW"]')).toBeVisible();
+  await expect(page.getByTestId("sow-locked")).toHaveCount(0);
+  await expect(editor(page)).toHaveAttribute("contenteditable", "true");
+  await expect(page.getByTestId("impact-none")).toHaveText("No Sub-Skills need rebuild");
+});
+
+test("e7_3 a draft already open: Create new version is off", async ({ page, baseURL }) => {
+  const f = fake(draftV4(), { impact: impactOf([]) });
+  await open(page, baseURL!, f);
+  await page.getByRole("tab", { name: "Versions (4)" }).click();
+  await page
+    .getByTestId("sow-versions")
+    .locator(".ant-table-row")
+    .filter({ hasText: "v3" })
+    .click();
+  await expect(page.getByTestId("sow-locked")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create new version" })).toBeDisabled();
+  expect(f.newVersions).toEqual([]);
+});
+
+test("e7_3 an impact of 300 Sub-Skills is virtualized", async ({ page, baseURL }) => {
+  const many = Array.from({ length: 300 }, (_, i) => ({
+    skill_id: `MS01.${i + 1}`,
+    reason: "cites F-OTP",
+  }));
+  await open(page, baseURL!, fake(draftV4(), { impact: impactOf(many) }));
+  await page.getByRole("tab", { name: "Impact" }).click();
+  await expect(page.getByTestId("sow-impact")).toContainText("300 Sub-Skills to rebuild");
+  const rows = page.getByTestId("impact-sub-skills").locator(".ant-table-row");
+  await expect(rows.first()).toBeVisible();
+  expect(await rows.count()).toBeLessThan(60);
+});
+
+test("e7_3 impact text is rendered as text", async ({ page, baseURL }) => {
+  const evil = [{ skill_id: "MS01.2", reason: "<img src=x onerror=alert(1)>cites F-OTP" }];
+  await open(page, baseURL!, fake(draftV4(), { impact: impactOf(evil) }));
+  await page.getByRole("tab", { name: "Impact" }).click();
+  await expect(page.getByTestId("impact-sub-skills")).toContainText("<img src=x onerror");
+  await expect(page.getByTestId("sow-impact").locator("img")).toHaveCount(0);
 });

@@ -19,7 +19,7 @@ import {
 import { useState } from "react";
 
 import { ApiErrorState, LoadingState, StatusBadge } from "@/components/ui-kit";
-import type { SowCitationDetail, SowDiff, SowVersionSummary } from "@/contracts";
+import type { SowCitationDetail, SowDiff, SowSectionDiff, SowVersionSummary } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
 import type { CiteClick } from "./sow-editor";
@@ -210,9 +210,17 @@ export function DiffList({ projectId, from, to }: { projectId: string; from: num
   if (diff.query.isLoading) return <LoadingState />;
   if (diff.query.error)
     return <ApiErrorState error={diff.query.error} onRetry={() => void diff.query.refetch()} />;
-  const sections = diff.result.data?.sections ?? [];
   return (
     <div data-testid="sow-diff">
+      <SectionChanges sections={diff.result.data?.sections ?? []} />
+    </div>
+  );
+}
+
+/** Section badges with their changed items: the diff drawer and the impact preview (E7.3) share them. */
+export function SectionChanges({ sections }: { sections: SowSectionDiff[] }) {
+  return (
+    <>
       {sections.map((s) => (
         <div key={s.section_id} data-section={s.section_id} style={{ marginBottom: 8 }}>
           <Tag color={CHANGE_COLOR[s.change]} data-change={s.change}>
@@ -230,7 +238,7 @@ export function DiffList({ projectId, from, to }: { projectId: string; from: num
           ) : null}
         </div>
       ))}
-    </div>
+    </>
   );
 }
 
