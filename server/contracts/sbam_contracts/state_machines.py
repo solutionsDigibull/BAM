@@ -342,6 +342,9 @@ SUB_SKILL: Final = Machine(
         (K.BUILDING, "gate_failed", K.CORRECTING, S),
         (K.BUILDING, "dependency_missing", K.DEPENDENCY_FAILED, S),
         (K.BUILDING, "template_error", K.BUILD_ERROR, S),
+        # The model could not answer (E11.2c, #483): schema re-asks or transport retries are spent.
+        # Nothing is wrong with the Sub-Skill, so the FDE's `retry` (below) tries again.
+        (K.BUILDING, "generation_failed", K.NEEDS_FDE_REVIEW, S),
         (K.CORRECTING, "correction_applied", K.BUILDING, S),
         (K.CORRECTING, "attempts_exhausted", K.NEEDS_FDE_REVIEW, S),
         (K.NEEDS_FDE_REVIEW, "retry", K.BUILDING, F),
