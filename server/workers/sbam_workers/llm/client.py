@@ -152,8 +152,18 @@ def cache_key(alias: str, messages: list[Message]) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
+# A `<` that would open or close a <data> block or an <image> label, in any case and with any
+# whitespace or `/` before the name (`</DATA >`, `< /data`, `<Image name=...>`). `\b` keeps words
+# such as <database> or <imagery> intact.
+_TAG_START = re.compile(r"<(?=\s*/?\s*(?:data|image)\b)", re.IGNORECASE)
+
+
 def _escape(text: str) -> str:
-    return text.replace("</data", "<\\/data")
+    """Document text can neither close its <data> block nor forge another block or an image
+    label: a backslash follows every such `<` (`</data` -> `<\\/data`, as before; `<data` ->
+    `<\\data`). Deterministic, so identical input keeps one cache key (`cache_key`); it only
+    inserts backslashes, so it cannot create a tag."""
+    return _TAG_START.sub("<\\\\", text)
 
 
 def compose(
