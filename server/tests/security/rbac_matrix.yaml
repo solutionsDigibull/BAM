@@ -300,6 +300,33 @@ routes:
       <<: *super_admin_only
       super_admin: "422 VALIDATION_ERROR"
 
+  # ---- tenant SRIM runtime defaults (E9.1b): the tenant's own row, so another tenant's admin
+  # reads and writes ITS OWN values (200), never this tenant's; a tenant-less super-admin has none --
+  get_srim_defaults_api_v1_admin_srim_defaults_get:
+    request: {method: GET, path: /api/v1/admin/srim-defaults}
+    expect: *tenant_admin_list
+
+  put_srim_defaults_api_v1_admin_srim_defaults_put:
+    request:
+      method: PUT
+      path: /api/v1/admin/srim-defaults
+      headers: {if-match: '"0"'}
+      json:
+        orchestration: {router: Acme_Router, trigger: Acme_Trigger}
+        execution: {engine: Acme_Engine}
+        gateway: {route_via: Acme_Gateway}
+        persistence: {database: Acme_DB, action: Acme_SQL}
+        audit: {telemetry: Acme_Audit}
+        ui: {target: Acme_Canvas, method: Acme_Widgets}
+    expect: *tenant_admin_list
+
+  reset_srim_defaults_api_v1_admin_srim_defaults_delete:
+    request:
+      method: DELETE
+      path: /api/v1/admin/srim-defaults
+      headers: {if-match: '"0"'}
+    expect: *tenant_admin_list
+
   # ---- runtime registry -------------------------------------------------------------------
   admin_registry_api_v1_admin_registry_get:
     request: {method: GET, path: /api/v1/admin/registry}

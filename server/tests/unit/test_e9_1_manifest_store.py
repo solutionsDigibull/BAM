@@ -5,6 +5,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from knowledge_db import TENANT, World
@@ -23,9 +24,10 @@ from sbam_api.registry.models import RuntimeRegistryPackageRow, RuntimeRegistryR
 from sbam_api.registry.repository import upsert_registry
 from sbam_api.schema_sql.models import WorkflowSchema
 from sbam_api.sow.models import SowVersion
+from sbam_api.srim_defaults.models import TenantSrimDefaults
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.canonical import deterministic_hash
-from sbam_contracts.manifest import SkillManifest
+from sbam_contracts.manifest import ISA14_SRIM_DEFAULTS, SkillManifest
 from sbam_workers.build.manifest import (
     IDS_MISMATCH,
     MANIFEST_INVALID,
@@ -56,6 +58,7 @@ class Build:
             RuntimeRegistryRow,
             RuntimeRegistryPackageRow,
             AuditLog,
+            TenantSrimDefaults,
         ):
             table.__table__.create(engine, checkfirst=True)  # type: ignore[attr-defined]
         skill = proposal("Investor Auth Manager", "F-ACCESS-1", "F-ACCESS-2", **changes)
@@ -225,3 +228,64 @@ def test_e9_1_missing_runtime_digest_is_reported(b: Build) -> None:
     with pytest.raises(ApplicationError) as caught:
         build_for(b.store, b.inp())
     assert caught.value.type == PROVENANCE_MISSING and "runtime image digest" in str(caught.value)
+
+
+# --- E9.1b: the tenant's own SRIM runtime defaults ---------------------------------------------
+
+CUSTOM: dict[str, Any] = {
+    "orchestration": {"router": "Acme_Router", "trigger": "Acme_Trigger"},
+    "execution": {"engine": "Acme_Engine"},
+    "gateway": {"route_via": "Acme_Gateway"},
+    "persistence": {"database": "Acme_DB", "action": "Acme_SQL"},
+    "audit": {"telemetry": "Acme_Audit"},
+    "ui": {"target": "Acme_Canvas", "method": "Acme_Widgets"},
+}
+
+
+def set_defaults(b: Build, tenant: uuid.UUID, defaults: dict[str, Any]) -> None:
+    with b.p.w.sessions() as s:
+        s.add(TenantSrimDefaults(tenant_id=tenant, defaults=defaults))
+        s.commit()
+
+
+def srim(row: SubSkillManifest) -> dict[str, object]:
+    block: dict[str, object] = row.manifest["srim_runtime_definition"]
+    return block
+
+
+def test_e9_1b_t05_a_tenant_without_its_own_defaults_gets_the_isa14_ones(b: Build) -> None:
+    build_for(b.store, b.inp())
+    [row] = b.manifests()
+    block = srim(row)
+    assert block["orchestration"] == ISA14_SRIM_DEFAULTS.model_dump(mode="json")["orchestration"]
+    assert block["persistence"] == {
+        **ISA14_SRIM_DEFAULTS.model_dump(mode="json")["persistence"],
+        "table": "investor_profiles, auth_event_audit_handoff",
+    }
+
+
+def test_e9_1b_t06_later_builds_use_the_tenants_values_and_earlier_manifests_stay(
+    b: Build,
+) -> None:
+    build_for(b.store, b.inp(build_no=1))
+    [first] = b.manifests()
+    stored = dict(first.manifest)
+    set_defaults(b, TENANT, CUSTOM)
+    build_for(b.store, b.inp(build_no=2))
+    rows = {r.build_no: r for r in b.manifests()}
+    assert rows[1].manifest == stored and rows[1].sha256 == first.sha256  # not rewritten
+    second = srim(rows[2])
+    assert second["gateway"] == CUSTOM["gateway"] and second["audit"] == CUSTOM["audit"]
+    assert second["persistence"] == {
+        **CUSTOM["persistence"],
+        "table": "investor_profiles, auth_event_audit_handoff",  # still derived from V.tables
+    }
+    assert rows[2].sha256 != rows[1].sha256
+    SkillManifest.model_validate(rows[2].manifest)  # still a valid, sealed Skill Manifest
+
+
+def test_e9_1b_t07_another_tenants_values_are_never_used(b: Build) -> None:
+    set_defaults(b, uuid.uuid4(), CUSTOM)
+    build_for(b.store, b.inp())
+    [row] = b.manifests()
+    assert srim(row)["gateway"] == ISA14_SRIM_DEFAULTS.model_dump(mode="json")["gateway"]
