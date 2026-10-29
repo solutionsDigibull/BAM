@@ -73,7 +73,13 @@ class Harness(ProjectsHarness):
         return self.client.post(f"/api/v1{HOOKS}", json=payload, headers=headers)
 
     def pre_create(
-        self, token: str, name: str, size: int, project: str | None = None, **meta: Any
+        self,
+        token: str,
+        name: str,
+        size: int,
+        project: str | None = None,
+        hook_secret: str | None = SECRET,
+        **meta: Any,
     ) -> Any:
         upload = {
             "Size": size,
@@ -85,7 +91,7 @@ class Harness(ProjectsHarness):
                 **meta,
             },
         }
-        return self.hook({"Type": "pre-create", "Event": {"Upload": upload}})
+        return self.hook({"Type": "pre-create", "Event": {"Upload": upload}}, hook_secret)
 
     def post_finish(self, upload_id: str, token: str, size: int, offset: int | None = None) -> Any:
         upload = {
@@ -561,3 +567,55 @@ def test_e4_2_repositories_are_scoped_to_the_callers_tenant(h: Harness) -> None:
         mine = DocumentVersionRepository(s, TenantContext(TENANT_A, uuid.UUID(h.project)))
         theirs = DocumentVersionRepository(s, TenantContext(TENANT_B, uuid.UUID(h.project)))
         assert mine.active_count() == 1 and theirs.active_count() == 0
+
+
+# --- A-14: upload tokens have their own key ------------------------------------------------------
+
+TOKEN_KEY = "upload-token-key-for-tests"  # noqa: S105 - a test value
+
+
+def _separate_keys(h: Harness) -> None:
+    h.client.app.state.settings.upload_token_key = SecretStr(TOKEN_KEY)  # type: ignore[attr-defined]
+
+
+def test_a14_t01_tokens_are_signed_with_the_token_key_not_the_hook_secret(h: Harness) -> None:
+    _separate_keys(h)
+    token = h.announce(h.files("a.pdf")).json()["token"]
+    assert tokens.verify(TOKEN_KEY, token, time.time())  # the token key opens it
+    with pytest.raises(Exception):  # noqa: B017 - TokenError, whatever its name
+        tokens.verify(SECRET, token, time.time())  # the hook secret does not
+
+
+def test_a14_t02_a_token_signed_with_the_hook_secret_is_refused_once_keys_are_separate(
+    h: Harness,
+) -> None:
+    _separate_keys(h)
+    claims = tokens.UploadClaims(
+        TENANT_A, uuid.UUID(h.project), FDE_A1, uuid7(), int(time.time()) + 600
+    )
+    forged = tokens.issue(SECRET, claims)  # someone who learned the hook secret
+    assert rejected(h.pre_create(forged, "a.pdf", len(PDF)))["status"] == 403
+
+
+def test_a14_t03_rotating_the_hook_secret_does_not_invalidate_issued_tokens(h: Harness) -> None:
+    _separate_keys(h)
+    token = h.announce(h.files("a.pdf")).json()["token"]
+    h.client.app.state.settings.tusd_hook_secret = SecretStr("rotated-hook-secret")  # type: ignore[attr-defined]
+    res = h.pre_create(token, "a.pdf", len(PDF), hook_secret="rotated-hook-secret")  # noqa: S106
+    assert res.status_code == 200 and "RejectUpload" not in res.text
+
+
+def test_a14_t04_rotating_the_token_key_does_not_break_the_hook_auth(h: Harness) -> None:
+    _separate_keys(h)
+    token = h.announce(h.files("a.pdf")).json()["token"]
+    h.client.app.state.settings.upload_token_key = SecretStr("rotated-token-key")  # type: ignore[attr-defined]
+    assert rejected(h.pre_create(token, "a.pdf", len(PDF)))["status"] == 403  # old token: refused
+    fresh = h.announce(h.files("b.pdf")).json()["token"]  # a new one works, same hook secret
+    assert "RejectUpload" not in h.pre_create(fresh, "b.pdf", len(PDF)).text
+
+
+def test_a14_t05_the_hook_secret_alone_cannot_mint_an_upload_token(h: Harness) -> None:
+    _separate_keys(h)
+    h.client.app.state.settings.upload_token_key = None  # type: ignore[attr-defined]
+    h.client.app.state.settings.tusd_hook_secret = None  # type: ignore[attr-defined]
+    assert h.announce(h.files("a.pdf")).status_code == 503

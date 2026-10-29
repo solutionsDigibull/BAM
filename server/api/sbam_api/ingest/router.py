@@ -50,12 +50,25 @@ User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
 
 
+def _unavailable() -> ApiError:
+    return ApiError(
+        503, ErrorCode.SERVICE_UNAVAILABLE, "Uploads unavailable", "Uploads are not configured."
+    )
+
+
 def _secret(settings: Settings) -> str:
-    if settings.tusd_hook_secret is None:  # fail closed: no secret, no uploads
-        raise ApiError(
-            503, ErrorCode.SERVICE_UNAVAILABLE, "Uploads unavailable", "Uploads are not configured."
-        )
+    """The hook secret: what tusd's hooks prove they know. Fail closed: none, no uploads."""
+    if settings.tusd_hook_secret is None:
+        raise _unavailable()
     return settings.tusd_hook_secret.get_secret_value()
+
+
+def _token_key(settings: Settings) -> str:
+    """The key upload tokens are signed with (A-14: not the hook secret)."""
+    key = settings.upload_token_secret()
+    if key is None:
+        raise _unavailable()
+    return key
 
 
 @router.post("/projects/{project_id}/uploads", status_code=201, response_model=UploadToken)
@@ -67,10 +80,10 @@ def create_upload_token(
     sessions: Sessions,
 ) -> UploadToken:
     settings: Settings = request.app.state.settings
-    secret = _secret(settings)
+    key = _token_key(settings)
     with sessions() as session:
         return service.request_upload(
-            session, user, project_id, body, secret, settings.tusd_public_url
+            session, user, project_id, body, key, settings.tusd_public_url
         )
 
 
@@ -220,8 +233,9 @@ def hook_secret(
 
 @router.post("/internal/tusd/hooks", dependencies=[Depends(internal)])
 async def tusd_hook(
-    request: Request, secret: Annotated[str, Depends(hook_secret)], sessions: Sessions
+    request: Request, _hook: Annotated[str, Depends(hook_secret)], sessions: Sessions
 ) -> dict[str, object]:
+    secret = _token_key(request.app.state.settings)  # verifies the upload token, not the hook
     try:
         hook = tusd.HookRequest.model_validate_json(await request.body())
     except ValidationError:

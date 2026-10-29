@@ -26,7 +26,7 @@ done
 
 # Keep in sync with the top-level `secrets:` of compose/compose.deploy.yaml (a unit test compares them).
 DB_SECRETS="postgres_password sbam_db_password temporal_db_password keycloak_db_password langfuse_db_password"
-OTHER_SECRETS="keycloak_admin_password keycloak_admin_client_secret tusd_hook_secret storage_signing_key auth_secret openrouter_api_key cognee_user_secret bifrost_virtual_key"
+OTHER_SECRETS="keycloak_admin_password keycloak_admin_client_secret tusd_hook_secret upload_token_key storage_signing_key auth_secret openrouter_api_key cognee_user_secret bifrost_virtual_key"
 
 fail=0
 bad() { echo "FAIL $1: $2"; fail=1; }
@@ -58,6 +58,11 @@ for name in $DB_SECRETS $OTHER_SECRETS; do
       if [ "$name" != openrouter_api_key ] && [ "${#value}" -lt "$min" ]; then bad "$name" "shorter than $min characters"; fi ;;
   esac
 done
+
+# The upload-token key must not be the tusd hook secret: rotating or leaking one must not touch the other.
+if [ -f "$DIR/tusd_hook_secret" ] && [ -f "$DIR/upload_token_key" ] && cmp -s "$DIR/tusd_hook_secret" "$DIR/upload_token_key"; then
+  bad upload_token_key "must differ from tusd_hook_secret"
+fi
 
 if [ -n "$ENV_FILE" ]; then
   [ -r "$ENV_FILE" ] || bad "$ENV_FILE" "env file not readable"

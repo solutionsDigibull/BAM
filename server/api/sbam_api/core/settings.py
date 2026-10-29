@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # Uploads (#61): tusd calls the hook endpoint with this secret; no secret = hooks and upload
     # tokens answer 503. The browser reaches tusd at `tusd_public_url`.
     tusd_hook_secret: SecretStr | None = None
+    # The key that signs upload tokens, separate from the hook secret (A-14) so rotating or leaking
+    # one never touches the other. Unset in a dev environment it falls back to the hook secret; a
+    # deployed environment must set its own.
+    upload_token_key: SecretStr | None = None
     tusd_public_url: str = "http://localhost:1080/files/"
     # List cursors are HMAC-signed (core.conventions.encode_cursor).
     # ponytail: a random key per process when unset, so cursors die on restart (the client starts
@@ -85,6 +89,7 @@ class Settings(BaseSettings):
                 "STORAGE_SIGNING_KEY": self.storage_signing_key,
                 "KEYCLOAK_ADMIN_CLIENT_SECRET": self.keycloak_admin_client_secret,
                 "TUSD_HOOK_SECRET": self.tusd_hook_secret,
+                "UPLOAD_TOKEN_KEY": self.upload_token_key,
             }
             bad = [n for n, v in secrets_by_name.items() if _is_placeholder(v)]
             if bad:  # names only, never values
@@ -93,6 +98,11 @@ class Settings(BaseSettings):
                     f"while SBAM_ENV={self.sbam_env}. Provision real secrets."
                 )
         return self
+
+    def upload_token_secret(self) -> str | None:
+        """The key that signs and verifies upload tokens; None = uploads are off (503)."""
+        key = self.upload_token_key or self.tusd_hook_secret  # the fallback is dev-only (validator)
+        return key.get_secret_value() if key else None
 
     @model_validator(mode="after")
     def _refuse_mock_provider_outside_dev(self) -> "Settings":
@@ -104,6 +114,25 @@ class Settings(BaseSettings):
         posthog_problem(
             self.sbam_env, self.posthog_host, self.posthog_api_key, self.posthog_distinct_id_salt
         )
+        return self
+
+    @model_validator(mode="after")
+    def _require_separate_upload_token_key_when_deployed(self) -> "Settings":
+        if not deployed_env(self.sbam_env):
+            return self
+        if not _set(self.upload_token_key):
+            raise SettingsError(
+                f"UPLOAD_TOKEN_KEY is required when SBAM_ENV={self.sbam_env} "
+                "(it must differ from TUSD_HOOK_SECRET)."
+            )
+        if (
+            self.upload_token_key
+            and self.tusd_hook_secret
+            and (
+                self.upload_token_key.get_secret_value() == self.tusd_hook_secret.get_secret_value()
+            )
+        ):
+            raise SettingsError("UPLOAD_TOKEN_KEY must differ from TUSD_HOOK_SECRET.")
         return self
 
 
