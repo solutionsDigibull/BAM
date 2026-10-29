@@ -59,7 +59,7 @@ def test_e0_8_t02_checksums_cover_every_fixture_file_and_nothing_else() -> None:
 
 def test_e0_8_t03_every_file_is_documented() -> None:
     assert undocumented() == []
-    assert len(fixture_files()) == 37
+    assert len(fixture_files()) == 38
 
 
 def test_e0_8_t03_readme_lists_no_file_that_does_not_exist() -> None:

@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { keycloakLogin } from "./stack/stack";
+
 // E2.5 against the running Compose stack with real Keycloak logins (seed users from
 // compose/keycloak/seed.sh). Runs only in the "keycloak" project: E2E_BASE_URL + E2E_KEYCLOAK=1.
 // E2E_SEED_PASSWORD = SEED_USER_PASSWORD; ENV_FILE = the stack's env file (for stopping Keycloak).
@@ -15,17 +17,6 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 test.beforeAll(() => {
   if (!PASSWORD) throw new Error("set E2E_SEED_PASSWORD (SEED_USER_PASSWORD from compose/.env)");
 });
-
-async function keycloakLogin(page: Page, portal: "admin" | "fde", username: string, query = "") {
-  await page.goto(`/login-${portal}${query}`);
-  await page.getByRole("button", { name: "Sign in with Keycloak" }).click();
-  await page.waitForURL(/\/realms\/bullm\//);
-  // Organizations make the login identity-first: username page, then password page.
-  await page.locator("#username").fill(username);
-  await page.locator("#kc-login").click();
-  await page.locator("#password").fill(PASSWORD);
-  await page.locator("#kc-login").click();
-}
 
 const pathOf = (page: Page) => new URL(page.url()).pathname;
 
