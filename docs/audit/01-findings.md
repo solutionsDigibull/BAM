@@ -65,7 +65,7 @@ injection bugs.
 | F-03 | Approval signals Temporal before commit (reverse race, lock across call) | Code | P2 |
 | F-06 | No Postgres row-level security (no leak found) | Code + live IDOR | P2 hardening |
 | N-07 | FDE citation attribution forgeable (unmerged branch) | Code | block merge |
-| F-34 | Schema-SQL validator reads the first `LANGUAGE` anywhere in the text (comment trick accepted); not exploitable with the current scratch image | **PoC** | P3 |
+| F-34 | Schema-SQL validator reads the first `LANGUAGE` anywhere in the text (comment trick accepted); the `FORBIDDEN_WORDS` blocklist also misses `pg_sleep`, `pg_terminate_backend`, `pg_ls_waldir`/`logdir`, `pg_authid` reads and more, confirmed live, no `plpython` needed | **PoC** | P3 |
 | F-35 | A stolen session cookie keeps working about 5 minutes after sign-out | **PoC** | P3 |
 | F-36 | Unmerged AST gate stack is bypassed by module attribute chains to `sys.modules` (os.execv, socket, environ) | **PoC** | P1 pre-merge (#460) |
 | F-37 | LLM data-block escape is case-sensitive; forged `<data>`/`<image>` markers pass (hardening; model behaviour untested) | **PoC** (deterministic part) | P2 (#461) |
@@ -355,6 +355,30 @@ containing `pg_sleep(3600)` is accepted (the gate relies on its 30 s throwaway d
 the scratch image has the `plpython3u` control files but no `plpython` library and no `python3`.
 **Fix:** take the language from the parsed statement, not a regex over the text; add `pg_sleep` and friends to the
 forbidden words or rely on `statement_timeout` explicitly.
+
+### F-34 addendum: the blocklist misses a wide class of functions, with no `plpython` needed `PoC` · P3
+Live-tested against a real `schema-check`-image container (2026-10-29, `poc/schema_sql/`), independent of the
+`LANGUAGE` comment trick above. `FORBIDDEN_WORDS` is a name blocklist, not a safe subset: a plain `LANGUAGE
+plpgsql`/`sql` function body calling `pg_sleep`, `pg_terminate_backend`, `pg_reload_conf`, `current_setting`,
+`pg_ls_waldir`/`pg_ls_logdir`, `lo_get`, a direct `SELECT ... FROM pg_authid`, `table_to_xml`, a
+dynamically-concatenated function name, a Unicode-escaped identifier, or `EXECUT/**/E` (comment-split) all pass
+`check()` unchanged. Confirmed these actually run, not just parse: a body calling `pg_sleep(2)` measurably blocked
+for ~2 s, `pg_terminate_backend` ran and returned a result, `current_setting` returned a real value — and `apply()`
+reports **zero findings** (a clean PASS) for all of them, because none of these are in `FORBIDDEN_WORDS` and
+`MISSING_TABLE`/`NO_INSERT_ONLY_GUARD` don't look for them. (No file content was read or exfiltrated in this test;
+only harmless arguments were used.) Severity stays P3: `schema-check` is a throwaway, `trust`-auth, no-real-data
+Postgres on an `internal: true` Docker network reachable only from `worker-build` (TD §20.3.6), so none of the
+confirmed calls read real secrets or reach outside the scratch database. The practical risk is resource exhaustion:
+`schema-check` is one `cpus: 1.0` / `mem_limit: 512m` container that `worker-build` serializes every project's
+schema check through, so a `pg_sleep(29)` (just under the 30 s `statement_timeout`) in an uploaded or
+LLM-generated schema — now reachable via `PUT W/schema-sql/source` (#104, merged to `dev`) as well as codegen —
+stalls that shared container for every other project's build queued behind it.
+**Fix:** as F-34 proposes, read the language from the parsed statement rather than a regex, and treat this as an
+allowlist problem: restrict function bodies to a known-safe statement shape (e.g. `sqlglot`-parsed `SELECT`/`RAISE`/
+`PERFORM`/assignment only) rather than enumerating every dangerous call by name. Short term, add `pg_sleep`,
+`pg_terminate_backend`, `pg_reload_conf`, `pg_ls_waldir`, `pg_ls_logdir`, `lo_get`, `pg_authid`, `table_to_xml`,
+`query_to_xml` and a Unicode-escape check to `FORBIDDEN_WORDS`. Commented on #457 (F-34) rather than filing a new
+issue. Scripts: `poc/schema_sql/fuzz.py`, `fuzz2.py`, `poc_safe.py`.
 
 ### F-35 A stolen session cookie works about 5 minutes after sign-out `PoC` · P3
 Live through the UI: after "Sign out" (RP-initiated logout), replaying the pre-logout cookie returned 200 at t+3 s,
