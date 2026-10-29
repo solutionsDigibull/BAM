@@ -29,7 +29,8 @@ from pathlib import Path
 REPO = os.environ.get("REPO", "solutionsDigibull/BAM")
 ROOT = Path(__file__).resolve().parent.parent
 BUSY = {"status:in-progress", "status:in-review"}
-DEP_LINE = re.compile(r"^\s*(?:\*\*)?(blocked by|depends on)(?:\*\*)?\s*:", re.I)
+# A list item or quote may carry the line (`- Blocked by: #119`, `> Blocked by: #119`): #536.
+DEP_LINE = re.compile(r"^\s*(?:[-*+>]\s+)*(?:\*\*)?(blocked by|depends on)(?:\*\*)?\s*:", re.I)
 
 QUERY = """
 query($owner:String!,$name:String!,$after:String){ repository(owner:$owner,name:$name){
