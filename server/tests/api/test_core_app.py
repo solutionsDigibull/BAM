@@ -4,7 +4,7 @@ import json
 import socket
 import sys
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 
 import pytest
@@ -329,3 +329,39 @@ def test_e1_3_storage_check_needs_a_writable_directory(tmp_path: Path) -> None:
     assert not list(tmp_path.iterdir())  # probe file cleaned up
     with pytest.raises(OSError):
         asyncio.run(_storage_check(tmp_path / "missing"))
+
+
+def _chunks(total: int, size: int = 64) -> Iterator[bytes]:
+    yield b'{"count": 1, "pad": "'
+    for _ in range(total // size):
+        yield b"x" * size
+    yield b'"}'
+
+
+def test_a19_t02_a_chunked_body_over_the_limit_is_413_not_400(app_factory: AppFactory) -> None:
+    client = TestClient(with_test_routes(app_factory(max_body_bytes=256)))
+    response = client.post("/api/v1/_test/items", content=_chunks(1024))  # no Content-Length
+    assert response.status_code == 413
+    assert assert_problem(response.json(), 413).code == "PAYLOAD_TOO_LARGE"
+    assert "x-correlation-id" in response.headers
+
+
+def test_a19_t03_a_chunked_body_under_the_limit_still_passes(app_factory: AppFactory) -> None:
+    client = TestClient(with_test_routes(app_factory(max_body_bytes=4096)))
+    response = client.post(
+        "/api/v1/_test/items",
+        content=iter([b'{"count"', b": 3}"]),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 200 and response.json() == {"count": 3}
+
+
+def test_a19_t04_a_chunked_body_exactly_at_the_limit_passes(app_factory: AppFactory) -> None:
+    body = b'{"count": 1}'
+    client = TestClient(with_test_routes(app_factory(max_body_bytes=len(body))))
+    response = client.post(
+        "/api/v1/_test/items",
+        content=iter([body[:5], body[5:]]),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 200

@@ -371,3 +371,73 @@ def test_e3_3_concurrent_edit_during_apply_is_409(h: ImportHarness) -> None:
     with mock.patch("sbam_api.masters.importer._new_version", side_effect=StaleRowVersion()):
         res = h.upload(workbook(edit))
     problem(res, 409, "VERSION_CONFLICT")
+
+
+# --- A-19: validate before materialising rows -----------------------------------------------------
+
+
+def _refusal(data: bytes) -> tuple[Any, float]:
+    """What `_read` raises for this workbook, and how long it took."""
+    import time
+
+    from sbam_api.core.conventions import ApiError
+    from sbam_api.masters.importer import _read
+
+    started = time.monotonic()
+    with pytest.raises(ApiError) as caught:
+        _read("masters.xlsx", data)
+    return caught.value, time.monotonic() - started
+
+
+def test_a19_t01_a_huge_tab_is_refused_from_the_zip_directory_in_under_a_second() -> None:
+    """The audit's N-03: a tab with 400k rows (13 MB zipped) took 11 s and 250 MB to reject."""
+    import random
+
+    book = Workbook(write_only=True)
+    for name in ("README", "Organization", "Rules", "Agents", "Skills", "Filetype"):
+        book.create_sheet(name).append(["x"])
+    bulk = book.create_sheet("Bulk")
+    rng = random.Random(1)  # noqa: S311 - test data
+    for n in range(300_000):
+        bulk.append([f"{rng.getrandbits(60):x}", f"{rng.getrandbits(60):x}", n])
+    out = io.BytesIO()
+    book.save(out)
+    error, seconds = _refusal(out.getvalue())
+    assert error.code == "VALIDATION_ERROR" and error.status == 422
+    assert seconds < 1
+
+
+def test_a19_t02_a_template_tab_over_the_row_cap_is_422_and_stops_streaming(
+    h: ImportHarness,
+) -> None:
+    from sbam_api.masters.importer import MAX_DATA_ROWS
+
+    def grow(book: Workbook) -> None:
+        sheet = book["Skills"]
+        for n in range(MAX_DATA_ROWS + 50):
+            sheet.append([f"filler {n}"])
+
+    body = problem(h.upload(workbook(grow)), 422, "VALIDATION_ERROR")
+    assert body["errors"][0]["path"] == "Skills!rows"
+    assert h.counts() == (0, 0)  # nothing written
+
+
+def test_a19_t03_the_cap_counts_filled_rows_not_formatted_empty_ones(h: ImportHarness) -> None:
+    from sbam_api.masters.importer import MAX_DATA_ROWS
+
+    def pad(book: Workbook) -> None:
+        sheet = book["Skills"]
+        sheet.cell(row=MAX_DATA_ROWS + 100, column=1).value = None  # a styled, empty used range
+        sheet.row_dimensions[MAX_DATA_ROWS + 100].height = 30
+
+    res = h.upload(workbook(pad), mode="validate-only")
+    assert res.status_code == 200, res.text
+
+
+def test_a19_t04_a_wrong_tab_set_still_reports_the_same_structure_error(h: ImportHarness) -> None:
+    def drop(book: Workbook) -> None:
+        del book["Rules"]
+
+    body = problem(h.upload(workbook(drop)), 422, "STRUCTURE_MISMATCH")
+    assert body["errors"][0]["path"] == "workbook!tabs"
+    assert "missing ['Rules']" in body["errors"][0]["message"]
