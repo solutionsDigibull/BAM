@@ -15,7 +15,7 @@ from sbam_api.schema_sql.models import WorkflowSchema
 from sbam_api.storage.base import Kind, StorageScope
 from sbam_contracts.schema_sql import MAX_SOURCE_BYTES
 from sqlalchemy import select
-from test_auth import ADMIN_A, FDE_A2, TENANT_A, TENANT_B, problem
+from test_auth import FDE_A2, TENANT_A, TENANT_B, problem
 from test_isatvon_validate_api import Harness as WorkflowHarness
 
 BASE = (
@@ -184,5 +184,5 @@ def test_e9_4_another_tenant_or_an_unassigned_fde_gets_404(h: Harness) -> None:
 
 def test_e9_4_only_the_fde_portal_sets_the_base(h: Harness) -> None:
     # refused before the handler; tests/security/rbac_matrix.yaml pins every role's answer
-    problem(h.put(h.sql_document(BASE), h.realm.token(ADMIN_A)), 404, "NOT_FOUND")
+    problem(h.put(h.sql_document(BASE), h.admin_a()), 403, "WRONG_PORTAL")
     assert h.schemas() == []
