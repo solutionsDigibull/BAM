@@ -408,6 +408,7 @@ def check_release_file(path: Path) -> list[Finding]:
         "SBAM_API_IMAGE",
         "SBAM_WORKER_IMAGE",
         "SBAM_WEB_IMAGE",
+        "SBAM_PROXY_IMAGE",
         "SBAM_MOCK_API_IMAGE",
     ):
         value = seen.get(key, "")
