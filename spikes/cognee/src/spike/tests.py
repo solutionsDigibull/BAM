@@ -139,28 +139,15 @@ def t05_size_vs_context() -> dict:
     text_chars = sum(len(c["text"]) for c in chunk_rows)
     chunk_tokens = sum(len(enc.encode(c["text"])) for c in chunk_rows)
     tok_per_char = chunk_tokens / text_chars
-    # Fixed JSON wrapper cost per chunk (id, document_version_id, location). Measured on the tiny fixture chunks,
-    # then applied at a realistic chunk size, because the fixture chunks are too short to show the real ratio.
+    # Fixed JSON wrapper cost per chunk (id, document_version_id, location), measured on the fixture chunks.
     wrapper_per_chunk = (parts["chunks.jsonl"] - chunk_tokens) / len(chunk_rows)
-    target_chunk_tokens = 1000
-    chunk_factor = 1 + wrapper_per_chunk / target_chunk_tokens
-    # Graph records are NOT extrapolated: on tiny fixtures their size is dominated by fixed per-record cost (ids,
+    # Graph records are NOT scaled: on tiny fixtures their size is dominated by fixed per-record cost (ids,
     # source_refs), so any ratio to text size would be meaningless. Report measured size per record instead.
     n_graph_records = max(1, sum(1 for n in ("entities.jsonl", "relations.jsonl")
                                  for _ in (d / n).read_text(encoding="utf-8").splitlines()))
     graph_tokens = parts["entities.jsonl"] + parts["relations.jsonl"]
     masters_tokens = parts["masters.jsonl"]  # constant per tenant, independent of corpus size
-    scenarios = {"20 files x 15 MB (hard limit)": 20 * 15 * 1024 * 1024,
-                 "20 files x 500 KB (large typical)": 20 * 500 * 1024,
-                 "20 files x 50 KB (typical RFQ pack)": 20 * 50 * 1024}
-    reserve = 16_000
-    windows = {"128k": 128_000, "200k": 200_000, "1M": 1_000_000}
-    table = {}
-    for name, nbytes in scenarios.items():
-        text_tokens = nbytes * tok_per_char  # assumes ~1 byte per character (English/ASCII-heavy text)
-        chunks_only = int(text_tokens * chunk_factor + masters_tokens)
-        table[name] = {"tokens_chunks_and_masters_excl_graph": chunks_only,
-                       "ranking_needed_even_without_graph": {w: chunks_only > (n - reserve) for w, n in windows.items()}}
+    # Nothing is extrapolated to a larger corpus (E0.18-T03): sizing needs a real corpus, not a ratio from one fixture.
     # exercise ranking path: force a tiny budget on the real fixture and record the selection per section
     budget = 100  # must be below the whole fixture corpus (~300 tokens) or ranking is not actually forced
     cvecs = embed([c["text"] for c in chunk_rows])
@@ -173,14 +160,15 @@ def t05_size_vs_context() -> dict:
             if used + t <= budget:
                 picked.append(c["id"]); used += t
         selection[s] = {"chunks": picked, "tokens": used}
-    return {"method": "tiktoken cl100k_base on bundle parts; extrapolated by measured tokens/char; windows are "
-                      "assumptions (sbam-sow model not chosen yet); reserve 16k tokens for prompt+output",
+    return {"method": "tiktoken cl100k_base on the bundle files and on the chunk text of this one fixture; measured "
+                      "values only, nothing extrapolated to a larger corpus",
             "bundle_tokens_by_part": parts, "bundle_tokens_total": sum(parts.values()),
+            "chunk_text_characters": text_chars, "chunk_text_tokens": chunk_tokens,
             "tokens_per_char": round(tok_per_char, 4), "wrapper_tokens_per_chunk": round(wrapper_per_chunk, 1),
-            "chunk_factor_at_1000_token_chunks": round(chunk_factor, 3), "graph_tokens_measured": graph_tokens,
+            "graph_tokens_measured": graph_tokens,
             "graph_tokens_per_record_measured": round(graph_tokens / n_graph_records, 1),
             "masters_tokens": masters_tokens,
-            "scenarios": table, "ranking_budget_tokens": budget, "ranking_selection": selection}
+            "ranking_budget_tokens": budget, "ranking_selection": selection}
 
 
 async def main() -> None:
@@ -190,9 +178,8 @@ async def main() -> None:
                "T03": t03_provenance(), "T04": t04_master_injection(), "T05": t05_size_vs_context()}
     (OUT / "results.json").write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     for k, v in results.items():
-        brief = {kk: vv for kk, vv in v.items() if kk not in ("ranking_selection", "scenarios", "bundle_tokens_by_part")}
+        brief = {kk: vv for kk, vv in v.items() if kk not in ("ranking_selection", "bundle_tokens_by_part")}
         print(f"\n== {k}:", json.dumps(brief, ensure_ascii=False)[:900])
-    print("\nT05 scenarios:", json.dumps(results["T05"]["scenarios"], indent=1))
 
 
 if __name__ == "__main__":

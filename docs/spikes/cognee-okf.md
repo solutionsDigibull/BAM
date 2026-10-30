@@ -36,7 +36,7 @@ and were reproduced on three full rebuilds (the committed bundle is from the thi
 | `E0.9-T02` Full content | **Pass** | 4 of 4 documents: joined `chunks.jsonl` text equals `doc.md` byte for byte (934 of 934 characters, compared by `verify_bundle` and again by the report script) |
 | `E0.9-T03` Provenance | **Pass** | 22 of 22 entities and 18 of 18 relations carry at least one `source_ref` with `document_version_id` and a location (page+line or sheet+cell). All 22 entities have a block-level ref; 3 entities also have a whole-document fallback ref (the LLM normalized the name so it did not match the text) |
 | `E0.9-T04` Master injection | **Pass, with data findings** | Graph has an `Organization ORG-EMS` entity; 16 of 16 included master nodes exist as entities; 16 non-structural edges touch the root; ILLUSTRATIVE rows (`ORG-CORE`, `RULE-CORE`, `SK-CORE`) never reached the graph. Details below |
-| `E0.9-T05` Size vs context | **Answered** | Ranking is needed whenever the window is 200k or smaller, and for any corpus above about 50 KB per file. Numbers below |
+| `E0.9-T05` Size vs context | **Partly answered** | Measured on the one fixture only: the chunk text of project A is about 300 tokens. How big a real corpus gets, and so when ranking is needed, was **not measured** (the first version of this report extrapolated it; that is removed, see below) |
 | `E0.9-T06` Gateway-only egress | **Pass (by topology)** | Runner is attached only to the `internal` network. From the runner: `openrouter.ai:443` and `1.1.1.1:443` are blocked, `bifrost:8080` is reachable. The runner environment holds no OpenRouter or Bifrost-secret variable (checked by name). Two full builds succeeded through Bifrost, so all traffic used it. This is a structural guarantee, not a packet capture |
 | `E0.9-T07` Bifrost down | **Pass, with findings** | See below |
 
@@ -64,18 +64,23 @@ deterministic (identical `masters.jsonl` hash across runs). Findings for #21 and
 
 ### Bundle size vs context (T05)
 
-Method: `tiktoken cl100k_base` on the real bundle, extrapolated by measured tokens per character (0.318). The `sbam-sow`
-model is not chosen, so 128k, 200k and 1M windows are assumptions, with 16k tokens reserved for prompt and output.
+Only figures that were measured on this run are reported, each with its method. Nothing here is scaled up to a larger
+corpus: the first version of this report multiplied a tokens-per-character ratio from 934 characters to "20 files × 15 MB"
+and read the context-window verdict from that. That was an extrapolation from one tiny fixture and it is withdrawn.
 
-| Corpus | Tokens (chunks + masters, graph excluded) | Ranking needed at 128k / 200k / 1M |
+| Figure | Value | Method |
 |---|---|---|
-| 20 files × 15 MB (hard limit) | ≈ 107 million | yes / yes / yes |
-| 20 files × 500 KB | ≈ 3.5 million | yes / yes / yes |
-| 20 files × 50 KB (typical RFQ pack) | ≈ 352 thousand | yes / yes / **no** |
+| Chunk text of project A | 934 characters, about 300 tokens (0.318 tokens per character) | `tiktoken cl100k_base` on the text of the four documents, counted by the report script. One fixture, English text |
+| `chunks.jsonl` of project A | 1,088 tokens | `tiktoken cl100k_base` on the whole file. It includes the JSON fields of every chunk record (ids, offsets, source refs), not only the text, which is why it is larger than the text alone |
+| `masters.jsonl` of this workbook | 2,730 tokens | `tiktoken cl100k_base` on the whole file |
+| Graph (`entities.jsonl` + `relations.jsonl`) of project A | 5,872 tokens | `tiktoken cl100k_base` on both files, one run. Not used for any sizing: on tiny fixtures it is dominated by a fixed cost per record (about 147 tokens per record), so no ratio to text size can be read from it, and the LLM extraction is nondeterministic (finding 5 below) |
+| The whole bundle | 9,845 tokens (5,872 graph + 2,730 masters + 1,088 chunks) | Sum of the three counts above |
 
-The real project A bundle is 9,845 tokens (5,872 graph, 2,730 masters, 1,088 chunks). Graph size is **not** extrapolated: on tiny fixtures
-it is dominated by fixed per-record cost (about 147 tokens per record), so no ratio to text size is meaningful. A larger
-real corpus is needed to size the graph. Masters are a constant 2,730 tokens for this workbook.
+What follows from this, and what does not. The masters are a constant cost for this workbook (2,730 tokens), so they do not
+grow with the documents. The chunk text is the only part whose growth with the documents could be measured, and it needs a
+real corpus: a pack of realistic RFQ documents run through the same script. The `sbam-sow` model is not chosen, so no context
+window is assumed either. Until that measurement exists the question "when is ranking needed" is open, and the ranking path
+below is kept in the design as a safeguard, not as a sized requirement.
 
 **Ranking path exercised** with a forced 100-token budget (the corpus is about 300 tokens): 89 to 100 tokens selected per
 section, recorded in `results.json`. Quality finding: cosine similarity between a bare section title and a chunk favours short
@@ -108,7 +113,7 @@ status `DATASET_PROCESSING_ERRORED`; **no bundle was written**; Bifrost recovere
 - Fixtures are tiny (project A is 934 characters). **Large documents (up to 15 MB), streamed writes and Cognee's chunker at scale were not tested.**
 - Only one chat model and one embedding model were tried. Extraction quality was sanity-checked, not evaluated.
 - Costs and latency were not measured beyond the observed ~30 s per project build for 3–4 tiny documents.
-- Master data came from a workbook mock, not the Admin API (not built yet). Retest with the real snapshot in #80.
+- Master data came from a workbook mock, not the Admin API. The Admin masters APIs exist now (#54, #55, #56, #59), so the spike has to be re-run on a snapshot they export and the mock and the real shape diffed (#203, tests E0.18-T01 and T02; the steps are on that issue).
 - T06 is proven by network topology, not a packet capture.
 
 ## Recommendation
