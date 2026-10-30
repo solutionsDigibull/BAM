@@ -123,8 +123,9 @@ def request_upload(
         raise not_found()
     require_active(project)
 
-    used = DocumentVersionRepository(session, ctx).active_count()
     reservations = ReservationRepository(session, ctx)
+    reservations.lock_slots()  # the check and the reservations below: one request at a time
+    used = DocumentVersionRepository(session, ctx).active_count()
     used += reservations.pending_count(now)
     batch_id = uuid7()
     accepted: list[AcceptedFile] = []
@@ -260,6 +261,7 @@ def pre_create(
     if not is_allowed(name):
         return refuse(415, ErrorCode.UNSUPPORTED_TYPE, _DETAIL[ErrorCode.UNSUPPORTED_TYPE])
     reservations = ReservationRepository(session, ctx)
+    reservations.lock_slots()  # the limit check below counts the project's other pending slots
     slot = reservations.claim(claims.batch_id, name, size, now)
     if slot is None or slot.user_id != claims.user_id:
         return refuse(
