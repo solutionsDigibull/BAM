@@ -44,6 +44,7 @@ def sandbox(tmp_path: Path) -> dict[str, Path]:
         "testgen-base.json",
         "correction.json",
         "correction-base.json",
+        "codegen.json",
     ):
         (golden / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"

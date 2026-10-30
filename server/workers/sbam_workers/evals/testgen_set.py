@@ -184,11 +184,11 @@ DOMAINS: Final[dict[str, DomainProfile]] = {
         required_inputs=["ticket_id", "customer_tier"],
         fresh_state_parameters=["assignment_attempts", "queue_load", "ticket_status"],
         action_step="Pick the least loaded queue for the customer tier and assign the ticket through Queue_MCP.",
-        acceptance_check="Programmatically evaluate if assigned_queue is not null AND sla_breach == False.",
+        acceptance_check="Programmatically evaluate if assigned == True AND sla_breach == False.",
         action_tool="Queue_MCP (Ticket Assigner)",
         fixed_check_tool="Sla_MCP (Response Time Validator)",
         libraries=["fastmcp", "psycopg"],
-        success_gate="assigned_queue is not null AND sla_breach == False",
+        success_gate="assigned == True AND sla_breach == False",
         no_op_condition="ticket_status is 'CLOSED'",
         escalation_condition="assignment_attempts >= max_iterations",
         tables=["tickets", "triage_handoff"],
@@ -271,7 +271,7 @@ def build_testgen_set() -> GoldenTestgenSet:
                     max_iterations=bound,
                 )
             )
-    return GoldenTestgenSet(task=Task.TESTGEN, version=2, domains=DOMAINS, items=items)
+    return GoldenTestgenSet(task=Task.TESTGEN, version=3, domains=DOMAINS, items=items)
 
 
 def render_json() -> str:

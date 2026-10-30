@@ -1,0 +1,12 @@
+{
+  "task": "codegen",
+  "score": 0.9458,
+  "items": 20,
+  "runs": 3,
+  "alias": "sbam-codegen",
+  "prompt_sha256": {
+    "codegen-bodies/1.0.0": "4a448dbc1d082c2288a3f887a2d209e8648fdd3d33aedff9ea4ade71d49ec912"
+  },
+  "recorded_on": "2026-10-30",
+  "note": "recorded with --record; review before merging"
+}

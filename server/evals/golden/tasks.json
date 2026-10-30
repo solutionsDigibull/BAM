@@ -33,8 +33,8 @@
     "prompt_ids": [
       "codegen-bodies"
     ],
-    "status": "todo",
-    "note": "Needs 20 Sub-Skill specs whose generated bodies must pass the AST gate and compile."
+    "status": "ready",
+    "note": "20 items: the five testgen Sub-Skills at four iteration bounds (codegen.json, from sbam_workers.evals.codegen_set); the model writes the bodies for the fastmcp-loopy skeleton."
   },
   {
     "task": "testgen",

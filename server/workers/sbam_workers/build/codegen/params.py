@@ -113,12 +113,23 @@ def _field_specs(schema: Mapping[str, Any], where: str) -> list[dict[str, Any]]:
 def params_from_manifest(manifest: SkillManifest) -> dict[str, Any]:
     """Skill Manifest -> render params. Does not validate; `validate_params` does."""
     data = manifest.dump()
-    detail = data["sbam_build_record"]["isatvon_detail"]
+    return params_from_parts(
+        data["skill_metadata"]["skill_id"],
+        data["sbam_build_record"]["isatvon_detail"],
+        data["contracts"],
+    )
+
+
+def params_from_parts(
+    skill_id: str, detail: Mapping[str, Any], contracts: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The render params from the three things a manifest supplies: the skill id, the structured
+    ISATVON (`isatvon_detail`) and the `contracts`. A manifest is not needed to get them."""
     tech, auto, variables, outcome = (
         detail[k] for k in ("t_tech_stack", "a_automation", "v_variables", "o_outcome")
     )
     handoff = outcome["state_handoff_file"]
-    inputs = _field_specs(data["contracts"]["input_schema"], "contracts.input_schema")
+    inputs = _field_specs(contracts["input_schema"], "contracts.input_schema")
     parameters = [
         {"name": p["name"], "value": p["value"] if p.get("value") is not None else p.get("default")}
         for p in variables.get("parameters") or []
@@ -134,13 +145,13 @@ def params_from_manifest(manifest: SkillManifest) -> dict[str, Any]:
         raise invalid([f"v_variables gate expression: {exc}"]) from exc
     known = {f["name"] for f in inputs} | {"max_iterations"} | {p["name"] for p in parameters}
     return {
-        "skill_id": data["skill_metadata"]["skill_id"],
+        "skill_id": skill_id,
         "action_tool": tool_name(tech["action_tool"]),
         "action_step": auto["action_step"],
         "fixed_check_tool": tool_name(tech["fixed_check_tool"]),
         "acceptance_check": auto["acceptance_check"],
         "inputs": inputs,
-        "outputs": _field_specs(data["contracts"]["output_schema"], "contracts.output_schema"),
+        "outputs": _field_specs(contracts["output_schema"], "contracts.output_schema"),
         "parameters": parameters,
         "fresh_state": fresh_state,
         "gate_outputs": sorted(used - known - set(fresh_state)),

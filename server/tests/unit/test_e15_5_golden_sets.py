@@ -35,6 +35,7 @@ def copy_dir(tmp_path: Path) -> Path:
         "testgen-base.json",
         "correction.json",
         "correction-base.json",
+        "codegen.json",
     ):
         (tmp_path / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
@@ -63,7 +64,9 @@ def test_e15_5_every_llm_task_is_listed_once_with_real_prompts() -> None:
 
 def test_e15_5_a_task_is_ready_only_with_at_least_the_minimum_items() -> None:
     ready = [t for t in load_tasks() if t.status == "ready"]
-    assert sorted(t.task for t in ready) == sorted([Task.OCR, Task.TESTGEN, Task.CORRECTION])
+    assert sorted(t.task for t in ready) == sorted(
+        [Task.OCR, Task.TESTGEN, Task.CORRECTION, Task.CODEGEN]
+    )
     assert len(load_ocr().items) >= MIN_ITEMS
 
 

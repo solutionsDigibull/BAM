@@ -1,0 +1,146 @@
+{
+  "task": "codegen",
+  "version": 1,
+  "items": [
+    {
+      "id": "codegen-01",
+      "description": "login with a one-time code, max_iterations 1",
+      "synthetic": true,
+      "domain": "login with a one-time code",
+      "max_iterations": 1
+    },
+    {
+      "id": "codegen-02",
+      "description": "login with a one-time code, max_iterations 2",
+      "synthetic": true,
+      "domain": "login with a one-time code",
+      "max_iterations": 2
+    },
+    {
+      "id": "codegen-03",
+      "description": "login with a one-time code, max_iterations 3",
+      "synthetic": true,
+      "domain": "login with a one-time code",
+      "max_iterations": 3
+    },
+    {
+      "id": "codegen-04",
+      "description": "login with a one-time code, max_iterations 5",
+      "synthetic": true,
+      "domain": "login with a one-time code",
+      "max_iterations": 5
+    },
+    {
+      "id": "codegen-05",
+      "description": "invoice matching, max_iterations 1",
+      "synthetic": true,
+      "domain": "invoice matching",
+      "max_iterations": 1
+    },
+    {
+      "id": "codegen-06",
+      "description": "invoice matching, max_iterations 2",
+      "synthetic": true,
+      "domain": "invoice matching",
+      "max_iterations": 2
+    },
+    {
+      "id": "codegen-07",
+      "description": "invoice matching, max_iterations 3",
+      "synthetic": true,
+      "domain": "invoice matching",
+      "max_iterations": 3
+    },
+    {
+      "id": "codegen-08",
+      "description": "invoice matching, max_iterations 5",
+      "synthetic": true,
+      "domain": "invoice matching",
+      "max_iterations": 5
+    },
+    {
+      "id": "codegen-09",
+      "description": "stock reservation, max_iterations 1",
+      "synthetic": true,
+      "domain": "stock reservation",
+      "max_iterations": 1
+    },
+    {
+      "id": "codegen-10",
+      "description": "stock reservation, max_iterations 2",
+      "synthetic": true,
+      "domain": "stock reservation",
+      "max_iterations": 2
+    },
+    {
+      "id": "codegen-11",
+      "description": "stock reservation, max_iterations 3",
+      "synthetic": true,
+      "domain": "stock reservation",
+      "max_iterations": 3
+    },
+    {
+      "id": "codegen-12",
+      "description": "stock reservation, max_iterations 5",
+      "synthetic": true,
+      "domain": "stock reservation",
+      "max_iterations": 5
+    },
+    {
+      "id": "codegen-13",
+      "description": "ticket triage, max_iterations 1",
+      "synthetic": true,
+      "domain": "ticket triage",
+      "max_iterations": 1
+    },
+    {
+      "id": "codegen-14",
+      "description": "ticket triage, max_iterations 2",
+      "synthetic": true,
+      "domain": "ticket triage",
+      "max_iterations": 2
+    },
+    {
+      "id": "codegen-15",
+      "description": "ticket triage, max_iterations 3",
+      "synthetic": true,
+      "domain": "ticket triage",
+      "max_iterations": 3
+    },
+    {
+      "id": "codegen-16",
+      "description": "ticket triage, max_iterations 5",
+      "synthetic": true,
+      "domain": "ticket triage",
+      "max_iterations": 5
+    },
+    {
+      "id": "codegen-17",
+      "description": "leave request, max_iterations 1",
+      "synthetic": true,
+      "domain": "leave request",
+      "max_iterations": 1
+    },
+    {
+      "id": "codegen-18",
+      "description": "leave request, max_iterations 2",
+      "synthetic": true,
+      "domain": "leave request",
+      "max_iterations": 2
+    },
+    {
+      "id": "codegen-19",
+      "description": "leave request, max_iterations 3",
+      "synthetic": true,
+      "domain": "leave request",
+      "max_iterations": 3
+    },
+    {
+      "id": "codegen-20",
+      "description": "leave request, max_iterations 5",
+      "synthetic": true,
+      "domain": "leave request",
+      "max_iterations": 5
+    }
+  ]
+}

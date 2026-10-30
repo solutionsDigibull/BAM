@@ -210,7 +210,7 @@ def runner_of(answer: Callable[[CodeBodies], Correction | None]) -> Callable[[],
 def sandbox(tmp_path: Path) -> dict[str, Path]:
     golden = tmp_path / "golden"
     golden.mkdir(exist_ok=True)
-    for name in ("tasks.json", "correction.json", "correction-base.json"):
+    for name in ("tasks.json", "correction.json", "correction-base.json", "codegen.json"):
         (golden / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
         )

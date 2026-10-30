@@ -153,6 +153,7 @@ def test_e15_5_a_variant_that_is_not_a_valid_sub_skill_is_a_problem(tmp_path: Pa
         "testgen.json",
         "correction.json",
         "correction-base.json",
+        "codegen.json",
     ):
         (tmp_path / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
@@ -210,6 +211,7 @@ def sandbox(tmp_path: Path) -> dict[str, Path]:
         "testgen-base.json",
         "correction.json",
         "correction-base.json",
+        "codegen.json",
     ):
         (golden / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
@@ -272,7 +274,7 @@ def test_e15_5_testgen_is_listed_as_a_ready_task() -> None:
     from sbam_workers.evals.golden import load_tasks
 
     ready = sorted(t.task for t in load_tasks() if t.status == "ready")
-    assert ready == sorted([Task.OCR, Task.TESTGEN, Task.CORRECTION])
+    assert ready == sorted([Task.OCR, Task.TESTGEN, Task.CORRECTION, Task.CODEGEN])
 
 
 def test_e15_5_the_committed_testgen_baseline_is_valid_and_matches_the_set() -> None:
