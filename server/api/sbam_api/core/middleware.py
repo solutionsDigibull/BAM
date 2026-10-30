@@ -1,4 +1,4 @@
-"""Pure-ASGI middleware: correlation id + access log + 500 safety net, and request body limit."""
+"""Pure-ASGI middleware: correlation id, access log, 500 net, body limit, no-store."""
 
 import logging
 import re
@@ -157,3 +157,34 @@ class BodyLimitMiddleware:
         else:
             if exceeded and not started and not answered:  # the app swallowed it and sent nothing
                 await send_problem(send, too_large)
+
+
+class NoStoreMiddleware:
+    """`Cache-Control: no-store` on JSON answered to an authenticated request (A-15).
+
+    A shared cache or the browser must not keep one user's data. A route that sets its own
+    Cache-Control (a private ETag-validated read) keeps it; answers without a credential and
+    non-JSON answers (downloads, which set theirs) are left alone.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not _header(scope, b"authorization"):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_no_store(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = [(bytes(k).lower(), bytes(v)) for k, v in message.get("headers", [])]
+                kind = next((v for k, v in headers if k == b"content-type"), b"")
+                is_json = kind.startswith((b"application/json", b"application/problem+json"))
+                if is_json and not any(k == b"cache-control" for k, _ in headers):
+                    message["headers"] = [
+                        *message.get("headers", []),
+                        (b"cache-control", b"no-store"),
+                    ]
+            await send(message)
+
+        await self.app(scope, receive, send_no_store)

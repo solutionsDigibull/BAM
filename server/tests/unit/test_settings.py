@@ -187,3 +187,31 @@ def test_a14_t04_dev_falls_back_to_the_hook_secret_and_prefers_its_own_key(
 def test_a14_t05_no_secret_at_all_means_uploads_off(env: pytest.MonkeyPatch) -> None:
     env.setenv("SBAM_ENV", "development")
     assert load_settings().upload_token_secret() is None
+
+
+def test_a15_one_replica_may_use_a_per_process_cursor_key(env: pytest.MonkeyPatch) -> None:
+    first, second = load_settings(), load_settings()
+    assert first.sbam_api_replicas == 1
+    assert first.cursor_secret.get_secret_value() != second.cursor_secret.get_secret_value()
+
+
+@pytest.mark.parametrize("blank", [None, "", "  "])
+def test_a15_several_replicas_need_a_shared_cursor_secret(
+    env: pytest.MonkeyPatch, blank: str | None
+) -> None:
+    env.setenv("SBAM_API_REPLICAS", "2")
+    if blank is not None:
+        env.setenv("CURSOR_SECRET", blank)  # Compose passes an unset variable as ""
+    with pytest.raises(SettingsError, match="CURSOR_SECRET"):
+        load_settings()
+
+
+def test_a15_several_replicas_with_a_secret_start(env: pytest.MonkeyPatch) -> None:
+    env.setenv("SBAM_API_REPLICAS", "3")
+    env.setenv("CURSOR_SECRET", "k" * 32)
+    assert load_settings().cursor_secret.get_secret_value() == "k" * 32
+
+
+def test_a15_a_blank_cursor_secret_never_becomes_the_key(env: pytest.MonkeyPatch) -> None:
+    env.setenv("CURSOR_SECRET", "")
+    assert len(load_settings().cursor_secret.get_secret_value()) == 64  # the random per-process key

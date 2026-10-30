@@ -60,8 +60,10 @@ class Settings(BaseSettings):
     tusd_public_url: str = "http://localhost:1080/files/"
     # List cursors are HMAC-signed (core.conventions.encode_cursor).
     # ponytail: a random key per process when unset, so cursors die on restart (the client starts
-    # again at page 1); set CURSOR_SECRET once the API runs more than one replica.
+    # again at page 1). Replicas must share one key or a cursor signed by one fails on another, so
+    # SBAM_API_REPLICAS above 1 refuses to start without CURSOR_SECRET (A-15); blank = unset.
     cursor_secret: SecretStr = Field(default_factory=lambda: SecretStr(secrets.token_hex(32)))
+    sbam_api_replicas: int = Field(default=1, ge=1)
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     # Per-user request budgets (A-08, core/ratelimit.py), per minute, per API process; 0 = off.
     rate_limit_writes_per_minute: int = Field(default=120, ge=0)
@@ -86,6 +88,22 @@ class Settings(BaseSettings):
     posthog_host: str | None = None  # Compose passes "" when unset: a str, not a URL
     posthog_api_key: SecretStr | None = None
     posthog_distinct_id_salt: SecretStr | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_cursor_secret_is_unset(cls, data: Any) -> Any:
+        if isinstance(data, dict) and not _set(data.get("cursor_secret")):
+            data = {k: v for k, v in data.items() if k != "cursor_secret"}
+        return data
+
+    @model_validator(mode="after")
+    def _replicas_share_one_cursor_secret(self) -> "Settings":
+        if self.sbam_api_replicas > 1 and "cursor_secret" not in self.model_fields_set:
+            raise SettingsError(
+                f"CURSOR_SECRET is required when SBAM_API_REPLICAS={self.sbam_api_replicas}: "
+                "every replica must sign and verify list cursors with the same key."
+            )
+        return self
 
     @model_validator(mode="after")
     def _refuse_placeholder_secrets_outside_dev(self) -> "Settings":
