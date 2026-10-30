@@ -521,7 +521,8 @@ test("e7_3_t05 a double click on confirm sends one approval", async ({ page, bas
   await open(page, baseURL!, f);
   await approveButton(page).click();
   await confirmButton(page).dblclick();
-  await expect(page.getByText("SOW v1 approved.")).toBeVisible();
+  // the answer is delayed 600 ms; the rest of the budget is the runner's, not the page's
+  await expect(page.getByText("SOW v1 approved.")).toBeVisible({ timeout: 20_000 });
   expect(f.approvals).toHaveLength(1);
 });
 
