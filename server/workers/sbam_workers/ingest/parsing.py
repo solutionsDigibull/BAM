@@ -206,6 +206,12 @@ def _complete(
             return _outcome(version)
         _transition(session, ctx, inp, version.id, "parse_completed")
         version = _load(session, ctx, inp.ref_id)
+        # The OCR step replaces the text pass's files: the old keys are named before they go (#496).
+        superseded = [
+            k
+            for k in (version.derived_md_key, version.derived_json_key)
+            if k not in (md_key, json_key)
+        ]
         version.derived_md_key, version.derived_json_key = md_key, json_key
         version.parse_report = report.model_dump(mode="json")
         version.parse_code = None
@@ -226,7 +232,26 @@ def _complete(
         )
         session.commit()
         outcome = _outcome(version)
+    _drop_superseded(deps, ctx, version.id, [k for k in superseded if k])
     return outcome
+
+
+def _drop_superseded(
+    deps: ParseDeps, ctx: TenantContext, version_id: uuid.UUID, keys: list[str]
+) -> None:
+    """Delete the derived files this version no longer points at, unless another version or a master
+    document does (a derivative is named by its content, so two documents can share one). Runs
+    after the commit, so a crash leaves a stray file and never a version without its file. A file
+    that cannot be deleted is logged, not raised: the answer is stored and a retry would not get
+    here (#496)."""
+    for key in keys:
+        try:
+            with deps.sessions() as session:
+                if DocumentVersionRepository(session, ctx).derived_key_in_use(key, [version_id]):
+                    continue
+            deps.storage.delete(key)
+        except Exception:  # never turn a stored result into a failed activity
+            log.warning("could not delete a superseded derived file", exc_info=True)
 
 
 def _fail(

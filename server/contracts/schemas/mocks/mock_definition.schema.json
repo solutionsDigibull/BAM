@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:mocks/mock_definition:0.1.0",
+  "$defs": {
+    "JsonValue": {},
+    "MockResponse": {
+      "additionalProperties": false,
+      "description": "One answer: a status and a JSON body (absent = an empty body).",
+      "properties": {
+        "status": {
+          "maximum": 599,
+          "minimum": 100,
+          "title": "Status",
+          "type": "integer"
+        },
+        "body": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "MockResponse",
+      "type": "object"
+    },
+    "MockStub": {
+      "additionalProperties": false,
+      "description": "What one route answers. `responses` is the per-call sequence: the first call gets the first\nentry, and the last entry answers every call after that.",
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 512,
+          "pattern": "^/[A-Za-z0-9._~!$&'()*+,;=:@%/{}-]*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "case": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "only for this case; absent = every case without its own stub",
+          "title": "Case"
+        },
+        "responses": {
+          "items": {
+            "$ref": "#/$defs/MockResponse"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Responses",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "path",
+        "responses"
+      ],
+      "title": "MockStub",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The stubs for one API reference (`S.external_data` entry `name`).",
+  "properties": {
+    "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "stubs": {
+      "items": {
+        "$ref": "#/$defs/MockStub"
+      },
+      "maxItems": 200,
+      "minItems": 1,
+      "title": "Stubs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "stubs"
+  ],
+  "title": "MockDefinition",
+  "type": "object"
+}

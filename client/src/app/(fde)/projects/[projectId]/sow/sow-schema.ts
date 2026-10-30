@@ -8,6 +8,7 @@
 //
 // `templateLock` refuses any change to the template: the nine sections (ids, order, headings), item ids and
 // module ids. Everything inside them stays editable (E6.5-T04).
+import DOMPurify from "dompurify";
 import { Extension, Node, type AnyExtension, type JSONContent } from "@tiptap/react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import type { Node as PmNode } from "@tiptap/pm/model";
@@ -137,13 +138,41 @@ const TemplateLock = Extension.create({
   ],
 });
 
-const DROPPED = "script, style, iframe, object, embed, noscript, template, img, svg, link, meta";
+// Pasted HTML is untrusted (it comes from other pages and documents): an allowlist, not a blocklist.
+// Only what the SOW schema can hold survives; every other tag is unwrapped to its text, and a
+// script's, style's or template's contents are dropped with it. No link, image or style attribute.
+const PASTE_TAGS = [
+  "p", "br", "h1", "h2", "h3", "h4", "ul", "ol", "li", "strong", "b", "em", "i", "blockquote",
+  "section", "div", "article", "span",
+]; // prettier-ignore
+// The data-* hooks the SOW nodes parse from (copy and paste inside the editor), and nothing else.
+const PASTE_ATTRS = [
+  "data-section", "data-field", "data-label", "data-record", "data-item", "data-citations",
+  "data-cite",
+]; // prettier-ignore
 
-/** Pasted HTML without the elements above, contents included (a <script>'s body is not text to keep). */
+/** Pasted HTML reduced to the SOW's own vocabulary (DOMPurify, tag and attribute allowlist). */
 export function cleanPastedHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  doc.querySelectorAll(DROPPED).forEach((el) => el.remove());
-  return doc.body.innerHTML;
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: PASTE_TAGS,
+    ALLOWED_ATTR: PASTE_ATTRS,
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+    KEEP_CONTENT: true,
+    FORBID_CONTENTS: [
+      "script",
+      "style",
+      "template",
+      "iframe",
+      "object",
+      "embed",
+      "noscript",
+      "svg",
+      "math",
+      "title",
+    ],
+    USE_PROFILES: undefined,
+  });
 }
 
 const PasteGuard = Extension.create({

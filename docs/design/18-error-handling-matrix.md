@@ -37,6 +37,7 @@
 | E30 | Disk full                                                                     | Storage metrics        | —                                   | Writes fail (503)                          | Operator expands volume                 |
 | E31 | Stored code bundle no longer matches what `assemble` recorded                 | AST gate (hash check)  | — (non-retryable)                   | `BUILD_ERROR`                              | Platform investigates, then Retry       |
 | E32 | A code gate is given inputs that are not the attempt's (attempt, template, manifest or bundle) | AST gate               | — (non-retryable)                   | `BUILD_ERROR`                              | Platform fixes the wiring, then Retry   |
+| E33 | A static tool or clamd gives no verdict after its retries (timeout, crash, unreachable, signatures older than 24 h) | Static gate           | 2 attempts (never a correction)     | `BUILD_ERROR`                              | Operator fixes the tool or clamd, then Retry |
 
 Rules: failures never advance state; only transient errors are retried automatically; evidence of failed attempts is kept; every failure produces an in-app notification with the reason and the next action.
 

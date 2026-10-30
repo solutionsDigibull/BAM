@@ -300,6 +300,33 @@ routes:
       <<: *super_admin_only
       super_admin: "422 VALIDATION_ERROR"
 
+  # ---- tenant SRIM runtime defaults (E9.1b): the tenant's own row, so another tenant's admin
+  # reads and writes ITS OWN values (200), never this tenant's; a tenant-less super-admin has none --
+  get_srim_defaults_api_v1_admin_srim_defaults_get:
+    request: {method: GET, path: /api/v1/admin/srim-defaults}
+    expect: *tenant_admin_list
+
+  put_srim_defaults_api_v1_admin_srim_defaults_put:
+    request:
+      method: PUT
+      path: /api/v1/admin/srim-defaults
+      headers: {if-match: '"0"'}
+      json:
+        orchestration: {router: Acme_Router, trigger: Acme_Trigger}
+        execution: {engine: Acme_Engine}
+        gateway: {route_via: Acme_Gateway}
+        persistence: {database: Acme_DB, action: Acme_SQL}
+        audit: {telemetry: Acme_Audit}
+        ui: {target: Acme_Canvas, method: Acme_Widgets}
+    expect: *tenant_admin_list
+
+  reset_srim_defaults_api_v1_admin_srim_defaults_delete:
+    request:
+      method: DELETE
+      path: /api/v1/admin/srim-defaults
+      headers: {if-match: '"0"'}
+    expect: *tenant_admin_list
+
   # ---- runtime registry -------------------------------------------------------------------
   admin_registry_api_v1_admin_registry_get:
     request: {method: GET, path: /api/v1/admin/registry}
@@ -795,6 +822,91 @@ routes:
       path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/code/attempts/{n}/diff/{m}
       params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", n: "0", m: "1"}
       query: {path: action.py}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  # Test data of a Sub-Skill (E13.4). The world seeds no ISATVON rows, so an assigned FDE reaches
+  # the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
+  get_tests_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  post_case_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_cases_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests/cases
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      headers: {if-match: '"rbac"'}
+      json: {name: x, input: {}, expected_terminal: SUCCESS}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  put_case_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_cases__case_id__put:
+    request:
+      method: PUT
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests/cases/{case_id}
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", case_id: "00000000-0000-0000-0000-000000000001"}
+      headers: {if-match: '"rbac"'}
+      json: {input: {}}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  delete_case_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_cases__case_id__delete:
+    request:
+      method: DELETE
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/tests/cases/{case_id}
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", case_id: "00000000-0000-0000-0000-000000000001"}
+      headers: {if-match: '"rbac"'}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  # Test runs of a Sub-Skill (E13.6). The world seeds no ISATVON rows, so an assigned FDE reaches
+  # the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
+  get_test_runs_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__test_runs_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/test-runs
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  # The held ISATVON patch of a Sub-Skill (#499). The world seeds no ISATVON rows, so an assigned FDE
+  # reaches the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
+  held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/held-patch
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  accept_held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_accept_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/held-patch/accept
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      headers: {idempotency-key: "rbac-held-patch-0001", if-match: '"rbac"'}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  reject_held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_reject_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/held-patch/reject
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      headers: {idempotency-key: "rbac-held-patch-0001", if-match: '"rbac"'}
     expect:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"

@@ -1,0 +1,2 @@
+alias: sbam-testgen
+description: Synthetic test cases for one Sub-Skill, from its own ISATVON only (E13.4, TD §15.1).

@@ -97,6 +97,9 @@ services:
       - *wrapper-mount
       # The realm file rendered for this environment's public origin (compose/keycloak/render_realm.py).
       - ${SBAM_REALM_FILE:?render it with compose/keycloak/render_realm.py and set the path}:/opt/keycloak/data/import/realm-bullm.json:ro
+      # The password blacklist the rendered realm's password policy names (render_realm.py PASSWORD_POLICY): a
+      # policy that names a missing file would reject every password change.
+      - ./keycloak/password-blacklist.txt:/opt/keycloak/data/password-blacklists/common-passwords.txt:ro
     ports: !override
       - ${SBAM_OPS_BIND:?set the VM Netbird address}:${KEYCLOAK_PORT:-8080}:8080
     secrets:
@@ -221,6 +224,12 @@ services:
     environment:
       <<: *worker-deploy-env
       DATABASE_URL: !reset null
+      # Keycloak events into the audit log (A-18b): read as sbam-api-admin, the secret is a Docker secret.
+      KEYCLOAK_ADMIN_CLIENT_SECRET: !reset null
+      KEYCLOAK_ADMIN_CLIENT_SECRET_FILE: /run/secrets/keycloak_admin_client_secret
+    secrets:
+      - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: keycloak_admin_client_secret, target: keycloak_admin_client_secret, uid: "10001", gid: "10001", mode: 0400 }
 
   worker-knowledge:
     <<: *worker-deploy
@@ -271,6 +280,11 @@ services:
   sbam-mock-api:
     image: ${SBAM_MOCK_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-mock-api@sha256:...)}
     build: !reset null
+    environment:
+      MOCK_CONTROL_TOKEN: !reset null
+      MOCK_CONTROL_TOKEN_FILE: /run/secrets/mock_control_token # the service reads the file itself
+    secrets:
+      - { source: mock_control_token, target: mock_control_token, uid: "10001", gid: "10001", mode: 0400 }
 
   sbam-web:
     image: ${SBAM_WEB_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-web@sha256:...)}
@@ -293,11 +307,18 @@ services:
   proxy:
     # Reverse proxy (compose/proxy/Caddyfile): the only public service. Terminates TLS 1.2+, adds HSTS, routes
     # the portal (sbam-web, /files to tusd) and the Keycloak login paths, answers everything else with 404.
-    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    # The image is Caddy plus the rate-limit module (compose/docker/proxy.Dockerfile, A-08b): the Caddyfile's
+    # per-IP `rate_limit` does not exist in stock Caddy, so this is a release image like the others.
+    image: ${SBAM_PROXY_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-proxy@sha256:...)}
     environment:
       SBAM_PORTAL_HOST: ${SBAM_PORTAL_HOST:?set the public portal hostname}
       SBAM_AUTH_HOST: ${SBAM_AUTH_HOST:?set the public Keycloak hostname}
       SBAM_TLS: ${SBAM_TLS:-}
+      # Per-client-IP limits per minute (Caddyfile): all portal paths, sign-in, files and uploads, the Keycloak host.
+      SBAM_RATE_PORTAL_EVENTS: ${SBAM_RATE_PORTAL_EVENTS:-600}
+      SBAM_RATE_SIGNIN_EVENTS: ${SBAM_RATE_SIGNIN_EVENTS:-30}
+      SBAM_RATE_FILES_EVENTS: ${SBAM_RATE_FILES_EVENTS:-300}
+      SBAM_RATE_AUTH_HOST_EVENTS: ${SBAM_RATE_AUTH_HOST_EVENTS:-300}
       SBAM_ACME_EMAIL: ${SBAM_ACME_EMAIL:?set the ACME contact email (unused with SBAM_TLS=internal or provided certificates)}
     volumes:
       - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
@@ -344,6 +365,7 @@ secrets:
   keycloak_admin_client_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/keycloak_admin_client_secret" }
   tusd_hook_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/tusd_hook_secret" }
   upload_token_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/upload_token_key" }
+  mock_control_token: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/mock_control_token" }
   storage_signing_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/storage_signing_key" }
   auth_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/auth_secret" }
   openrouter_api_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/openrouter_api_key" }

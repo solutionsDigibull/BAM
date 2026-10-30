@@ -41,6 +41,8 @@ from sbam_contracts.knowledge import (
     cognee_dataset,
 )
 
+from sbam_workers.llm.meter import metered
+
 log = logging.getLogger("sbam_workers.knowledge.cognee")
 
 DATASET_RE = re.compile(DATASET_PATTERN)
@@ -214,8 +216,9 @@ class CogneeAdapter:
             data = await asyncio.to_thread(self._storage.get, item.storage_key)
             if hashlib.sha256(data).hexdigest() != item.sha256:
                 raise ItemRejected(f"sha256 mismatch for item {item.source_id}")
-            async with _classified():
-                await self._backend.add(who, dataset, key, data)
+            with metered(scope.tenant_id, scope.project_id, "add"):
+                async with _classified():
+                    await self._backend.add(who, dataset, key, data)
             present.add(key)
             added.append(key)
         self._log("items added", scope, added=len(added), skipped=len(skipped))
@@ -255,8 +258,9 @@ class CogneeAdapter:
     async def cognify(self, scope: ProjectScope) -> None:
         """Build the graph. Can take minutes: the calling activity heartbeats from its own task."""
         dataset, who = await self._authorize(scope)
-        async with _classified():
-            await self._backend.cognify(who, dataset)
+        with metered(scope.tenant_id, scope.project_id, "cognify"):  # its model calls are counted
+            async with _classified():
+                await self._backend.cognify(who, dataset)
         self._log("cognify done", scope)
 
     async def search(self, scope: ProjectScope, query: str, top_k: int = 10) -> list[SearchHit]:
@@ -265,8 +269,9 @@ class CogneeAdapter:
             raise ValueError(f"query must be 1..{MAX_QUERY_LENGTH} characters")
         if not 1 <= top_k <= MAX_TOP_K:
             raise ValueError(f"top_k must be 1..{MAX_TOP_K}")
-        async with _classified():
-            hits = await self._backend.search(who, dataset, query, top_k)
+        with metered(scope.tenant_id, scope.project_id, "search"):
+            async with _classified():
+                hits = await self._backend.search(who, dataset, query, top_k)
         self._log("search", scope, hits=len(hits))
         return hits[:top_k]
 

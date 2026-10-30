@@ -241,6 +241,7 @@ def test_e16_3_t04_cli_passes_on_repo_and_fails_on_placeholder_release(
                 ("SBAM_API_IMAGE", "sbam-api"),
                 ("SBAM_WORKER_IMAGE", "sbam-worker"),
                 ("SBAM_WEB_IMAGE", "sbam-web"),
+                ("SBAM_PROXY_IMAGE", "sbam-proxy"),
                 ("SBAM_MOCK_API_IMAGE", "sbam-mock-api"),
             )
         ),
@@ -543,15 +544,28 @@ def test_e16_3_proxy_service_hardening_and_secure_cookie_origin(
     os.environ.get("SBAM_VALIDATE_PROXY") != "1",
     reason="set SBAM_VALIDATE_PROXY=1 (needs docker pull of the caddy image)",
 )
-def test_e16_3_caddyfile_validates_with_caddy() -> None:  # pragma: no cover - needs the image
+def test_e16_3_caddyfile_validates_with_caddy() -> None:  # pragma: no cover - needs docker
+    """The Caddyfile uses `rate_limit`, which only the sbam-proxy image (Caddy + caddy-ratelimit,
+    compose/docker/proxy.Dockerfile) knows: stock Caddy refuses it, so validate with the real image.
+    """
     assert DOCKER
-    image = next(
-        m
-        for m in re.findall(
-            r"image: (caddy\S+)",
-            (COMPOSE / "compose.deploy.yaml").read_text(encoding="utf-8"),
-        )
+    image = "sbam-proxy:validate"
+    built = subprocess.run(  # noqa: S603 - fixed argv
+        [
+            DOCKER,
+            "build",
+            "-q",
+            "-f",
+            str(COMPOSE / "docker" / "proxy.Dockerfile"),
+            "-t",
+            image,
+            str(COMPOSE.parent),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
+    assert built.returncode == 0, built.stderr
     proc = subprocess.run(  # noqa: S603 - fixed argv
         [
             DOCKER,
@@ -652,6 +666,7 @@ SECRET_NAMES = [
     "keycloak_admin_client_secret",
     "tusd_hook_secret",
     "upload_token_key",
+    "mock_control_token",
     "storage_signing_key",
     "auth_secret",
     "openrouter_api_key",

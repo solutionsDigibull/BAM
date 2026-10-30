@@ -13,12 +13,13 @@ from alembic import command
 from sbam_api.audit.models import AuditLog
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.ids import uuid7
+from sbam_api.db.base import utcnow
 from sbam_api.db.migrate import config
 from sbam_api.db.repository import TenantContext
 from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.projects.models import Project
-from sbam_api.sow.approve import approve_version
+from sbam_api.sow.approve import RELAY_MIN_AGE, approve_version, redeliver_pending
 from sbam_api.sow.models import SowVersion
 from sbam_api.sow.service import Generation, record_generation
 from sbam_contracts.pipeline import PipelineStage, PipelineStatus
@@ -135,3 +136,103 @@ def test_e7_1_t10_concurrent_approvals_make_one_transition_and_one_signal(
             )
         ).all()
         assert len(approvals) == 1
+
+
+class Flaky(Pipeline):
+    """Down for the first `fail` signals, then up."""
+
+    def __init__(self, fail: int) -> None:
+        super().__init__()
+        self.fail = fail
+
+    async def signal(self, name: str, payload: Any, **kw: Any) -> None:
+        if self.fail > 0:
+            self.fail -= 1
+            from temporalio.service import RPCError, RPCStatusCode
+
+            raise RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
+        await super().signal(name, payload, **kw)
+
+
+def test_a03_the_signal_is_never_sent_before_the_approval_is_visible_to_another_connection(
+    sessions: sessionmaker[Session],
+) -> None:
+    """The race of #439 on real transactions: when Temporal hears of the approval, a second
+    connection (what `create_workflow` uses) already reads the version as APPROVED."""
+    project_id, sha = a_sow(sessions)
+    seen: list[str] = []
+
+    class Watching(Pipeline):
+        async def signal(self, name: str, payload: Any, **kw: Any) -> None:
+            with sessions() as other:  # a different connection, as the activity has
+                seen.append(
+                    other.scalars(
+                        select(SowVersion.state).where(SowVersion.project_id == project_id)
+                    ).one()
+                )
+            await super().signal(name, payload, **kw)
+
+    pipeline = Watching()
+
+    async def client() -> Any:
+        return pipeline
+
+    asyncio.run(
+        approve_version(sessions, client, FDE, project_id, 1, SowApproveRequest(sha256=sha))
+    )
+    assert seen == ["APPROVED"]
+
+
+def test_a03_a_failed_signal_is_saved_then_two_racing_retries_send_exactly_one(
+    sessions: sessionmaker[Session],
+) -> None:
+    project_id, sha = a_sow(sessions)
+    pipeline = Flaky(fail=1)
+
+    async def client() -> Any:
+        return pipeline
+
+    body = SowApproveRequest(sha256=sha)
+    with pytest.raises(Exception, match="Orchestrator"):
+        asyncio.run(approve_version(sessions, client, FDE, project_id, 1, body))
+    with sessions() as s:
+        version = s.scalars(select(SowVersion).where(SowVersion.project_id == project_id)).one()
+        assert version.state == "APPROVED" and version.signal_sent_at is None
+
+    async def retries() -> list[SowApproval]:
+        return list(
+            await asyncio.gather(
+                approve_version(sessions, client, FDE, project_id, 1, body),
+                approve_version(sessions, client, FDE, project_id, 1, body),
+            )
+        )
+
+    assert {a.status.value for a in asyncio.run(retries())} == {"APPROVED"}
+    assert len(pipeline.signals) == 1
+    with sessions() as s:
+        version = s.scalars(select(SowVersion).where(SowVersion.project_id == project_id)).one()
+        assert version.signal_sent_at is not None
+
+
+def test_a03_the_relay_and_a_retry_racing_send_exactly_one(
+    sessions: sessionmaker[Session],
+) -> None:
+    project_id, sha = a_sow(sessions)
+    pipeline = Flaky(fail=1)
+
+    async def client() -> Any:
+        return pipeline
+
+    with pytest.raises(Exception, match="Orchestrator"):
+        asyncio.run(
+            approve_version(sessions, client, FDE, project_id, 1, SowApproveRequest(sha256=sha))
+        )
+
+    async def race() -> Any:
+        return await asyncio.gather(
+            redeliver_pending(sessions, client, utcnow() + RELAY_MIN_AGE),
+            redeliver_pending(sessions, client, utcnow() + RELAY_MIN_AGE),
+        )
+
+    sent = asyncio.run(race())
+    assert sum(s for s, _ in sent) == 1 and len(pipeline.signals) == 1

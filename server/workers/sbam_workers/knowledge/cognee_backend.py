@@ -20,6 +20,8 @@ from sbam_contracts.knowledge import GraphEdge, GraphNode, SearchHit
 from sbam_workers import mirror
 from sbam_workers.knowledge.cognee_adapter import CogneeAdapter, DatasetNotFound, Principal
 from sbam_workers.knowledge.scope import SqlScopeGuard
+from sbam_workers.llm import meter
+from sbam_workers.llm.store import SqlCallStore
 from sbam_workers.settings import WorkerSettings
 
 COGNEE_LLM_PROVIDER = "custom"
@@ -145,6 +147,8 @@ class CogneeLibrary:
 def default_adapter() -> CogneeAdapter:
     """The adapter the knowledge activities use (E5.2+): real Cognee, the DB guard, storage."""
     settings = WorkerSettings()  # type: ignore[call-arg]  # values come from the environment
+    # Cognee's own model calls reach Bifrost without passing LlmClient: count them (#420).
+    meter.install(SqlCallStore(mirror.sessions()), settings)
     return CogneeAdapter(
         CogneeLibrary(),
         SqlScopeGuard(mirror.sessions()),

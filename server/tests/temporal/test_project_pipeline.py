@@ -60,6 +60,7 @@ from sbam_workers.build import stubs as build_stubs
 from sbam_workers.build.plan import make_plan
 from sbam_workers.pipeline.project_pipeline import ProjectPipeline
 from sbam_workers.stub_ids import stage_stub_id, stub_id
+from sbam_workers.test import stubs as test_stubs
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.client import Client, WorkflowHandle, WorkflowHistory
@@ -198,6 +199,8 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "generate_bodies": build_stubs.generate_bodies,
     "assemble": build_stubs.assemble,
     "ast_gate": build_stubs.ast_gate,
+    "static_gate": build_stubs.static_gate,
+    "generate_tests": test_stubs.generate_tests,
     "correct": build_stubs.correct,
 }
 

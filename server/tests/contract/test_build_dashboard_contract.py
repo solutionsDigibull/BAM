@@ -17,6 +17,7 @@ from sbam_contracts.build_dashboard import (
     GateResult,
     GatesResponse,
     GateStatus,
+    Severity,
 )
 from sbam_workers.build.codegen.bundle import SyntaxFinding
 
@@ -78,3 +79,13 @@ def test_e12_6_gates_response_with_findings() -> None:
     assert resp.gates[0].findings[0].message == "<b>x</b>"  # kept as text; the UI shows it as text
     with pytest.raises(ValidationError):
         Finding.model_validate({"gate": "RUFF", "code": "E501", "message": "x", "extra": 1})
+
+
+def test_e12_4_a_static_finding_carries_a_severity_and_the_ast_ones_do_not() -> None:
+    assert Finding(gate=GateName.AST_SYNTAX, code="X", message="m").severity is None
+    bandit = Finding.model_validate(
+        {"gate": "BANDIT", "code": "B602", "message": "m", "severity": "HIGH", "line": 3}
+    )
+    assert bandit.severity is Severity.HIGH
+    with pytest.raises(ValidationError):
+        Finding.model_validate({"gate": "BANDIT", "code": "B602", "message": "m", "severity": "x"})

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# sbam-mock-api (TD §20.2): health-only stub so the Compose core profile runs.
-# ponytail: #126 (E13.5) replaces server.py with the real mock APIs for sandbox tests.
+# sbam-mock-api (TD §20.2, E13.5): the mock APIs of sandbox tests. Standard library only (no pip, no
+# network at build time); MOCK_CONTROL_TOKEN (or _FILE) is required, see server.py.
 FROM python:3.12.15-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258
 LABEL org.opencontainers.image.source="https://github.com/solutionsDigibull/BAM" \
       org.opencontainers.image.vendor="Digibull" \

@@ -9,6 +9,7 @@ import { useCustom, useCustomMutation, type BaseRecord } from "@refinedev/core";
 import {
   Alert,
   App,
+  Button,
   Drawer,
   Empty,
   Flex,
@@ -24,7 +25,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { ApiErrorState, EmptyState, LoadingState, Meta, MUTED } from "@/components/ui-kit";
-import type { BuildRow, BuildsResponse, GateName, GatesResponse } from "@/contracts";
+import type {
+  BuildRow,
+  BuildsResponse,
+  GateName,
+  GatesResponse,
+  HeldPatchResponse,
+} from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
 import type { GridActions } from "./build-grid";
@@ -32,10 +39,15 @@ import {
   buildRows,
   buildsUrl,
   codeHref,
+  decideUrl,
   GATE_LABEL,
   gatesUrl,
+  heldOf,
+  heldPatchUrl,
+  ifMatchOf,
   pollMs,
   retryUrl,
+  showValue,
   summary,
 } from "./build-api";
 
@@ -140,6 +152,130 @@ function FindingsDrawer({
   );
 }
 
+export const NO_PATCH_MESSAGE = "No ISATVON patch is waiting for your decision.";
+
+/**
+ * The ISATVON patch a correction proposed (#499): what it changes, why, and Accept / Reject. Both
+ * send the build on again, so the grid is refreshed afterwards. Everything from the build is shown
+ * as text, the model's rationale included.
+ */
+function PatchDrawer({
+  projectId,
+  workflowId,
+  row,
+  onClose,
+  onDecided,
+}: {
+  projectId: string;
+  workflowId: string;
+  row: BuildRow;
+  onClose: () => void;
+  onDecided: () => Promise<unknown>;
+}) {
+  const { message } = App.useApp();
+  const { result, query } = useCustom<HeldPatchResponse, ApiError>({
+    url: heldPatchUrl(projectId, workflowId, row.sub_skill_id),
+    method: "get",
+    queryOptions: { retry: false },
+  });
+  const held = heldOf(result.data);
+  const [reason, setReason] = useState("");
+  const { mutateAsync, mutation } = useCustomMutation<BaseRecord, ApiError>();
+
+  const decide = async (what: "accept" | "reject") => {
+    if (!held) return;
+    try {
+      await mutateAsync({
+        url: decideUrl(projectId, workflowId, row.sub_skill_id, what),
+        method: "post",
+        values: reason.trim() ? { reason: reason.trim() } : {},
+        config: {
+          headers: {
+            "idempotency-key": newKey(),
+            ...(what === "accept" ? { "if-match": ifMatchOf(held) } : {}),
+          },
+        },
+        successNotification: false,
+        errorNotification: false,
+      });
+      message.success(
+        what === "accept"
+          ? `Patch accepted for ${row.skill_id}: the build runs again from it`
+          : `Patch rejected for ${row.skill_id}: the build runs again from the approved ISATVON`,
+      );
+      onClose();
+      await onDecided();
+    } catch (e) {
+      message.error((e as ApiError).message);
+    }
+  };
+
+  let body;
+  if (query.isLoading) body = <Spin />;
+  else if (query.isError)
+    body = <ApiErrorState error={query.error} onRetry={() => query.refetch()} />;
+  else if (!held) body = <Empty description={NO_PATCH_MESSAGE} />;
+  else
+    body = (
+      <Flex vertical gap={16}>
+        <Alert
+          type="warning"
+          showIcon
+          message="This correction changes what the Sub-Skill means"
+          description="It is held for you instead of certifying. Accept applies it to the Sub-Skill and builds again; Reject builds again from the approved ISATVON."
+        />
+        <Meta>
+          Proposed on attempt {held.attempt} after {held.failed_gate} failed
+        </Meta>
+        {/* text only: the rationale comes from a model */}
+        <Typography.Paragraph style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+          {held.rationale}
+        </Typography.Paragraph>
+        <section aria-label="Changes">
+          {(held.ops ?? []).map((op, i) => (
+            <div
+              key={i}
+              role="listitem"
+              style={{ borderLeft: "3px solid #fde68a", padding: "6px 12px", marginBottom: 8 }}
+            >
+              <Flex gap={8} wrap align="center">
+                <Tag>{op.op}</Tag>
+                <Typography.Text code>{op.path}</Typography.Text>
+              </Flex>
+              {op.op !== "remove" && (
+                <Typography.Paragraph style={{ margin: "6px 0 0", whiteSpace: "pre-wrap" }}>
+                  {showValue(op.value)}
+                </Typography.Paragraph>
+              )}
+            </div>
+          ))}
+        </section>
+        <Input.TextArea
+          aria-label="Reason"
+          placeholder="Optional: why you accept or reject it (kept with the build)"
+          rows={2}
+          maxLength={500}
+          showCount
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+        <Flex gap={8} justify="flex-end">
+          <Button loading={mutation.isPending} onClick={() => decide("reject")}>
+            Reject
+          </Button>
+          <Button type="primary" loading={mutation.isPending} onClick={() => decide("accept")}>
+            Accept
+          </Button>
+        </Flex>
+      </Flex>
+    );
+  return (
+    <Drawer open width={640} onClose={onClose} title={`${row.skill_id} · proposed ISATVON patch`}>
+      {body}
+    </Drawer>
+  );
+}
+
 export function BuildScreen({ projectId, workflowId }: { projectId: string; workflowId: string }) {
   const { message } = App.useApp();
   const builds = useCustom<BuildsResponse, ApiError>({
@@ -157,12 +293,14 @@ export function BuildScreen({ projectId, workflowId }: { projectId: string; work
   const counts = summary(rows);
   const [findings, setFindings] = useState<{ row: BuildRow; gate: GateName } | null>(null);
   const [retry, setRetry] = useState<BuildRow | null>(null);
+  const [patch, setPatch] = useState<BuildRow | null>(null);
   const [reason, setReason] = useState("");
   const { mutateAsync, mutation } = useCustomMutation<BaseRecord, ApiError>();
 
   const actions: GridActions = {
     onFindings: (row, gate) => setFindings({ row, gate }),
     onRetry: (row) => setRetry(row),
+    onPatch: (row) => setPatch(row),
   };
 
   const sendRetry = async () => {
@@ -232,6 +370,15 @@ export function BuildScreen({ projectId, workflowId }: { projectId: string; work
           row={findings.row}
           gate={findings.gate}
           onClose={() => setFindings(null)}
+        />
+      )}
+      {patch && (
+        <PatchDrawer
+          projectId={projectId}
+          workflowId={workflowId}
+          row={patch}
+          onClose={() => setPatch(null)}
+          onDecided={() => builds.query.refetch()}
         />
       )}
       <Modal

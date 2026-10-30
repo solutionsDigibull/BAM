@@ -2,7 +2,7 @@ import { Editor, type JSONContent } from "@tiptap/react";
 import { afterEach, describe, expect, test } from "vitest";
 
 import fixture from "../../../../../../e2e/fixtures/sow-ms01.json";
-import { SECTION_IDS, citationsOf, isSowDoc, sowExtensions } from "./sow-schema";
+import { SECTION_IDS, citationsOf, cleanPastedHtml, isSowDoc, sowExtensions } from "./sow-schema";
 
 const SOW = fixture.content_tiptap as JSONContent;
 let editor: Editor | undefined;
@@ -95,6 +95,81 @@ describe("SOW editor schema (E6.5, ADR 0019)", () => {
       expect(saved).not.toContain(bad);
     }
     expect(e.getHTML()).not.toMatch(/<(script|iframe|img|style)/);
+  });
+
+  describe("a11 pasted HTML is reduced to an allowlist (DOMPurify)", () => {
+    const hostile = [
+      '<p onclick="alert(1)" onmouseover="alert(2)">x</p>',
+      '<a href="javascript:alert(1)">click</a>',
+      '<p><a href="data:text/html,<script>alert(1)</script>">d</a></p>',
+      "<svg><script>alert(1)</script></svg>",
+      '<svg onload="alert(1)"></svg>',
+      "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>",
+      '<form action="http://evil"><input name=a></form>',
+      '<p style="background:url(http://evil/x)">s</p>',
+      '<div data-x="1" id="a" class="c" aria-label="l" contenteditable>t</div>',
+      '<noscript><p title="</noscript><img src=x onerror=alert(1)>"></noscript>',
+      '<base href="http://evil/"><link rel="stylesheet" href="http://evil/c.css">',
+      '<object data="http://evil"></object><embed src="http://evil">',
+      "<video src=x onerror=alert(1)><audio src=x onerror=alert(1)>",
+      "<details open ontoggle=alert(1)>t</details>",
+    ];
+
+    test.each(hostile)("%s leaves no script, handler, link or style behind", (html) => {
+      const out = cleanPastedHtml(html);
+      expect(out).not.toMatch(
+        /<\s*(script|iframe|img|svg|math|style|link|base|form|input|object|embed|a|video|audio|details)\b/i,
+      );
+      expect(out).not.toMatch(
+        /\son[a-z]+\s*=|javascript:|data:text|evil|style=|id=|class=|aria-|contenteditable/i,
+      );
+    });
+
+    test("scripts and styles are dropped with their contents, other tags keep their text", () => {
+      const out = cleanPastedHtml(
+        "<script>alert(1)</script><style>b{}</style><u>kept</u><p>text</p>",
+      );
+      expect(out).toContain("kept");
+      expect(out).toContain("<p>text</p>");
+      expect(out).not.toMatch(/alert|b\{\}/);
+    });
+
+    test("the SOW's own hooks and plain formatting survive a paste", () => {
+      const html =
+        '<section data-section="overview"><div data-field="objective" data-label="Objective">' +
+        "<p>Goal <strong>one</strong> <em>two</em></p><ul><li>a</li></ul></div></section>" +
+        '<span data-cite="ref-1">1</span><h2>Title</h2>';
+      const out = cleanPastedHtml(html);
+      for (const keep of [
+        "data-section",
+        "data-field",
+        "data-label",
+        "data-cite",
+        "<strong>",
+        "<li>",
+        "<h2>",
+      ]) {
+        expect(out).toContain(keep);
+      }
+    });
+
+    test("a mutation-prone payload is stable: sanitizing twice changes nothing", () => {
+      for (const html of hostile) {
+        const once = cleanPastedHtml(html);
+        expect(cleanPastedHtml(once)).toBe(once);
+      }
+    });
+
+    test("through the editor: handlers and javascript: links never reach the document", () => {
+      const e = open();
+      const { to } = headingPos(e, 0);
+      e.commands.setTextSelection(to + 4);
+      e.view.pasteHTML('<p onclick="alert(1)">safe</p><a href="javascript:alert(2)">link</a>');
+      const saved = JSON.stringify(e.getJSON());
+      expect(saved).toContain("safe");
+      expect(saved).not.toMatch(/onclick|javascript|alert\(|"link"/);
+      expect(e.getHTML()).not.toMatch(/onclick|javascript:|<a\b/);
+    });
   });
 
   test("citations are listed in reading order with their ids", () => {

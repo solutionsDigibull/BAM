@@ -9,3 +9,10 @@ BUNDLE_TAMPERED: Final = "BUNDLE_TAMPERED"
 # The gate was handed inputs that do not belong to the code attempt (no attempt row, not assembled,
 # another template or manifest, a verdict row about another bundle): a wiring defect. Non-retryable.
 GATE_INPUT_MISMATCH: Final = "AST_GATE_INPUT_MISMATCH"
+# A static tool could not give a verdict (it timed out or crashed, clamd was unreachable, or its
+# signatures are stale): retried by Temporal, never a correction. After the retries it is a platform
+# defect (BUILD_ERROR, an operator fixes it).
+STATIC_GATE_INFRA: Final = "STATIC_GATE_INFRA"
+# The import gate could not start its container (no docker, the daemon or the pinned image is
+# unavailable): retried by Temporal, never a correction and never a verdict on the code.
+IMPORT_GATE_INFRA: Final = "IMPORT_GATE_INFRA"

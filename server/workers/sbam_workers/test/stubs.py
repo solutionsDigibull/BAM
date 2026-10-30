@@ -15,11 +15,11 @@ from sbam_workers.registry import activity_for
 from sbam_workers.stub_ids import stage_stub_id, stub_activity
 
 
-@activity_for(TaskQueue.LLM)
-@activity.defn(name="generate_tests")
-@stub_activity
+@activity.defn(
+    name="generate_tests"
+)  # registered by `build/wiring.py`; the workflow's typed handle
 async def generate_tests(inp: BuildStageInput) -> IdResult:
-    """Real: LLM (`sbam-testgen`) writes the Sub-Skill's tests."""
+    """Real (E13.4): `sbam-testgen` writes the Sub-Skill's tests."""
     return IdResult(id=stage_stub_id(inp, "tests"))
 
 

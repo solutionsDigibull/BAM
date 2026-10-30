@@ -1,10 +1,10 @@
 """Queries on `audit_log` and `notification_outbox`. Audit rows are only ever inserted or read."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from sbam_api.audit.models import AuditLog, NotificationOutbox
@@ -143,3 +143,22 @@ def previous_transition_at(session: Session, audit: AuditLog) -> datetime | None
         .limit(1)
     )
     return session.scalar(query)
+
+
+def known_entity_ids(session: Session, entity_type: str, ids: list[str]) -> set[str]:
+    """System job only: which of these entity ids already have an audit row of this type (any
+    tenant). Lets an import that reads the same source twice write each item once."""
+    if not ids:
+        return set()
+    query = select(AuditLog.entity_id).where(
+        AuditLog.entity_type == entity_type, AuditLog.entity_id.in_(ids)
+    )
+    return {i for i in session.scalars(query) if i}
+
+
+def last_written(session: Session, entity_types: list[str]) -> datetime | None:
+    """System job only: when the newest audit row of these types was written."""
+    found = session.scalar(
+        select(func.max(AuditLog.at)).where(AuditLog.entity_type.in_(entity_types))
+    )
+    return found if found is None or found.tzinfo else found.replace(tzinfo=UTC)

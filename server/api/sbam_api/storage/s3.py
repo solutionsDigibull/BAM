@@ -3,12 +3,15 @@
 import hashlib
 import io
 import tempfile
+from collections.abc import Iterator
 from typing import Any, BinaryIO
 
 from botocore.exceptions import BotoCoreError, ClientError
 
 from sbam_api.storage.base import (
+    InvalidStorageKey,
     Kind,
+    ListedObject,
     StorageIntegrityError,
     StorageScope,
     StorageUnavailable,
@@ -39,6 +42,13 @@ class S3Backend:
                 if not self.exists(key):
                     spool.seek(0)
                     self.s3.upload_fileobj(spool, self.bucket, key)
+                else:  # in use again: refresh LastModified so the unreferenced-file sweep skips it
+                    self.s3.copy_object(
+                        Bucket=self.bucket,
+                        Key=key,
+                        CopySource={"Bucket": self.bucket, "Key": key},
+                        MetadataDirective="REPLACE",
+                    )
             except (BotoCoreError, ClientError):
                 raise StorageUnavailable() from None
         return StoredObject(key, sha256, size, content_type)
@@ -78,3 +88,17 @@ class S3Backend:
         except BotoCoreError:
             raise StorageUnavailable() from None
         return True
+
+    def list_keys(self, prefix: str) -> Iterator[ListedObject]:
+        try:
+            for page in self.s3.get_paginator("list_objects_v2").paginate(
+                Bucket=self.bucket, Prefix=prefix
+            ):
+                for item in page.get("Contents", []):
+                    try:
+                        parse_key(item["Key"])
+                    except InvalidStorageKey:
+                        continue
+                    yield ListedObject(item["Key"], int(item["Size"]), item["LastModified"])
+        except (BotoCoreError, ClientError):
+            raise StorageUnavailable() from None

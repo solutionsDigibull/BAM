@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:promptfoo/test_run:0.1.0",
+  "$defs": {
+    "AssertionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Case",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/AssertionType"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "message": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case",
+        "type",
+        "passed"
+      ],
+      "title": "AssertionResult",
+      "type": "object"
+    },
+    "AssertionType": {
+      "description": "What a suite assertion checks. The values are the `Assertion.type` a test case may carry.",
+      "enum": [
+        "output_schema",
+        "state_handoff_id",
+        "terminal_state",
+        "expected_output",
+        "iterations_within_bound",
+        "cycle_time_within_budget",
+        "handoff_rows",
+        "ui_updates",
+        "llm_rubric"
+      ],
+      "title": "AssertionType",
+      "type": "string"
+    },
+    "TestRunState": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "NON_CERTIFYING",
+        "BLOCKED"
+      ],
+      "title": "TestRunState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A stored Promptfoo run (`test_runs`): per case per assertion, and the totals by case.",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "sub_skill_id": {
+      "format": "uuid",
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "code_attempt_id": {
+      "format": "uuid",
+      "title": "Code Attempt Id",
+      "type": "string"
+    },
+    "sandbox_run_id": {
+      "format": "uuid",
+      "title": "Sandbox Run Id",
+      "type": "string"
+    },
+    "suite_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Suite Sha256",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "#/$defs/TestRunState"
+    },
+    "total": {
+      "minimum": 3,
+      "title": "Total",
+      "type": "integer"
+    },
+    "passed": {
+      "minimum": 0,
+      "title": "Passed",
+      "type": "integer"
+    },
+    "failed": {
+      "minimum": 0,
+      "title": "Failed",
+      "type": "integer"
+    },
+    "non_certifying": {
+      "default": false,
+      "title": "Non Certifying",
+      "type": "boolean"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/AssertionResult"
+      },
+      "maxItems": 2000,
+      "title": "Results",
+      "type": "array"
+    },
+    "report_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Report Key"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "sub_skill_id",
+    "code_attempt_id",
+    "sandbox_run_id",
+    "suite_sha256",
+    "state",
+    "total",
+    "passed",
+    "failed",
+    "results",
+    "created_at"
+  ],
+  "title": "TestRunOut",
+  "type": "object"
+}

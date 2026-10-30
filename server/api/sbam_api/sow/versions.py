@@ -50,7 +50,14 @@ from sbam_api.knowledge.repository import KnowledgeVersionRepository
 from sbam_api.sow.models import Sow, SowSource, SowVersion
 from sbam_api.sow.repository import SowRepository, SowVersionRepository
 from sbam_api.sow.service import canonical_sha256
-from sbam_api.sow.tiptap import TipTapInvalid, citations_of, from_tiptap, stamp_fde
+from sbam_api.sow.tiptap import (
+    TipTapInvalid,
+    citations_of,
+    fde_stamps,
+    from_tiptap,
+    stamp_fde,
+    to_tiptap,
+)
 from sbam_api.state_machine.service import apply_create
 from sbam_api.storage.base import StorageBackend
 
@@ -221,16 +228,9 @@ def _today() -> str:
     return datetime.now(UTC).date().isoformat()
 
 
-def _fde_stamps(structured: dict[str, Any] | None) -> set[tuple[str, str, str | None]]:
-    """(author, date, note) of the FDE-authored citations the saved version already holds."""
-    if structured is None:
-        return set()
-    doc = SowDocument.model_validate(structured)
-    return {
-        (c.author, c.date.isoformat(), c.note)
-        for _, c in citations_of(doc)
-        if isinstance(c, FdeCitation)
-    }
+def _fde_stamps(structured: dict[str, Any] | None) -> set[tuple[str, Any, Any, Any]]:
+    """The FDE-authored citations the saved version already holds, each with its statement."""
+    return set() if structured is None else fde_stamps(to_tiptap(structured))
 
 
 @dataclass(frozen=True)

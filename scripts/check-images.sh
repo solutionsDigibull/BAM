@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 TAG=check
 HADOLINT=hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
 TRIVY=aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
-IMAGES=(sbam-api sbam-worker sbam-web sbam-toolchain sbam-promptfoo skill-runtime sbam-mock-api)
+IMAGES=(sbam-api sbam-worker sbam-web sbam-toolchain sbam-promptfoo skill-runtime sbam-mock-api sbam-proxy)
 fail=0
 pass() { printf 'PASS  %s\n' "$1"; }
 bad() { printf 'FAIL  %s\n' "$1"; fail=1; }
@@ -25,6 +25,7 @@ if [[ "${1:-}" != "--no-build" ]]; then
   build sbam-promptfoo promptfoo.Dockerfile
   build skill-runtime skill-runtime.Dockerfile
   build sbam-mock-api mock-api.Dockerfile
+  build sbam-proxy proxy.Dockerfile
   pass "build all ${#IMAGES[@]} images"
 fi
 

@@ -20,6 +20,7 @@ from sbam_contracts import (
     build_dashboard,
     code_view,
     documents,
+    held_patch,
     identity,
     isatvon14,
     isatvon_grid,
@@ -30,9 +31,11 @@ from sbam_contracts import (
     manifest_api,
     masters,
     masters_api,
+    mocks,
     notifications,
     okf,
     projects,
+    promptfoo,
     runs,
     runtime_registry,
     schema_sql,
@@ -226,6 +229,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("isatvon", isatvon_workbench),
             ("manifest", manifest),
             ("manifest", manifest_api),
+            ("mocks", mocks),
             ("masters", masters),
             ("masters", masters_api),
             ("notifications", notifications),
@@ -238,6 +242,8 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("runtime_registry", runtime_registry),
             ("state_machines", state_machines),
             ("testgen", testgen),
+            ("promptfoo", promptfoo),
+            ("held_patch", held_patch),
         )
         for stem in module.schemas()
     }

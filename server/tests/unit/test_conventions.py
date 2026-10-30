@@ -142,7 +142,7 @@ def test_e0_7_t08_forged_cursor_is_400(tamper: str) -> None:
             encode_cursor({"id": "p9"}, "tenant-a", b"x").split(".")[0] + "." + mac,
             "tenant-a",
         ),
-        "edit-mac": (payload + "." + mac[:-2] + "AA", "tenant-a"),
+        "edit-mac": (payload + "." + ("B" if mac[0] == "A" else "A") + mac[1:], "tenant-a"),
         "garbage": ("not-a-cursor", "tenant-a"),
         "other-tenant": (token, "tenant-b"),
     }[tamper]

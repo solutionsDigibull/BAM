@@ -135,6 +135,28 @@ def test_e11_2c_the_test_generation_stage_is_handled_the_same_way() -> None:
     assert result.certified
 
 
+def test_e11_4b_edited_tests_that_no_longer_fit_wait_in_review_with_the_reason() -> None:
+    flag = {"on": True}
+
+    async def scenario(build: Build) -> Any:
+        await build.until_waiting()
+        said = notice(build, "sub_skill.generation_error")
+        flag["on"] = False
+        await build.retry()
+        return said, await build.finish()
+
+    said, result = run(
+        scenario,
+        generate_tests=traced(
+            "generate_tests",
+            [],
+            failing_while(flag, lambda: model_failure("TestDataStale")),
+        ),
+    )
+    assert said["stage"] == "test generation" and said["error"] == "TestDataStale"
+    assert said["next_action"] == "retry" and result.certified
+
+
 def test_e11_2c_a_platform_defect_still_fails_the_workflow_loudly() -> None:
     """A wiring mismatch is not the model's fault and an FDE retry would not fix it."""
 
@@ -162,6 +184,7 @@ def test_e11_2c_a_platform_defect_still_fails_the_workflow_loudly() -> None:
         (model_failure("LlmRequestRejected"), "LlmRequestRejected"),
         (model_failure("BudgetExceeded"), "BudgetExceeded"),
         (model_failure("ContextTooLarge"), "ContextTooLarge"),
+        (model_failure("TestDataStale"), "TestDataStale"),
         (
             TimeoutError("late", type=TimeoutType.START_TO_CLOSE, last_heartbeat_details=[]),
             TIMED_OUT,

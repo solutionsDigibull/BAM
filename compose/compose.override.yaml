@@ -75,6 +75,8 @@ services:
       keycloak-seed: { condition: service_completed_successfully }
     environment:
       WATCHPACK_POLLING: "true" # file events don't cross Docker Desktop bind mounts on Windows
+      # The upload URL the API hands out (compose.yaml); the dev CSP allows its origin (#568).
+      TUSD_PUBLIC_URL: ${TUSD_PUBLIC_URL:-http://localhost:${TUSD_PORT:-1080}/files/}
     volumes:
       - ../client:/app/client
       - web_node_modules:/app/client/node_modules

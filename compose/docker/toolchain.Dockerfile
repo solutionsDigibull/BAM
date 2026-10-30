@@ -8,7 +8,7 @@ LABEL org.opencontainers.image.source="https://github.com/solutionsDigibull/BAM"
 ENV PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN pip install --no-cache-dir \
       ruff==0.16.10 \
-      black==26.10.0 \
+      black==26.10.1 \
       mypy==2.4.0 \
       bandit==1.9.4 \
  && groupadd --gid 10001 sbam \

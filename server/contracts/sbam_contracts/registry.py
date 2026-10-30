@@ -27,6 +27,7 @@ from sbam_contracts.documents import (
     UploadRequest,
     UploadToken,
 )
+from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
 from sbam_contracts.identity import (
     Me,
     Tenant,
@@ -54,7 +55,14 @@ from sbam_contracts.knowledge import (
     KnowledgeNodeDetail,
     KnowledgeVersionList,
 )
-from sbam_contracts.manifest import Isa14Manifest, LoopSpec, SkillManifest, WorkflowManifest
+from sbam_contracts.manifest import (
+    Isa14Manifest,
+    LoopSpec,
+    SkillManifest,
+    SrimDefaultsView,
+    SrimRuntimeDefaults,
+    WorkflowManifest,
+)
 from sbam_contracts.manifest_api import ManifestVersionList, ManifestView
 from sbam_contracts.masters import (
     AgentsPayload,
@@ -80,6 +88,7 @@ from sbam_contracts.masters_api import (
     MasterTypes,
     MasterVersionCreate,
 )
+from sbam_contracts.mocks import MockDefinition, MockJournal, MockRunSetup
 from sbam_contracts.notifications import Notification
 from sbam_contracts.okf import (
     BundleCoverage,
@@ -98,6 +107,7 @@ from sbam_contracts.projects import (
     WorkflowRename,
     WorkflowSummary,
 )
+from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.schema_sql import SchemaSqlSourcePut, WorkflowSchemaSql
@@ -137,12 +147,17 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/sub_skill_extraction", SubSkillExtraction),
     ("build/builds_response", BuildsResponse),
     ("build/gates_response", GatesResponse),
+    ("held_patch/held_patch_response", HeldPatchResponse),
+    ("held_patch/patch_decision", PatchDecision),
+    ("held_patch/patch_decided", PatchDecided),
     ("build/schema_sql", WorkflowSchemaSql),
     ("build/schema_sql_source_put", SchemaSqlSourcePut),
     ("manifest/isa14_manifest", Isa14Manifest),
     ("manifest/skill_manifest", SkillManifest),
     ("manifest/workflow_manifest", WorkflowManifest),
     ("manifest/loop_spec", LoopSpec),
+    ("manifest/srim_runtime_defaults", SrimRuntimeDefaults),
+    ("manifest/srim_defaults_view", SrimDefaultsView),
     ("manifest/manifest_version_list", ManifestVersionList),
     ("manifest/manifest_view", ManifestView),
     ("masters/readme", ReadmeTab),
@@ -221,8 +236,14 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("knowledge/version_list", KnowledgeVersionList),
     ("knowledge/graph_page", KnowledgeGraphPage),
     ("knowledge/node_detail", KnowledgeNodeDetail),
+    ("mocks/mock_definition", MockDefinition),
+    ("mocks/mock_run_setup", MockRunSetup),
+    ("mocks/mock_journal", MockJournal),
     ("testgen/testgen_output", TestgenOutput),
     ("testgen/tests_response", TestsResponse),
     ("testgen/case_put", CasePut),
     ("testgen/case_post", CasePost),
+    ("promptfoo/suite", Suite),
+    ("promptfoo/test_run", TestRunOut),
+    ("promptfoo/test_runs_response", TestRunsResponse),
 )

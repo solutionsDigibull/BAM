@@ -546,3 +546,169 @@ def test_e12_3_t08_injection_derived_import_is_rejected(
     files = in_action(good, "    import os\n    os.system(otp_payload)\n")
     found = failed_codes(rules(template, files), GateName.AST_IMPORTS)
     assert found & {"FORBIDDEN_IMPORT", "FORBIDDEN_CALL", "IMPORT_NOT_ALLOWED"}
+
+
+# --- A-34: the gate is a fast fail, but one allowed module must not reach another -----
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    json.codecs.sys.modules['os'].execv('/bin/sh', [])\n",
+        "    json.codecs.sys.modules['os'].listdir('/')\n",
+        "    json.codecs.sys.modules['os'].environ\n",
+        "    json.codecs.sys.modules['socket'].create_connection(('x', 1))\n",
+        "    json.decoder.re.enum.sys.modules\n",
+        "    typing.sys.modules\n",
+        "    m = json.codecs.sys\n",
+        "    pathlib.os.getcwd()\n",
+        "    json._sys\n",
+        "    json.codecs.builtins\n",
+    ],
+)
+def test_a34_t01_module_attribute_chain_to_another_module(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    results = rules(template, in_action(good, "    import json\n    import typing\n" + code))
+    assert "FORBIDDEN_CALL" in codes(results, GateName.AST_IMPORTS)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    operator.attrgetter('codecs.sys.modules')(json)\n",
+        "    f = operator.methodcaller('__reduce__')\n",
+        "    string.Formatter().vformat('{0.codecs.sys}', (json,), {})\n",
+    ],
+)
+def test_a34_t01_string_driven_attribute_walkers(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    results = rules(template, in_action(good, "    import json\n" + code))
+    assert "FORBIDDEN_CALL" in codes(results, GateName.AST_IMPORTS)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    for i in range(10**12):\n        pass\n",
+        "    for i in range(0, 1 << 40):\n        pass\n",
+        "    for i in range(10 ** 10 ** 10):\n        pass\n",
+        "    x = [0] * 10**11\n",
+        "    x = 'a' * 10**11\n",
+        "    x = b'a' * (2 ** 40)\n",
+        "    x = bytearray(10**11)\n",
+        "    x = 10 ** 10 ** 10\n",
+    ],
+)
+def test_a34_t02_resource_bomb_literals(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    found = failed_codes(rules(template, in_action(good, code)), GateName.AST_NO_MANUAL_LOOP)
+    assert found & {"UNBOUNDED_ITERATION", "RESOURCE_BOMB"}
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    x = '{0.__class__.__mro__}'.format(1)\n",
+        "    x = '{0.real}'.format(1)\n",
+        "    x = '{0[0]}'.format([1])\n",
+        "    x = '{:{0.real}}'.format(1)\n",
+        "    x = '{0.__class__}'.format_map({})\n",
+        "    fmt = otp_payload\n    x = fmt.format(1)\n",
+    ],
+)
+def test_a34_t03_format_string_attribute_walk(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    assert "DYNAMIC_ACCESS" in codes(rules(template, in_action(good, code)), GateName.AST_IMPORTS)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    x = '{} and {}'.format(1, 2)\n",
+        "    x = '{0}:{1}'.format(1, 2)\n",
+        "    x = '{name!r:>10}'.format(name='a')\n",
+        "    x = json.dumps({'a': 1}, sort_keys=True)\n",
+        "    x = '-' * 40\n",
+        "    x = [0] * 100\n",
+        "    x = 10 ** 6\n",
+        "    for i in range(1000):\n        pass\n",
+    ],
+)
+def test_a34_t04_ordinary_code_is_not_flagged(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    results = rules(template, in_action(good, "    import json\n" + code))
+    assert only_failed(results) == set()
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    g = getattr\n    g(json, 'x')\n",
+        "    v = vars\n",
+        "    fns = [globals, locals]\n",
+    ],
+)
+def test_a34_t05_dynamic_access_through_an_alias(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    results = rules(template, in_action(good, "    import json\n" + code))
+    assert "DYNAMIC_ACCESS" in codes(results, GateName.AST_IMPORTS)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    typing.get_type_hints(otp_payload)\n",
+        "    typing.ForwardRef('int')\n",
+        "    x: \"__import__('os').system('id')\" = 1\n",
+        "    class M(pydantic.BaseModel):\n        y: \"__import__('os').system('id')\"\n",
+        "    f = pydantic.create_model('M', y=(\"open('/etc/passwd').read()\", ...))\n",
+        "    z = 'sys.modules[\"os\"].environ'\n",
+        "    z = '().__class__.__subclasses__()'\n",
+    ],
+)
+def test_a34_t06_string_evaluated_as_code(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    results = rules(
+        template,
+        in_action(good, "    import json\n    import typing\n    import pydantic\n" + code),
+    )
+    assert codes(results, GateName.AST_IMPORTS) & {"FORBIDDEN_CALL", "DYNAMIC_ACCESS"}
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    n = 10**12\n    for i in range(n):\n        pass\n",
+        "    n = 2 ** 40\n    x = 'a' * n\n",
+    ],
+)
+def test_a34_t07_bomb_size_bound_to_a_name(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    found = failed_codes(rules(template, in_action(good, code)), GateName.AST_NO_MANUAL_LOOP)
+    assert found & {"UNBOUNDED_ITERATION", "RESOURCE_BOMB"}
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "    status = 'open'\n",
+        "    status = 'input'\n",
+        "    msg = 'select one from the list'\n",
+        "    msg = 'user.name'\n",
+        "    n = 1000\n    for i in range(n):\n        pass\n",
+        "    n = 5\n    n = 10**12\n    x = 'a' * 3\n",
+    ],
+)
+def test_a34_t08_plain_strings_and_names_are_not_flagged(
+    template: LoadedTemplate, good: dict[str, bytes], code: str
+) -> None:
+    results = rules(template, in_action(good, code))
+    assert GateName.AST_IMPORTS not in only_failed(results)

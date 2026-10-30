@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:5c299a49cc8eae8b22b513f6e41e9211dcf3f806e495dfd6aa8148862839ae62
+// source-sha256:e54044a3e43222bb587f2186cbd8d88c4cef2c359c97b351957c3f4ead2e7543
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -183,6 +183,11 @@ export type BuildStage =
  */
 export type GateStatus = "PENDING" | "RUNNING" | "PASSED" | "FAILED" | "SKIPPED";
 /**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestRunState".
+ */
+export type TestRunState = "PASS" | "FAIL" | "NON_CERTIFYING" | "BLOCKED";
+/**
  * The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the
  * dashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).
  *
@@ -209,6 +214,14 @@ export type GateName =
   | "BANDIT"
   | "IMPORT_RESOLUTION"
   | "LOOP_TESTS";
+/**
+ * How serious a static-gate finding is (E12.4). A gate fails on a HIGH finding; LOW and MEDIUM
+ * ones are reported (Bandit's own scale; Ruff, Black, MyPy and ClamAV findings are all HIGH).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Severity".
+ */
+export type Severity = "LOW" | "MEDIUM" | "HIGH";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SchemaSource".
@@ -400,6 +413,22 @@ export type ExpectedTerminal = "SUCCESS" | "ESCALATED" | "NO_OP";
  * via the `definition` "CaseKind".
  */
 export type CaseKind = "PASS_FIRST" | "PASS_AFTER_RETRY" | "ESCALATION" | "NO_OP" | "EDGE" | "FDE";
+/**
+ * What a suite assertion checks. The values are the `Assertion.type` a test case may carry.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AssertionType".
+ */
+export type AssertionType =
+  | "output_schema"
+  | "state_handoff_id"
+  | "terminal_state"
+  | "expected_output"
+  | "iterations_within_bound"
+  | "cycle_time_within_budget"
+  | "handoff_rows"
+  | "ui_updates"
+  | "llm_rubric";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -423,12 +452,17 @@ export interface SbamContracts {
   SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
+  HeldPatchResponse?: HeldPatchResponse;
+  PatchDecision?: PatchDecision;
+  PatchDecided?: PatchDecided;
   WorkflowSchemaSql?: WorkflowSchemaSql;
   SchemaSqlSourcePut?: SchemaSqlSourcePut;
   Isa14Manifest?: Isa14Manifest;
   SkillManifest?: SkillManifest;
   WorkflowManifest?: WorkflowManifest;
   LoopSpec?: LoopSpec;
+  SrimRuntimeDefaults?: SrimRuntimeDefaults;
+  SrimDefaultsView?: SrimDefaultsView;
   ManifestVersionList?: ManifestVersionList;
   ManifestView?: ManifestView;
   ReadmeTab?: ReadmeTab;
@@ -507,10 +541,16 @@ export interface SbamContracts {
   KnowledgeVersionList?: KnowledgeVersionList;
   KnowledgeGraphPage?: KnowledgeGraphPage;
   KnowledgeNodeDetail?: KnowledgeNodeDetail;
+  MockDefinition?: MockDefinition;
+  MockRunSetup?: MockRunSetup;
+  MockJournal?: MockJournal;
   TestgenOutput?: TestgenOutput;
   TestsResponse?: TestsResponse;
   CasePut?: CasePut;
   CasePost?: CasePost;
+  Suite?: Suite;
+  TestRunOut?: TestRunOut;
+  TestRunsResponse?: TestRunsResponse;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -1074,6 +1114,18 @@ export interface BuildRow {
   gates?: {
     [k: string]: GateStatus | undefined;
   };
+  loop_tests?: LoopTestsBadge | null;
+}
+/**
+ * The 'Loop tests' cell of the Build & Test grid: `passed/total` and a state.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LoopTestsBadge".
+ */
+export interface LoopTestsBadge {
+  state: TestRunState;
+  passed: number;
+  total: number;
 }
 /**
  * `GET W/sub-skills/{sub_id}/gates?attempt=`: one attempt's gate results, in GateName order.
@@ -1100,7 +1152,8 @@ export interface GateResult {
  * One problem a gate found; the shape the build worker writes into `gate_results.findings`.
  * `file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.
  * LIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the
- * registry's version (null when it has none) and `message` the guidance.
+ * registry's version (null when it has none) and `message` the guidance. The static gates
+ * (E12.4) set `severity`; the AST gates leave it out.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "Finding".
@@ -1115,6 +1168,69 @@ export interface Finding {
   expected?: string | null;
   actual?: string | null;
   package?: string | null;
+  severity?: Severity | null;
+}
+/**
+ * `held` is null when no patch is waiting (none was proposed, or it was already decided).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HeldPatchResponse".
+ */
+export interface HeldPatchResponse {
+  held?: HeldPatch | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HeldPatch".
+ */
+export interface HeldPatch {
+  sub_skill_id: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  content_sha256: string;
+  attempt: number;
+  failed_gate: string;
+  rationale: string;
+  /**
+   * @maxItems 50
+   */
+  changed_paths?: string[];
+  /**
+   * @maxItems 50
+   */
+  ops?: HeldPatchOp[];
+  isatvon_sha256_before: string;
+  isatvon_sha256_after: string;
+}
+/**
+ * One RFC 6902 operation, as the build recorded it. `value` is empty for `remove`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HeldPatchOp".
+ */
+export interface HeldPatchOp {
+  op: "add" | "remove" | "replace" | "test";
+  path: string;
+  value?: JsonValue;
+}
+/**
+ * Body of both decisions. A reason is optional for accepting and recorded for rejecting.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PatchDecision".
+ */
+export interface PatchDecision {
+  reason?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PatchDecided".
+ */
+export interface PatchDecided {
+  sub_skill_id: string;
+  build_no: number;
+  decision: "ACCEPTED" | "REJECTED";
 }
 /**
  * One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no
@@ -1650,6 +1766,44 @@ export interface LoopSpec {
   escalation_condition: string;
   budget_limit_ms: number;
   ui_update_template: string;
+}
+/**
+ * A tenant's SRIM runtime blocks (TD §11.2, O-19): set by an Admin, never by the LLM. Every
+ * block is required and every value a non-empty string, so a partial update cannot half-apply.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SrimRuntimeDefaults".
+ */
+export interface SrimRuntimeDefaults {
+  orchestration: Orchestration;
+  execution: Execution;
+  gateway: Gateway;
+  persistence: PersistenceDefaults;
+  audit: Audit;
+  ui: RuntimeUi;
+}
+/**
+ * `Persistence` without `table`, which is derived from each Sub-Skill's V.tables.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PersistenceDefaults".
+ */
+export interface PersistenceDefaults {
+  database: string;
+  action: string;
+}
+/**
+ * `GET/PUT /admin/srim-defaults`: the tenant's values (ISA14's until it sets its own).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SrimDefaultsView".
+ */
+export interface SrimDefaultsView {
+  defaults: SrimRuntimeDefaults;
+  /**
+   * true while the tenant has not set its own values
+   */
+  is_default: boolean;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -3717,6 +3871,132 @@ export interface SourcePassage {
   truncated?: boolean;
 }
 /**
+ * The stubs for one API reference (`S.external_data` entry `name`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockDefinition".
+ */
+export interface MockDefinition {
+  name: string;
+  /**
+   * @minItems 1
+   * @maxItems 200
+   */
+  stubs: [MockStub, ...MockStub[]];
+}
+/**
+ * What one route answers. `responses` is the per-call sequence: the first call gets the first
+ * entry, and the last entry answers every call after that.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockStub".
+ */
+export interface MockStub {
+  /**
+   * Pattern: `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`
+   */
+  id: string;
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /**
+   * Pattern: `^/[A-Za-z0-9._~!$&'()*+,;=:@%/{}-]*$`
+   */
+  path: string;
+  /**
+   * only for this case; absent = every case without its own stub
+   */
+  case?: string | null;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  responses:
+    | [MockResponse]
+    | [MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse, MockResponse]
+    | [
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse
+      ]
+    | [
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse,
+        MockResponse
+      ];
+}
+/**
+ * One answer: a status and a JSON body (absent = an empty body).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockResponse".
+ */
+export interface MockResponse {
+  status: number;
+  body?: JsonValue;
+}
+/**
+ * `PUT /_control/runs/{run_id}`: every definition of the dataset, for one sandbox run.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockRunSetup".
+ */
+export interface MockRunSetup {
+  /**
+   * @minItems 1
+   */
+  definitions: [MockDefinition, ...MockDefinition[]];
+}
+/**
+ * `GET /_control/runs/{run_id}/journal`: the run's request journal, stored with its logs.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MockJournal".
+ */
+export interface MockJournal {
+  /**
+   * Pattern: `^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$`
+   */
+  run_id: string;
+  entries: JournalEntry[];
+  /**
+   * oldest entries discarded once the journal is full
+   */
+  dropped?: number;
+}
+/**
+ * One request the service saw, in order. Bodies are never recorded.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "JournalEntry".
+ */
+export interface JournalEntry {
+  n: number;
+  case: string | null;
+  method: string;
+  path: string;
+  stub_id: string;
+  response_index: number | null;
+  status: number;
+}
+/**
  * What `sbam-testgen` may answer (E13.4): at least three cases, PASS_FIRST and ESCALATION and
  * one more of PASS_AFTER_RETRY, NO_OP or EDGE, with distinct names.
  *
@@ -3824,6 +4104,10 @@ export interface TestDatasetOut {
   synthetic?: true;
   edited_by_fde: boolean;
   files_keys: string[];
+  /**
+   * the mock definitions of its API references (E13.5)
+   */
+  mocks_keys?: string[];
   created_at: string;
   cases: TestCaseOut[];
 }
@@ -3938,4 +4222,293 @@ export interface CasePost {
    * @maxItems 50
    */
   assertions?: Assertion[];
+}
+/**
+ * The suite for one Sub-Skill build: at least three cases, all of which must pass.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Suite".
+ */
+export interface Suite {
+  suite_version?: "1";
+  bounds: SuiteBounds;
+  output_schema: {
+    [k: string]: JsonValue | undefined;
+  };
+  /**
+   * @minItems 3
+   * @maxItems 20
+   */
+  cases:
+    | [SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase, SuiteCase]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ]
+    | [
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase,
+        SuiteCase
+      ];
+}
+/**
+ * The V bounds the assertions read, as the manifest declares them.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SuiteBounds".
+ */
+export interface SuiteBounds {
+  max_iterations: number;
+  budget_ms: number;
+  /**
+   * @maxItems 200
+   */
+  handoff_fields?: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SuiteCase".
+ */
+export interface SuiteCase {
+  name: string;
+  kind: CaseKind;
+  input: {
+    [k: string]: JsonValue | undefined;
+  };
+  expected_terminal: "SUCCESS" | "ESCALATED" | "NO_OP";
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  assertions: [SuiteAssertion, ...SuiteAssertion[]];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SuiteAssertion".
+ */
+export interface SuiteAssertion {
+  type: AssertionType;
+  value?: JsonValue;
+}
+/**
+ * A stored Promptfoo run (`test_runs`): per case per assertion, and the totals by case.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestRunOut".
+ */
+export interface TestRunOut {
+  id: string;
+  sub_skill_id: string;
+  code_attempt_id: string;
+  sandbox_run_id: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  suite_sha256: string;
+  state: TestRunState;
+  total: number;
+  passed: number;
+  failed: number;
+  non_certifying?: boolean;
+  /**
+   * @maxItems 2000
+   */
+  results: AssertionResult[];
+  report_key?: string | null;
+  created_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AssertionResult".
+ */
+export interface AssertionResult {
+  case: string;
+  type: AssertionType;
+  passed: boolean;
+  message?: string;
+}
+/**
+ * `GET W/sub-skills/{sub_id}/test-runs`: the runs, newest first (empty before any).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TestRunsResponse".
+ */
+export interface TestRunsResponse {
+  /**
+   * @maxItems 100
+   */
+  runs?: TestRunOut[];
 }

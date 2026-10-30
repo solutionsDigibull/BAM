@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:promptfoo/suite:0.1.0",
+  "$defs": {
+    "AssertionType": {
+      "description": "What a suite assertion checks. The values are the `Assertion.type` a test case may carry.",
+      "enum": [
+        "output_schema",
+        "state_handoff_id",
+        "terminal_state",
+        "expected_output",
+        "iterations_within_bound",
+        "cycle_time_within_budget",
+        "handoff_rows",
+        "ui_updates",
+        "llm_rubric"
+      ],
+      "title": "AssertionType",
+      "type": "string"
+    },
+    "CaseKind": {
+      "enum": [
+        "PASS_FIRST",
+        "PASS_AFTER_RETRY",
+        "ESCALATION",
+        "NO_OP",
+        "EDGE",
+        "FDE"
+      ],
+      "title": "CaseKind",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "SuiteAssertion": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/AssertionType"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "SuiteAssertion",
+      "type": "object"
+    },
+    "SuiteBounds": {
+      "additionalProperties": false,
+      "description": "The V bounds the assertions read, as the manifest declares them.",
+      "properties": {
+        "max_iterations": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Iterations",
+          "type": "integer"
+        },
+        "budget_ms": {
+          "minimum": 1,
+          "title": "Budget Ms",
+          "type": "integer"
+        },
+        "handoff_fields": {
+          "items": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Handoff Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "max_iterations",
+        "budget_ms"
+      ],
+      "title": "SuiteBounds",
+      "type": "object"
+    },
+    "SuiteCase": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CaseKind"
+        },
+        "input": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Input",
+          "type": "object"
+        },
+        "expected_terminal": {
+          "enum": [
+            "SUCCESS",
+            "ESCALATED",
+            "NO_OP"
+          ],
+          "title": "Expected Terminal",
+          "type": "string"
+        },
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/SuiteAssertion"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Assertions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "input",
+        "expected_terminal",
+        "assertions"
+      ],
+      "title": "SuiteCase",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The suite for one Sub-Skill build: at least three cases, all of which must pass.",
+  "properties": {
+    "suite_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Suite Version",
+      "type": "string"
+    },
+    "bounds": {
+      "$ref": "#/$defs/SuiteBounds"
+    },
+    "output_schema": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Output Schema",
+      "type": "object"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/SuiteCase"
+      },
+      "maxItems": 20,
+      "minItems": 3,
+      "title": "Cases",
+      "type": "array"
+    }
+  },
+  "required": [
+    "bounds",
+    "output_schema",
+    "cases"
+  ],
+  "title": "Suite",
+  "type": "object"
+}

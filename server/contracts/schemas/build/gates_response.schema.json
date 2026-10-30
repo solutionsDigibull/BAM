@@ -4,7 +4,7 @@
   "$defs": {
     "Finding": {
       "additionalProperties": false,
-      "description": "One problem a gate found; the shape the build worker writes into `gate_results.findings`.\n`file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.\nLIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the\nregistry's version (null when it has none) and `message` the guidance.",
+      "description": "One problem a gate found; the shape the build worker writes into `gate_results.findings`.\n`file` / `line` point into the generated bundle, so the UI can open the Code Viewer there.\nLIBRARIES findings (E9.3) name the `package`; `expected` is what was requested, `actual` the\nregistry's version (null when it has none) and `message` the guidance. The static gates\n(E12.4) set `severity`; the AST gates leave it out.",
       "properties": {
         "gate": {
           "$ref": "#/$defs/GateName"
@@ -97,6 +97,17 @@
           ],
           "default": null,
           "title": "Package"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -178,6 +189,16 @@
         "SKIPPED"
       ],
       "title": "GateStatus",
+      "type": "string"
+    },
+    "Severity": {
+      "description": "How serious a static-gate finding is (E12.4). A gate fails on a HIGH finding; LOW and MEDIUM\nones are reported (Bandit's own scale; Ruff, Black, MyPy and ClamAV findings are all HIGH).",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "Severity",
       "type": "string"
     }
   },

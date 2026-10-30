@@ -196,21 +196,35 @@ def test_e1_4_fastapi_builtin_telemetry_stays_off_with_an_endpoint(
 def test_e1_4_full_queue_drops_spans_without_blocking(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import time
+    """Ending a span never waits on the exporter. The exporter here blocks until released, so a
+    queue that made `end()` wait would hang the thread: the check is that it finishes, not how fast
+    a loaded runner is (a wall-clock bound made this test fail on slow CI machines)."""
+    import threading
 
     from sbam_api.core import telemetry
 
     monkeypatch.setattr(telemetry, "_provider", None)  # a fresh provider with a real exporter
     dead = make_settings(tmp_path, otel_exporter_otlp_endpoint="http://127.0.0.1:1")
     provider = tracer_provider(dead)
-    try:
+    release, finished = threading.Event(), threading.Event()
+
+    def stuck_export(*_: object) -> SpanExportResult:
+        release.wait(60)
+        return SpanExportResult.FAILURE
+
+    def emit() -> None:
         tracer = provider.get_tracer("e1_4")
-        start = time.perf_counter()
         for i in range(5000):  # > max_queue_size (2048): the overflow is dropped, not waited on
             tracer.start_span(f"s{i}").end()
-        assert time.perf_counter() - start < 1.0
+        finished.set()
+
+    try:
+        monkeypatch.setattr(OTLPSpanExporter, "export", stuck_export)
+        threading.Thread(target=emit, daemon=True).start()
+        assert finished.wait(30), "ending spans blocked on a full export queue"
     finally:
-        # Shutdown flushes the queue; against a dead port each batch waits its 2 s timeout.
+        release.set()
+        # Shutdown flushes the queue; the exporter no longer blocks.
         monkeypatch.setattr(OTLPSpanExporter, "export", lambda *_: SpanExportResult.FAILURE)
         provider.shutdown()
 

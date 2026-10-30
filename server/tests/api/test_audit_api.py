@@ -152,7 +152,9 @@ def test_e2_8_pages_newest_first_with_a_signed_cursor(h: Harness) -> None:
             break
     assert seen == everything
     first = audit(h, limit="1").json()["next_cursor"]
-    problem(audit(h, cursor=first[:-2] + "zz"), 400, "INVALID_CURSOR")
+    payload, mac = first.split(".")  # last char has base64 padding bits
+    forged = f"{payload}.{'B' if mac[0] == 'A' else 'A'}{mac[1:]}"
+    problem(audit(h, cursor=forged), 400, "INVALID_CURSOR")
     problem(audit(h, h.admin_b(), cursor=first), 400, "INVALID_CURSOR")  # tenant A's cursor
 
 

@@ -33,6 +33,12 @@ x-worker: &worker
     LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
     LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     LANGFUSE_LOG_CONTENT: ${LANGFUSE_LOG_CONTENT:-false}
+    # LLM cost control (#420, ADR 0015): the derivative cache, and the opt-in budgets. Empty = no limit.
+    # The price table is JSON per alias in USD per million tokens, used when Bifrost reports no cost.
+    LLM_DERIVATIVE_CACHE: ${LLM_DERIVATIVE_CACHE:-true}
+    LLM_PROJECT_BUDGET_USD: ${LLM_PROJECT_BUDGET_USD:-}
+    LLM_TENANT_BUDGET_USD: ${LLM_TENANT_BUDGET_USD:-}
+    LLM_PRICE_USD_PER_MTOK: ${LLM_PRICE_USD_PER_MTOK:-}
   depends_on: &worker-depends
     api-migrate: { condition: service_completed_successfully } # temporal_runs (run mirror)
     postgres: { condition: service_healthy }
@@ -345,6 +351,10 @@ services:
       UPLOAD_TOKEN_KEY: ${UPLOAD_TOKEN_KEY:-}
       TUSD_PUBLIC_URL: ${TUSD_PUBLIC_URL:-http://localhost:${TUSD_PORT:-1080}/files/}
       MAX_BODY_BYTES: ${MAX_BODY_BYTES:-10485760}
+      # Per-user request budgets per minute, per API process; 0 = off (A-08, core/ratelimit.py)
+      RATE_LIMIT_WRITES_PER_MINUTE: ${RATE_LIMIT_WRITES_PER_MINUTE:-120}
+      RATE_LIMIT_LLM_PER_MINUTE: ${RATE_LIMIT_LLM_PER_MINUTE:-10}
+      AUDIT_DENIED_PER_MINUTE: ${AUDIT_DENIED_PER_MINUTE:-30}
       # The masters workbook import (#56) scans uploads with clamd; down = the import answers 503.
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
@@ -381,6 +391,10 @@ services:
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
       CLAMAV_MAX_SIGNATURE_AGE_HOURS: ${CLAMAV_MAX_SIGNATURE_AGE_HOURS:-48}
+      # Keycloak events into the audit log (A-18b): this worker reads them as sbam-api-admin
+      # (view-events). Empty secret = the import does nothing.
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/bullm
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
     volumes: [storage:/data/storage] # only this worker writes/removes stored files
     depends_on:
       <<: *worker-depends
@@ -446,12 +460,20 @@ services:
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-certify }
 
   sbam-mock-api:
-    # Stub: health-only until #126.
+    # The mock APIs of sandbox tests (E13.5): stubs per run, a request journal, never forwards. Internal
+    # network only, no published port; the control surface needs MOCK_CONTROL_TOKEN, which tools under test
+    # never get (the worker and the sandbox adapter do).
     image: sbam-mock-api:local
     build:
       context: ..
       dockerfile: compose/docker/mock-api.Dockerfile
+    environment:
+      MOCK_CONTROL_TOKEN: ${MOCK_CONTROL_TOKEN:?is required - set it in compose/.env (copy compose/.env.example)}
     networks: [sbam_internal]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
     restart: unless-stopped
 
   sbam-web:
