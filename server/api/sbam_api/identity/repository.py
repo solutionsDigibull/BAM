@@ -87,6 +87,29 @@ def lock_tenant(session: Session, tenant_id: uuid.UUID) -> None:
     session.execute(select(Tenant.id).where(Tenant.id == tenant_id).with_for_update())
 
 
+def pending_idp_sync(session: Session, cutoff: datetime, limit: int) -> list[uuid.UUID]:
+    """Users whose Keycloak account has not caught up since before `cutoff`, oldest first. Platform
+    wide on purpose: the relay serves every tenant and only reads ids."""
+    return list(
+        session.scalars(
+            select(User.id)
+            .where(User.idp_sync_pending_at < cutoff)
+            .order_by(User.idp_sync_pending_at)
+            .limit(limit)
+        )
+    )
+
+
+def clear_idp_sync(session: Session, user_id: uuid.UUID, stamp: datetime) -> None:
+    """Keycloak agrees with the row as of `stamp`. A bulk UPDATE leaves `row_version` (the ETag)
+    alone, and the stamp guard keeps the mark of a change made since."""
+    session.execute(
+        update(User)
+        .where(User.id == user_id, User.idp_sync_pending_at == stamp)
+        .values(idp_sync_pending_at=None, idp_synced_roles=None)
+    )
+
+
 class UserRepository(TenantScopedRepository[User]):
     model = User
 
