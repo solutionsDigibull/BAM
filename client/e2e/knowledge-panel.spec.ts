@@ -6,6 +6,8 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const PROJECT = "0190f3a2-7b1c-7d4e-8f00-000000000001";
 const KV = "0190f3a2-7b1c-7d4e-8f00-00000000c0a1";
 const API = "**/api/proxy/api/v1";
+// the projects list, with or without the `?limit=` a list that follows its cursor sends
+const PROJECTS = /\/api\/proxy\/api\/v1\/projects(\?.*)?$/;
 const ZIP = Buffer.from("PK\u0003\u0004 fake okf bundle zip");
 const ZIP_SHA = createHash("sha256").update(ZIP).digest("hex");
 const json = (route: Route, body: unknown, status = 200) =>
@@ -51,7 +53,7 @@ const version = (over: Record<string, unknown> = {}) => ({
 
 async function open(page: Page, baseURL: string, versions: () => unknown[]) {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL }]);
-  await page.route(`${API}/projects`, (r) => json(r, { items: [project] }));
+  await page.route(PROJECTS, (r) => json(r, { items: [project] }));
   await page.route(`${API}/projects/${PROJECT}/knowledge`, (r) =>
     json(r, { versions: versions() }),
   );
@@ -146,7 +148,7 @@ test("e5_6_t06 another project's panel is not found and shows no data", async ({
   baseURL,
 }) => {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL! }]);
-  await page.route(`${API}/projects`, (r) => json(r, { items: [] }));
+  await page.route(PROJECTS, (r) => json(r, { items: [] }));
   await page.route(`${API}/projects/${PROJECT}/knowledge`, (r) =>
     r.fulfill({
       status: 404,
