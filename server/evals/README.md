@@ -72,9 +72,12 @@ it as it is (no pre-check or patch finding); the code that makes the Sub-Skill w
 (an emptied body passes the pre-check); and only the flawed body changed, with no rewrite of the
 Sub-Skill's behaviour to make the problem go away (#446).
 
-The baseline (score **0.983**, 20 items x 3 runs, prompt `correct-code/1.0.0`, recorded on
-2026-10-30) had four misses in 60 runs, all on "the pipeline would take it": three on
-`correction-02` (the model says it removed a `while` loop and leaves it in) and one on `correction-15`.
+The baseline (score **1.000**, 20 items x 3 runs, prompt `correct-code/1.1.0`, recorded on
+2026-10-30). The first baseline, under `1.0.0`, was 0.983 with four misses in 60 runs: three on
+`correction-02` (the model said it removed a `while` loop and left it in) and one on `correction-15`.
+`1.1.0` tells the model to delete a flagged loop and keep one pass of its body (#631). Two runs of it
+scored 0.996 (one miss: `correction-15` touched a second body) and 1.000, so 1 miss in 120 runs
+against 4 in 60; `correction-02` went from failing 5 of 6 calls to 0 of 6.
 
 **What it does not check:** it does not run the repaired code. A repair that passes the pre-check but
 fails at run time (one run of `correction-15` dropped the `otp_match = ...` line, and the token still
