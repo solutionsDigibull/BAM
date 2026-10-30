@@ -11,11 +11,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Path, Query, Request
 from sbam_contracts.build import RetryAccepted, RetryRequest, SubSkillRetry
+from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
 from sbam_contracts.code_view import CodeAttemptList, CodeDiff, CodeFileView
 from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.builds import code_view, patch_decision
+from sbam_api.builds import code_view, dashboard, patch_decision
 from sbam_api.builds.service import ensure_waiting, retry_build
 from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import validate_idempotency_key
@@ -33,6 +34,28 @@ Cycle = Annotated[int | None, Query(ge=0)]
 CodePath = Annotated[str, Query(min_length=1, max_length=256)]
 Attempt = Annotated[int, Path(ge=0, le=2)]
 CODE = "/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/code"
+GateAttempt = Annotated[int | None, Query(ge=0, le=2)]
+
+
+@router.get("/projects/{project_id}/workflows/{workflow_id}/builds")
+def builds(
+    project_id: Project, workflow_id: UUID, user: User, sessions: Sessions
+) -> BuildsResponse:
+    with sessions() as session:
+        return dashboard.builds(session, user, project_id, workflow_id)
+
+
+@router.get("/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/gates")
+def gates(
+    project_id: Project,
+    workflow_id: UUID,
+    sub_id: UUID,
+    user: User,
+    sessions: Sessions,
+    attempt: GateAttempt = None,
+) -> GatesResponse:
+    with sessions() as session:
+        return dashboard.gates(session, user, project_id, workflow_id, sub_id, attempt)
 
 
 @router.get(f"{CODE}/attempts")

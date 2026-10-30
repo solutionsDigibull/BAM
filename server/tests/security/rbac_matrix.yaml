@@ -826,6 +826,26 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # Build & Test dashboard (E12.6b). The world's Workflow has no Sub-Skills, so an assigned FDE
+  # reads an empty grid; the Sub-Skill of the gates route is unknown, so 404.
+  builds_api_v1_projects__project_id__workflows__workflow_id__builds_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/builds
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  gates_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__gates_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/gates
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # Test data of a Sub-Skill (E13.4). The world seeds no ISATVON rows, so an assigned FDE reaches
   # the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
   get_tests_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__tests_get:
