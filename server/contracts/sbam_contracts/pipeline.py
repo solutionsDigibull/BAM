@@ -167,9 +167,11 @@ class StageRef(RunInput):
 
 class SowGenerateInput(StageRef):
     """`generate_sow`'s input: the knowledge version, and the FDE's hint on a regeneration (a short
-    instruction they typed, never document content)."""
+    instruction they typed, never document content). `fresh` is set by an explicit Regenerate: it
+    skips the derivative cache, so the same hint still gets a new answer (#595)."""
 
     hint: Annotated[str | None, Field(max_length=2000)] = None
+    fresh: bool = False
 
 
 class WorkflowRef(RunInput):
