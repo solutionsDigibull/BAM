@@ -92,6 +92,13 @@ class SowVersion(Stateful, ProjectOwned, Base):
     error_reason: Mapped[str | None] = mapped_column(String(300))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_by: Mapped[str | None] = mapped_column(String(255))
+    # When the pipeline took the approval (the signal, or the run that replaced it). NULL on an
+    # approved version = the approval is saved and the pipeline has not been told yet (A-03).
+    signal_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Who is telling the pipeline right now (the approver's request, a retry or the relay): one at a
+    # time, so a second approval never sends a second signal. A claim older than the stale window
+    # belongs to a process that died.
+    signal_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 register_entity(MachineName.SOW_VERSION, SowVersion)
