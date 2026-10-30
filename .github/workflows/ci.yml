@@ -184,6 +184,7 @@ jobs:
           - { name: sbam-worker, file: server.Dockerfile, target: prod, args: "PACKAGE=sbam-workers\nROLE=worker" }
           - { name: sbam-web, file: web.Dockerfile, target: prod, args: "" }
           - { name: sbam-mock-api, file: mock-api.Dockerfile, target: "", args: "" }
+          - { name: sbam-proxy, file: proxy.Dockerfile, target: "", args: "" } # Caddy + rate limiting (A-08b)
           - { name: skill-runtime, file: skill-runtime.Dockerfile, target: "", args: "" } # #67
           - { name: sbam-llm-mock, file: llm-mock.Dockerfile, target: "", args: "" } # dev VM only (#143)
     env:
@@ -282,7 +283,7 @@ jobs:
         run: |
           {
             echo "# release ${{ github.sha }} (${{ github.ref_name }})"
-            for name in sbam-api sbam-worker sbam-web sbam-mock-api sbam-llm-mock; do
+            for name in sbam-api sbam-worker sbam-web sbam-proxy sbam-mock-api sbam-llm-mock; do
               var="$(echo "${name#sbam-}" | tr 'a-z-' 'A-Z_')"
               echo "SBAM_${var}_IMAGE=$(cat "digest/$name")"
             done
