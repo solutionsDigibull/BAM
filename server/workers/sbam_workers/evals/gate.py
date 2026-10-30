@@ -44,6 +44,7 @@ from sbam_workers.evals.golden import (
     BASELINE_DIR,
     EVALS_DIR,
     GOLDEN_DIR,
+    DomainProfile,
     GoldenTestgenItem,
     OcrItem,
     Task,
@@ -114,10 +115,11 @@ async def run_testgen(
     make_generator: Callable[[], TestgenGenerator],
     items: Sequence[GoldenTestgenItem],
     base: dict[str, Any],
+    domains: dict[str, DomainProfile],
     runs: int,
 ) -> list[list[ItemResult]]:
     """`runs` passes over the items, each with its own generator (so each with its own client)."""
-    documents = [(item, build_testgen_isatvon(item, base)) for item in items]
+    documents = [(item, build_testgen_isatvon(item, base, domains)) for item in items]
     out: list[list[ItemResult]] = []
     for _ in range(runs):
         generate = make_generator()
@@ -129,7 +131,9 @@ async def run_testgen(
                 raise InfraError(
                     f"the provider failed on {item.id}: {type(exc).__name__}"
                 ) from None
-            results.append(score_testgen(item.id, item.overrides.required_inputs, output, attempts))
+            results.append(
+                score_testgen(item.id, domains[item.domain].required_inputs, output, attempts)
+            )
         out.append(results)
     return out
 
@@ -304,11 +308,12 @@ async def run_testgen_gate(
     today: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> GateReport:
     """The test-generation gate."""
-    items = load_testgen(golden_dir).items
+    loaded = load_testgen(golden_dir)
+    items = loaded.items
     base = testgen_base(golden_dir)
     return await run_task_gate(
         Task.TESTGEN,
-        lambda count: run_testgen(make_generator, items, base, count),
+        lambda count: run_testgen(make_generator, items, base, loaded.domains, count),
         items=len(items),
         record=record,
         runs=runs,

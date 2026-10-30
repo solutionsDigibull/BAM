@@ -77,29 +77,65 @@ class OcrSet(_Strict):
     items: list[OcrItem]
 
 
-class GoldenTestgenOverrides(_Strict):
-    """What an item changes in the base Sub-Skill (`testgen-base.json`, the MS01.1 sample). The rest
-    of the document stays as it is."""
+class DomainProfile(_Strict):
+    """One invented business domain: every field of a Sub-Skill's ISATVON that names it.
 
-    max_iterations: int = Field(ge=1, le=5)  # 1 removes PASS_AFTER_RETRY from the allowed kinds
+    A variant is the base Sub-Skill (`testgen-base.json`, only its structure is kept) written out
+    for a domain, so its prose, tables, outputs and handoff all agree. A variant that only swapped
+    the tables and inputs still told the model about the base's login tables, and it wrote into
+    them."""
+
+    macro_category: str
+    skill_id: str
+    skill_name: str
+    trigger: str
+    action: str
+    check: str
+    actor_level: str
+    actor_persona: str
+    actor_authority: str
+    goal: str
+    method: str
+    background: str
+    topic: str
+    history: str
     required_inputs: Annotated[list[str], Field(min_length=2)]
     fresh_state_parameters: Annotated[list[str], Field(min_length=1)]
-    tables: Annotated[list[str], Field(min_length=1)]
-    success_gate: str = Field(min_length=1)
-    no_op_condition: str = Field(min_length=1)
-    escalation_condition: str = Field(min_length=1)
+    action_step: str
+    acceptance_check: str
+    action_tool: str
+    fixed_check_tool: str
+    libraries: Annotated[list[str], Field(min_length=1)]  # package names
+    success_gate: str
+    no_op_condition: str
+    escalation_condition: str
+    tables: Annotated[list[str], Field(min_length=2, max_length=2)]  # [state table, handoff table]
+    parameter_name: str
+    parameter_value: int
+    secrets: Annotated[list[str], Field(min_length=1)]
+    outputs: dict[str, Any]  # o_outcome.json_schema
+    handoff_fields: Annotated[list[str], Field(min_length=1)]  # after `iteration_pass`
+    handoff_description: str
+    success_criteria: str
+    loop_update: str  # shown from the second pass; `{n}` is the bound
+    escalated_update: str
+    db_update: str
+    alert: str
+    next_skill: str
 
 
 class GoldenTestgenItem(_Strict):
     id: Annotated[str, Field(pattern=r"^testgen-\d{2}$")]
     description: str = Field(min_length=1)
     synthetic: Literal[True]
-    overrides: GoldenTestgenOverrides
+    domain: str = Field(min_length=1)
+    max_iterations: int = Field(ge=1, le=5)  # 1 removes PASS_AFTER_RETRY from the allowed kinds
 
 
 class GoldenTestgenSet(_Strict):
     task: Literal[Task.TESTGEN]
     version: int = Field(ge=1)
+    domains: dict[str, DomainProfile]
     items: list[GoldenTestgenItem]
 
 
@@ -124,21 +160,102 @@ def testgen_base(golden_dir: Path = GOLDEN_DIR) -> dict[str, Any]:
     return base
 
 
-def build_testgen_isatvon(item: GoldenTestgenItem, base: dict[str, Any]) -> dict[str, Any]:
-    """The item's Sub-Skill: the base with the item's overrides applied, and validated."""
-    document = copy.deepcopy(base)
-    definition = document["isatvon_definition"]
-    o = item.overrides
-    definition["s_source"]["required_inputs"] = list(o.required_inputs)
-    definition["s_source"]["fresh_state_parameters"] = list(o.fresh_state_parameters)
-    variables = definition["v_variables"]
-    variables["max_iterations"] = o.max_iterations
-    variables["tables"] = list(o.tables)
-    variables["success_gate"] = o.success_gate
-    variables["no_op_condition"] = o.no_op_condition
-    variables["escalation_condition"] = o.escalation_condition
-    SubSkill.model_validate(document)  # a variant that is not a valid Sub-Skill cannot be a test
-    return document
+_LIBRARY_VERSIONS: Final = {"fastmcp": ">=2.0", "psycopg": ">=3.2"}
+
+
+def build_testgen_isatvon(
+    item: GoldenTestgenItem, base: dict[str, Any], domains: dict[str, DomainProfile]
+) -> dict[str, Any]:
+    """The item's Sub-Skill: the base's structure written out for the item's domain and bound, and
+    validated. Nothing of the base's own domain is kept."""
+    p, n = domains[item.domain], item.max_iterations
+    retries = (
+        f"Allow up to {n} retry loops before escalating"
+        if n > 1
+        else ("No retries: escalate when the first check fails")
+    )
+    doc = copy.deepcopy(base)
+    doc["skill_metadata"] = {
+        "macro_category": p.macro_category,
+        "skill_id": p.skill_id,
+        "skill_name": p.skill_name,
+    }
+    d = doc["isatvon_definition"]
+    d["i_instructions"] = {
+        "statement": (
+            f"Trigger: {p.trigger}. Action: {p.action}. Check: {p.check}. Bound: {retries}."
+        ),
+        "trigger": p.trigger,
+        "action": p.action,
+        "check": p.check,
+        "bound": retries,
+        "user_role": {
+            "level": p.actor_level,
+            "persona": p.actor_persona,
+            "authority": p.actor_authority,
+        },
+        "task": {
+            "goal": p.goal,
+            "method": p.method,
+            "steps": [
+                f"Trigger: {p.trigger}",
+                f"Action Step: {p.action}",
+                f"Fixed Check: {p.check}",
+                f"Loop or Resolve: retry up to {n} times, then resolve or escalate",
+            ],
+        },
+        "context": {"background": p.background, "topic": p.topic, "history": p.history},
+    }
+    d["s_source"] = {
+        "required_inputs": list(p.required_inputs),
+        "fresh_state_parameters": list(p.fresh_state_parameters),
+    }
+    d["a_automation"].update(
+        action_step=p.action_step,
+        acceptance_check=p.acceptance_check,
+        srim_metadata=f"FastMCP_Execution_Engine with PostgreSQL JSONB state in {p.tables[0]}",
+    )
+    d["t_tech_stack"].update(
+        action_tool=p.action_tool,
+        fixed_check_tool=p.fixed_check_tool,
+        libraries=[
+            {
+                "package": lib,
+                **({"version_constraint": v} if (v := _LIBRARY_VERSIONS.get(lib)) else {}),
+            }
+            for lib in p.libraries
+        ],
+    )
+    d["v_variables"].update(
+        max_iterations=n,
+        success_gate=p.success_gate,
+        no_op_condition=p.no_op_condition,
+        escalation_condition=p.escalation_condition,
+        tables=list(p.tables),
+        parameters=[{"name": p.parameter_name, "type": "integer", "value": p.parameter_value}],
+        secrets=list(p.secrets),
+    )
+    d["o_outcome"] = {
+        "json_schema": copy.deepcopy(p.outputs),
+        "state_handoff_file": {
+            "table": p.tables[1],
+            "mode": "append_only",
+            "required_fields": ["iteration_pass", *p.handoff_fields],
+            "description": p.handoff_description,
+        },
+        "success_criteria": p.success_criteria,
+    }
+    d["n_notification"] = {
+        "ui_updates": [
+            p.loop_update.format(n=n) if n > 1 else "Status: Verifying -> Resolved",
+            p.escalated_update,
+        ],
+        "database_updates": [p.db_update],
+        "alerts": [p.alert],
+        "next": p.next_skill,
+    }
+    SubSkill.model_validate(doc)  # a variant that is not a valid Sub-Skill cannot be a test
+    return doc
 
 
 def check_golden(
@@ -199,14 +316,15 @@ def _check_ocr(entry: TaskEntry, golden_dir: Path) -> list[str]:
 
 def _check_testgen(entry: TaskEntry, golden_dir: Path) -> list[str]:
     try:
-        items = load_testgen(golden_dir).items
+        loaded = load_testgen(golden_dir)
         base = testgen_base(golden_dir)
     except (OSError, ValidationError, ValueError) as exc:
         return [f"{entry.task}: {type(exc).__name__}"]
+    items = loaded.items
     problems = _check_count_and_ids(entry, [x.id for x in items])
     for item in items:
         try:
-            build_testgen_isatvon(item, base)
+            build_testgen_isatvon(item, base, loaded.domains)
         except (ValidationError, KeyError, TypeError, ValueError) as exc:
             problems.append(f"{item.id}: not a valid Sub-Skill ({type(exc).__name__})")
     return problems

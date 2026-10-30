@@ -68,33 +68,81 @@ def test_e15_5_the_testgen_set_has_twenty_valid_distinct_sub_skills() -> None:
     assert check_golden() == []
     assert len({i.id for i in SET.items}) == len(SET.items) == len(DOMAINS) * len(BOUNDS) == 20
     assert all(i.synthetic is True for i in SET.items)
-    inputs = {tuple(i.overrides.required_inputs) for i in SET.items}
+    inputs = {tuple(SET.domains[i.domain].required_inputs) for i in SET.items}
     assert len(inputs) == len(DOMAINS)  # five different closed input schemas
     for item in SET.items:
-        assert build_testgen_isatvon(item, BASE)["isatvon_definition"]  # valid, or it raises
+        assert build_testgen_isatvon(item, BASE, SET.domains)[
+            "isatvon_definition"
+        ]  # valid, or it raises
 
 
 def test_e15_5_each_variant_carries_its_own_inputs_tables_and_bound() -> None:
     for item in SET.items:
-        isatvon = build_testgen_isatvon(item, BASE)
+        domain = SET.domains[item.domain]
+        isatvon = build_testgen_isatvon(item, BASE, SET.domains)
         schema = input_schema(isatvon)
-        assert schema["required"] == item.overrides.required_inputs
+        assert schema["required"] == domain.required_inputs
         assert schema["additionalProperties"] is False
         v = isatvon["isatvon_definition"]["v_variables"]
-        assert v["max_iterations"] == item.overrides.max_iterations
-        assert v["tables"] == item.overrides.tables
+        assert v["max_iterations"] == item.max_iterations
+        assert v["tables"] == domain.tables
 
 
 def test_e15_5_a_bound_of_one_takes_pass_after_retry_out_of_the_allowed_kinds() -> None:
     for item in SET.items:
-        kinds = {k.value for k in allowed_kinds(build_testgen_isatvon(item, BASE))}
-        assert ("PASS_AFTER_RETRY" in kinds) is (item.overrides.max_iterations > 1)
+        kinds = {k.value for k in allowed_kinds(build_testgen_isatvon(item, BASE, SET.domains))}
+        assert ("PASS_AFTER_RETRY" in kinds) is (item.max_iterations > 1)
 
 
 def test_e15_5_the_base_is_not_changed_by_building_a_variant() -> None:
     before = json.dumps(BASE, sort_keys=True)
-    build_testgen_isatvon(SET.items[5], BASE)
+    build_testgen_isatvon(SET.items[5], BASE, SET.domains)
     assert json.dumps(BASE, sort_keys=True) == before
+
+
+def _strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for v in value.values() for s in _strings(v)]
+    if isinstance(value, list):
+        return [s for v in value for s in _strings(v)]
+    return []
+
+
+LOGIN = "login with a one-time code"
+LOGIN_WORDS = ("investor", "otp", "login", "jwt", "rbac", "device", "mobile", "vault", "kyc")
+
+
+def test_e15_5_no_login_text_is_left_in_the_other_domains() -> None:
+    """The first version only swapped the tables and inputs of the login sample; its prose still
+    named `investor_profiles`, and the model wrote its seed SQL into that table, which the Sub-Skill
+    did not declare. Every other domain must read as its own process, start to finish."""
+    others = [i for i in SET.items if i.domain != LOGIN]
+    assert len(others) == 16
+    for item in others:
+        text = " ".join(_strings(build_testgen_isatvon(item, BASE, SET.domains))).lower()
+        leaked = [w for w in LOGIN_WORDS if w in text]
+        assert not leaked, f"{item.id} ({item.domain}) still mentions {leaked}"
+
+
+def test_e15_5_each_document_names_only_its_own_tables() -> None:
+    for item in SET.items:
+        text = " ".join(_strings(build_testgen_isatvon(item, BASE, SET.domains)))
+        mine = set(SET.domains[item.domain].tables)
+        others = {t for name, d in SET.domains.items() if name != item.domain for t in d.tables}
+        assert all(t in text for t in mine), f"{item.id} does not mention its own tables"
+        assert not [
+            t for t in others - mine if t in text
+        ], f"{item.id} mentions another domain's table"
+
+
+def test_e15_5_the_handoff_table_is_a_declared_table_and_the_conditions_match_the_state() -> None:
+    for item in SET.items:
+        d = build_testgen_isatvon(item, BASE, SET.domains)["isatvon_definition"]
+        assert d["o_outcome"]["state_handoff_file"]["table"] in d["v_variables"]["tables"]
+        escalation = d["v_variables"]["escalation_condition"]
+        assert any(p in escalation for p in d["s_source"]["fresh_state_parameters"])
 
 
 def test_e15_5_a_variant_that_is_not_a_valid_sub_skill_is_a_problem(tmp_path: Path) -> None:
@@ -199,7 +247,7 @@ def test_e15_5_each_testgen_run_gets_its_own_generator() -> None:
         made.append(1)
         return generator_of()()
 
-    results = asyncio.run(run_testgen(factory, SET.items, BASE, runs=3))
+    results = asyncio.run(run_testgen(factory, SET.items, BASE, SET.domains, runs=3))
     assert len(made) == 3 and [len(r) for r in results] == [20, 20, 20]
     assert all(r.score == 1.0 for run_results in results for r in run_results)
 
