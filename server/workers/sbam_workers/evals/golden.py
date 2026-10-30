@@ -162,6 +162,20 @@ class GoldenCorrectionSet(_Strict):
     items: list[GoldenCorrectionItem]
 
 
+class GoldenCodegenItem(_Strict):
+    id: Annotated[str, Field(pattern=r"^codegen-\d{2}$")]
+    description: str = Field(min_length=1)
+    synthetic: Literal[True]
+    domain: str = Field(min_length=1)  # one of the testgen set's domains: the Sub-Skills are shared
+    max_iterations: int = Field(ge=1, le=5)
+
+
+class GoldenCodegenSet(_Strict):
+    task: Literal[Task.CODEGEN]
+    version: int = Field(ge=1)
+    items: list[GoldenCodegenItem]
+
+
 def load_tasks(golden_dir: Path = GOLDEN_DIR) -> list[TaskEntry]:
     raw = json.loads((golden_dir / "tasks.json").read_text(encoding="utf-8"))
     return [TaskEntry.model_validate(row) for row in raw]
@@ -309,6 +323,11 @@ def apply_defect(item: GoldenCorrectionItem, bodies: dict[str, Any]) -> dict[str
     return out
 
 
+def load_codegen(golden_dir: Path = GOLDEN_DIR) -> GoldenCodegenSet:
+    text = (golden_dir / "codegen.json").read_text(encoding="utf-8")
+    return GoldenCodegenSet.model_validate_json(text)
+
+
 def check_golden(
     golden_dir: Path = GOLDEN_DIR, prompt_ids: frozenset[str] = frozenset()
 ) -> list[str]:
@@ -340,6 +359,8 @@ def _check_ready(entry: TaskEntry, golden_dir: Path) -> list[str]:
         return _check_testgen(entry, golden_dir)
     if entry.task is Task.CORRECTION:
         return _check_correction(entry, golden_dir)
+    if entry.task is Task.CODEGEN:
+        return _check_codegen(entry, golden_dir)
     return [f"{entry.task}: listed as ready, but no loader for its items exists yet"]
 
 
@@ -393,6 +414,19 @@ def _check_correction(entry: TaskEntry, golden_dir: Path) -> list[str]:
         return [f"{entry.task}: {type(exc).__name__}"]
     problems = _check_count_and_ids(entry, [x.id for x in loaded.items])
     return problems + verify_items(loaded.items, base)
+
+
+def _check_codegen(entry: TaskEntry, golden_dir: Path) -> list[str]:
+    from sbam_workers.evals.codegen_set import verify_items  # heavy: loads a template
+
+    try:
+        loaded = load_codegen(golden_dir)
+        shared = load_testgen(golden_dir)
+        base = testgen_base(golden_dir)
+    except (OSError, ValidationError, ValueError) as exc:
+        return [f"{entry.task}: {type(exc).__name__}"]
+    problems = _check_count_and_ids(entry, [x.id for x in loaded.items])
+    return problems + verify_items(loaded.items, base, shared.domains)
 
 
 def _repeats[T](values: list[T]) -> list[T]:

@@ -6,12 +6,14 @@ punctuation are: `ADx-2026-014` is not `ADX-2026-014`. A task scores the mean it
 over its runs so one unlucky sample does not decide the gate (the model is not deterministic).
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from sbam_contracts.build import IsatvonPatchClass
 from sbam_contracts.testgen import TestgenOutput
 
+from sbam_workers.build.codegen.bodies import GeneratedBodies
 from sbam_workers.build.codegen.correction import Correction
 from sbam_workers.evals.golden import OcrItem
 
@@ -116,3 +118,29 @@ def score_correction(
     return ItemResult(
         item_id, len(CORRECTION_CHECKS) - len(missing), len(CORRECTION_CHECKS), missing
     )
+
+
+CODEGEN_CHECKS = ("valid", "accepted", "clean", "complete")
+
+
+def score_codegen(
+    item_id: str, generated: GeneratedBodies | None, gate_outputs: Sequence[str]
+) -> ItemResult:
+    """Four checks, a quarter each. `valid`: the model gave bodies the client accepted. `accepted`:
+    the pre-check passed and the bodies assembled into files (the build would go on to the AST
+    gate). `clean`: it took no re-ask. `complete`: the check tool names every gate output in its
+    return, a structural stand-in for what the AST gate's conformance check enforces later (it does
+    not prove the value is right, only that the key is there)."""
+    if generated is None:
+        return ItemResult(item_id, 0, len(CODEGEN_CHECKS), CODEGEN_CHECKS)
+    check = generated.bodies.check_body
+    passed = {
+        "valid": True,
+        "accepted": not generated.findings and bool(generated.files),
+        "clean": generated.attempts <= 1,  # 0 is a replay-cache hit
+        "complete": all(
+            re.search(rf"""["']{re.escape(name)}["']""", check) for name in gate_outputs
+        ),
+    }
+    missing = tuple(name for name in CODEGEN_CHECKS if not passed[name])
+    return ItemResult(item_id, len(CODEGEN_CHECKS) - len(missing), len(CODEGEN_CHECKS), missing)

@@ -31,8 +31,9 @@ from sbam_contracts.testgen import TestgenOutput
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from sbam_workers.build.codegen.bodies import CodeBodies
+from sbam_workers.build.codegen.bodies import CodeBodies, GeneratedBodies, generate_bodies
 from sbam_workers.build.codegen.correction import Correction, correct_code
+from sbam_workers.build.codegen.store import LoadedTemplate
 from sbam_workers.evals.baseline import (
     Baseline,
     Decision,
@@ -42,6 +43,7 @@ from sbam_workers.evals.baseline import (
     load_gate_config,
     write_baseline,
 )
+from sbam_workers.evals.codegen_set import CodegenCase, build_cases, load_codegen_template
 from sbam_workers.evals.correction_set import (
     MUST_KEEP,
     CorrectionEnv,
@@ -60,6 +62,7 @@ from sbam_workers.evals.golden import (
     Task,
     build_testgen_isatvon,
     correction_base,
+    load_codegen,
     load_correction,
     load_ocr,
     load_tasks,
@@ -69,6 +72,7 @@ from sbam_workers.evals.golden import (
 from sbam_workers.evals.render import render_page
 from sbam_workers.evals.scoring import (
     ItemResult,
+    score_codegen,
     score_correction,
     score_ocr,
     score_testgen,
@@ -98,6 +102,8 @@ TestgenGenerator = Callable[[Mapping[str, Any]], Awaitable[tuple[TestgenOutput |
 CorrectionRunner = Callable[
     [Mapping[str, Any], CodeBodies, list[dict[str, Any]]], Awaitable[Correction | None]
 ]
+# (the Sub-Skill's case) -> the generated bodies, or None if the model never gave any
+CodegenRunner = Callable[[CodegenCase], Awaitable[GeneratedBodies | None]]
 EXIT = {Verdict.PASS: 0, Verdict.REGRESSED: 1, Verdict.INFRA_ERROR: 2, Verdict.NO_BASELINE: 3}
 
 
@@ -305,6 +311,52 @@ def live_correction_factory(
     return make
 
 
+async def run_codegen(
+    make_runner: Callable[[], CodegenRunner], cases: Sequence[CodegenCase], runs: int
+) -> list[list[ItemResult]]:
+    """`runs` passes over the Sub-Skills, each with its own runner (so its own client)."""
+    out: list[list[ItemResult]] = []
+    for _ in range(runs):
+        run = make_runner()
+        results: list[ItemResult] = []
+        for case in cases:
+            try:
+                generated = await run(case)
+            except LlmTransportError as exc:
+                raise InfraError(
+                    f"the provider failed on {case.item.id}: {type(exc).__name__}"
+                ) from None
+            results.append(score_codegen(case.item.id, generated, case.params["gate_outputs"]))
+        out.append(results)
+    return out
+
+
+def live_codegen_factory(
+    template: LoadedTemplate, bifrost_url: str | None = None
+) -> Callable[[], CodegenRunner]:
+    """Runners on the real `generate_bodies` (schema re-asks, pre-check, assembly) and Bifrost."""
+
+    def make() -> CodegenRunner:
+        client, _ = _live_client(bifrost_url)
+
+        async def run(case: CodegenCase) -> GeneratedBodies | None:
+            scope = LlmScope(
+                uuid.uuid4(), uuid.uuid4(), "eval-gate", f"wf-{uuid.uuid4()}:run", "act-eval"
+            )
+            try:
+                return await generate_bodies(
+                    client, scope, template, case.params, case.skeleton, ()
+                )
+            except SchemaInvalidAfterRetries:
+                return None  # the model never gave bodies the schema accepts
+            except (LlmRequestRejected, ContextTooLarge):
+                return None
+
+        return run
+
+    return make
+
+
 def prompt_shas(task: Task, golden_dir: Path = GOLDEN_DIR) -> dict[str, str]:
     """`prompt id/version -> sha256` of the latest version of every prompt the task uses."""
     registry = PromptRegistry()
@@ -443,6 +495,33 @@ async def run_correction_gate(
     )
 
 
+async def run_codegen_gate(
+    make_runner: Callable[[], CodegenRunner],
+    *,
+    record: bool = False,
+    runs: int | None = None,
+    golden_dir: Path = GOLDEN_DIR,
+    evals_dir: Path = EVALS_DIR,
+    baseline_dir: Path = BASELINE_DIR,
+    today: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> GateReport:
+    """The code-generation gate."""
+    items = load_codegen(golden_dir).items
+    shared = load_testgen(golden_dir)
+    cases = build_cases(items, testgen_base(golden_dir), shared.domains)
+    return await run_task_gate(
+        Task.CODEGEN,
+        lambda count: run_codegen(make_runner, cases, count),
+        items=len(items),
+        record=record,
+        runs=runs,
+        golden_dir=golden_dir,
+        evals_dir=evals_dir,
+        baseline_dir=baseline_dir,
+        today=today,
+    )
+
+
 def render_report(report: GateReport) -> str:
     lines = [f"{report.decision.verdict}: {report.decision.reason}"]
     for number, run in enumerate(report.runs, start=1):
@@ -458,7 +537,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a golden set against the model")
     parser.add_argument(
         "--task",
-        choices=[Task.OCR.value, Task.TESTGEN.value, Task.CORRECTION.value],
+        choices=[Task.OCR.value, Task.TESTGEN.value, Task.CORRECTION.value, Task.CODEGEN.value],
         default="ocr",
     )
     parser.add_argument("--runs", type=int, default=None, help="override gate.json")
@@ -467,7 +546,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--bifrost-url", default=None)
     args = parser.parse_args(argv)
-    if args.task == Task.CORRECTION.value:
+    if args.task == Task.CODEGEN.value:
+        coroutine = run_codegen_gate(
+            live_codegen_factory(load_codegen_template(), args.bifrost_url),
+            record=args.record,
+            runs=args.runs,
+        )
+    elif args.task == Task.CORRECTION.value:
         coroutine = run_correction_gate(
             live_correction_factory(build_env(correction_base()), args.bifrost_url),
             record=args.record,

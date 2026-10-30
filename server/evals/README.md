@@ -17,7 +17,8 @@ model's answer. Nothing in this folder calls a model.
 | `ocr` | **ready**, 20 items, baseline recorded |
 | `testgen` | **ready**, 20 items, baseline recorded |
 | `correction` | **ready**, 20 items, baseline recorded |
-| `sow`, `isatvon`, `codegen` | `todo`: each lands in its own change |
+| `codegen` | **ready**, 20 items, baseline recorded |
+| `sow`, `isatvon` | `todo`: each lands in its own change |
 
 ## Running the gate
 
@@ -26,11 +27,12 @@ uv run python -m sbam_workers.evals.gate --task ocr            # compare with th
 uv run python -m sbam_workers.evals.gate --task ocr --record   # write a baseline, to be reviewed
 uv run python -m sbam_workers.evals.gate --task testgen        # the same for test generation
 uv run python -m sbam_workers.evals.gate --task correction     # and for the corrector
+uv run python -m sbam_workers.evals.gate --task codegen        # and for code generation
 ```
 
-It sends each page (OCR), Sub-Skill (test generation) or flawed code (correction) through the
-production path (`ocr.read_page`, `testgen.generate` or `correct_code`, each over `LlmClient`,
-through Bifrost) and needs a reachable Bifrost with a working provider key. A full run is 60 calls
+It sends each page (OCR), Sub-Skill (test generation), flawed code (correction) or Sub-Skill
+(code generation) through the production path (`ocr.read_page`, `testgen.generate`,
+`correct_code` or `generate_bodies`, each over `LlmClient`, through Bifrost) and needs a reachable Bifrost with a working provider key. A full run is 60 calls
 (20 items x 3 runs), about $0.30 with the current OCR model. Exit codes: **0** PASS, **1** REGRESSED
 (the score fell by more than `gate.json`'s threshold), **2** INFRA_ERROR (the provider failed, or the
 baseline could not be written: never a pass), **3** NO_BASELINE (a new task: record and review one).
@@ -83,6 +85,27 @@ against 4 in 60; `correction-02` went from failing 5 of 6 calls to 0 of 6.
 fails at run time (one run of `correction-15` dropped the `otp_match = ...` line, and the token still
 appears elsewhere) scores as accepted; only the later static gate and the sandbox would catch it.
 Treat the score as the repair quality the pre-check and these structural checks can see.
+
+### Code generation
+
+Twenty items: the five testgen Sub-Skills (so one source for them) at four iteration bounds. The
+model is asked, as in a build, for the code bodies that fill the `fastmcp-loopy` skeleton. No
+manifest is needed: `params_from_parts` takes the skill id, the structured ISATVON and the
+contracts, which here come from the Sub-Skill. Building the set checks that every item gives render
+parameters the template accepts and a skeleton that renders, and that no gate output is a stray word
+(an `is not null` in a gate once made `null` an output the check tool had to return).
+
+An item scores four checks: the model gave bodies the client accepts; the pre-check passed and they
+assembled into files; it needed no re-ask; and the check tool names every gate output (a structural
+stand-in for the AST gate's later conformance check: it shows the key is there, not that the value
+is right).
+
+The baseline (score **0.946**, 20 items x 3 runs, prompt `codegen-bodies/1.0.0`, recorded on
+2026-10-30) had 13 misses in 60 runs, all on "the pre-check passed and they assembled". **12 of the
+13 are the leave-request Sub-Skills** (`codegen-17` to `20`, every run): they take `start_date` and
+`end_date`, the model imports `datetime` in the action body, and the template's allowlist
+(`__future__`, `fastmcp`, `json`, `pydantic`, `typing`) refuses it. A real build of a Sub-Skill that
+handles dates would hit the same wall, so this is a finding about the product, not about the set.
 
 ## Rules
 
