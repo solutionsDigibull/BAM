@@ -1,7 +1,14 @@
 // The Build & Test dashboard's data rules (TD §9.3, E12.6), free of AG Grid so they can be tested alone.
 // GET W/builds and GET W/sub-skills/{id}/gates come with the gate issues (#117 / #119); until they land
 // the shapes are sbam_contracts.build_dashboard (#312). Retry is #107's POST W/sub-skills/{id}/retry.
-import type { BuildRow, BuildsResponse, GateName, GateStatus, SubSkillState } from "@/contracts";
+import type {
+  BuildRow,
+  BuildsResponse,
+  GateName,
+  GateStatus,
+  HeldPatch,
+  SubSkillState,
+} from "@/contracts";
 
 const workflowUrl = (p: string, w: string) => `projects/${p}/workflows/${w}`;
 export const buildsUrl = (p: string, w: string) => `${workflowUrl(p, w)}/builds`;
@@ -9,6 +16,33 @@ export const gatesUrl = (p: string, w: string, subId: string) =>
   `${workflowUrl(p, w)}/sub-skills/${subId}/gates`;
 export const retryUrl = (p: string, w: string, subId: string) =>
   `${workflowUrl(p, w)}/sub-skills/${subId}/retry`;
+
+// The ISATVON patch a correction proposed and the FDE decides (#499). Accept and reject send the
+// existing retry afterwards; accepting needs the Sub-Skill's content hash as If-Match.
+export const heldPatchUrl = (p: string, w: string, subId: string) =>
+  `${workflowUrl(p, w)}/sub-skills/${subId}/held-patch`;
+export const decideUrl = (p: string, w: string, subId: string, what: "accept" | "reject") =>
+  `${heldPatchUrl(p, w, subId)}/${what}`;
+
+/** The held patch of a held-patch answer, or null: `useCustom` hands back `{}` while loading or on error. */
+export const heldOf = (answer: unknown): HeldPatch | null => {
+  const held = (answer as { held?: unknown } | null | undefined)?.held;
+  return typeof held === "object" && held !== null && "sub_skill_id" in held
+    ? (held as HeldPatch)
+    : null;
+};
+
+const MAX_VALUE_CHARS = 400;
+
+/** A patch value as text, cut so one huge value cannot flood the drawer; never markup. */
+export const showValue = (value: unknown): string => {
+  if (value === undefined) return "";
+  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+  return text.length > MAX_VALUE_CHARS ? `${text.slice(0, MAX_VALUE_CHARS)}…` : text;
+};
+
+/** The ETag accepting must send: the Sub-Skill's content hash, quoted. */
+export const ifMatchOf = (held: HeldPatch) => `"${held.content_sha256}"`;
 
 /** Where a finding opens in the Code Viewer (read-only, E13). */
 export const codeHref = (
