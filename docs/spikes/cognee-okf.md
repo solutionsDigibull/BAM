@@ -132,18 +132,42 @@ spike result that depends on the text of a `RAG Reference` cell can differ in wo
 
 **What this shows and what it does not.** It shows the Admin import and export keep every field of
 this workbook. It does **not** show that the spike passes on a tenant's own data: the export came
-from the same workbook, so there is no field the real Admin holds and the workbook lacks. **E0.18-T01
-(the spike checks `build` and `tests` on an export) is not done:** `spike.build` stopped at the first
-embedding call with a 401 "User not found" from OpenRouter, so the key in the spike stack's `.env` is
-not accepted. It needs a valid key (never committed) and a rerun of `spike.masters --workbook`,
-`spike.build` and `spike.tests`.
+from the same workbook, so there is no field the real Admin holds and the workbook lacks.
+
+### The spike on the Admin export (E0.18-T01, #203)
+
+Method: `spike.masters --workbook` on the export, then `spike.build` and `spike.tests`, in the
+spike's own stack (runner, Bifrost, OpenRouter). Both steps exited 0. The measured results are in
+[`results.real-admin-export.json`](../../spikes/cognee/out/results.real-admin-export.json); the
+committed bundle and `results.json` are still the mock run's.
+
+| Check | Mock run (above) | Admin export |
+|---|---|---|
+| T01 isolation | Pass | Pass: A sees B's marker 0 times, B sees A's 0; own markers 1 and 2; 0 graph nodes in B with an A document id. An unscoped search for B's marker still hits once (the caveat above stands) |
+| T01 stronger (one user per project) | Pass | Pass: `DatasetNotFoundError` both ways; unscoped search 0 hits |
+| T03 provenance | 22 of 22 entities, 18 of 18 relations | 20 of 20 entities, 19 of 19 relations carry a valid `source_ref`; 0 use the whole-document fallback |
+| T04 master injection | 16 of 16 master nodes, 16 edges to the root | 16 of 16, 16 non-structural edges touch the root; no ILLUSTRATIVE row appears |
+| T05 sizes (`tiktoken cl100k_base`, one fixture) | chunks 1,088; masters 2,730; graph 5,872; bundle 9,845 tokens | chunks 1,088; masters 2,730; graph 5,932; bundle 9,905 tokens |
+
+Every check passes. What differs is the number of entities and relations the model extracts
+(22 and 18 in the mock report, 20 and 19 here), which moves the graph by 60 tokens. The input
+differs only in the key order of two `RAG Reference` cells, one of them included in the context, but
+I did not separate that from the normal run-to-run variation of an LLM extraction. T02, T06 and T07
+were not re-run on the export (T07 needs Bifrost stopped by hand).
+
+The first attempt failed with a 401 "User not found" from OpenRouter. The cause was in the setup,
+not the spike: the spike stack's Bifrost had a different OpenRouter key from the main stack's (the
+SHA-256 prefixes of the two values differed), and the key was replaced in `spikes/cognee/.env`.
+
+**Still not shown:** that the spike passes on a tenant's own data. This export came from the same
+workbook, so it proves the Admin import/export path, not a real tenant's content.
 
 ## Limits of this spike
 
 - Fixtures are tiny (project A is 934 characters). **Large documents (up to 15 MB), streamed writes and Cognee's chunker at scale were not tested.**
 - Only one chat model and one embedding model were tried. Extraction quality was sanity-checked, not evaluated.
 - Costs and latency were not measured beyond the observed ~30 s per project build for 3–4 tiny documents.
-- Master data came from a workbook mock, not the Admin API. The mock and an Admin export of it were diffed (no differences, see above), but the spike's `build` and `tests` have not been run on an export yet (#203, E0.18-T01).
+- Master data came from a workbook mock, then from an Admin export of the same workbook (diffed: no differences; the spike passes on both, see above). It has not been run on a tenant's own data.
 - T06 is proven by network topology, not a packet capture.
 
 ## Recommendation
