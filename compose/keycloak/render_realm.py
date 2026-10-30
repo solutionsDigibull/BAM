@@ -15,10 +15,10 @@ second factor. The committed dev file keeps both off, so the seed users still wo
   policy that names a missing file rejects every password change, and an unknown policy name stops
   Keycloak from starting, so the policy string is checked against a real Keycloak (see
   tests/integration/test_a18_keycloak_hardening.py).
-* Second factor (`--mfa`): `admins` (default) asks TOTP of every user who holds `sbam-admin` or
-  `super-admin`; `all` asks everyone (the FDE policy flag); `off` leaves the browser flow as
-  Keycloak ships it. A user with no authenticator yet is sent to set one up at that sign-in.
-  WebAuthn is not offered: see `mfa_flows`.
+* Second factor (`--mfa`): `admins` (default) asks TOTP or a WebAuthn security key of every user
+  who holds `sbam-admin` or `super-admin`; `all` asks everyone (the FDE policy flag); `off` leaves
+  the browser flow as Keycloak ships it. A user with no second factor yet is sent to set up TOTP at
+  that sign-in and can add a key afterwards (see `mfa_flows`).
 * The two admin roles include the marker role `mfa-required`, which a single role condition in the
   flow tests (two conditions on a subflow are ANDed, and two subflows would ask a user with both
   roles twice). SBAM keeps only its three portal roles from a token: the marker is invisible to it.
@@ -73,26 +73,35 @@ def _step(
 
 def mfa_flows(mode: str) -> tuple[list[dict], list[dict]]:
     """The browser flow with a second factor, and the authenticator config it needs. Same shape as
-    Keycloak's own `browser` flow (cookie, identity provider redirector, forms), with TOTP after the
-    password: asked only of users holding MFA_ROLE (`admins`) or of everyone (`all`). The OTP step
-    is REQUIRED with user setup allowed, so a user with no authenticator yet is sent to set one up
-    at that sign-in. (An ALTERNATIVE step cannot do that: Keycloak has nothing to enrol into and
-    the sign-in fails; and a REQUIRED step makes it ignore ALTERNATIVE siblings, so WebAuthn cannot
-    sit beside it.)
+    Keycloak's own `browser` flow (cookie, identity provider redirector, forms), with a second
+    factor after the password: asked only of users holding MFA_ROLE (`admins`) or of everyone
+    (`all`). The second factor is two conditional steps, because no single Keycloak step does both
+    halves:
+
+    * `choose`: Keycloak's stock "conditional 2FA". A user with a TOTP or a WebAuthn credential
+      is asked for it (for the one they have, or to pick when they have both).
+    * `enrol`: only when neither was used in this sign-in (`Condition - credential`, included =
+      false: that condition looks at what was *used*, not at what is configured), so the user has
+      no second factor yet and is sent to set up TOTP. An OTP step that is REQUIRED with user setup
+      allowed is the only shape that enrols; an ALTERNATIVE one has nothing to enrol into and the
+      sign-in fails.
     """
     forms = f"{FLOW} forms"
+    second = f"{FLOW} second factor"
+    choose = f"{FLOW} choose factor"
+    enrol = f"{FLOW} enrol factor"
+    nothing_used = f"{MFA_ROLE}-no-factor-used"
 
     def basic(alias: str, steps: list[dict], *, top: bool = False) -> dict:
         return {
             "alias": alias,
-            "description": "SBAM: password, then TOTP" if top else alias,
+            "description": "SBAM: password, then TOTP or WebAuthn" if top else alias,
             "providerId": "basic-flow",
             "topLevel": top,
             "builtIn": False,
             "authenticationExecutions": steps,
         }
 
-    otp = _step("auth-otp-form", "REQUIRED", 20, setup=True)
     flows = [
         basic(
             FLOW,
@@ -104,17 +113,48 @@ def mfa_flows(mode: str) -> tuple[list[dict], list[dict]]:
             top=True,
         )
     ]
-    configs: list[dict] = []
     password = _step("auth-username-password-form", "REQUIRED", 10)
+    configs: list[dict] = [
+        {
+            "alias": nothing_used,
+            "config": {"credentials": "otp##webauthn##webauthn-passwordless", "included": "false"},
+        }
+    ]
+    factor = [
+        basic(
+            second,
+            [
+                _step(choose, "CONDITIONAL", 10, flow=True),
+                _step(enrol, "CONDITIONAL", 20, flow=True),
+            ],
+        ),
+        basic(
+            choose,
+            [
+                _step("conditional-user-configured", "REQUIRED", 10),
+                _step(
+                    "webauthn-authenticator", "ALTERNATIVE", 20
+                ),  # a key first, when they have one
+                _step("auth-otp-form", "ALTERNATIVE", 30),
+            ],
+        ),
+        basic(
+            enrol,
+            [
+                _step("conditional-credential", "REQUIRED", 10, authenticatorConfig=nothing_used),
+                _step("auth-otp-form", "REQUIRED", 20, setup=True),
+            ],
+        ),
+    ]
     if mode == "all":
-        flows.append(basic(forms, [password, otp]))
+        flows.append(basic(forms, [password, _step(second, "REQUIRED", 20, flow=True)]))
     else:
         gate = f"{FLOW} admins"
         flows.append(basic(forms, [password, _step(gate, "CONDITIONAL", 20, flow=True)]))
         role = _step("conditional-user-role", "REQUIRED", 10, authenticatorConfig=MFA_ROLE)
-        flows.append(basic(gate, [role, {**otp, "priority": 20}]))
+        flows.append(basic(gate, [role, _step(second, "REQUIRED", 20, flow=True)]))
         configs.append({"alias": MFA_ROLE, "config": {"condUserRole": MFA_ROLE, "negate": "false"}})
-    return flows, configs
+    return [*flows, *factor], configs
 
 
 def harden(realm: dict, mfa: str = "admins") -> dict:

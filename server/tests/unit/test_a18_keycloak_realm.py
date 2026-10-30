@@ -31,6 +31,9 @@ AUTHENTICATORS = {
     "auth-username-password-form",
     "conditional-user-role",
     "auth-otp-form",
+    "webauthn-authenticator",
+    "conditional-user-configured",
+    "conditional-credential",
 }
 
 
@@ -67,22 +70,60 @@ def test_a18_t02_the_rendered_realm_has_the_password_policy() -> None:
     assert got["passwordBlacklist"] == render_realm.BLACKLIST
 
 
-def test_a18_t03_admins_mode_gates_otp_on_the_marker_role() -> None:
+FACTOR_FLOWS = {
+    "browser-mfa second factor",
+    "browser-mfa choose factor",
+    "browser-mfa enrol factor",
+}
+
+
+def by_name(steps: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {e.get("authenticator") or e["flowAlias"]: e for e in steps}
+
+
+def test_a18_t03_admins_mode_gates_the_second_factor_on_the_marker_role() -> None:
     r = realm("admins")
     assert r["browserFlow"] == "browser-mfa"
     steps = executions(r)
-    assert set(steps) == {"browser-mfa", "browser-mfa forms", "browser-mfa admins"}
-    gate = {e.get("authenticator") or e["flowAlias"]: e for e in steps["browser-mfa admins"]}
+    assert set(steps) == {"browser-mfa", "browser-mfa forms", "browser-mfa admins"} | FACTOR_FLOWS
+    gate = by_name(steps["browser-mfa admins"])
     assert gate["conditional-user-role"]["requirement"] == "REQUIRED"
     assert gate["conditional-user-role"]["authenticatorConfig"] == "mfa-required"
-    assert gate["auth-otp-form"]["requirement"] == "REQUIRED"  # REQUIRED + setup enrols new users
-    assert gate["auth-otp-form"]["userSetupAllowed"] is True
-    forms = {e.get("authenticator") or e["flowAlias"]: e for e in steps["browser-mfa forms"]}
+    assert gate["browser-mfa second factor"]["requirement"] == "REQUIRED"
+    forms = by_name(steps["browser-mfa forms"])
     assert forms["browser-mfa admins"]["requirement"] == "CONDITIONAL"
     assert forms["auth-username-password-form"]["requirement"] == "REQUIRED"
-    assert r["authenticatorConfig"] == [
-        {"alias": "mfa-required", "config": {"condUserRole": "mfa-required", "negate": "false"}}
-    ]
+    assert {c["alias"] for c in r["authenticatorConfig"]} == {
+        "mfa-required",
+        "mfa-required-no-factor-used",
+    }
+
+
+def test_a18_t03b_the_second_factor_offers_totp_and_a_key_and_enrols_totp() -> None:
+    steps = executions(realm("admins"))
+    second = by_name(steps["browser-mfa second factor"])
+    assert second["browser-mfa choose factor"]["requirement"] == "CONDITIONAL"
+    assert second["browser-mfa enrol factor"]["requirement"] == "CONDITIONAL"
+    choose = by_name(steps["browser-mfa choose factor"])
+    assert choose["conditional-user-configured"]["requirement"] == "REQUIRED"
+    assert choose["webauthn-authenticator"]["requirement"] == "ALTERNATIVE"
+    assert choose["auth-otp-form"]["requirement"] == "ALTERNATIVE"
+    assert choose["webauthn-authenticator"]["priority"] < choose["auth-otp-form"]["priority"]
+    enrol = by_name(steps["browser-mfa enrol factor"])
+    # REQUIRED + user setup is the only shape that enrols; ALTERNATIVE would fail the sign-in
+    assert enrol["auth-otp-form"]["requirement"] == "REQUIRED"
+    assert enrol["auth-otp-form"]["userSetupAllowed"] is True
+    assert enrol["conditional-credential"]["authenticatorConfig"] == "mfa-required-no-factor-used"
+
+
+def test_a18_t03c_the_enrol_step_runs_only_when_no_second_factor_was_used() -> None:
+    config = next(
+        c
+        for c in realm("admins")["authenticatorConfig"]
+        if c["alias"] == "mfa-required-no-factor-used"
+    )["config"]
+    assert config["included"] == "false"  # true only when none of the credentials below was used
+    assert set(config["credentials"].split("##")) == {"otp", "webauthn", "webauthn-passwordless"}
 
 
 def test_a18_t04_only_the_two_admin_roles_include_the_marker() -> None:
@@ -96,10 +137,11 @@ def test_a18_t04_only_the_two_admin_roles_include_the_marker() -> None:
 def test_a18_t05_all_mode_asks_everyone_with_no_role_condition() -> None:
     r = realm("all")
     steps = executions(r)
-    assert set(steps) == {"browser-mfa", "browser-mfa forms"}
-    forms = [e.get("authenticator") for e in steps["browser-mfa forms"]]
-    assert forms == ["auth-username-password-form", "auth-otp-form"]
-    assert r["authenticatorConfig"] == [] and r["browserFlow"] == "browser-mfa"
+    assert set(steps) == {"browser-mfa", "browser-mfa forms"} | FACTOR_FLOWS
+    forms = [e.get("authenticator") or e["flowAlias"] for e in steps["browser-mfa forms"]]
+    assert forms == ["auth-username-password-form", "browser-mfa second factor"]
+    assert [c["alias"] for c in r["authenticatorConfig"]] == ["mfa-required-no-factor-used"]
+    assert r["browserFlow"] == "browser-mfa"
     assert not any(x.get("composite") for x in r["roles"]["realm"])  # no marker needed
 
 
