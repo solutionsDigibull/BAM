@@ -54,6 +54,56 @@ describe("dataProvider (E1.14)", () => {
     expect(out).toMatchObject({ total: 2, cursor: { next: "c2" } });
   });
 
+  it("a_15b_t01 pagination off follows the cursor until the list ends", async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [{ id: 1 }, { id: 2 }], next_cursor: "c2" }));
+    fetchMock.mockResolvedValueOnce(json({ items: [{ id: 3 }, { id: 4 }], next_cursor: "c3" }));
+    fetchMock.mockResolvedValueOnce(json({ items: [{ id: 5 }], next_cursor: null }));
+    const out = await dataProvider.getList({ resource: "projects", pagination: { mode: "off" } });
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      `${API_BASE}/projects?limit=100`,
+      `${API_BASE}/projects?limit=100&cursor=c2`,
+      `${API_BASE}/projects?limit=100&cursor=c3`,
+    ]);
+    expect(out.data).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }]);
+    expect(out).toMatchObject({ total: 5, cursor: { next: undefined } });
+  });
+
+  it("a_15b_t02 a list of exactly one full page and an empty list take one request", async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [{ id: 1 }], next_cursor: null }));
+    await dataProvider.getList({ resource: "projects", pagination: { mode: "off" } });
+    fetchMock.mockResolvedValueOnce(json({ items: [] }));
+    const empty = await dataProvider.getList({ resource: "projects", pagination: { mode: "off" } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(empty.data).toEqual([]);
+  });
+
+  it("a_15b_t03 a cursor that never ends stops at the page cap and says it was cut short", async () => {
+    fetchMock.mockImplementation(async () => json({ items: [{ id: 1 }], next_cursor: "again" }));
+    const out = await dataProvider.getList({ resource: "projects", pagination: { mode: "off" } });
+    expect(fetchMock).toHaveBeenCalledTimes(50);
+    expect(out.cursor?.next).toBe("again");
+  });
+
+  it("a_15b_t04 a page that fails midway fails the whole list, never a short one", async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [{ id: 1 }], next_cursor: "c2" }));
+    fetchMock.mockResolvedValueOnce(json({ title: "Bad" }, { status: 422 }));
+    await expect(
+      dataProvider.getList({ resource: "projects", pagination: { mode: "off" } }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it("a_15b_t05 a paged list still sends one request with the caller's cursor", async () => {
+    fetchMock.mockResolvedValueOnce(json({ items: [{ id: 1 }], next_cursor: "c9" }));
+    const out = await dataProvider.getList({
+      resource: "projects",
+      pagination: { currentPage: 2, pageSize: 10 },
+      meta: { cursor: "c2" },
+    });
+    expect(fetchMock.mock.calls).toHaveLength(1);
+    expect(fetchMock.mock.calls[0]![0]).toBe(`${API_BASE}/projects?limit=10&cursor=c2`);
+    expect(out.cursor?.next).toBe("c9");
+  });
+
   it("keeps a non-JSON error body as a plain HttpError", async () => {
     fetchMock.mockResolvedValueOnce(
       new Response("<html>", { status: 502, statusText: "Bad Gateway" }),
