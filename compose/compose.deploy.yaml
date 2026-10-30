@@ -262,6 +262,13 @@ services:
     environment:
       <<: *worker-deploy-env
       DATABASE_URL: !reset null
+      # E12.4b: the sbam-toolchain image is not in the release digests yet (a follow-up, which needs the
+      # release pipeline), so a deployed worker runs Ruff, MyPy and Bandit as its own child processes
+      # (the local executor). With this unset it never waits for a runner that is not there.
+      TOOLCHAIN_JOBS_DIR: !reset null
+    volumes: !override ["storage:/data/storage", *wrapper-mount]
+    depends_on:
+      toolchain: !reset null
 
   worker-test:
     <<: *worker-deploy
@@ -276,6 +283,13 @@ services:
     environment:
       <<: *worker-deploy-env
       DATABASE_URL: !reset null
+
+  # E12.4b: built on the host and not in the release digests yet, so not part of a deployed environment
+  # (the compose lint refuses a host build). Start it by enabling the profile on a laptop or a dev VM.
+  toolchain:
+    profiles: [toolchain-sidecar]
+  toolchain-init:
+    profiles: [toolchain-sidecar]
 
   sbam-mock-api:
     image: ${SBAM_MOCK_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-mock-api@sha256:...)}

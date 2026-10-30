@@ -19,13 +19,13 @@ from sbam_workers.build.gates.errors import STATIC_GATE_INFRA
 from sbam_workers.build.gates.static_gate import GATES, StaticGate
 from sbam_workers.build.gates.static_tools import (
     TOOLS,
-    ToolFailure,
     ToolResult,
     run_bandit,
     run_black,
     run_mypy,
     run_ruff,
 )
+from sbam_workers.build.gates.toolchain import ToolFailure
 from sqlalchemy import select
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import ActivityEnvironment
