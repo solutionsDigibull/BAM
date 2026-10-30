@@ -73,6 +73,28 @@ class SandboxRunRepository(TenantScopedRepository[SandboxRunRecord]):
             query = query.where(SandboxRunRecord.dataset_id == dataset_id)
         return list(self.session.scalars(query.order_by(SandboxRunRecord.run_no)))
 
+    def certifying_pass(
+        self, code_attempt_id: uuid.UUID, dataset_id: uuid.UUID | None = None
+    ) -> SandboxRunRecord | None:
+        """The newest run that may count towards certification: finished, on the certifying host,
+        every case passed. This is the certification checklist's one question about the sandbox; a
+        run in any other mode (a laptop's local-docker run) never answers it, whatever its result.
+        """
+        query = (
+            self._scoped()
+            .where(
+                SandboxRunRecord.code_attempt_id == code_attempt_id,
+                SandboxRunRecord.status == SandboxRunStatus.FINISHED.value,
+                SandboxRunRecord.mode == SandboxMode.CUBESANDBOX.value,
+                SandboxRunRecord.failure_category.is_(None),
+            )
+            .order_by(SandboxRunRecord.run_no.desc())
+            .limit(1)
+        )
+        if dataset_id is not None:
+            query = query.where(SandboxRunRecord.dataset_id == dataset_id)
+        return self.session.scalars(query).first()
+
     def claim(
         self,
         *,

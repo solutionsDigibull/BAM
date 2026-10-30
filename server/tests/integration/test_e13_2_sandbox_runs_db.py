@@ -330,6 +330,56 @@ def test_e13_2_a_local_result_is_never_the_answer_of_a_certifying_worker(
         session.rollback()
 
 
+def test_e13_2_t02_the_certification_query_never_accepts_a_local_run(
+    sessions: sessionmaker[Session],
+) -> None:
+    """E13.2-T02's last step: whatever a local-docker run reports, certification asks for a run on
+    the certifying host and gets nothing."""
+    with sessions() as session:
+        repo = SandboxRunRepository(session, ctx())
+        aid, dataset = attempt(session), uuid.uuid4()
+
+        def finished(mode: SandboxMode, outcome: RunOutcome, activity: str) -> None:
+            row = repo.claim(
+                code_attempt_id=aid, dataset_id=dataset, mode=mode, runtime_digest=DIGEST,
+                workflow_id="build-x", activity_id=activity, activity_attempt=1, now=NOW,
+            ).row  # fmt: skip
+            repo.finish(row, outcome, NOW)
+
+        passed = RunOutcome(failure_category=None, exit_code=0)
+        finished(SandboxMode.LOCAL_DOCKER_NONCERT, passed, "a-local")
+        assert (
+            repo.certifying_pass(aid) is None
+        )  # a clean local pass is not evidence for certification
+        finished(
+            SandboxMode.CUBESANDBOX,
+            RunOutcome(failure_category=FailureCategory.TIMEOUT, exit_code=1),
+            "a-cube-fail",
+        )
+        assert (
+            repo.certifying_pass(aid) is None
+        )  # a certifying run that failed is not a pass either
+        finished(
+            SandboxMode.CUBESANDBOX,
+            RunOutcome(
+                failure_category=FailureCategory.INFRA_ERROR,
+                infra_reason=InfraReason.HOST_UNREACHABLE,
+            ),
+            "a-cube-infra",
+        )
+        assert repo.certifying_pass(aid) is None
+        finished(SandboxMode.CUBESANDBOX, passed, "a-cube-pass")
+        found = repo.certifying_pass(aid)
+        assert found is not None and found.mode == "CUBESANDBOX" and found.failure_category is None
+        assert (
+            repo.certifying_pass(aid, uuid.uuid4()) is None
+        )  # another dataset's pass is not this one's
+        assert (
+            SandboxRunRepository(session, ctx(OTHER)).certifying_pass(aid) is None
+        )  # tenant scoped
+        session.rollback()
+
+
 def test_e13_2_an_infra_failure_is_never_replayed_it_is_rerun(
     sessions: sessionmaker[Session],
 ) -> None:
