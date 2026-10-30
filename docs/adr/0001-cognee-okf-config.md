@@ -12,7 +12,7 @@ and failure behaviour (see the spike report for numbers and method).
 
 ## Decision
 
-1. **Engine and stores.** Cognee 1.6.2 with its default stores (graph Ladybug, vector LanceDB, relational SQLite) on one
+1. **Engine and stores.** Cognee 1.6.5 (bumped from 1.6.2 in #540, which lets `litellm` leave the audit allowlist) with its default stores (graph Ladybug, vector LanceDB, relational SQLite) on one
    Docker volume `cognee_data` mounted at `/data/cognee` (`DATA_ROOT_DIRECTORY=/data/cognee/data`,
    `SYSTEM_ROOT_DIRECTORY=/data/cognee/system`). `ENABLE_BACKEND_ACCESS_CONTROL=true`, and the worker fails its health check if it is not.
 2. **Isolation = dataset + user, per project.** Dataset name `sbam_<tenant_uuid>_<project_uuid>`, derived server-side and

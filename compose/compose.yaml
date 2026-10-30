@@ -446,7 +446,7 @@ services:
       <<: *worker-depends
       clamav: { condition: service_healthy }
   worker-knowledge:
-    # Cognee 1.6.2 runs as a library in this worker (#78, ADR 0001). Its stores live on cognee_data; its
+    # Cognee 1.6.5 runs as a library in this worker (#78, ADR 0001). Its stores live on cognee_data; its
     # LLM and embedding calls go to Bifrost only. The worker refuses to start (health FAILED) when access
     # control is off or any of these is missing (E5.1-T04). No OpenRouter key, no internet route.
     <<: *worker

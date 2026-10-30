@@ -1,4 +1,4 @@
-"""E5.1 Cognee adapter against the real worker-knowledge (Cognee 1.6.2) and Bifrost.
+"""E5.1 Cognee adapter against the real worker-knowledge (Cognee 1.6.5) and Bifrost.
 
 A driver runs inside worker-knowledge (`docker compose exec`), so Cognee uses its real config,
 the cognee_data volume and the internal network. Its scope guard allows the two test projects:

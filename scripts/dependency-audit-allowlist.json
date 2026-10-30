@@ -31,16 +31,6 @@
       "reviewed": "2026-10-30",
       "expires": "2027-01-28",
       "tracking": "#437"
-    },
-    {
-      "package": "litellm",
-      "ids": [
-        "CVE-2026-114612"
-      ],
-      "reason": "Affects the LiteLLM proxy server (salt-key reuse). We never run or import litellm.proxy: SBAM's LLM calls go through Bifrost, litellm is only cognee's client library. Fixed in 1.100.4+, but cognee 1.6.2 caps litellm<1.97; cognee 1.6.5 lifts the cap. Bump cognee in a knowledge-lane change that runs the live Cognee suite.",
-      "reviewed": "2026-10-30",
-      "expires": "2027-01-28",
-      "tracking": "#437"
     }
   ]
 }
