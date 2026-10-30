@@ -1,0 +1,226 @@
+{
+  "task": "correction",
+  "version": 1,
+  "items": [
+    {
+      "id": "correction-01",
+      "description": "a while loop in the check body",
+      "synthetic": true,
+      "expect_code": "MANUAL_LOOP",
+      "defect": {
+        "slot": "check_body",
+        "text": "while True:\n    break\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-02",
+      "description": "a retry loop around the action body",
+      "synthetic": true,
+      "expect_code": "MANUAL_LOOP",
+      "defect": {
+        "slot": "action_body",
+        "text": "attempts = 0\nwhile attempts < 3:\n    attempts += 1\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-03",
+      "description": "an unused helper that loops",
+      "synthetic": true,
+      "expect_code": "MANUAL_LOOP",
+      "defect": {
+        "slot": "helpers",
+        "text": "def _spin() -> int:\n    n = 0\n    while n < 3:\n        n += 1\n    return n\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-04",
+      "description": "the device limit check rewritten as a countdown loop",
+      "synthetic": true,
+      "expect_code": "MANUAL_LOOP",
+      "defect": {
+        "slot": "helpers",
+        "text": "    devices = int(current.active_devices or 0)\n    while devices > limit:\n        devices -= 1\n    return devices == limit",
+        "find": "    return int(current.active_devices or 0) <= limit"
+      }
+    },
+    {
+      "id": "correction-05",
+      "description": "pickle imported in the helpers",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_IMPORT",
+      "defect": {
+        "slot": "helpers",
+        "text": "import pickle\n\n_CACHE = pickle.dumps({})\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-06",
+      "description": "ctypes imported in the helpers",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_IMPORT",
+      "defect": {
+        "slot": "helpers",
+        "text": "import ctypes\n\n_LIB = ctypes.c_int(0)\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-07",
+      "description": "marshal imported in the helpers",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_IMPORT",
+      "defect": {
+        "slot": "helpers",
+        "text": "import marshal\n\n_BLOB = marshal.dumps(1)\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-08",
+      "description": "subprocess imported in the helpers",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_IMPORT",
+      "defect": {
+        "slot": "helpers",
+        "text": "import subprocess\n\n_RUN = subprocess.run\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-09",
+      "description": "eval called in the check body",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_CALL",
+      "defect": {
+        "slot": "check_body",
+        "text": "probe = eval(\"1 + 1\")\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-10",
+      "description": "exec called in the action body",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_CALL",
+      "defect": {
+        "slot": "action_body",
+        "text": "exec(\"seen = True\")\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-11",
+      "description": "__import__ called in a helper",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_CALL",
+      "defect": {
+        "slot": "helpers",
+        "text": "def _load(name: str):\n    return __import__(name)\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-12",
+      "description": "compile called in the check body",
+      "synthetic": true,
+      "expect_code": "FORBIDDEN_CALL",
+      "defect": {
+        "slot": "check_body",
+        "text": "code = compile(\"1\", \"x\", \"eval\")\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-13",
+      "description": "SQL built with an f-string in the action body",
+      "synthetic": true,
+      "expect_code": "SQL_UNSAFE",
+      "defect": {
+        "slot": "action_body",
+        "text": "query = f\"SELECT user_status FROM investor_auth WHERE mobile_number = '{mobile_number}'\"\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-14",
+      "description": "SQL built by concatenation in the action body",
+      "synthetic": true,
+      "expect_code": "SQL_UNSAFE",
+      "defect": {
+        "slot": "action_body",
+        "text": "query = \"SELECT user_status FROM investor_auth WHERE mobile_number = '\" + mobile_number + \"'\"\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-15",
+      "description": "SQL built with % formatting in the action body",
+      "synthetic": true,
+      "expect_code": "SQL_UNSAFE",
+      "defect": {
+        "slot": "action_body",
+        "text": "query = \"SELECT user_status FROM investor_auth WHERE mobile_number = '%s'\" % mobile_number\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-16",
+      "description": "SQL built with .format in the check body",
+      "synthetic": true,
+      "expect_code": "SQL_UNSAFE",
+      "defect": {
+        "slot": "check_body",
+        "text": "query = \"SELECT user_status FROM investor_auth WHERE mobile_number = '{}'\".format(mobile_number)\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-17",
+      "description": "requests imported in the helpers",
+      "synthetic": true,
+      "expect_code": "IMPORT_NOT_ALLOWED",
+      "defect": {
+        "slot": "helpers",
+        "text": "import requests\n\n_SESSION = requests.Session\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-18",
+      "description": "numpy imported in the helpers",
+      "synthetic": true,
+      "expect_code": "IMPORT_NOT_ALLOWED",
+      "defect": {
+        "slot": "helpers",
+        "text": "import numpy\n\n_ZEROS = numpy.zeros\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-19",
+      "description": "pandas imported in the helpers",
+      "synthetic": true,
+      "expect_code": "IMPORT_NOT_ALLOWED",
+      "defect": {
+        "slot": "helpers",
+        "text": "import pandas\n\n_FRAME = pandas.DataFrame\n\n\n",
+        "find": null
+      }
+    },
+    {
+      "id": "correction-20",
+      "description": "yaml imported in the helpers",
+      "synthetic": true,
+      "expect_code": "IMPORT_NOT_ALLOWED",
+      "defect": {
+        "slot": "helpers",
+        "text": "from yaml import safe_load\n\n_PARSE = safe_load\n\n\n",
+        "find": null
+      }
+    }
+  ]
+}

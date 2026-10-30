@@ -6,11 +6,13 @@ punctuation are: `ADx-2026-014` is not `ADX-2026-014`. A task scores the mean it
 over its runs so one unlucky sample does not decide the gate (the model is not deterministic).
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from sbam_contracts.build import IsatvonPatchClass
 from sbam_contracts.testgen import TestgenOutput
 
+from sbam_workers.build.codegen.correction import Correction
 from sbam_workers.evals.golden import OcrItem
 
 
@@ -73,3 +75,44 @@ def score_testgen(
     }
     missing = tuple(name for name in TESTGEN_CHECKS if not passed[name])
     return ItemResult(item_id, len(TESTGEN_CHECKS) - len(missing), len(TESTGEN_CHECKS), missing)
+
+
+CORRECTION_CHECKS = ("valid", "accepted", "preserves", "scoped")
+_SLOTS = ("action_body", "check_body", "helpers", "state_queries")
+
+
+def _text(bodies: Mapping[str, object]) -> str:
+    parts: list[str] = []
+    for slot in _SLOTS:
+        value = bodies[slot]
+        parts += list(value.values()) if isinstance(value, dict) else [str(value)]
+    return "\n".join(parts)
+
+
+def score_correction(
+    item_id: str,
+    flawed: Mapping[str, object],
+    slot: str,
+    correction: Correction | None,
+    must_keep: Sequence[str],
+) -> ItemResult:
+    """Four checks, a quarter each. `valid`: the corrector gave an answer the client accepted.
+    `accepted`: the pipeline would take it as it is (no pre-check or patch finding).
+    `preserves`: the code that makes the Sub-Skill do its job is still there (an emptied body
+    passes the pre-check). `scoped`: it left the other bodies alone and did not rewrite the
+    Sub-Skill's behaviour to make the problem go away (#446); only `slot`, where the flaw is, may
+    change."""
+    if correction is None:
+        return ItemResult(item_id, 0, len(CORRECTION_CHECKS), CORRECTION_CHECKS)
+    corrected = correction.bodies.model_dump()
+    untouched = all(corrected[other] == flawed[other] for other in _SLOTS if other != slot)
+    passed = {
+        "valid": True,
+        "accepted": not correction.findings,
+        "preserves": all(token in _text(corrected) for token in must_keep),
+        "scoped": untouched and correction.patch_class is not IsatvonPatchClass.BEHAVIOUR,
+    }
+    missing = tuple(name for name in CORRECTION_CHECKS if not passed[name])
+    return ItemResult(
+        item_id, len(CORRECTION_CHECKS) - len(missing), len(CORRECTION_CHECKS), missing
+    )

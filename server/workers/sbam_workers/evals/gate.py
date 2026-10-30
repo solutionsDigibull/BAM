@@ -5,8 +5,8 @@
 
 Exit codes: 0 PASS, 1 REGRESSED, 2 INFRA_ERROR (the provider failed: never a pass), 3 NO_BASELINE.
 
-OCR and test generation have golden sets so far. Both go through the production path (OCR through
-`ocr.read_page`, test generation through `testgen.generate`, each over a real `LlmClient`), so the
+OCR, test generation and correction have golden sets so far. Each goes through the production path
+(`ocr.read_page`, `testgen.generate`, `correct_code`, each over a real `LlmClient`), so the
 prompt, the schema checks and the re-asks are the ones the build gets. Every run builds its own
 client and call store: the client caches answers, and runs that shared one would return the first
 run's answers and average nothing.
@@ -31,6 +31,8 @@ from sbam_contracts.testgen import TestgenOutput
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from sbam_workers.build.codegen.bodies import CodeBodies
+from sbam_workers.build.codegen.correction import Correction, correct_code
 from sbam_workers.evals.baseline import (
     Baseline,
     Decision,
@@ -40,22 +42,38 @@ from sbam_workers.evals.baseline import (
     load_gate_config,
     write_baseline,
 )
+from sbam_workers.evals.correction_set import (
+    MUST_KEEP,
+    CorrectionEnv,
+    build_env,
+    findings_of,
+    flawed_bodies,
+)
 from sbam_workers.evals.golden import (
     BASELINE_DIR,
     EVALS_DIR,
     GOLDEN_DIR,
     DomainProfile,
+    GoldenCorrectionItem,
     GoldenTestgenItem,
     OcrItem,
     Task,
     build_testgen_isatvon,
+    correction_base,
+    load_correction,
     load_ocr,
     load_tasks,
     load_testgen,
     testgen_base,
 )
 from sbam_workers.evals.render import render_page
-from sbam_workers.evals.scoring import ItemResult, score_ocr, score_testgen, task_score
+from sbam_workers.evals.scoring import (
+    ItemResult,
+    score_correction,
+    score_ocr,
+    score_testgen,
+    task_score,
+)
 from sbam_workers.ingest import ocr
 from sbam_workers.ingest.ocr import OcrDeps, OcrRun
 from sbam_workers.ingest.rasterize import open_source
@@ -75,6 +93,11 @@ from sbam_workers.test import testgen
 OcrReader = Callable[[bytes, str], Awaitable[str]]  # (image bytes, media type) -> the text read
 # (the Sub-Skill's ISATVON) -> (the model's cases or None if it never gave valid ones, model calls)
 TestgenGenerator = Callable[[Mapping[str, Any]], Awaitable[tuple[TestgenOutput | None, int]]]
+# (the Sub-Skill, its flawed bodies, the findings) -> the corrector's answer, or None if it never
+# gave one the client accepts
+CorrectionRunner = Callable[
+    [Mapping[str, Any], CodeBodies, list[dict[str, Any]]], Awaitable[Correction | None]
+]
 EXIT = {Verdict.PASS: 0, Verdict.REGRESSED: 1, Verdict.INFRA_ERROR: 2, Verdict.NO_BASELINE: 3}
 
 
@@ -213,6 +236,75 @@ def live_testgen_factory(bifrost_url: str | None = None) -> Callable[[], Testgen
     return make
 
 
+async def run_correction(
+    make_runner: Callable[[], CorrectionRunner],
+    items: Sequence[GoldenCorrectionItem],
+    base: dict[str, Any],
+    env: CorrectionEnv,
+    runs: int,
+) -> list[list[ItemResult]]:
+    """`runs` passes over the flawed bodies, each with its own runner (so its own client). The
+    findings are worked out once: they are what the pre-check reports for the flawed bodies."""
+    cases = []
+    for item in items:
+        bodies = flawed_bodies(item, base)
+        cases.append((item, bodies, findings_of(bodies, env)))
+    out: list[list[ItemResult]] = []
+    for _ in range(runs):
+        run = make_runner()
+        results: list[ItemResult] = []
+        for item, bodies, findings in cases:
+            try:
+                correction = await run(env.sub_skill, bodies, findings)
+            except LlmTransportError as exc:
+                raise InfraError(
+                    f"the provider failed on {item.id}: {type(exc).__name__}"
+                ) from None
+            results.append(
+                score_correction(
+                    item.id, bodies.model_dump(), item.defect.slot, correction, MUST_KEEP
+                )
+            )
+        out.append(results)
+    return out
+
+
+def live_correction_factory(
+    env: CorrectionEnv, bifrost_url: str | None = None
+) -> Callable[[], CorrectionRunner]:
+    """Runners on the real `correct_code` (its schema re-asks and pre-checks) and Bifrost."""
+
+    def make() -> CorrectionRunner:
+        client, _ = _live_client(bifrost_url)
+
+        async def run(
+            sub_skill: Mapping[str, Any], bodies: CodeBodies, findings: list[dict[str, Any]]
+        ) -> Correction | None:
+            scope = LlmScope(
+                uuid.uuid4(), uuid.uuid4(), "eval-gate", f"wf-{uuid.uuid4()}:run", "act-eval"
+            )
+            try:
+                return await correct_code(
+                    client,
+                    scope,
+                    sub_skill=sub_skill,
+                    current=bodies,
+                    template=env.template,
+                    params=env.params,
+                    skeleton=env.skeleton,
+                    modules=(),
+                    findings=findings,
+                )
+            except SchemaInvalidAfterRetries:
+                return None  # the model never gave an answer the schema accepts
+            except (LlmRequestRejected, ContextTooLarge):
+                return None
+
+        return run
+
+    return make
+
+
 def prompt_shas(task: Task, golden_dir: Path = GOLDEN_DIR) -> dict[str, str]:
     """`prompt id/version -> sha256` of the latest version of every prompt the task uses."""
     registry = PromptRegistry()
@@ -324,6 +416,33 @@ async def run_testgen_gate(
     )
 
 
+async def run_correction_gate(
+    make_runner: Callable[[], CorrectionRunner],
+    *,
+    record: bool = False,
+    runs: int | None = None,
+    golden_dir: Path = GOLDEN_DIR,
+    evals_dir: Path = EVALS_DIR,
+    baseline_dir: Path = BASELINE_DIR,
+    today: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> GateReport:
+    """The correction gate."""
+    items = load_correction(golden_dir).items
+    base = correction_base(golden_dir)
+    env = build_env(base)
+    return await run_task_gate(
+        Task.CORRECTION,
+        lambda count: run_correction(make_runner, items, base, env, count),
+        items=len(items),
+        record=record,
+        runs=runs,
+        golden_dir=golden_dir,
+        evals_dir=evals_dir,
+        baseline_dir=baseline_dir,
+        today=today,
+    )
+
+
 def render_report(report: GateReport) -> str:
     lines = [f"{report.decision.verdict}: {report.decision.reason}"]
     for number, run in enumerate(report.runs, start=1):
@@ -337,14 +456,24 @@ def render_report(report: GateReport) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a golden set against the model")
-    parser.add_argument("--task", choices=[Task.OCR.value, Task.TESTGEN.value], default="ocr")
+    parser.add_argument(
+        "--task",
+        choices=[Task.OCR.value, Task.TESTGEN.value, Task.CORRECTION.value],
+        default="ocr",
+    )
     parser.add_argument("--runs", type=int, default=None, help="override gate.json")
     parser.add_argument(
         "--record", action="store_true", help="write a baseline instead of comparing"
     )
     parser.add_argument("--bifrost-url", default=None)
     args = parser.parse_args(argv)
-    if args.task == Task.TESTGEN.value:
+    if args.task == Task.CORRECTION.value:
+        coroutine = run_correction_gate(
+            live_correction_factory(build_env(correction_base()), args.bifrost_url),
+            record=args.record,
+            runs=args.runs,
+        )
+    elif args.task == Task.TESTGEN.value:
         coroutine = run_testgen_gate(
             live_testgen_factory(args.bifrost_url), record=args.record, runs=args.runs
         )

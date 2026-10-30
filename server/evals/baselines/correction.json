@@ -1,0 +1,12 @@
+{
+  "task": "correction",
+  "score": 0.9833,
+  "items": 20,
+  "runs": 3,
+  "alias": "sbam-corrector",
+  "prompt_sha256": {
+    "correct-code/1.0.0": "5013b740498265f3bb9b79b65aa8c22725cdc1eb3296ea18a3d1e5778cb641c7"
+  },
+  "recorded_on": "2026-10-30",
+  "note": "recorded with --record; review before merging"
+}

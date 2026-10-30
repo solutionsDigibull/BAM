@@ -139,6 +139,29 @@ class GoldenTestgenSet(_Strict):
     items: list[GoldenTestgenItem]
 
 
+class Defect(_Strict):
+    """A flaw put into the base code bodies. With `find`, that text (which must occur exactly once)
+    in the slot is replaced by `text`; without it, `text` is put in front of the slot."""
+
+    slot: Literal["action_body", "check_body", "helpers"]
+    text: str
+    find: str | None = None
+
+
+class GoldenCorrectionItem(_Strict):
+    id: Annotated[str, Field(pattern=r"^correction-\d{2}$")]
+    description: str = Field(min_length=1)
+    synthetic: Literal[True]
+    expect_code: str  # the pre-check code the defect must raise (checked when the set is built)
+    defect: Defect
+
+
+class GoldenCorrectionSet(_Strict):
+    task: Literal[Task.CORRECTION]
+    version: int = Field(ge=1)
+    items: list[GoldenCorrectionItem]
+
+
 def load_tasks(golden_dir: Path = GOLDEN_DIR) -> list[TaskEntry]:
     raw = json.loads((golden_dir / "tasks.json").read_text(encoding="utf-8"))
     return [TaskEntry.model_validate(row) for row in raw]
@@ -258,6 +281,34 @@ def build_testgen_isatvon(
     return doc
 
 
+def load_correction(golden_dir: Path = GOLDEN_DIR) -> GoldenCorrectionSet:
+    text = (golden_dir / "correction.json").read_text(encoding="utf-8")
+    return GoldenCorrectionSet.model_validate_json(text)
+
+
+def correction_base(golden_dir: Path = GOLDEN_DIR) -> dict[str, Any]:
+    """`sub_skill`, `manifest` and `bodies` of the MS01.1 sample: what every item starts from."""
+    base: dict[str, Any] = json.loads(
+        (golden_dir / "correction-base.json").read_text(encoding="utf-8")
+    )
+    return base
+
+
+def apply_defect(item: GoldenCorrectionItem, bodies: dict[str, Any]) -> dict[str, Any]:
+    """The base bodies with the item's defect put in. Raises `ValueError` if `find` is not there
+    exactly once, so a defect cannot silently do nothing."""
+    out = copy.deepcopy(bodies)
+    d = item.defect
+    current: str = out[d.slot]
+    if d.find is None:
+        out[d.slot] = d.text + current
+    else:
+        if current.count(d.find) != 1:
+            raise ValueError(f"{item.id}: the text to replace is not in {d.slot} exactly once")
+        out[d.slot] = current.replace(d.find, d.text, 1)
+    return out
+
+
 def check_golden(
     golden_dir: Path = GOLDEN_DIR, prompt_ids: frozenset[str] = frozenset()
 ) -> list[str]:
@@ -287,6 +338,8 @@ def _check_ready(entry: TaskEntry, golden_dir: Path) -> list[str]:
         return _check_ocr(entry, golden_dir)
     if entry.task is Task.TESTGEN:
         return _check_testgen(entry, golden_dir)
+    if entry.task is Task.CORRECTION:
+        return _check_correction(entry, golden_dir)
     return [f"{entry.task}: listed as ready, but no loader for its items exists yet"]
 
 
@@ -328,6 +381,18 @@ def _check_testgen(entry: TaskEntry, golden_dir: Path) -> list[str]:
         except (ValidationError, KeyError, TypeError, ValueError) as exc:
             problems.append(f"{item.id}: not a valid Sub-Skill ({type(exc).__name__})")
     return problems
+
+
+def _check_correction(entry: TaskEntry, golden_dir: Path) -> list[str]:
+    from sbam_workers.evals.correction_set import verify_items  # heavy: loads a template
+
+    try:
+        loaded = load_correction(golden_dir)
+        base = correction_base(golden_dir)
+    except (OSError, ValidationError, ValueError) as exc:
+        return [f"{entry.task}: {type(exc).__name__}"]
+    problems = _check_count_and_ids(entry, [x.id for x in loaded.items])
+    return problems + verify_items(loaded.items, base)
 
 
 def _repeats[T](values: list[T]) -> list[T]:
