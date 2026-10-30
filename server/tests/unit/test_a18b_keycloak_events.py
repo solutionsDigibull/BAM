@@ -18,10 +18,12 @@ from sbam_api.identity.keycloak_events import (
     ip_class,
 )
 from sbam_api.identity.models import Tenant, User
-from sqlalchemy import Engine, pool, select
+from sqlalchemy import Engine, pool, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-NOW = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
+# The importer's cursor is the audit row's `at`, which the database stamps with the real clock, so
+# the events must hang off the real clock too: a fixed date goes stale and fails every later run.
+NOW = datetime.now(UTC).replace(microsecond=0)
 TENANT = uuid.uuid4()
 SUB = str(uuid.uuid4())
 ADMIN_SUB = str(uuid.uuid4())
@@ -197,6 +199,9 @@ def test_a18b_t06_a_worker_that_was_down_catches_up_from_its_last_row(
 ) -> None:
     feed = Feed([login_error(1, minutes_ago=300)])
     run(sessions, feed, now=NOW - timedelta(minutes=290))  # imported while it was up
+    with sessions() as session:  # ...so those rows were written then, not just now
+        session.execute(update(AuditLog).values(at=NOW - timedelta(minutes=290)))
+        session.commit()
     feed.stored.append(login_error(2, minutes_ago=100))  # happened while the worker was down
     feed.stored.append(login_error(3, minutes_ago=1))
     result = run(sessions, feed)
