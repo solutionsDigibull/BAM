@@ -17,8 +17,10 @@ from sqlglot import exp
 from sqlglot.errors import SqlglotError
 
 DIALECT = "postgres"
-# Casts are how a literal gets its type ('2026-01-01'::date); every other function is refused.
-_LITERAL_FUNCTIONS = (exp.Cast, exp.TryCast)
+# Casts are how a literal gets its type ('2026-01-01'::date). AND and OR join comparisons: sqlglot
+# makes them `Func` subclasses, but a `WHERE a = 'x' AND b = 'y'` calls nothing, and refusing it
+# refused the ordinary way to address one row. Every other function is refused.
+_LITERAL_FUNCTIONS = (exp.Cast, exp.TryCast, exp.And, exp.Or)
 
 
 class SeedRejected(ValueError):  # noqa: N818 - the reason is shown to the FDE
