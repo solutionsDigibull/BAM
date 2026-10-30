@@ -39,6 +39,10 @@ step left. CubeSandbox (`TencentCloud/CubeSandbox`, Apache-2.0, E2B-compatible) 
    never mounts `/var/run/docker.sock` (that is host root). Local isolation is weaker than a microVM (runs share a
    container), which is why its results are stamped `NON_CERTIFYING` in the run row, in the outputs and in the API,
    and why the certification checklist rejects any run whose mode is not `CUBESANDBOX`.
+   The agent (`compose/sandbox-runner/agent.py`, stdlib only) gives the worker the same five verbs as a VM. Because
+   the agent and the code it runs share one uid, it is non-dumpable (no `/proc` peeking at its token), a child
+   subreaper that sweeps every descendant on `destroy`, resolves paths by their real location, and holds **one run
+   at a time** so two runs never share a filesystem view. Throughput on a laptop is therefore one run at a time.
 7. **The in-VM runner is vendored, not installed.** The E13.3 harness and what it imports are copied into
    `/opt/sbam/harness` (the slot the image already reserves) and put on `PYTHONPATH`, not installed into the
    virtualenv, because the runtime registry is generated from what is installed and must not list platform code.
