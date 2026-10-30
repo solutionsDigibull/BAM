@@ -108,12 +108,42 @@ status `DATASET_PROCESSING_ERRORED`; **no bundle was written**; Bifrost recovere
 | 7 | Bundle `created_at` is excluded from the hashed manifest in the prototype (it would break same-input determinism) | Keep `created_at` outside the hash in the real bundle |
 | 8 | Host port 8080 is commonly taken; the spike publishes Bifrost on 18080 | Documentation only |
 
+### Mock vs Admin export (E0.18-T02, #203)
+
+Method: the repo workbook (`docs/reference/BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx`) was
+imported for a dev tenant through the masters import service (`import_workbook`, `upsert`, all six
+tabs, 0 errors) and exported again through the masters export service (`export`), both run inside
+the API container. The export (31,458 bytes) was compared with the workbook by
+`python -m spike.diff_masters` and read by `python -m spike.masters --workbook`.
+
+| What | Mock workbook | Admin export |
+|---|---|---|
+| Entries read by the spike | 23 | 23 |
+| Included in the master context / excluded / warnings | 19 / 4 / 16 | 19 / 4 / 16 |
+| Tabs and column headers that differ | none | none |
+| Entries only on one side | none | none |
+| Payload cells that differ | none (as parsed JSON) | none |
+
+The first diff reported 2 differences (`RAG Reference` of `DOM-PCBA-01` and `PRJ-RFQ-2026-001`).
+They had the same keys and values and differed only in key order, because the export writes the
+keys sorted and the workbook keeps its column order. The diff now compares JSON cells as parsed
+JSON, so that is not reported. The order does change `masters.jsonl` (its sha256 is different), so a
+spike result that depends on the text of a `RAG Reference` cell can differ in wording between the two.
+
+**What this shows and what it does not.** It shows the Admin import and export keep every field of
+this workbook. It does **not** show that the spike passes on a tenant's own data: the export came
+from the same workbook, so there is no field the real Admin holds and the workbook lacks. **E0.18-T01
+(the spike checks `build` and `tests` on an export) is not done:** `spike.build` stopped at the first
+embedding call with a 401 "User not found" from OpenRouter, so the key in the spike stack's `.env` is
+not accepted. It needs a valid key (never committed) and a rerun of `spike.masters --workbook`,
+`spike.build` and `spike.tests`.
+
 ## Limits of this spike
 
 - Fixtures are tiny (project A is 934 characters). **Large documents (up to 15 MB), streamed writes and Cognee's chunker at scale were not tested.**
 - Only one chat model and one embedding model were tried. Extraction quality was sanity-checked, not evaluated.
 - Costs and latency were not measured beyond the observed ~30 s per project build for 3–4 tiny documents.
-- Master data came from a workbook mock, not the Admin API. The Admin masters APIs exist now (#54, #55, #56, #59), so the spike has to be re-run on a snapshot they export and the mock and the real shape diffed (#203, tests E0.18-T01 and T02; the steps are on that issue).
+- Master data came from a workbook mock, not the Admin API. The mock and an Admin export of it were diffed (no differences, see above), but the spike's `build` and `tests` have not been run on an export yet (#203, E0.18-T01).
 - T06 is proven by network topology, not a packet capture.
 
 ## Recommendation
