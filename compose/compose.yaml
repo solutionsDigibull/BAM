@@ -391,6 +391,10 @@ services:
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
       CLAMAV_MAX_SIGNATURE_AGE_HOURS: ${CLAMAV_MAX_SIGNATURE_AGE_HOURS:-48}
+      # Keycloak events into the audit log (A-18b): this worker reads them as sbam-api-admin
+      # (view-events). Empty secret = the import does nothing.
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/realms/bullm
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
     volumes: [storage:/data/storage] # only this worker writes/removes stored files
     depends_on:
       <<: *worker-depends
