@@ -377,9 +377,11 @@ def test_e13_5_limits_bodies_runs_journal_and_lifetime() -> None:
         assert small.raw(f"{data}Content-Length: {srv.MAX_BODY_BYTES + 1}\r\n\r\n").startswith(
             "HTTP/1.0 413"
         )
-        assert (
-            small.store.answer(RUN_A, None, "GET", "/crm/accounts/1", now=10_000.0) is None
-        )  # expired
+        # lifetime on an injected clock: the real monotonic clock is the host's uptime
+        small.store.put(RUN_A, setup(), now=0.0)  # expires at 100
+        answer = small.store.answer
+        assert answer(RUN_A, None, "GET", "/crm/accounts/1", now=99.0) is not None
+        assert answer(RUN_A, None, "GET", "/crm/accounts/1", now=100.0) is None  # expired
     finally:
         small.close()
 
