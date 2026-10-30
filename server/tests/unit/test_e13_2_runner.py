@@ -207,8 +207,8 @@ def test_e13_2_state_script_step_i_runs_before_pass_i_plus_2(runner: ModuleType)
 def test_e13_2_a_failed_case_trace_still_validates_with_its_null_terminal(
     runner: ModuleType,
 ) -> None:
-    """`HarnessTrace.to_json_object()` drops `terminal: null`, and the result no longer
-    validates."""
+    """`HarnessTrace.to_json_object()` drops `terminal: null` and the result no longer validates
+    (#626)."""
     failed = runner.error_trace("c1", "IMPORT_ERROR", "ModuleNotFoundError: x")
     dumped = json.loads(failed.model_dump_json(by_alias=True))
     assert dumped["terminal"] is None
