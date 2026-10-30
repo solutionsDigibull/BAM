@@ -8,9 +8,12 @@ import { landing } from "@/lib/landing";
 import { isAdmin, isFde, isUuid } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
+// Where the browser uploads to in local development (the API returns the same URL, compose.yaml).
+const DEV_UPLOAD_URL = process.env.TUSD_PUBLIC_URL || "http://localhost:1080/files/";
+
 export async function proxy(req: NextRequest) {
   const nonce = newNonce();
-  const csp = buildCsp(nonce, process.env.NODE_ENV === "development");
+  const csp = buildCsp(nonce, process.env.NODE_ENV === "development", DEV_UPLOAD_URL);
   const res = await route(req, nonce, csp);
   res.headers.set("Content-Security-Policy", csp);
   return res;

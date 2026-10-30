@@ -32,6 +32,40 @@ describe("buildCsp (A-11)", () => {
     expect(csp).not.toMatch(/http:|https:|\*/);
   });
 
+  describe("uploads to tusd (#568)", () => {
+    const local = "http://localhost:1080/files/";
+
+    it("allows the local tusd origin in development", () => {
+      expect(directive(buildCsp("n", true, local), "connect-src")).toBe(
+        "'self' http://localhost:1080",
+      );
+    });
+
+    it("never allows it in production: connect-src stays 'self'", () => {
+      expect(directive(buildCsp("n", false, local), "connect-src")).toBe("'self'");
+      expect(buildCsp("n", false, local)).not.toContain("1080");
+    });
+
+    it("allows the origin only: no path, no wildcard", () => {
+      const connect = directive(
+        buildCsp("n", true, "http://localhost:1555/files/x?y=1"),
+        "connect-src",
+      );
+      expect(connect).toBe("'self' http://localhost:1555");
+      expect(connect).not.toMatch(/\*|\/files/);
+    });
+
+    it.each([
+      "",
+      "not a url",
+      "javascript:alert(1)",
+      "data:text/plain,x",
+      "ftp://localhost/files/",
+    ])("adds nothing for %j", (url) => {
+      expect(directive(buildCsp("n", true, url), "connect-src")).toBe("'self'");
+    });
+  });
+
   it("makes a fresh unguessable nonce each time", () => {
     const seen = new Set(Array.from({ length: 50 }, newNonce));
     expect(seen.size).toBe(50);
