@@ -27,6 +27,7 @@ from sbam_contracts.documents import (
     UploadRequest,
     UploadToken,
 )
+from sbam_contracts.harness import TestRunTraces
 from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
 from sbam_contracts.identity import (
     Me,
@@ -246,4 +247,5 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("promptfoo/suite", Suite),
     ("promptfoo/test_run", TestRunOut),
     ("promptfoo/test_runs_response", TestRunsResponse),
+    ("promptfoo/test_run_traces", TestRunTraces),
 )

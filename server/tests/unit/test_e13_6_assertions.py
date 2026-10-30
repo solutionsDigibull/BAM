@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from sbam_contracts.harness import HarnessTrace
 from sbam_contracts.promptfoo import AssertionType, SuiteAssertion, SuiteBounds, SuiteCase
 from sbam_contracts.testgen import CaseKind
 from sbam_workers.test.assertions import (
@@ -12,7 +13,6 @@ from sbam_workers.test.assertions import (
     judge_case,
     run_assertion,
 )
-from sbam_workers.test.harness import HarnessTrace
 
 SCHEMA = {
     "type": "object",

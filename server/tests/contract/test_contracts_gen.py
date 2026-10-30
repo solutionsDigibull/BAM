@@ -20,6 +20,7 @@ from sbam_contracts import (
     build_dashboard,
     code_view,
     documents,
+    harness,
     held_patch,
     identity,
     isatvon14,
@@ -243,6 +244,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("state_machines", state_machines),
             ("testgen", testgen),
             ("promptfoo", promptfoo),
+            ("promptfoo", harness),
             ("held_patch", held_patch),
         )
         for stem in module.schemas()

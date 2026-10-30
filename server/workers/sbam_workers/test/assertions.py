@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Final
 
 from jsonschema import Draft202012Validator
+from sbam_contracts.harness import HarnessTrace
 from sbam_contracts.promptfoo import (
     AssertionResult,
     AssertionType,
@@ -25,7 +26,7 @@ from sbam_contracts.promptfoo import (
     SuiteCase,
 )
 
-from sbam_workers.test.harness import HarnessTrace, progress_message
+from sbam_workers.test.harness import progress_message
 
 HANDOFF_ID: Final = "state_handoff_id"
 _PROGRESS: Final = re.compile(r"^Looping \[Pass \d+/\d+\]$")
