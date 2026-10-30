@@ -17,6 +17,7 @@ from sbam_contracts.held_patch import (
 def held(**over: Any) -> dict[str, Any]:
     return {
         "sub_skill_id": uuid.uuid4(),
+        "content_sha256": "c" * 64,
         "attempt": 1,
         "failed_gate": "run_sandbox_tests",
         "rationale": "loosen the bound",
@@ -73,3 +74,10 @@ def test_a20b_a_decision_is_accepted_or_rejected_only() -> None:
         PatchDecided.model_validate(
             {"sub_skill_id": str(uuid.uuid4()), "build_no": 1, "decision": "MAYBE"}
         )
+
+
+def test_a20b_the_held_patch_carries_the_content_hash_to_send_as_if_match() -> None:
+    assert HeldPatch.model_validate(held()).content_sha256 == "c" * 64
+    for bad in ("", "xyz", "C" * 64, "c" * 63):
+        with pytest.raises(ValidationError):
+            HeldPatch.model_validate(held(content_sha256=bad))

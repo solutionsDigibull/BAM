@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:0300fb880f59a9f7fd9f2d599026c4c4dcdebb2ba318d71094201b6f93c2bb91
+// source-sha256:e54044a3e43222bb587f2186cbd8d88c4cef2c359c97b351957c3f4ead2e7543
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -1185,6 +1185,10 @@ export interface HeldPatchResponse {
  */
 export interface HeldPatch {
   sub_skill_id: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  content_sha256: string;
   attempt: number;
   failed_gate: string;
   rationale: string;
