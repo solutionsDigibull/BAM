@@ -6,16 +6,17 @@ Sub-Skill; 400 without a valid Idempotency-Key; 503 when Temporal is down. W is
 `/projects/{project_id}/workflows/{workflow_id}`.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Path, Query, Request
 from sbam_contracts.build import RetryAccepted, RetryRequest, SubSkillRetry
 from sbam_contracts.code_view import CodeAttemptList, CodeDiff, CodeFileView
+from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.builds import code_view
-from sbam_api.builds.service import retry_build
+from sbam_api.builds import code_view, patch_decision
+from sbam_api.builds.service import ensure_waiting, retry_build
 from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import validate_idempotency_key
 from sbam_api.projects.guard import active_project
@@ -129,4 +130,123 @@ async def retry(
         workflow_id=workflow_id,
         sub_skill_id=sub_id,
         retry=SubSkillRetry(reason=body.reason, idempotency_key=key, actor_id=str(user.user_id)),
+    )
+
+
+HELD = "/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/held-patch"
+IfMatch = Annotated[str | None, Header()]
+IdemKey = Annotated[str | None, Header(alias="Idempotency-Key")]
+
+
+@router.get(HELD)
+def held_patch(
+    project_id: Project, workflow_id: UUID, sub_id: UUID, user: User, sessions: Sessions
+) -> HeldPatchResponse:
+    with sessions() as session:
+        held = patch_decision.get_held(session, user.context(project_id), workflow_id, sub_id)
+        return HeldPatchResponse(held=held)
+
+
+async def _decide(
+    request: Request,
+    sessions: sessionmaker[Session],
+    user: CurrentUser,
+    project_id: UUID,
+    workflow_id: UUID,
+    sub_id: UUID,
+    key: str,
+    body: PatchDecision,
+    decision: Literal["ACCEPTED", "REJECTED"],
+    if_match: str | None,
+) -> PatchDecided:
+    """Apply the decision, then send the existing `retry` (the same key: a repeat is one signal).
+    The decision is committed before the signal, so if the signal fails the FDE can press retry and
+    still start from the decided ISATVON."""
+    client = await temporal_client(request)
+    tenant_id = user.context(project_id).tenant_id
+    with sessions() as session:
+        seen = patch_decision.decided(session, user, project_id, workflow_id, sub_id, key)
+    if not seen:
+        await ensure_waiting(
+            client,
+            tenant_id=tenant_id,
+            project_id=project_id,
+            workflow_id=workflow_id,
+            sub_skill_id=sub_id,
+        )
+        with sessions() as session:
+            if decision == "ACCEPTED":
+                patch_decision.accept(
+                    session, user, project_id, workflow_id, sub_id, if_match, key, body.reason
+                )
+            else:
+                patch_decision.reject(
+                    session, user, project_id, workflow_id, sub_id, key, body.reason
+                )
+            session.commit()
+    accepted = await retry_build(
+        client,
+        tenant_id=tenant_id,
+        project_id=project_id,
+        workflow_id=workflow_id,
+        sub_skill_id=sub_id,
+        retry=SubSkillRetry(
+            reason=body.reason or f"ISATVON patch {decision.lower()}",
+            idempotency_key=key,
+            actor_id=str(user.user_id),
+        ),
+    )
+    return PatchDecided(sub_skill_id=sub_id, build_no=accepted.build_no, decision=decision)
+
+
+@router.post(HELD + "/accept", status_code=202)
+async def accept_held_patch(
+    project_id: Project,
+    workflow_id: UUID,
+    sub_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    if_match: IfMatch = None,
+    idempotency_key: IdemKey = None,
+    body: PatchDecision | None = None,
+) -> PatchDecided:
+    key = validate_idempotency_key(idempotency_key)
+    return await _decide(
+        request,
+        sessions,
+        user,
+        project_id,
+        workflow_id,
+        sub_id,
+        key,
+        body or PatchDecision(),
+        "ACCEPTED",
+        if_match,
+    )
+
+
+@router.post(HELD + "/reject", status_code=202)
+async def reject_held_patch(
+    project_id: Project,
+    workflow_id: UUID,
+    sub_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    idempotency_key: IdemKey = None,
+    body: PatchDecision | None = None,
+) -> PatchDecided:
+    key = validate_idempotency_key(idempotency_key)
+    return await _decide(
+        request,
+        sessions,
+        user,
+        project_id,
+        workflow_id,
+        sub_id,
+        key,
+        body or PatchDecision(),
+        "REJECTED",
+        None,
     )
