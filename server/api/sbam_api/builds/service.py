@@ -86,6 +86,33 @@ async def build_status(client: Client, workflow_id: str) -> SubSkillBuildStatus 
     return None
 
 
+async def ensure_waiting(
+    client: Client,
+    *,
+    tenant_id: UUID,
+    project_id: UUID,
+    workflow_id: UUID,
+    sub_skill_id: UUID,
+) -> None:
+    """404 unless the newest build is this Sub-Skill's, 409 NOT_IN_REVIEW unless it waits for the
+    FDE. Nothing is signalled; a decision that changes data calls this first (#499)."""
+    build_id = await latest_build_id(client, sub_skill_id)
+    if build_id is None:
+        raise not_found()
+    status = await build_status(client, build_id)
+    if status is None:
+        raise NotInReview()
+    if (status.tenant_id, status.project_id, status.workflow_id, status.sub_skill_id) != (
+        tenant_id,
+        project_id,
+        workflow_id,
+        sub_skill_id,
+    ):
+        raise not_found()
+    if not status.waiting_for_retry:
+        raise NotInReview()
+
+
 async def retry_build(
     client: Client,
     *,

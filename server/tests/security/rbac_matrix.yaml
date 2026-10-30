@@ -880,6 +880,37 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # The held ISATVON patch of a Sub-Skill (#499). The world seeds no ISATVON rows, so an assigned FDE
+  # reaches the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
+  held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/held-patch
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  accept_held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_accept_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/held-patch/accept
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      headers: {idempotency-key: "rbac-held-patch-0001", if-match: '"rbac"'}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  reject_held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_reject_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/held-patch/reject
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      headers: {idempotency-key: "rbac-held-patch-0001", if-match: '"rbac"'}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.
