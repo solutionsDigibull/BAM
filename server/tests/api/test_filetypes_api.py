@@ -40,6 +40,12 @@ def test_e3_7_admins_read_the_same_table(h: Harness, who: str) -> None:
     assert res.status_code == 200 and len(res.json()) == 43
 
 
+def test_a15_a_signed_in_account_without_a_portal_role_cannot_read_the_table(h: Harness) -> None:
+    """Platform data, but not for any valid token: a role-less account is the wrong portal."""
+    token = h.realm.token(uuid.uuid4(), realm_access={"roles": ["offline_access"]})
+    problem(h.call("GET", "/admin/filetypes", token), 403, "WRONG_PORTAL")
+
+
 def test_e3_7_anonymous_is_401(h: Harness) -> None:
     problem(h.client.get("/api/v1/admin/filetypes"), 401, "UNAUTHENTICATED")
 

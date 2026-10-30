@@ -366,6 +366,14 @@ def super_admin(user: CurrentUserDep) -> CurrentUser:
     return user
 
 
+def admin_or_fde(user: CurrentUserDep) -> CurrentUser:
+    """Platform data both portals read (`/admin/filetypes`): sbam-admin, super-admin or sbam-fde.
+    A signed-in account with none of those roles (and no tenant needed) is the wrong portal."""
+    if not user.roles & {ROLE_ADMIN, ROLE_SUPER_ADMIN, ROLE_FDE}:
+        raise wrong_portal()
+    return user
+
+
 def authenticated(user: CurrentUserDep) -> CurrentUser:
     """Any signed-in user, whatever the portal (`/me`)."""
     return user
@@ -376,7 +384,7 @@ def internal() -> None:
 
 
 POLICIES: frozenset[Callable[..., Any]] = frozenset(
-    {admin, fde, super_admin, authenticated, internal}
+    {admin, fde, super_admin, admin_or_fde, authenticated, internal}
 )
 
 
