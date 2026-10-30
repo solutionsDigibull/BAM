@@ -2,8 +2,7 @@
 
 `run_cases.py` lives under compose/ because it ships inside the runtime image; it is loaded by path.
 The vendored closure is checked in both directions (ADR 0023, decision 7): a module the runner
-starts
-importing and a listed file it no longer needs both fail here.
+starts importing and a listed file it no longer needs both fail here.
 """
 
 import importlib.util

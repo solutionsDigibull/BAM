@@ -1,6 +1,5 @@
 """E13.2 activity rules that need no database: which infrastructure failures are worth a retry, how
-much
-room a Sub-Skill's loop gets, what makes a dataset runnable and how the mock API is found."""
+much room a Sub-Skill's loop gets, what makes a dataset runnable and how the mock API is found."""
 
 import uuid
 

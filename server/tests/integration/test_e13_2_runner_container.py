@@ -1,15 +1,12 @@
 """E13.2 end to end, nothing faked: a generated MS01.1 bundle, the in-VM runner and its vendored
-harness
-inside the hardened `sandbox-runner` container, the real PostgreSQL and FastMCP of the runtime
-image,
-driven by the real executor over the real `LocalDockerBackend`.
+harness inside the hardened `sandbox-runner` container, the real PostgreSQL and FastMCP of the
+runtime image, driven by the real executor over the real `LocalDockerBackend`.
 
 Needs Docker and the runtime image (`make runtime-registry` builds `skill-runtime:local`). The
-sandbox
-image is built from it here (layers are cached) and started with the isolation flags of the compose
-`sandbox-runner` service. A run executes one bundle and nothing else, so each test changes the
-bundle,
-the dataset or the limits and reads what the platform would read: the classified outcome.
+sandbox image is built from it here (layers are cached) and started with the isolation flags of the
+compose `sandbox-runner` service. A run executes one bundle and nothing else, so each test changes
+the bundle, the dataset or the limits and reads what the platform would read: the classified
+outcome.
 
 CubeSandbox is not involved: this is the non-certifying local backend. What only a KVM host can show
 (microVM boot, egress enforcement, the host's OOM killer) is the host acceptance suite's job.

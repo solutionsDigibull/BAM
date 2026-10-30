@@ -1,6 +1,6 @@
 """E13.2 `run_sandbox_tests` through the real activity: Postgres at head, local object storage, the
-real
-loaders and store, and, where a run must really happen, the hardened `sandbox-runner` container.
+real loaders and store, and, where a run must really happen, the hardened `sandbox-runner`
+container.
 
 The stage is driven by Temporal's activity environment, the way a worker would, and every claim is
 read back from the database: the row, its frozen state, the evidence in storage and the LOOP_TESTS
@@ -8,8 +8,7 @@ verdict the corrector reads. Failure paths that need no container use a fake bac
 milliseconds and can fail in ways a real host does (down, slow, wrong).
 
 Needs `make up` (Postgres) and Docker with `skill-runtime:local` for the container tests; not part
-of
-the unit run.
+of the unit run.
 """
 
 import asyncio

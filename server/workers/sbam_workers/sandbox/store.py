@@ -168,8 +168,7 @@ class SqlRunStore:
         dataset_sha256: str | None,
     ) -> None:
         """The LOOP_TESTS verdict of this build pass: PASSED, or FAILED with the findings the
-        corrector
-        reads. One row per stage key, so a retried pass finds the row it already wrote."""
+        corrector reads. One row per stage key, so a retried pass finds the row it already wrote."""
         findings = [f.model_dump(mode="json", exclude_none=True) for f in classified.findings()]
         GateResultRepository(session, self._ctx(inp)).record_stage(
             {

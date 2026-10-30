@@ -105,8 +105,8 @@ def loop_tests_failed(identity: Identity) -> ApplicationError:
 def limits_for(loop_spec: Mapping[str, Any]) -> SandboxLimits:
     """Room for the bound the Sub-Skill declared: `max_iterations` passes of two tools, each allowed
     `budget_ms`, plus a margin. Never below the default. A Sub-Skill that needs more than the
-    policy's
-    ceiling can never be tested here, and retrying will not change that: refused, not clamped."""
+    policy's ceiling can never be tested here, and retrying will not change that: refused, not
+    clamped."""
     seconds = math.ceil(
         int(loop_spec["max_iterations"]) * 2 * int(loop_spec["budget_ms"]) / 1000 + 10
     )
