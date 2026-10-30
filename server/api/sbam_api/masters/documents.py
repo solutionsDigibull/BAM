@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser
+from sbam_api.core.bulkhead import CLAMD, BulkheadFullError
 from sbam_api.core.conventions import ApiError, check_if_match, not_found
 from sbam_api.core.settings import Settings
 from sbam_api.db.base import utcnow
@@ -59,6 +60,7 @@ from sbam_api.storage import Kind, StorageBackend, StorageScope
 TENANT_SCOPE_PROJECT: Final = uuid.UUID(int=0)
 SCAN_ATTEMPTS: Final = 5
 SCAN_BACKOFF: Final = 0.5  # seconds, doubled after each failed attempt
+SCAN_DEADLINE: Final = 10.0  # seconds a request may spend on retries before it takes SCAN_FAILED
 SNIFF_BYTES: Final = 8192
 _OPENAPI: Final = re.compile(r"""(?:^|[{,])\s*["']?openapi["']?\s*:""", re.MULTILINE)
 _SWAGGER: Final = re.compile(r"""(?:^|[{,])\s*["']?swagger["']?\s*:""", re.MULTILINE)
@@ -284,14 +286,29 @@ def _scan(settings: Settings, data: bytes, sleep: Callable[[float], None]) -> Sc
     """The verdict, or None when clamd gave none in `SCAN_ATTEMPTS` tries (never a pass)."""
     clamd = ClamdClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout)
     delay = SCAN_BACKOFF
+    started = time.monotonic()
     for attempt in range(SCAN_ATTEMPTS):
         try:
-            return clamd.scan(io.BytesIO(data))
+            with CLAMD.slot():
+                return clamd.scan(io.BytesIO(data))
+        except BulkheadFullError:
+            raise scan_unavailable() from None
         except ClamdError:
-            if attempt < SCAN_ATTEMPTS - 1:
-                sleep(delay)
-                delay *= 2
+            # The request gives up at SCAN_DEADLINE, not after every backoff of a hung clamd.
+            if attempt == SCAN_ATTEMPTS - 1 or time.monotonic() - started + delay > SCAN_DEADLINE:
+                break
+            sleep(delay)
+            delay *= 2
     return None
+
+
+def scan_unavailable() -> ApiError:
+    return ApiError(
+        503,
+        ErrorCode.SCAN_UNAVAILABLE,
+        "The virus scanner is unavailable",
+        "Nothing was imported. Try again in a few minutes.",
+    )
 
 
 # --- list, get, route -----------------------------------------------------------------------
