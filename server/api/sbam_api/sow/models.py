@@ -15,7 +15,7 @@ from typing import Any
 
 from sbam_contracts.sow import SECTIONS
 from sbam_contracts.state_machines import MachineName
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import Mapped, mapped_column
@@ -100,6 +100,13 @@ class SowVersion(Stateful, ProjectOwned, Base):
     # belongs to a process that died.
     signal_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
+# Approvals saved but not yet signalled: the relay's scan (0046).
+Index(
+    "ix_sow_versions_signal_pending",
+    SowVersion.approved_at,
+    postgresql_where=SowVersion.approved_at.is_not(None) & SowVersion.signal_sent_at.is_(None),
+)
 
 register_entity(MachineName.SOW_VERSION, SowVersion)
 
