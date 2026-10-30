@@ -1,6 +1,7 @@
 """Liveness and readiness.
 
-Bodies carry only check names and ok/fail: no hosts, versions or errors.
+Bodies carry only check names and ok/fail, plus each bulkhead's ok/saturated: no hosts, versions or
+errors.
 """
 
 import asyncio

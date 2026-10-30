@@ -94,10 +94,16 @@ def test_e1_3_t03_ready_503_when_temporal_down(app_factory: AppFactory) -> None:
     checks = {**ALL_OK, "temporal": fixed(False)}
     response = TestClient(app_factory(checks)).get("/health/ready")
     assert response.status_code == 503
-    assert response.json() == {
-        "status": "fail",
-        "checks": {"db": "ok", "storage": "ok", "temporal": "fail", "keycloak_jwks": "ok"},
+    body = response.json()
+    assert body["status"] == "fail"
+    assert body["checks"] == {
+        "db": "ok",
+        "storage": "ok",
+        "temporal": "fail",
+        "keycloak_jwks": "ok",
     }
+    # N-02: how full each dependency's bulkhead is; informational, it never changes the status.
+    assert body["bulkheads"] == {"clamd": "ok", "keycloak_admin": "ok"}
 
 
 def _closed_port() -> int:
