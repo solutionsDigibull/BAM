@@ -269,6 +269,12 @@ services:
     environment:
       <<: *worker-deploy-env
       DATABASE_URL: !reset null
+      # The mock API's control token (E13.2): the same secret the service reads itself.
+      MOCK_CONTROL_TOKEN: !reset null
+      MOCK_CONTROL_TOKEN_FILE: /run/secrets/mock_control_token
+    secrets:
+      - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: mock_control_token, target: mock_control_token, uid: "10001", gid: "10001", mode: 0400 }
 
   worker-certify:
     <<: *worker-deploy

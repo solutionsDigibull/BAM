@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sandbox/run:0.1.0",
+  "$defs": {
+    "FailureCategory": {
+      "enum": [
+        "IMPORT_ERROR",
+        "RUNTIME_ERROR",
+        "TIMEOUT",
+        "OOM",
+        "OUTPUT_SCHEMA_MISMATCH",
+        "ASSERTION_FAILED",
+        "EGRESS_BLOCKED",
+        "INFRA_ERROR"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "InfraReason": {
+      "description": "Why a run is INFRA_ERROR; stored in the run row so an operator sees the cause.",
+      "enum": [
+        "NOT_CONFIGURED",
+        "HOST_UNREACHABLE",
+        "HASH_MISMATCH",
+        "INPUT_MISMATCH",
+        "TEMPLATE_DIGEST_MISMATCH",
+        "VM_CREATE_FAILED",
+        "VM_BOOT_TIMEOUT",
+        "RUNNER_FAILED",
+        "DATASET_INVALID",
+        "EGRESS_LOG_UNAVAILABLE",
+        "DESTROY_FAILED",
+        "CANCELLED",
+        "SUPERSEDED"
+      ],
+      "title": "InfraReason",
+      "type": "string"
+    },
+    "SandboxMode": {
+      "enum": [
+        "CUBESANDBOX",
+        "LOCAL_DOCKER_NONCERT"
+      ],
+      "title": "SandboxMode",
+      "type": "string"
+    },
+    "SandboxRunStatus": {
+      "enum": [
+        "STARTED",
+        "FINISHED"
+      ],
+      "title": "SandboxRunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One row of `sandbox_runs` as the API returns it (TD §7.7).",
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "code_attempt_id": {
+      "format": "uuid",
+      "title": "Code Attempt Id",
+      "type": "string"
+    },
+    "dataset_id": {
+      "format": "uuid",
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "run_no": {
+      "minimum": 1,
+      "title": "Run No",
+      "type": "integer"
+    },
+    "mode": {
+      "$ref": "#/$defs/SandboxMode"
+    },
+    "status": {
+      "$ref": "#/$defs/SandboxRunStatus"
+    },
+    "runtime_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Runtime Digest",
+      "type": "string"
+    },
+    "vm_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Vm Id"
+    },
+    "duration_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration Ms"
+    },
+    "exit_code": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exit Code"
+    },
+    "failure_category": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FailureCategory"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "infra_reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InfraReason"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "egress_log_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Egress Log Key"
+    },
+    "outputs_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outputs Key"
+    },
+    "logs_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Logs Key"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finished At"
+    }
+  },
+  "required": [
+    "id",
+    "code_attempt_id",
+    "dataset_id",
+    "run_no",
+    "mode",
+    "status",
+    "runtime_digest",
+    "started_at"
+  ],
+  "title": "SandboxRun",
+  "type": "object"
+}

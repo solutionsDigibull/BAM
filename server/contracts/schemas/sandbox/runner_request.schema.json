@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sandbox/runner_request:0.1.0",
+  "$defs": {
+    "HarnessConfig": {
+      "additionalProperties": false,
+      "description": "What the harness needs from the Sub-Skill's ISATVON that the loop spec does not carry:\nwhich two tools drive a pass, how fresh state is keyed, what a handoff row holds and what the\nSub-Skill says to the user. Built by the worker from the stored Sub-Skill, never from the\nbundle under test.",
+      "properties": {
+        "action_tool": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,99}$",
+          "title": "Action Tool",
+          "type": "string"
+        },
+        "fixed_check_tool": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,99}$",
+          "title": "Fixed Check Tool",
+          "type": "string"
+        },
+        "fresh_state_parameters": {
+          "items": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,99}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Fresh State Parameters",
+          "type": "array"
+        },
+        "required_inputs": {
+          "items": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,99}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Required Inputs",
+          "type": "array"
+        },
+        "key_field": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,99}$",
+          "title": "Key Field",
+          "type": "string"
+        },
+        "handoff_fields": {
+          "items": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,99}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Handoff Fields",
+          "type": "array"
+        },
+        "ui_updates": {
+          "items": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Ui Updates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "action_tool",
+        "fixed_check_tool",
+        "fresh_state_parameters",
+        "required_inputs",
+        "key_field",
+        "handoff_fields",
+        "ui_updates"
+      ],
+      "title": "HarnessConfig",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "SandboxLimits": {
+      "additionalProperties": false,
+      "description": "VM resources and time. Anything outside the policy is rejected, never clamped.",
+      "properties": {
+        "cpu": {
+          "default": 1,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Cpu",
+          "type": "integer"
+        },
+        "memory_mb": {
+          "default": 1024,
+          "maximum": 2048,
+          "minimum": 512,
+          "title": "Memory Mb",
+          "type": "integer"
+        },
+        "case_timeout_s": {
+          "default": 60,
+          "maximum": 300,
+          "minimum": 10,
+          "title": "Case Timeout S",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 10485760,
+          "maximum": 10485760,
+          "minimum": 1024,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "SandboxLimits",
+      "type": "object"
+    },
+    "SandboxMode": {
+      "enum": [
+        "CUBESANDBOX",
+        "LOCAL_DOCKER_NONCERT"
+      ],
+      "title": "SandboxMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`/work/request.json`, the only way data reaches the runner besides the files it reads.",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "limits": {
+      "$ref": "#/$defs/SandboxLimits"
+    },
+    "mode": {
+      "$ref": "#/$defs/SandboxMode"
+    },
+    "tool_module": {
+      "maxLength": 200,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+      "title": "Tool Module",
+      "type": "string"
+    },
+    "loop_spec": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Loop Spec",
+      "type": "object"
+    },
+    "harness": {
+      "$ref": "#/$defs/HarnessConfig"
+    },
+    "handoff_table": {
+      "pattern": "^[a-z_][a-z0-9_]{0,62}$",
+      "title": "Handoff Table",
+      "type": "string"
+    },
+    "cases": {
+      "items": {
+        "additionalProperties": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "type": "object"
+      },
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "egress_probe": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 50,
+      "title": "Egress Probe",
+      "type": "array"
+    }
+  },
+  "required": [
+    "limits",
+    "mode",
+    "tool_module",
+    "loop_spec",
+    "harness",
+    "handoff_table",
+    "cases"
+  ],
+  "title": "RunnerRequest",
+  "type": "object"
+}

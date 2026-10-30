@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sandbox/limits:0.1.0",
+  "additionalProperties": false,
+  "description": "VM resources and time. Anything outside the policy is rejected, never clamped.",
+  "properties": {
+    "cpu": {
+      "default": 1,
+      "maximum": 2,
+      "minimum": 1,
+      "title": "Cpu",
+      "type": "integer"
+    },
+    "memory_mb": {
+      "default": 1024,
+      "maximum": 2048,
+      "minimum": 512,
+      "title": "Memory Mb",
+      "type": "integer"
+    },
+    "case_timeout_s": {
+      "default": 60,
+      "maximum": 300,
+      "minimum": 10,
+      "title": "Case Timeout S",
+      "type": "integer"
+    },
+    "max_output_bytes": {
+      "default": 10485760,
+      "maximum": 10485760,
+      "minimum": 1024,
+      "title": "Max Output Bytes",
+      "type": "integer"
+    }
+  },
+  "title": "SandboxLimits",
+  "type": "object"
+}

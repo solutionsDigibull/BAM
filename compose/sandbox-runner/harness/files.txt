@@ -1,0 +1,17 @@
+# The import closure of run_cases.py: everything the in-VM runner imports from this repository, and
+# nothing else (ADR 0023, decision 7). Vendored into /opt/sbam/harness by stage.py; a test fails when
+# this list and the real closure differ, in either direction. One repo-relative path per line.
+server/contracts/sbam_contracts/__init__.py
+server/contracts/sbam_contracts/_jsonschema.py
+server/contracts/sbam_contracts/api.py
+server/contracts/sbam_contracts/canonical.py
+server/contracts/sbam_contracts/gate_expr.py
+server/contracts/sbam_contracts/harness.py
+server/contracts/sbam_contracts/isatvon14.py
+server/contracts/sbam_contracts/sandbox.py
+server/workers/sbam_workers/__init__.py
+server/workers/sbam_workers/isatvon/__init__.py
+server/workers/sbam_workers/isatvon/loop_expr.py
+server/workers/sbam_workers/isatvon/loop_spec.py
+server/workers/sbam_workers/test/__init__.py
+server/workers/sbam_workers/test/harness.py
