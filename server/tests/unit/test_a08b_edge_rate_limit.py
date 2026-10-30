@@ -67,10 +67,12 @@ def proxy() -> Iterator[str]:
             "-v", f"{REPO / 'compose/proxy/Caddyfile'}:/etc/caddy/Caddyfile:ro", tag,
         )  # fmt: skip
         assert started.returncode == 0, started.stderr
-        for _ in range(30):  # TLS is ready when a request gets any answer
-            if get("portal.test", "/projects") != "000":
+        for _ in range(60):  # ready when the proxy answers 200: TLS up and its upstream healthy
+            if get("portal.test", "/projects") == "200":  # not auth.test: its budget is a test
                 break
             time.sleep(1)
+        else:
+            pytest.fail("the proxy never became ready:\n" + docker("logs", name).stdout[-1500:])
         yield name
     finally:
         docker("rm", "-f", name, stub)

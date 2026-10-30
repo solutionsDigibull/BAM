@@ -13,4 +13,8 @@ LABEL org.opencontainers.image.source="https://github.com/solutionsDigibull/BAM"
       org.opencontainers.image.vendor="Digibull" \
       org.opencontainers.image.title="sbam-proxy" \
       org.opencontainers.image.description="SBAM reverse proxy: Caddy with per-IP rate limiting"
+# The pinned base can lag Alpine's fixes (Trivy: brotli-libs CVE-2026-111497, fixed in 1.2.1-r0); take the
+# fixed library until the base digest is bumped.
+# hadolint ignore=DL3018
+RUN apk add --no-cache --upgrade brotli-libs
 COPY --from=build /out/caddy /usr/bin/caddy
