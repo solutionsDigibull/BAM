@@ -348,3 +348,22 @@ def test_e6_2_t07_a_regeneration_with_a_hint_is_v2_with_v1_as_parent(g: Gen) -> 
     user = bifrost.requests[0]["messages"][1]["content"]
     assert '<data name="hint">\nIgnore the canteen; add a QA module\n</data>' in user
     assert v2.content_tiptap is not None and v2.content_tiptap["type"] == "doc"
+
+
+def test_a595_t01_an_explicit_regenerate_asks_the_model_again_for_the_same_input(g: Gen) -> None:
+    g.run(FakeBifrost([completion(g.answer())]))
+    again = StageRef(**{**g.ref.model_dump(), "run_id": uuid.uuid4()})
+    bifrost = FakeBifrost([completion(g.answer())])
+    second = asyncio.run(generate_version(g.deps(bifrost), again, g.scope(), fresh=True))
+    assert len(bifrost.requests) == 1  # no hint, nothing changed: still a new model call
+    v1, v2 = g.versions()
+    assert (v1.version, v2.version, v2.id) == (1, 2, second)
+
+
+def test_a595_t02_the_first_generation_still_reuses_a_cached_answer(g: Gen) -> None:
+    g.run(FakeBifrost([completion(g.answer())]))
+    again = StageRef(**{**g.ref.model_dump(), "run_id": uuid.uuid4()})
+    bifrost = FakeBifrost([])  # a call would raise: the answer must come from the cache
+    second = asyncio.run(generate_version(g.deps(bifrost), again, g.scope()))
+    assert bifrost.requests == [] and [v.version for v in g.versions()] == [1, 2]
+    assert g.versions()[1].id == second

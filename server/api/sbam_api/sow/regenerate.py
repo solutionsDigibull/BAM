@@ -131,7 +131,9 @@ def _spec(
             subject_type=SubjectType.PROJECT,
             subject_id=project.id,
             stage="sow",
-            input=SowGenerateInput(**base.model_dump(), ref_id=knowledge_version_id, hint=hint),
+            input=SowGenerateInput(
+                **base.model_dump(), ref_id=knowledge_version_id, hint=hint, fresh=True
+            ),  # an explicit Regenerate always asks the model again (#595)
         )
     refs = {"knowledge": knowledge_version_id, "okf": knowledge_version_id}
     return StartSpec(

@@ -312,6 +312,7 @@ def test_e6_2_t07_regenerate_in_review_starts_sow_regenerate_with_the_hint(h: Ha
     [call] = h.temporal.calls
     assert call["task_queue"] == "sbam-llm" and call["id_conflict_policy"].name == "FAIL"
     assert call["arg"].hint == "Add a QA module" and call["arg"].ref_id == h.kv
+    assert call["arg"].fresh is True  # an explicit Regenerate skips the derivative cache (#595)
     [audit] = h.trail("project", "SOW_REGENERATE_STARTED")
     assert audit.after == {"run_id": run["id"], "hint_chars": 15, "resumed": False}
     again = h.regenerate({"hint": "Add a QA module"}, **{"Idempotency-Key": "key-regen-1"})
