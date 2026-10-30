@@ -217,9 +217,15 @@ def _failed(deps: SowDeps, inp: StageRef, kind: str, message: str) -> Applicatio
 
 
 async def generate_version(
-    deps: SowDeps, inp: StageRef, scope: LlmScope, *, hint: str | None = None
+    deps: SowDeps,
+    inp: StageRef,
+    scope: LlmScope,
+    *,
+    hint: str | None = None,
+    fresh: bool = False,
 ) -> uuid.UUID:
-    """The SOW version of run `inp`; see the module docstring."""
+    """The SOW version of run `inp`; see the module docstring. `fresh` (an explicit Regenerate)
+    asks the model again even when the same input was answered before."""
     done = await asyncio.to_thread(_existing, deps, inp)
     if done is not None:
         version_id, state, reason = done
@@ -239,6 +245,7 @@ async def generate_version(
             scope,
             validate=check_citations(context),
             manifest_extra=context.manifest,
+            fresh=fresh,
         )
     except SchemaInvalidAfterRetries as exc:
         raise await asyncio.to_thread(
@@ -304,5 +311,5 @@ async def generate_sow(inp: SowGenerateInput) -> IdResult:
         activity_id=info.activity_id,
         attempt=info.attempt,
     )
-    ref = StageRef(**inp.model_dump(exclude={"hint"}))
-    return IdResult(id=await generate_version(_deps(), ref, scope, hint=inp.hint))
+    ref = StageRef(**inp.model_dump(exclude={"hint", "fresh"}))
+    return IdResult(id=await generate_version(_deps(), ref, scope, hint=inp.hint, fresh=inp.fresh))
