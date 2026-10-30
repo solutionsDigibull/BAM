@@ -62,6 +62,7 @@ from sbam_workers.test.harness import (  # noqa: E402
 
 EXIT_OK: Final = 0
 EXIT_REQUEST: Final = 2
+EXIT_CRASH: Final = 70
 EXIT_DATABASE: Final = 71
 EXIT_SEED: Final = 72
 RUNTIME_FILE: Final = "/etc/sbam-runtime"
@@ -115,7 +116,9 @@ class PgStore:
             self.conn.execute(str(statement))
 
     def rows(self) -> list[dict[str, Any]]:
-        cursor = self.conn.execute(f'SELECT payload FROM "{self.table}" ORDER BY id')  # noqa: S608
+        cursor = self.conn.execute(
+            f'SELECT payload FROM "{self.table}" ORDER BY id'
+        )  # noqa: S608
         return [dict(row[0]) for row in cursor.fetchall()]
 
     def append_handoff(self, table: str, row: Mapping[str, Any]) -> None:
@@ -132,7 +135,8 @@ class PgStore:
 
 def memory_error_in(exc: BaseException | None) -> bool:
     """FastMCP wraps what a tool raised in a ToolError whose message is `str(original)`: empty for a
-    MemoryError. The original is only on the exception chain, so this is read on the server side."""
+    MemoryError. The original is only on the exception chain, so this is read on the server side.
+    """
     seen: set[int] = set()
     while exc is not None and id(exc) not in seen:
         if isinstance(exc, MemoryError):
@@ -153,7 +157,9 @@ def add_memory_marker(mcp: Any) -> None:
                 return await call_next(context)
             except ToolError as exc:
                 if memory_error_in(exc):
-                    raise ToolError("MemoryError: the tool exhausted its memory") from exc
+                    raise ToolError(
+                        "MemoryError: the tool exhausted its memory"
+                    ) from exc
                 raise
 
     mcp.add_middleware(MemoryMarker())
@@ -165,7 +171,8 @@ class McpTools:
     The harness hands every tool the case inputs, the pass number and (for the check tool) the action's
     outputs. A generated tool declares only its own contract inputs and FastMCP rejects anything else, so
     each call is cut down to the parameters the tool declares. A call the harness cancels is abandoned,
-    not awaited (see the module docstring); `abandoned` tells the caller not to close the client."""
+    not awaited (see the module docstring); `abandoned` tells the caller not to close the client.
+    """
 
     def __init__(self, client: Any) -> None:
         self.client = client
@@ -180,7 +187,9 @@ class McpTools:
             }
         return self.declared.get(tool)
 
-    async def call(self, tool: str, arguments: Mapping[str, JsonValue]) -> dict[str, Any]:
+    async def call(
+        self, tool: str, arguments: Mapping[str, JsonValue]
+    ) -> dict[str, Any]:
         allowed = await self.parameters(tool)
         if allowed is not None:
             arguments = {k: v for k, v in arguments.items() if k in allowed}
@@ -188,12 +197,16 @@ class McpTools:
         try:
             result = await asyncio.shield(pending)
         except asyncio.CancelledError:
-            self.abandoned = True  # leave `pending` running; its thread may still be asleep
+            self.abandoned = (
+                True  # leave `pending` running; its thread may still be asleep
+            )
             raise
         return result.data  # type: ignore[no-any-return]  # a tool that prints returns None: the harness refuses it
 
 
-def error_trace(case_id: str, category: str, message: str, *, budget: bool = False) -> HarnessTrace:
+def error_trace(
+    case_id: str, category: str, message: str, *, budget: bool = False
+) -> HarnessTrace:
     return HarnessTrace(
         case_id=case_id,
         terminal=None,
@@ -216,7 +229,10 @@ def error_trace(case_id: str, category: str, message: str, *, budget: bool = Fal
 
 def as_oom(trace: HarnessTrace) -> HarnessTrace:
     """A tool that died of MemoryError is OOM, not a generic runtime error."""
-    if trace.error is not None and "MemoryError: the tool exhausted" in trace.error.message:
+    if (
+        trace.error is not None
+        and "MemoryError: the tool exhausted" in trace.error.message
+    ):
         error = trace.error.model_copy(update={"category": "OOM"})
         return trace.model_copy(update={"error": error})
     return trace
@@ -240,7 +256,10 @@ def loop_case(raw: Mapping[str, Any], request: RunnerRequest) -> LoopTestCase:
 
 def notification(request: RunnerRequest) -> NNotification:
     return NNotification(
-        ui_updates=list(request.harness.ui_updates), database_updates=[], alerts=[], next=None
+        ui_updates=list(request.harness.ui_updates),
+        database_updates=[],
+        alerts=[],
+        next=None,
     )
 
 
@@ -277,7 +296,9 @@ class Database:
 
         name = f"sbam_case_{number}"
         self.admin.execute(f'CREATE DATABASE "{name}" TEMPLATE {TEMPLATE_DB}')
-        return psycopg.connect(host="127.0.0.1", user="postgres", dbname=name, autocommit=True)
+        return psycopg.connect(
+            host="127.0.0.1", user="postgres", dbname=name, autocommit=True
+        )
 
     def stop(self) -> None:
         try:
@@ -285,7 +306,14 @@ class Database:
                 self.admin.close()
             if self.datadir:
                 subprocess.run(  # noqa: S603
-                    ["pg_ctl", "-D", self.datadir, "stop", "-m", "immediate"],  # noqa: S607
+                    [
+                        "pg_ctl",
+                        "-D",
+                        self.datadir,
+                        "stop",
+                        "-m",
+                        "immediate",
+                    ],  # noqa: S607
                     capture_output=True,
                     timeout=30,
                     check=False,
@@ -313,7 +341,11 @@ def import_bundle(bundle_dir: Path, tool_module: str) -> tuple[Any, Any, Any]:
 
 
 async def run_case_in_db(
-    request: RunnerRequest, raw: Mapping[str, Any], db: Database, number: int, bundle_dir: Path
+    request: RunnerRequest,
+    raw: Mapping[str, Any],
+    db: Database,
+    number: int,
+    bundle_dir: Path,
 ) -> tuple[HarnessTrace, list[dict[str, Any]]]:
     from fastmcp import Client
 
@@ -327,9 +359,12 @@ async def run_case_in_db(
         try:
             mcp, state, handoff = import_bundle(bundle_dir, request.tool_module)
         except BaseException as exc:  # a bundle may raise anything, SystemExit included
-            return error_trace(
-                str(raw["case_id"]), "IMPORT_ERROR", f"{type(exc).__name__}: {exc}"
-            ), []
+            return (
+                error_trace(
+                    str(raw["case_id"]), "IMPORT_ERROR", f"{type(exc).__name__}: {exc}"
+                ),
+                [],
+            )
         add_memory_marker(mcp)
         state.configure(conn)
         handoff.configure(conn)
@@ -364,7 +399,9 @@ async def run_case_in_db(
                 request.limits.case_timeout_s,
             )
         finally:
-            if not tools.abandoned:  # closing would wait for the tool that is still running
+            if (
+                not tools.abandoned
+            ):  # closing would wait for the tool that is still running
                 await client.__aexit__(None, None, None)
         try:
             rows = store.rows()[:MAX_DUMPED_ROWS]
@@ -404,12 +441,16 @@ def fit(outputs: RunnerOutputs, limit: int) -> RunnerOutputs:
     """Never write a file the worker will refuse to read: drop the dumps, then the pass detail."""
     if len(outputs.model_dump_json()) <= limit:
         return outputs
-    slim = [c.model_copy(update={"handoff_rows": [], "truncated": True}) for c in outputs.cases]
+    slim = [
+        c.model_copy(update={"handoff_rows": [], "truncated": True})
+        for c in outputs.cases
+    ]
     outputs = outputs.model_copy(update={"cases": slim})
     if len(outputs.model_dump_json()) <= limit:
         return outputs
     bare = [
-        c.model_copy(update={"trace": {**c.trace, "passes": [], "ui_updates": []}}) for c in slim
+        c.model_copy(update={"trace": {**c.trace, "passes": [], "ui_updates": []}})
+        for c in slim
     ]
     return outputs.model_copy(update={"cases": bare})
 
@@ -456,6 +497,15 @@ def run_all(
                 budget=True,
             )
             rows = []
+        except (SystemExit, KeyboardInterrupt) as exc:
+            # a tool that tries to end the process: asyncio re-raises these out of the loop, so they
+            # are caught here and become a failed case, not a dead runner
+            trace = error_trace(
+                str(raw["case_id"]),
+                "RUNTIME_ERROR",
+                f"{type(exc).__name__}: the code under test tried to end the runner",
+            )
+            rows = []
         results.append(result_of(raw, trace, rows))
     usage = resource.getrusage(resource.RUSAGE_SELF)
     return RunnerOutputs(
@@ -498,7 +548,13 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    code = main(sys.argv)
+    try:
+        code = main(sys.argv)
+    except (
+        BaseException
+    ) as exc:  # anything left: end now, never wait for a hung thread at shutdown
+        print(f"runner crashed: {type(exc).__name__}", file=sys.stderr)
+        code = EXIT_CRASH
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(code)  # a hung tool's thread must not keep the VM's process alive

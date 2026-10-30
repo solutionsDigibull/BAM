@@ -305,6 +305,31 @@ def test_e13_2_an_activity_that_already_finished_with_a_test_outcome_replays(
         session.rollback()
 
 
+def test_e13_2_a_local_result_is_never_the_answer_of_a_certifying_worker(
+    sessions: sessionmaker[Session],
+) -> None:
+    """The mode of a worker changed between two deliveries of one activity: the finished local run
+    must not be handed back as the answer of a worker that certifies."""
+    with sessions() as session:
+        repo = SandboxRunRepository(session, ctx())
+        aid, dataset = attempt(session), uuid.uuid4()
+        local = repo.claim(
+            code_attempt_id=aid,
+            dataset_id=dataset,
+            mode=SandboxMode.LOCAL_DOCKER_NONCERT,
+            runtime_digest=DIGEST,
+            workflow_id="build-x",
+            activity_id="act-m",
+            activity_attempt=1,
+            now=NOW,
+        ).row
+        repo.finish(local, RunOutcome(failure_category=None, exit_code=0), NOW)
+        again = claim(repo, aid, dataset, activity="act-m", n=2)  # CUBESANDBOX
+        assert again.replay is False and again.row.id != local.id and again.row.run_no == 2
+        assert again.row.mode == "CUBESANDBOX"
+        session.rollback()
+
+
 def test_e13_2_an_infra_failure_is_never_replayed_it_is_rerun(
     sessions: sessionmaker[Session],
 ) -> None:

@@ -28,7 +28,7 @@ from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.db.repository import TenantContext
 from sbam_api.manifests.repository import GateResultRepository, SubSkillManifestRepository
 from sbam_api.schema_sql.repository import WorkflowSchemaRepository
-from sbam_api.storage.base import StorageBackend
+from sbam_api.storage.base import StorageBackend, StorageIntegrityError
 from sbam_api.testgen.repository import CaseRepository, DatasetRepository
 from sbam_api.testgen.service import body_of, files_hashes, mocks_hashes
 from sbam_contracts.build import BuildStageInput
@@ -46,7 +46,7 @@ from sbam_workers.build.codegen.bundle import LOOP_SPEC_FILE
 from sbam_workers.isatvon.loop_spec import load_loop_spec
 from sbam_workers.sandbox.executor import DatasetInput
 from sbam_workers.sandbox.inputs import harness_config
-from sbam_workers.sandbox.verify import verify_bundle
+from sbam_workers.sandbox.verify import HashMismatch, verify_bundle
 from sbam_workers.test.testgen import data_files
 
 INPUT_MISMATCH: Final = "SandboxInputMismatch"
@@ -186,7 +186,7 @@ class SqlSandboxInputs:
             dataset=DatasetInput(cases, files_hashes(keys), mocks_hashes(mock_keys), dataset_sha),
             data_files=self._data_files(keys, isatvon),
             mocks=[
-                MockDefinition.model_validate_json(self.storage.get(key, verify=True))
+                MockDefinition.model_validate_json(self._verified(key, "a mock definition"))
                 for key in mock_keys
             ],
         )
@@ -251,8 +251,16 @@ class SqlSandboxInputs:
         out: dict[str, bytes] = {}
         for key in keys:
             digest = key.rsplit("/", 1)[-1]
-            out[named.get(digest, digest)] = self.storage.get(key, verify=True)
+            out[named.get(digest, digest)] = self._verified(key, "a dataset file")
         return out
+
+    def _verified(self, key: str, what: str) -> bytes:
+        """The stored bytes, or `HashMismatch`: an object that no longer hashes to its own key was
+        changed after the dataset recorded it, which is a security event, not a flaky read."""
+        try:
+            return self.storage.get(key, verify=True)
+        except StorageIntegrityError:
+            raise HashMismatch(what) from None
 
 
 def _same(left: str | None, right: str) -> bool:

@@ -64,6 +64,7 @@ class FakeBox:
         self.fs: dict[str, str] = {"/etc/sbam-runtime": DIGEST + "\n"}
         self.killed = 0
         self.kill_error: Exception | None = None
+        self.info = types.SimpleNamespace(memory_mb=1024, cpu_count=1)
         self.on_run: Callable[[str, dict[str, Any]], cubesandbox.CommandResult] = self.default_run
         self.commands = FakeCommands(self)
         self.files = FakeFiles(self)
@@ -72,6 +73,9 @@ class FakeBox:
         if cmd.startswith("head -c"):
             return cubesandbox.CommandResult("", "", 0)
         return cubesandbox.CommandResult("", "", 0)
+
+    def get_info(self) -> Any:
+        return self.info
 
     def kill(self) -> None:
         self.killed += 1
@@ -84,10 +88,11 @@ class FakeSandbox:
     created: ClassVar[list[dict[str, Any]]] = []
     create_error: ClassVar[Exception | None] = None
     listing: ClassVar[list[dict[str, Any]]] = []
+    info: ClassVar[Any] = None  # what get_info() reports for the next VMs; None = a 1 cpu, 1 GiB VM
 
     @classmethod
     def reset(cls) -> None:
-        cls.boxes, cls.created, cls.create_error, cls.listing = {}, [], None, []
+        cls.boxes, cls.created, cls.create_error, cls.listing, cls.info = {}, [], None, [], None
 
     @classmethod
     def create(cls, template: str | None = None, **kwargs: Any) -> FakeBox:
@@ -95,6 +100,8 @@ class FakeSandbox:
             raise cls.create_error
         cls.created.append({"template": template, **kwargs})
         box = FakeBox(f"vm-{len(cls.boxes) + 1}")
+        if cls.info is not None:
+            box.info = cls.info
         cls.boxes[box.sandbox_id] = box
         return box
 
@@ -123,6 +130,7 @@ def sdk() -> Any:
         SandboxNotFoundError=cubesandbox.SandboxNotFoundError,
         TemplateNotFoundError=cubesandbox.TemplateNotFoundError,
         FilesystemNotFoundError=cubesandbox.FilesystemNotFoundError,
+        SandboxInfo=cubesandbox.SandboxInfo,
     )
 
 
@@ -337,11 +345,13 @@ def test_e13_2_list_vms_carries_the_tags_the_reaper_filters_on() -> None:
     FakeSandbox.listing = [
         {"sandboxID": "vm-1", "startedAt": "2026-10-30T10:00:00Z", "metadata": {"sbam_run": "r"}},
         {"sandboxID": "vm-9", "startedAt": "garbage", "metadata": None},
+        {"sandboxID": "vm-8", "startedAt": 1_793_000_000, "metadata": {}},  # epoch seconds
     ]
     vms = run(b.list_vms())
     assert vms[0].vm_id == "vm-1" and vms[0].metadata == {"sbam_run": "r"}
     assert vms[0].started_at is not None and vms[0].started_at.tzinfo is not None
     assert vms[1].started_at is None and dict(vms[1].metadata) == {}
+    assert vms[2].started_at is not None and vms[2].started_at.year == 2026  # not left unreapable
 
 
 def test_e13_2_a_hung_host_call_ends_as_host_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -401,3 +411,31 @@ def test_e13_2_the_real_sdk_builds_a_backend_without_touching_the_network() -> N
     with pytest.raises(SandboxInfraError) as caught:
         run(b.list_vms())
     assert caught.value.reason is InfraReason.HOST_UNREACHABLE
+
+
+@pytest.mark.parametrize(
+    "info",
+    [
+        types.SimpleNamespace(memory_mb=4096, cpu_count=1),
+        types.SimpleNamespace(memory_mb=1024, cpu_count=8),
+    ],
+    ids=["too much memory", "too many cpus"],
+)
+def test_e13_2_a_template_bigger_than_the_runs_limits_is_refused_and_its_vm_destroyed(
+    info: Any,
+) -> None:
+    b = backend()
+    FakeSandbox.info = info
+    with pytest.raises(SandboxInfraError) as caught:
+        run(b.create(spec()))
+    assert caught.value.reason is InfraReason.VM_CREATE_FAILED
+    assert "exceed" in str(caught.value)
+    assert FakeSandbox.boxes["vm-1"].killed == 1  # the VM it made is gone, not leaked
+    with pytest.raises(SandboxInfraError):  # and it was never handed to the run
+        run(b.exec(VmHandle("vm-1"), ["x"], timeout_s=5, max_output_bytes=10))
+
+
+def test_e13_2_a_host_that_reports_no_size_is_believed() -> None:
+    b = backend()
+    FakeSandbox.info = types.SimpleNamespace(memory_mb=None, cpu_count=None)
+    assert run(b.create(spec())).vm_id == "vm-1"

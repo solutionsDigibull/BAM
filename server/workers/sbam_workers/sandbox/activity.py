@@ -81,6 +81,7 @@ NOT_RETRYABLE: Final = frozenset(
         InfraReason.TEMPLATE_DIGEST_MISMATCH,
     }
 )
+HEARTBEATS_PER_TIMEOUT: Final = 3
 MAX_JOURNAL_BYTES: Final = 64 * 1024
 log = logging.getLogger("sbam_workers.sandbox")
 
@@ -146,9 +147,11 @@ class RunSandboxTests:
         self.mock = mock
 
     async def _heartbeat(self, run_id: str) -> None:
+        """HEARTBEAT_SECONDS is how long Temporal waits (the stage's heartbeat timeout): three beats
+        inside it mean one late beat never reads as a dead worker."""
         while True:
             activity.heartbeat(run_id)
-            await asyncio.sleep(HEARTBEAT_SECONDS)
+            await asyncio.sleep(HEARTBEAT_SECONDS / HEARTBEATS_PER_TIMEOUT)
 
     @activity.defn(name=STAGE)
     async def run(self, inp: BuildStageInput) -> IdResult:

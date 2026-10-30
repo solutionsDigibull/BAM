@@ -4,8 +4,10 @@
 retry, a replay after a lost result and a stalled worker that wakes up late all have to end with
 exactly one completed row per outcome:
 
-* the same activity already FINISHED with a test outcome (anything but INFRA_ERROR): that is the
-  answer, handed back as a replay and never run again;
+* the same activity already FINISHED with a test outcome (anything but INFRA_ERROR), in the same
+  mode: that is the answer, handed back as a replay and never run again. A worker whose mode changed
+  since (a laptop result, then a certifying host) runs again instead of answering with a result that
+  cannot certify;
 * a STARTED row (a crashed or stalled attempt) is closed as INFRA_ERROR / SUPERSEDED, so there is
   never more than one live run per (code attempt, dataset) and the loser's late `finish` meets the
   frozen row (423) instead of overwriting;
@@ -92,6 +94,8 @@ class SandboxRunRepository(TenantScopedRepository[SandboxRunRecord]):
                     row.status == SandboxRunStatus.FINISHED
                     and row.temporal_workflow_id == workflow_id
                     and row.activity_id == activity_id
+                    and row.mode
+                    == mode.value  # a local result is never the answer of a certifying worker
                     and row.failure_category != FailureCategory.INFRA_ERROR
                 ):
                     return Claim(row, replay=True)

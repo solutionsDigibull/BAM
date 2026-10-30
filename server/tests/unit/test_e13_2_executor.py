@@ -59,6 +59,8 @@ class FakeBackend:
         self.written: dict[str, bytes] = {}
         self.system_written: dict[str, bytes] = {}
         self.exec_argv: Sequence[str] = ()
+        self.exec_timeouts: list[float] = []
+        self.exec_envs: list[Mapping[str, str]] = []
         self.digest = DIGEST
         self.outputs: bytes | None = None
         self.exec_result = ExecResult(exit_code=0, stdout=b"out", stderr=b"err")
@@ -98,6 +100,8 @@ class FakeBackend:
     ) -> ExecResult:
         self._maybe_fail("exec")
         self.exec_argv = argv
+        self.exec_timeouts.append(timeout_s)
+        self.exec_envs.append(dict(env or {}))
         return self.exec_result
 
     async def get_file(self, vm: VmHandle, path: str, *, max_bytes: int) -> bytes | None:
@@ -424,3 +428,48 @@ def test_e13_2_cancellation_mid_run_still_destroys_the_vm() -> None:
 
     asyncio.run(scenario())
     assert backend.destroyed == ["vm-1"]
+
+
+def run_it(backend: FakeBackend, run_input: RunInput) -> Any:
+    return asyncio.run(_run(backend, run_input))
+
+
+def many_cases(n: int) -> list[tuple[CaseKind, CaseBody]]:
+    bodies = [
+        (CaseKind.PASS_FIRST if i % 2 else CaseKind.ESCALATION, CaseBody.model_validate(
+            {"name": f"case-{i:02d}", "input": {}, "expected_terminal": "SUCCESS"}))
+        for i in range(n)
+    ]  # fmt: skip
+    return bodies
+
+
+def test_e13_2_the_runner_never_gets_longer_than_the_activity_can_wait() -> None:
+    """20 cases at 60 s would be 1230 s, past the stage's 20 minute activity timeout: the run ends
+    as a TIMEOUT of the code under test, not as an activity timeout that leaves a row and a VM open.
+    """
+    from sbam_workers.sandbox.executor import MAX_RUN_SECONDS
+
+    chosen = many_cases(20)
+    run_input = make_run(dataset=DatasetInput(chosen, {}, {}, dataset_sha256(chosen)))
+    backend = FakeBackend()
+    run_it(backend, run_input)
+    assert backend.exec_timeouts == [float(MAX_RUN_SECONDS)] and MAX_RUN_SECONDS < 20 * 60
+
+
+def test_e13_2_a_small_dataset_gets_exactly_its_cases_worth_of_time() -> None:
+    backend = FakeBackend()
+    run_it(backend, make_run())
+    assert backend.exec_timeouts == [60.0 * 3 + 30]
+
+
+def test_e13_2_the_code_under_test_learns_its_run_id_and_nothing_else() -> None:
+    backend = FakeBackend()
+    run_input = make_run()
+    run_it(backend, run_input)
+    assert backend.exec_envs == [
+        {
+            "SBAM_MODE": "CUBESANDBOX",
+            "SBAM_RUN_ID": str(run_input.run_id),
+            "SBAM_MOCK_API": "http://sbam-mock-api:8080",
+        }
+    ]

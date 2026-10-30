@@ -79,6 +79,10 @@ RUNNER_ARGV: Final = ("python", "-I", "/opt/sbam/harness/run_cases.py", REQUEST_
 MAX_REQUEST_BYTES: Final = 4 * 1024 * 1024
 BOOT_GRACE_S: Final = 300  # the host's own backstop beyond the run (ADR 0023, decision 10)
 MAX_LOG_BYTES: Final = 10 * 1024 * 1024
+# The stage's activity timeout is 20 minutes (TD §13.3). The runner gets less, so an overrun ends as
+# a TIMEOUT of the code under test, with the VM destroyed and the evidence stored, never as an
+# activity timeout that leaves a row open and a VM to the reaper.
+MAX_RUN_SECONDS: Final = 18 * 60
 
 EgressReader = Callable[[str], Awaitable[list[EgressEvent]]]
 VmCreated = Callable[[str], Awaitable[None]]  # told the VM id the moment the VM exists
@@ -308,7 +312,9 @@ async def _run_in_vm(
     files[REQUEST_PATH] = request_body
     await backend.put_files(vm, files)
 
-    total_timeout = float(run.limits.case_timeout_s * len(run.dataset.cases) + 30)
+    total_timeout = float(
+        min(run.limits.case_timeout_s * len(run.dataset.cases) + 30, MAX_RUN_SECONDS)
+    )
     result = await backend.exec(
         vm,
         RUNNER_ARGV,

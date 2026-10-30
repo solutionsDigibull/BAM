@@ -21,7 +21,6 @@ import asyncio
 import shlex
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any, Final, TypeVar
 
 import httpx
@@ -155,8 +154,26 @@ class CubeSandboxBackend:
             )
 
         box = await self._call(make, InfraReason.VM_CREATE_FAILED, timeout=CONTROL_TIMEOUT_S * 4)
+        try:
+            await self._within_limits(box, spec)
+        except BaseException:  # a VM this run may not use must not outlive the refusal
+            await asyncio.shield(self.destroy(box.sandbox_id, known=box))
+            raise
         self._live[box.sandbox_id] = box
         return VmHandle(box.sandbox_id)
+
+    async def _within_limits(self, box: Any, spec: VmSpec) -> None:
+        """The template, not this call, decides a VM's size (the SDK has no cpu or memory). A
+        template bigger than the run's limits would silently void them, so it is refused. A host that
+        reports no size is believed: only a size it states can be wrong."""
+        info = await self._call(box.get_info, InfraReason.VM_CREATE_FAILED)
+        memory, cpus = getattr(info, "memory_mb", None), getattr(info, "cpu_count", None)
+        if (memory is not None and memory > spec.limits.memory_mb) or (
+            cpus is not None and cpus > spec.limits.cpu
+        ):
+            raise SandboxInfraError(
+                InfraReason.VM_CREATE_FAILED, "the template's resources exceed the run's limits"
+            )
 
     async def read_runtime_digest(self, vm: VmHandle) -> str:
         box = self._vm(vm)
@@ -241,9 +258,9 @@ class CubeSandboxBackend:
             raise SandboxInfraError(InfraReason.RUNNER_FAILED, "the file is larger than the limit")
         return data
 
-    async def destroy(self, vm_id: str) -> None:
+    async def destroy(self, vm_id: str, *, known: Any = None) -> None:
         sdk = self._sdk_module
-        box = self._live.pop(vm_id, None)
+        box = self._live.pop(vm_id, None) or known
 
         def kill() -> None:
             target = box if box is not None else sdk.Sandbox.connect(vm_id, config=self._config)
@@ -258,12 +275,8 @@ class CubeSandboxBackend:
         )
         out: list[VmInfo] = []
         for row in rows:
-            started = row.get("startedAt")
-            try:
-                when = (
-                    datetime.fromisoformat(str(started).replace("Z", "+00:00")) if started else None
-                )
-            except ValueError:
-                when = None
-            out.append(VmInfo(str(row["sandboxID"]), when, dict(row.get("metadata") or {})))
+            # the SDK's own parser: CubeAPI gives ISO strings or epoch seconds, and a start time we
+            # cannot read would leave the VM unreapable for ever
+            info = sdk.SandboxInfo.from_dict(row)
+            out.append(VmInfo(str(row["sandboxID"]), info.started_at, dict(info.metadata or {})))
         return out

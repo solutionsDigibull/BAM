@@ -668,3 +668,102 @@ def test_e13_2_a_run_that_reports_nothing_is_not_a_pass(
     assert row.failure_category == "INFRA_ERROR" and row.infra_reason == "RUNNER_FAILED"
     assert backend.destroyed == ["vm-1"]  # and the VM it made is gone
     assert loop_gate(world) is None
+
+
+# --- a long run, and a cancelled one ------------------------------------------------------------
+
+
+class SlowBackend(FlakyBackend):
+    """`exec` takes `delay` seconds, or forever."""
+
+    def __init__(self, delay: float | None) -> None:
+        super().__init__()
+        self.delay = delay
+
+    async def exec(
+        self,
+        vm: VmHandle,
+        argv: Sequence[str],
+        *,
+        timeout_s: float,
+        env: Mapping[str, str] | None = None,
+        max_output_bytes: int,
+    ) -> ExecResult:
+        await asyncio.sleep(self.delay if self.delay is not None else 3600)
+        return ExecResult(0, b"", b"")
+
+
+def test_e13_2_a_long_run_heartbeats_so_temporal_sees_a_dead_worker_early(
+    sessions: sessionmaker[Session], storage: LocalDiskBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sbam_workers.sandbox.activity as module
+
+    monkeypatch.setattr(module, "HEARTBEAT_SECONDS", 0.05)
+    world = seed(sessions, storage)
+    beats: list[Any] = []
+    env = ActivityEnvironment()
+    env.info = _info(env, 1, "act-hb")
+    env.on_heartbeat = lambda *details: beats.append(details)
+    backend = SlowBackend(delay=0.4)
+    with pytest.raises(ApplicationError):  # the fake runner writes no outputs: infrastructure
+        asyncio.run(env.run(stage(world, storage, backend, monkeypatch).run, world.inp))
+    assert len(beats) >= 3 and beats[0] == (str(runs_of(world)[0].id),)
+    assert backend.destroyed == ["vm-1"]
+
+
+def test_e13_2_a_cancelled_activity_destroys_its_vm_and_closes_its_row(
+    sessions: sessionmaker[Session], storage: LocalDiskBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = seed(sessions, storage)
+    backend = SlowBackend(delay=None)  # the runner never answers
+    env = ActivityEnvironment()
+    env.info = _info(env, 1, "act-cancel")
+
+    async def go() -> None:
+        task = asyncio.ensure_future(
+            env.run(stage(world, storage, backend, monkeypatch).run, world.inp)
+        )
+        for _ in range(200):  # until the VM exists
+            await asyncio.sleep(0.05)
+            if backend.created:
+                break
+        env.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(go())
+    assert backend.destroyed == ["vm-1"]  # destroyed in `finally`, even on a cancel
+    [row] = runs_of(world)
+    assert row.infra_reason == InfraReason.CANCELLED.value and row.is_frozen
+    assert row.vm_id == "vm-1"  # recorded the moment it existed, so the reaper could find it
+
+
+def test_e13_2_a_late_worker_cannot_overwrite_the_row_a_newer_attempt_closed(
+    sessions: sessionmaker[Session], storage: LocalDiskBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sbam_api.db.repository import RowFrozen
+    from sbam_workers.sandbox.load import Identity
+
+    world = seed(sessions, storage)
+    store = SqlRunStore(sessions, storage)
+    identity = SqlSandboxInputs(sessions, storage).identify(world.inp)
+    assert isinstance(identity, Identity)
+    stale = store.claim(
+        world.inp, identity, SandboxMode.LOCAL_DOCKER_NONCERT,
+        workflow_id="build-x", activity_id="act-1", activity_attempt=1,
+    )  # fmt: skip
+    store.claim(  # the retry takes over and closes the stale row as SUPERSEDED
+        world.inp, identity, SandboxMode.LOCAL_DOCKER_NONCERT,
+        workflow_id="build-x", activity_id="act-1", activity_attempt=2,
+    )  # fmt: skip
+    with pytest.raises(RowFrozen):  # the stalled worker wakes up and tries to report a pass
+        store.finish(
+            world.inp, identity, stale.run_id, category=None, reason=None, exit_code=0,
+            vm_id="vm-late", duration_ms=1, evidence=None, classified=None,
+            bundle_sha256=None, dataset_sha256=None,
+        )  # fmt: skip
+    first = runs_of(world)[0]
+    assert (
+        first.infra_reason == InfraReason.SUPERSEDED.value
+        and first.failure_category == "INFRA_ERROR"
+    )

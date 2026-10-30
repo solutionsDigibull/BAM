@@ -331,3 +331,28 @@ def test_e13_2_nothing_survives_a_run_the_next_run_starts_clean(agent_url: str) 
     assert first.classified.category is FailureCategory.TIMEOUT
     second = run(agent_url, replace(run_input(), run_id=uuid.uuid4()))
     assert second.classified.category is None, second.classified  # no leftover database or port
+
+
+@pytest.mark.parametrize(
+    "code",
+    ["raise SystemExit(3)\n", "import sys\nsys.exit(4)\n", "raise KeyboardInterrupt\n"],
+    ids=["SystemExit", "sys.exit", "KeyboardInterrupt"],
+)
+def test_e13_2_a_tool_that_tries_to_exit_the_runner_fails_its_case_and_not_the_run(
+    agent_url: str, code: str
+) -> None:
+    result = run(agent_url, run_input(bodies=with_action(code + GOOD_RETURN)))
+    assert result.classified.category is FailureCategory.RUNTIME_ERROR, result.classified
+    assert result.classified.infra_reason is None and result.exit_code == 0
+
+
+def test_e13_2_a_tool_that_kills_the_runner_outright_is_known_to_be_infrastructure_for_now(
+    agent_url: str,
+) -> None:
+    """`os._exit` cannot be caught: the runner dies and writes nothing. Until the code under test
+    runs in its own process (#625) the platform cannot tell this from a dead runner, so it retries
+    and then blocks testing. This test records that limit so nobody mistakes it for a verdict."""
+    result = run(agent_url, run_input(bodies=with_action("import os\nos._exit(7)\n" + GOOD_RETURN)))
+    assert result.classified.category is FailureCategory.INFRA_ERROR
+    assert result.classified.infra_reason is InfraReason.RUNNER_FAILED
+    assert result.exit_code == 7 and result.destroy_error is None

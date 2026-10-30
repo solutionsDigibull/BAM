@@ -123,3 +123,23 @@ def test_e13_2_the_mock_api_is_only_offered_when_the_operator_pinned_its_address
         "10.1.2.3",
         8080,
     )
+
+
+class TamperedStorage:
+    def get(self, key: str, *, verify: bool = False) -> bytes:
+        from sbam_api.storage.base import StorageIntegrityError
+
+        if verify:
+            raise StorageIntegrityError()
+        return b"x"
+
+
+def test_e13_2_a_dataset_file_that_no_longer_hashes_to_its_key_is_a_hash_mismatch() -> None:
+    """A tampered stored object is a security event (no VM, non-retryable), not a flaky read."""
+    from sbam_workers.sandbox.verify import HashMismatch
+
+    inputs = SqlSandboxInputs(None, TamperedStorage())  # type: ignore[arg-type]
+    with pytest.raises(HashMismatch) as caught:
+        inputs._verified("t/p/tests/" + "a" * 64, "a dataset file")
+    assert caught.value.reason is InfraReason.HASH_MISMATCH
+    assert "a dataset file" in str(caught.value) and "t/p" not in str(caught.value)
