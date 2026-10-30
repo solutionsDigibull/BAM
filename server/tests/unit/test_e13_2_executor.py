@@ -478,9 +478,9 @@ def test_e13_2_the_code_under_test_learns_its_run_id_and_nothing_else() -> None:
 
 
 def test_e13_2_the_runner_never_depends_on_the_path_a_login_shell_chose() -> None:
-    """CubeSandbox runs `bash -l -c`; Debian's /etc/profile resets PATH, which would drop the virtualenv
-    (no fastmcp) and PostgreSQL (no initdb). The command names its interpreter and its PATH itself.
-    """
+    """CubeSandbox runs `bash -l -c`; Debian's /etc/profile resets PATH, which would drop the
+    virtualenv (no fastmcp) and PostgreSQL (no initdb). The command names its interpreter and its
+    PATH itself."""
     from sbam_workers.sandbox.cube_backend import redirected_command
     from sbam_workers.sandbox.executor import RUNNER_ARGV
 

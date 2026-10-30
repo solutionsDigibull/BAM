@@ -19,7 +19,8 @@ def _wrapped(loader: yaml.SafeLoader, node: yaml.Node) -> object:
         return loader.construct_sequence(node)
     if isinstance(node, yaml.MappingNode):
         return loader.construct_mapping(node)
-    return loader.construct_scalar(node) if node.value not in ("null", "") else None
+    assert isinstance(node, yaml.ScalarNode)
+    return None if node.value in ("null", "") else loader.construct_scalar(node)
 
 
 ComposeLoader.add_constructor("!reset", _wrapped)
@@ -64,11 +65,9 @@ def test_e13_2_no_deployed_overlay_sets_a_mode() -> None:
         "compose.dev.yaml",
     ):
         services = load(name)
-        worker = services.get("worker-test")
-        env = {} if worker is None else worker.get("environment") or {}
-        assert (
-            "SANDBOX_MODE" not in env
-        ), name  # the operator's env file decides, and preflight checks it
+        env = environment(services, "worker-test") if "worker-test" in services else {}
+        # the operator's env file decides, and the preflight checks it
+        assert "SANDBOX_MODE" not in env, name
 
 
 def test_e13_2_a_deployed_test_worker_gets_the_control_token_from_a_secret_file_only() -> None:
