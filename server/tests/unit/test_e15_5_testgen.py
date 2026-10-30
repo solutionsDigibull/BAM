@@ -157,7 +157,7 @@ def sandbox(tmp_path: Path) -> dict[str, Path]:
 
 
 def run(factory: Callable[[], TestgenGenerator], tmp_path: Path, **kwargs: Any) -> GateReport:
-    return asyncio.run(run_testgen_gate(factory, **sandbox(tmp_path), **kwargs))
+    return asyncio.run(run_testgen_gate(factory, **sandbox(tmp_path), **kwargs))  # type: ignore[arg-type]
 
 
 def test_e15_5_recording_a_testgen_baseline_pins_the_testgen_prompt(tmp_path: Path) -> None:
