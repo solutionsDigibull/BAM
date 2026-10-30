@@ -19,8 +19,10 @@
     "InfraReason": {
       "description": "Why a run is INFRA_ERROR; stored in the run row so an operator sees the cause.",
       "enum": [
+        "NOT_CONFIGURED",
         "HOST_UNREACHABLE",
         "HASH_MISMATCH",
+        "INPUT_MISMATCH",
         "TEMPLATE_DIGEST_MISMATCH",
         "VM_CREATE_FAILED",
         "VM_BOOT_TIMEOUT",

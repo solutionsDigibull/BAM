@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:0a028b4d5ea344503b11fe2b4c309f8fc7efda429c9b9c88828ba32fdd0c26b0
+// source-sha256:2ae9aae4dc7d21e035fe6ad1a3d85c4885a24f57ce0662dd6a6c4e66f635b2d4
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -469,8 +469,10 @@ export type FailureCategory =
  * via the `definition` "InfraReason".
  */
 export type InfraReason =
+  | "NOT_CONFIGURED"
   | "HOST_UNREACHABLE"
   | "HASH_MISMATCH"
+  | "INPUT_MISMATCH"
   | "TEMPLATE_DIGEST_MISMATCH"
   | "VM_CREATE_FAILED"
   | "VM_BOOT_TIMEOUT"
