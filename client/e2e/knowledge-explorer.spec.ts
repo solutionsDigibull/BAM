@@ -4,6 +4,8 @@ import { expect, test, type Page, type Request, type Route } from "@playwright/t
 const PROJECT = "0190f3a2-7b1c-7d4e-8f00-000000000001";
 const KV = "0190f3a2-7b1c-7d4e-8f00-00000000c0a1";
 const API = "**/api/proxy/api/v1";
+// the projects list, with or without the `?limit=` a list that follows its cursor sends
+const PROJECTS = /\/api\/proxy\/api\/v1\/projects(\?.*)?$/;
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
@@ -99,7 +101,7 @@ async function fakeGraph(page: Page, fake: Fake) {
 
 async function open(page: Page, baseURL: string, versions: () => unknown[] = () => [version()]) {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL }]);
-  await page.route(`${API}/projects`, (r) => json(r, { items: [project] }));
+  await page.route(PROJECTS, (r) => json(r, { items: [project] }));
   await page.route(`${API}/projects/${PROJECT}/knowledge`, (r) =>
     json(r, { versions: versions() }),
   );
