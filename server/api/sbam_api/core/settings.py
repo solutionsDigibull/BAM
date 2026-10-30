@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     # again at page 1); set CURSOR_SECRET once the API runs more than one replica.
     cursor_secret: SecretStr = Field(default_factory=lambda: SecretStr(secrets.token_hex(32)))
     max_body_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
+    # Per-user request budgets (A-08, core/ratelimit.py), per minute, per API process; 0 = off.
+    rate_limit_writes_per_minute: int = Field(default=120, ge=0)
+    rate_limit_llm_per_minute: int = Field(default=10, ge=0)
+    # access_denied audit rows written per actor per minute; further denials are only logged.
+    audit_denied_per_minute: int = Field(default=30, ge=0)
     # The masters workbook import (E3.3) scans the upload with clamd before reading it. Unreachable
     # clamd = the import answers 503 SCAN_UNAVAILABLE; nothing is read unscanned.
     clamav_host: str = Field(default="clamav", min_length=1)

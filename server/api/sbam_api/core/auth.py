@@ -326,6 +326,10 @@ def current_user(request: Request) -> CurrentUser:
         raise unauthenticated()
     auth: Auth = request.app.state.auth
     user = auth.verifier.verify(token.strip())
+    # after verify: a forged token spends nobody's budget
+    limiter = getattr(request.app.state, "limiter", None)
+    if limiter is not None:
+        limiter.check(str(user.user_id), request.method, request.url.path)
     if user.tenant_id is not None:
         assigned = auth.memberships.assigned_projects(user.tenant_id, user.user_id)
         user = CurrentUser(**{**user.__dict__, "assigned_project_ids": assigned})

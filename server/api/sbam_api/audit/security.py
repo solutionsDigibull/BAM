@@ -14,18 +14,26 @@ from sqlalchemy.orm import Session, sessionmaker
 from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser, LogSecurityAudit
 from sbam_api.core.logging import correlation_id_var
+from sbam_api.core.ratelimit import AuditThrottle
 
 ACCESS_DENIED = "access_denied"
 log = logging.getLogger("sbam_api.security")
 
 
 class AuditLogSecurityAudit:
-    def __init__(self, sessions: Callable[[], sessionmaker[Session]]) -> None:
+    def __init__(
+        self,
+        sessions: Callable[[], sessionmaker[Session]],
+        throttle: AuditThrottle | None = None,
+    ) -> None:
         self._sessions = sessions  # resolved on first denial, so app start needs no database
+        self._throttle = throttle
         self._log = LogSecurityAudit()
 
     def denied(self, *, actor: CurrentUser, route: str, target: str | None, reason: str) -> None:
         self._log.denied(actor=actor, route=route, target=target, reason=reason)
+        if self._throttle is not None and not self._throttle.allow(str(actor.user_id)):
+            return  # the log line above is the record; the audit table is not a flood target (A-08)
         try:
             with self._sessions()() as session:
                 record(
