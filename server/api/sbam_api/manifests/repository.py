@@ -99,6 +99,47 @@ class GateResultRepository(TenantScopedRepository[GateResultRow]):
         )
         return self.session.scalars(query).one_or_none()
 
+    def stage_statuses(
+        self, sub_skill_ids: list[uuid.UUID]
+    ) -> list[tuple[uuid.UUID, int, int, int, str, str]]:
+        """(sub_skill, build_no, cycle, attempt, gate, status) of every keyed result, without the
+        findings: the Build & Test grid picks each Sub-Skill's newest stage from these."""
+        query = (
+            self._scoped()
+            .where(
+                GateResultRow.sub_skill_id.in_(sub_skill_ids), GateResultRow.build_no.is_not(None)
+            )
+            .with_only_columns(
+                GateResultRow.sub_skill_id,
+                GateResultRow.build_no,
+                GateResultRow.cycle,
+                GateResultRow.attempt,
+                GateResultRow.gate,
+                GateResultRow.status,
+            )
+        )
+        return [
+            (sub, build, cycle, attempt, gate, status)
+            for sub, build, cycle, attempt, gate, status in self.session.execute(query)
+            if sub is not None and cycle is not None and attempt is not None
+        ]
+
+    def of_stage(
+        self, sub_skill_id: uuid.UUID, build_no: int, cycle: int, attempt: int
+    ) -> list[GateResultRow]:
+        """Every gate's result for one build stage key, by gate name."""
+        query = (
+            self._scoped()
+            .where(
+                GateResultRow.sub_skill_id == sub_skill_id,
+                GateResultRow.build_no == build_no,
+                GateResultRow.cycle == cycle,
+                GateResultRow.attempt == attempt,
+            )
+            .order_by(GateResultRow.gate)
+        )
+        return list(self.session.scalars(query))
+
     def failed_for_pass(
         self, sub_skill_id: uuid.UUID, build_no: int, cycle: int, attempt: int
     ) -> list[GateResultRow]:
