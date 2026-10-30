@@ -9,6 +9,7 @@ import os
 import threading
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -19,7 +20,7 @@ from sbam_api.db.migrate import config
 from sbam_api.db.repository import TenantContext
 from sbam_api.db.session import make_engine
 from sbam_api.llm.models import LlmDerivative
-from sbam_api.llm.repository import LlmDerivativeRepository
+from sbam_api.llm.repository import LlmDerivativeRepository, delete_unused_derivatives
 from sqlalchemy import Engine, pool, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
@@ -189,3 +190,34 @@ def test_420_t10_replace_and_a_soft_deleted_entry_overwrite_on_postgres_too(db: 
         session.commit()
         again = repo.by_key(key)
         assert again is not None and again.output["label"] == "again"
+
+
+def test_497_the_ttl_delete_runs_on_postgres_keeps_used_rows_and_honours_the_limit(db: Db) -> None:
+    now = datetime.now(UTC)
+    with db.sessions() as session:
+        for name, created, hit, tenant in (
+            ("a", 200, 1, TENANT),  # used yesterday: kept
+            ("b", 100, None, TENANT),  # never hit, too old
+            ("c", 200, 100, OTHER),  # last hit too old, another tenant
+            ("d", 150, None, TENANT),  # older still
+        ):
+            session.add(
+                LlmDerivative(
+                    tenant_id=tenant,
+                    cache_key=name * 64,
+                    alias="sbam-sow",
+                    prompt_id="smoke",
+                    prompt_version="1",
+                    output={"label": name},
+                    created_at=now - timedelta(days=created),
+                    last_hit_at=None if hit is None else now - timedelta(days=hit),
+                )
+            )
+        session.commit()
+        cutoff = now - timedelta(days=90)
+        assert delete_unused_derivatives(session, cutoff, 2) == 2  # the two idlest first: d, c
+        assert delete_unused_derivatives(session, cutoff, 2) == 1
+        assert delete_unused_derivatives(session, cutoff, 2) == 0
+        session.commit()
+        left = session.scalars(select(LlmDerivative.cache_key)).all()
+    assert left == ["a" * 64]

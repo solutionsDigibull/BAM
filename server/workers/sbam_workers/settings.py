@@ -52,6 +52,8 @@ class WorkerSettings(BaseSettings):
     # (C-41: no limit by default): once the recorded spend of a project or tenant reaches one, the
     # next model call is refused (non-retryable) until an admin raises it. Cache hits cost nothing.
     llm_derivative_cache: bool = True
+    # A cached answer unused for this many days is deleted by the daily sweep (#497); 0 keeps them.
+    llm_derivative_ttl_days: int = Field(default=90, ge=0)
     # `allow_inf_nan=False`: NaN would make every comparison false (a budget that never trips) and
     # Infinity is a limit that never trips; both are refused at start. Compose passes "" when unset.
     llm_project_budget_usd: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)

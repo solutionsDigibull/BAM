@@ -1,11 +1,13 @@
 """Tenant- and project-scoped `llm_calls` access (E6.1). Rows are only ever added: a call is
 history."""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from sbam_api.db.base import utcnow
 from sbam_api.db.repository import TenantScopedRepository
@@ -107,3 +109,18 @@ class LlmDerivativeRepository(TenantScopedRepository[LlmDerivative]):
         except IntegrityError:
             return False
         return True
+
+
+def delete_unused_derivatives(session: Session, cutoff: datetime, limit: int) -> int:
+    """System job only (#497): hard-delete up to `limit` cached answers whose last use is before
+    `cutoff`, in every tenant; the number removed. Last use is `last_hit_at`, else the row's
+    `created_at`, so a hit keeps an answer alive. Soft-deleted rows count too: they still hold the
+    text. The caller commits."""
+    last_use = func.coalesce(LlmDerivative.last_hit_at, LlmDerivative.created_at)
+    ids = select(LlmDerivative.id).where(last_use < cutoff).order_by(last_use).limit(limit)
+    result = session.execute(
+        delete(LlmDerivative)
+        .where(LlmDerivative.id.in_(ids))
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount)  # type: ignore[attr-defined]
