@@ -164,8 +164,8 @@ class CubeSandboxBackend:
 
     async def _within_limits(self, box: Any, spec: VmSpec) -> None:
         """The template, not this call, decides a VM's size (the SDK has no cpu or memory). A
-        template bigger than the run's limits would silently void them, so it is refused. A host that
-        reports no size is believed: only a size it states can be wrong."""
+        template bigger than the run's limits would silently void them, so it is refused. A host
+        that reports no size is believed: only a size it states can be wrong."""
         info = await self._call(box.get_info, InfraReason.VM_CREATE_FAILED)
         memory, cpus = getattr(info, "memory_mb", None), getattr(info, "cpu_count", None)
         if (memory is not None and memory > spec.limits.memory_mb) or (
