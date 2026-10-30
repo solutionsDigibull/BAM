@@ -718,3 +718,24 @@ def test_a33_t07_with_separate_keys_an_in_flight_upload_survives_a_hook_secret_r
         "rotated-hook-secret-2",
     )
     assert done.status_code == 200 and len(h.versions()) == 1  # the proof is tied to the token key
+
+
+def test_a15_announcing_and_starting_an_upload_take_the_project_slot_lock(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 20-file check counts then adds, so both places that do it hold the project's lock (the
+    lock itself is PostgreSQL-only: tests/unit/test_a15_upload_slot_lock.py)."""
+    from sbam_api.ingest.repository import ReservationRepository
+
+    taken: list[uuid.UUID | None] = []
+    real = ReservationRepository.lock_slots
+
+    def recording(self: ReservationRepository) -> None:
+        taken.append(self.ctx.project_id)
+        real(self)
+
+    monkeypatch.setattr(ReservationRepository, "lock_slots", recording)
+    token = h.announce(h.files("spec.pdf")).json()["token"]
+    assert taken == [uuid.UUID(h.project)]
+    assert h.pre_create(token, "spec.pdf", len(PDF)).status_code == 200
+    assert taken == [uuid.UUID(h.project)] * 2

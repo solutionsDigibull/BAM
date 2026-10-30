@@ -6,7 +6,7 @@ from datetime import datetime
 
 from sbam_contracts.documents import ScanStatus
 from sbam_contracts.state_machines import DocumentVersionState as S
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from sbam_api.db.repository import TenantScopedRepository
@@ -18,6 +18,9 @@ from sbam_api.state_machine.repository import StatefulRepository
 
 # A rejected, deleted or purged version no longer takes one of the 20 slots.
 _INACTIVE = (S.REJECTED.value, S.DELETED.value, S.PURGED.value)
+SLOT_LOCK_NAMESPACE = (
+    0x5B4D_7550  # first key of the pg_advisory_xact_lock pair; the second is the project
+)
 
 
 class DocumentRepository(TenantScopedRepository[Document]):
@@ -144,6 +147,18 @@ class DocumentVersionRepository(StatefulRepository):
 
 class ReservationRepository(TenantScopedRepository[UploadReservation]):
     model = UploadReservation
+
+    def lock_slots(self) -> None:
+        """Take the project's upload-slot lock until this transaction ends, so the 20-file check
+        (count what is there, then add) runs one request at a time: two requests cannot both see a
+        free slot (A-15). Other projects are not held up. Off PostgreSQL (the SQLite tests) it is a
+        no-op: they have one writer."""
+        if self.session.get_bind().dialect.name != "postgresql":
+            return
+        self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:ns, hashtext(:project))"),
+            {"ns": SLOT_LOCK_NAMESPACE, "project": str(self.ctx.project_id)},
+        )
 
     def pending_count(self, now: datetime, exclude: uuid.UUID | None = None) -> int:
         """Files announced or started but not finished, still inside their hold."""
