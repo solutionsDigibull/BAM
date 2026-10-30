@@ -100,12 +100,15 @@ assembled into files; it needed no re-ask; and the check tool names every gate o
 stand-in for the AST gate's later conformance check: it shows the key is there, not that the value
 is right).
 
-The baseline (score **0.946**, 20 items x 3 runs, prompt `codegen-bodies/1.0.0`, recorded on
-2026-10-30) had 13 misses in 60 runs, all on "the pre-check passed and they assembled". **12 of the
-13 are the leave-request Sub-Skills** (`codegen-17` to `20`, every run): they take `start_date` and
-`end_date`, the model imports `datetime` in the action body, and the template's allowlist
-(`__future__`, `fastmcp`, `json`, `pydantic`, `typing`) refuses it. A real build of a Sub-Skill that
-handles dates would hit the same wall, so this is a finding about the product, not about the set.
+The first baseline (score **0.946**, prompt `codegen-bodies/1.0.0`) had 13 misses in 60 runs, 12 of
+them the leave-request Sub-Skills (`codegen-17` to `20`, every run): they take `start_date` and
+`end_date`, the model imported `datetime` in the action body, and the template's allowlist
+(`__future__`, `fastmcp`, `json`, `pydantic`, `typing`) refused it. A real build of a Sub-Skill that
+handles dates would have hit the same wall. `codegen-bodies/1.1.0` says dates arrive as ISO strings
+and that `datetime`, `re`, `math` and `decimal` are not available; on identical code it scored
+**0.983** and then **0.975** on the recording run, with the leave-request failures gone. The
+remaining misses are scattered (a different item each run, mostly a pre-check finding), so they are
+sampling noise at this size, not a pattern. The recorded baseline is **0.975** on 1.1.0.
 
 ## Rules
 
