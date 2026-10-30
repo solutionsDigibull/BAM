@@ -506,7 +506,22 @@ services:
       toolchain: { condition: service_healthy }
   worker-test:
     <<: *worker
-    environment: { <<: *worker-env, SBAM_QUEUES: sbam-test }
+    # The sandbox this worker runs tests in (E13.2). Empty means none: `run_sandbox_tests` then ends as an
+    # infrastructure error (TESTING_BLOCKED), never as a pass. SANDBOX_MODE=CUBESANDBOX is the certifying
+    # host (docs/runbooks/sandbox-host.md); the sandbox-local profile sets LOCAL_DOCKER_NONCERT instead.
+    environment:
+      <<: *worker-env
+      SBAM_QUEUES: sbam-test
+      SANDBOX_MODE: ${SANDBOX_MODE:-}
+      CUBE_API_URL: ${CUBE_API_URL:-}
+      CUBE_API_KEY: ${CUBE_API_KEY:-}
+      CUBE_PROXY_NODE_IP: ${CUBE_PROXY_NODE_IP:-}
+      CUBE_PROXY_PORT_HTTP: ${CUBE_PROXY_PORT_HTTP:-80}
+      CUBE_SANDBOX_DOMAIN: ${CUBE_SANDBOX_DOMAIN:-cube.app}
+      SANDBOX_EGRESS_LOG_PATH: ${SANDBOX_EGRESS_LOG_PATH:-}
+      MOCK_API_URL: ${MOCK_API_URL:-}
+      MOCK_API_IP: ${MOCK_API_IP:-}
+      MOCK_CONTROL_TOKEN: ${MOCK_CONTROL_TOKEN:?is required - set it in compose/.env (copy compose/.env.example)}
   worker-certify:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-certify }

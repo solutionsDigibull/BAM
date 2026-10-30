@@ -13,11 +13,13 @@ from sbam_contracts.sandbox import (
     InfraReason,
     SandboxMode,
 )
+from sbam_workers.registry import PreflightError
 from sbam_workers.sandbox.backend import SandboxInfraError
 from sbam_workers.sandbox.cube_backend import CubeSandboxBackend
 from sbam_workers.sandbox.egress import MAX_EVENTS, JsonlEgressReader, read_events
 from sbam_workers.sandbox.factory import make_sandbox, problem
 from sbam_workers.sandbox.local_backend import LocalDockerBackend
+from sbam_workers.sandbox.preflight import MISCONFIGURED, check_sandbox
 from sbam_workers.settings import WorkerSettings
 
 AT = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
@@ -76,7 +78,7 @@ def test_e13_2_the_async_reader_reads_the_same_file(tmp_path: Path) -> None:
 def settings(monkeypatch: pytest.MonkeyPatch, **env: str) -> WorkerSettings:
     for key in (
         "SANDBOX_MODE", "CUBE_API_URL", "CUBE_API_KEY", "CUBE_PROXY_NODE_IP",
-        "SANDBOX_EGRESS_LOG_PATH", "SANDBOX_AGENT_URL", "SANDBOX_AGENT_TOKEN",
+        "SANDBOX_EGRESS_LOG_PATH", "SANDBOX_AGENT_URL", "SANDBOX_AGENT_TOKEN", "SBAM_ENV",
     ):  # fmt: skip
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("TEMPORAL_HOST", "temporal:7233")
@@ -161,3 +163,57 @@ def test_e13_2_the_mode_is_read_from_the_environment_only(monkeypatch: pytest.Mo
     s = settings(monkeypatch, **LOCAL)
     assert s.sandbox_mode is SandboxMode.LOCAL_DOCKER_NONCERT
     assert "sandbox_mode" in WorkerSettings.model_fields
+
+
+# --- startup self-check ------------------------------------------------------------------------
+
+
+def test_e13_2_a_worker_with_no_mode_starts_and_its_sandbox_tests_end_as_infrastructure_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    check_sandbox(settings(monkeypatch))  # nothing to check: no sandbox was asked for
+
+
+def test_e13_2_a_certifying_worker_starts_with_everything_it_needs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    check_sandbox(settings(monkeypatch, SBAM_ENV="production", **CUBE))
+
+
+@pytest.mark.parametrize(
+    "missing", ["CUBE_API_URL", "CUBE_PROXY_NODE_IP", "SANDBOX_EGRESS_LOG_PATH"]
+)
+def test_e13_2_a_half_configured_certifying_worker_refuses_to_start(
+    monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    s = settings(monkeypatch, **{k: v for k, v in CUBE.items() if k != missing})
+    with pytest.raises(PreflightError) as caught:
+        check_sandbox(s)
+    assert caught.value.code == MISCONFIGURED and missing in str(caught.value)
+    assert "cube:3000" not in str(caught.value)  # names variables, never values
+
+
+@pytest.mark.parametrize("env", ["staging", "production", "prod", "live"])
+def test_e13_2_a_deployed_worker_cannot_run_the_non_certifying_mode(
+    monkeypatch: pytest.MonkeyPatch, env: str
+) -> None:
+    with pytest.raises(PreflightError) as caught:
+        check_sandbox(settings(monkeypatch, SBAM_ENV=env, **LOCAL))
+    assert "can never certify" in str(caught.value)
+
+
+@pytest.mark.parametrize("env", ["development", "test", "ci"])
+def test_e13_2_a_laptop_may_run_the_non_certifying_mode(
+    monkeypatch: pytest.MonkeyPatch, env: str
+) -> None:
+    check_sandbox(settings(monkeypatch, SBAM_ENV=env, **LOCAL))
+
+
+def test_e13_2_the_check_is_registered_on_the_test_queue() -> None:
+    from sbam_contracts.runs import TaskQueue
+    from sbam_workers import registry
+
+    registry.load_all()
+    served = {fn.__name__ for fn in registry._PREFLIGHT[TaskQueue.TEST]}
+    assert "sandbox_preflight" in served
+    assert "sandbox_preflight" not in {fn.__name__ for fn in registry._PREFLIGHT[TaskQueue.BUILD]}

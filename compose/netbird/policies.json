@@ -19,7 +19,8 @@
     "langfuse": { "proto": "tcp", "port": 3001, "note": "LANGFUSE_PORT, obs profile" },
     "posthog": { "proto": "tcp", "port": 8010, "note": "POSTHOG_PORT, analytics profile" },
     "backup": { "proto": "tcp", "port": 8000, "note": "restic rest-server on the backup host (compose/backup/compose.backup-host.yaml)" },
-    "sandbox-api": { "proto": "tcp", "port": 3000, "note": "CubeSandbox API on the sandbox host. Port is the assumed default: confirm with the CubeSandbox install issue (#123) before applying" }
+    "sandbox-api": { "proto": "tcp", "port": 3000, "note": "CubeAPI on the sandbox host (control plane: create, list, kill). CUBE_API_URL" },
+    "sandbox-proxy": { "proto": "tcp", "port": 80, "note": "CubeProxy on the sandbox host (data plane: exec and file upload, plain HTTP, the SDK's only path). CUBE_PROXY_NODE_IP and CUBE_PROXY_PORT_HTTP. Without it a worker can create VMs and never run a test in one (E13.2 build log, flaw 3)" }
   },
   "ops_services": ["portal", "temporal-ui", "keycloak-admin", "grafana", "langfuse", "posthog"],
   "policies": [
@@ -46,10 +47,10 @@
     },
     {
       "name": "vms-to-sandbox-api",
-      "description": "Workers (on the VMs) call the sandbox host API. The sandbox host initiates nothing.",
+      "description": "Workers (on the VMs) call the sandbox host: CubeAPI to create and destroy VMs, CubeProxy to run tests in them. The sandbox host initiates nothing.",
       "sources": ["vm-dev", "vm-staging", "vm-prod"],
       "destinations": ["sandbox-host"],
-      "services": ["sandbox-api"]
+      "services": ["sandbox-api", "sandbox-proxy"]
     },
     {
       "name": "vms-to-backup-host",
@@ -82,7 +83,7 @@
   ],
   "must_deny": [
     { "source": "dev-laptops", "destination": "vm-prod", "services": ["ssh", "portal", "temporal-ui", "keycloak-admin", "grafana", "langfuse", "posthog"], "why": "E16.3-T07: production ops access is for the platform group only" },
-    { "source": "dev-laptops", "destination": "sandbox-host", "services": ["ssh", "sandbox-api"], "why": "only the VMs' workers call the sandbox API" },
+    { "source": "dev-laptops", "destination": "sandbox-host", "services": ["ssh", "sandbox-api", "sandbox-proxy"], "why": "only the VMs' workers call the sandbox API and proxy" },
     { "source": "sandbox-host", "destination": "vm-prod", "services": ["ssh", "portal", "temporal-ui", "keycloak-admin"], "why": "the sandbox host initiates nothing" },
     { "source": "vm-dev", "destination": "vm-prod", "services": ["ssh", "keycloak-admin", "temporal-ui"], "why": "environments are isolated from each other" },
     { "source": "vm-staging", "destination": "vm-prod", "services": ["ssh", "keycloak-admin", "temporal-ui"], "why": "environments are isolated from each other" }
