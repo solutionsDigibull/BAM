@@ -75,7 +75,18 @@ OUTPUTS_PATH: Final = f"{WORK_DIR}/out/outputs.json"
 DATA_DIR: Final = f"{WORK_DIR}/data"
 _DATA_NAME: Final = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,119}")
 HOSTS_PATH: Final = "/etc/hosts"
-RUNNER_ARGV: Final = ("python", "-I", "/opt/sbam/harness/run_cases.py", REQUEST_PATH)
+# CubeSandbox runs commands through `bash -l -c`, and a login shell on Debian sets its own PATH,
+# which drops the runtime's virtualenv and PostgreSQL. The runner is therefore started by absolute
+# path with the image's PATH restated, so it never depends on what a shell decided.
+RUNTIME_PATH: Final = "/opt/venv/bin:/usr/lib/postgresql/16/bin:/usr/local/bin:/usr/bin:/bin"
+RUNNER_ARGV: Final = (
+    "env",
+    f"PATH={RUNTIME_PATH}",
+    "/opt/venv/bin/python",
+    "-I",
+    "/opt/sbam/harness/run_cases.py",
+    REQUEST_PATH,
+)
 MAX_REQUEST_BYTES: Final = 4 * 1024 * 1024
 BOOT_GRACE_S: Final = 300  # the host's own backstop beyond the run (ADR 0023, decision 10)
 MAX_LOG_BYTES: Final = 10 * 1024 * 1024

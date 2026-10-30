@@ -37,6 +37,7 @@ from sbam_workers.sandbox.backend import (
 from sbam_workers.sandbox.executor import (
     OUTPUTS_PATH,
     REQUEST_PATH,
+    RUNTIME_PATH,
     DatasetInput,
     RunInput,
     execute,
@@ -244,7 +245,8 @@ def test_e13_2_t01_happy_run_passes_and_destroys_the_vm() -> None:
     assert backend.destroyed == ["vm-1"]
     assert result.outputs_json == backend.outputs
     assert b"out" in result.logs and b"err" in result.logs
-    assert list(backend.exec_argv)[:2] == ["python", "-I"]
+    assert list(backend.exec_argv)[:3] == ["env", f"PATH={RUNTIME_PATH}", "/opt/venv/bin/python"]
+    assert list(backend.exec_argv)[3:5] == ["-I", "/opt/sbam/harness/run_cases.py"]
 
 
 def test_e13_2_t04_bundle_hash_mismatch_creates_no_vm() -> None:
@@ -473,3 +475,17 @@ def test_e13_2_the_code_under_test_learns_its_run_id_and_nothing_else() -> None:
             "SBAM_MOCK_BASE_URL": "http://sbam-mock-api:8080",
         }
     ]
+
+
+def test_e13_2_the_runner_never_depends_on_the_path_a_login_shell_chose() -> None:
+    """CubeSandbox runs `bash -l -c`; Debian's /etc/profile resets PATH, which would drop the virtualenv
+    (no fastmcp) and PostgreSQL (no initdb). The command names its interpreter and its PATH itself.
+    """
+    from sbam_workers.sandbox.cube_backend import redirected_command
+    from sbam_workers.sandbox.executor import RUNNER_ARGV
+
+    assert RUNNER_ARGV[0] == "env" and RUNNER_ARGV[2].startswith("/opt/venv/bin/")
+    line = redirected_command(RUNNER_ARGV)
+    assert line.startswith(f"env PATH={RUNTIME_PATH} /opt/venv/bin/python -I ")
+    assert RUNTIME_PATH.split(":")[0] == "/opt/venv/bin"  # the runtime's own interpreter first
+    assert "/usr/lib/postgresql/16/bin" in RUNTIME_PATH  # initdb and pg_ctl
