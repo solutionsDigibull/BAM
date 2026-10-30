@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:held_patch/patch_decided:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "sub_skill_id": {
+      "format": "uuid",
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "build_no": {
+      "title": "Build No",
+      "type": "integer"
+    },
+    "decision": {
+      "enum": [
+        "ACCEPTED",
+        "REJECTED"
+      ],
+      "title": "Decision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sub_skill_id",
+    "build_no",
+    "decision"
+  ],
+  "title": "PatchDecided",
+  "type": "object"
+}

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:held_patch/held_patch_response:0.1.0",
+  "$defs": {
+    "HeldPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "sub_skill_id": {
+          "format": "uuid",
+          "title": "Sub Skill Id",
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "failed_gate": {
+          "maxLength": 100,
+          "title": "Failed Gate",
+          "type": "string"
+        },
+        "rationale": {
+          "maxLength": 4000,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "changed_paths": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Changed Paths",
+          "type": "array"
+        },
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/HeldPatchOp"
+          },
+          "maxItems": 50,
+          "title": "Ops",
+          "type": "array"
+        },
+        "isatvon_sha256_before": {
+          "maxLength": 80,
+          "title": "Isatvon Sha256 Before",
+          "type": "string"
+        },
+        "isatvon_sha256_after": {
+          "maxLength": 80,
+          "title": "Isatvon Sha256 After",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sub_skill_id",
+        "attempt",
+        "failed_gate",
+        "rationale",
+        "isatvon_sha256_before",
+        "isatvon_sha256_after"
+      ],
+      "title": "HeldPatch",
+      "type": "object"
+    },
+    "HeldPatchOp": {
+      "additionalProperties": false,
+      "description": "One RFC 6902 operation, as the build recorded it. `value` is empty for `remove`.",
+      "properties": {
+        "op": {
+          "enum": [
+            "add",
+            "remove",
+            "replace",
+            "test"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 512,
+          "title": "Path",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "op",
+        "path"
+      ],
+      "title": "HeldPatchOp",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "`held` is null when no patch is waiting (none was proposed, or it was already decided).",
+  "properties": {
+    "held": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HeldPatch"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "HeldPatchResponse",
+  "type": "object"
+}
