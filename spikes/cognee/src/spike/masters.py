@@ -65,11 +65,14 @@ class MasterSnapshotSource(Protocol):
 class AdminApiSource:
     """Seam for the real call (E3.2): GET /admin/masters/snapshots/{id}, tenant-scoped, sha256 verified.
 
-    Not implemented in the spike: the Admin API does not exist yet (#55, #21 are open).
+    Not implemented as an HTTP client in the spike. The Admin API exists now (#54, #55, #56, #59), and its
+    `GET /admin/masters/export` (E3.4) returns the masters in the same BAM 0.2 workbook layout this spike parses,
+    so a real snapshot is read by saving that export and passing it as `--workbook` (see README, "Run on a real
+    Admin snapshot", #203), and `python -m spike.diff_masters` lists what differs from the mock.
     """
 
     def get_snapshot(self, tenant_id: str, project_id: str) -> MasterSnapshot:
-        raise NotImplementedError("Admin masters snapshot API is not built yet (#55)")
+        raise NotImplementedError("use WorkbookMockSource on the Admin export: see the README, #203")
 
 
 class WorkbookMockSource:

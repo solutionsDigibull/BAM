@@ -36,7 +36,7 @@
   "pass": true
  },
  "T05": {
-  "method": "tiktoken cl100k_base on bundle parts; extrapolated by measured tokens/char; windows are assumptions (sbam-sow model not chosen yet); reserve 16k tokens for prompt+output",
+  "method": "tiktoken cl100k_base on the bundle files and on the chunk text of this one fixture; measured values only, nothing extrapolated to a larger corpus (the extrapolated scenarios of the first run were removed, see docs/spikes/cognee-okf.md)",
   "bundle_tokens_by_part": {
    "entities.jsonl": 2941,
    "relations.jsonl": 2931,
@@ -47,36 +47,9 @@
   "bundle_tokens_total": 9845,
   "tokens_per_char": 0.318,
   "wrapper_tokens_per_chunk": 71.9,
-  "chunk_factor_at_1000_token_chunks": 1.072,
   "graph_tokens_measured": 5872,
   "graph_tokens_per_record_measured": 146.8,
   "masters_tokens": 2730,
-  "scenarios": {
-   "20 files x 15 MB (hard limit)": {
-    "tokens_chunks_and_masters_excl_graph": 107225912,
-    "ranking_needed_even_without_graph": {
-     "128k": true,
-     "200k": true,
-     "1M": true
-    }
-   },
-   "20 files x 500 KB (large typical)": {
-    "tokens_chunks_and_masters_excl_graph": 3493067,
-    "ranking_needed_even_without_graph": {
-     "128k": true,
-     "200k": true,
-     "1M": true
-    }
-   },
-   "20 files x 50 KB (typical RFQ pack)": {
-    "tokens_chunks_and_masters_excl_graph": 351763,
-    "ranking_needed_even_without_graph": {
-     "128k": true,
-     "200k": true,
-     "1M": false
-    }
-   }
-  },
   "ranking_budget_tokens": 100,
   "ranking_selection": {
    "overview": {
