@@ -75,12 +75,10 @@ def mfa_flows(mode: str) -> tuple[list[dict], list[dict]]:
     """The browser flow with a second factor, and the authenticator config it needs. Same shape as
     Keycloak's own `browser` flow (cookie, identity provider redirector, forms), with TOTP after the
     password: asked only of users holding MFA_ROLE (`admins`) or of everyone (`all`). The OTP step
-    is
-    REQUIRED with user setup allowed, so a user with no authenticator yet is sent to set one up at
-    that
-    sign-in. (An ALTERNATIVE step cannot do that: Keycloak has nothing to enrol into and the sign-in
-    fails; and a REQUIRED step makes it ignore ALTERNATIVE siblings, so WebAuthn cannot sit beside
-    it.)
+    is REQUIRED with user setup allowed, so a user with no authenticator yet is sent to set one up
+    at that sign-in. (An ALTERNATIVE step cannot do that: Keycloak has nothing to enrol into and
+    the sign-in fails; and a REQUIRED step makes it ignore ALTERNATIVE siblings, so WebAuthn cannot
+    sit beside it.)
     """
     forms = f"{FLOW} forms"
 
@@ -112,16 +110,10 @@ def mfa_flows(mode: str) -> tuple[list[dict], list[dict]]:
         flows.append(basic(forms, [password, otp]))
     else:
         gate = f"{FLOW} admins"
-        flows.append(
-            basic(forms, [password, _step(gate, "CONDITIONAL", 20, flow=True)])
-        )
-        role = _step(
-            "conditional-user-role", "REQUIRED", 10, authenticatorConfig=MFA_ROLE
-        )
+        flows.append(basic(forms, [password, _step(gate, "CONDITIONAL", 20, flow=True)]))
+        role = _step("conditional-user-role", "REQUIRED", 10, authenticatorConfig=MFA_ROLE)
         flows.append(basic(gate, [role, {**otp, "priority": 20}]))
-        configs.append(
-            {"alias": MFA_ROLE, "config": {"condUserRole": MFA_ROLE, "negate": "false"}}
-        )
+        configs.append({"alias": MFA_ROLE, "config": {"condUserRole": MFA_ROLE, "negate": "false"}})
     return flows, configs
 
 
