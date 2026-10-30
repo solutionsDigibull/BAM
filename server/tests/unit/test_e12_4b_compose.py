@@ -1,9 +1,10 @@
-"""E12.4b: the `toolchain` sidecar is in the local stack and in no deployed environment.
+"""E12.4b / #575: the `toolchain` sidecar runs locally and in every deployed environment.
 
 Static, like test_e16_3_deploy.py: `docker compose config` resolves the files and starts nothing.
-The image is built on the host and is not in the release digests yet, so a deployed environment
-(dev VM, staging, prod) must run the static tools in the worker (an empty `TOOLCHAIN_JOBS_DIR`):
-a worker that points at a runner which is not there would end every build in BUILD_ERROR.
+A deployed environment takes the image from the release digests (`SBAM_TOOLCHAIN_IMAGE`), never
+from a host build, keeps the same isolation, and `worker-build` is wired to it: a worker that
+pointed at a runner that is not there would end every build in BUILD_ERROR, so the wiring is
+asserted for each environment.
 """
 
 import importlib.util
@@ -88,16 +89,23 @@ def test_e12_4b_the_local_stack_runs_the_toolchain_isolated_and_worker_build_use
 
 @needs_docker
 @pytest.mark.parametrize("env", lint.ENVS)
-def test_e12_4b_a_deployed_environment_has_no_toolchain_and_the_worker_does_not_wait_for_it(
+def test_e12_4b_a_deployed_environment_runs_the_toolchain_from_its_release_digest_isolated(
     env: str, env_file: Path
 ) -> None:
     services = lint.resolve(env, [], env_file)["services"]
-    assert "toolchain" not in services and "toolchain-init" not in services
+    toolchain = services["toolchain"]
+    assert "@sha256:" in toolchain["image"] and not toolchain.get(
+        "build"
+    )  # a digest, not a host build
+    assert toolchain["network_mode"] == "none" and toolchain["read_only"] is True
+    assert toolchain["user"] == "10001:10001" and toolchain["cap_drop"] == ["ALL"]
+    assert toolchain["healthcheck"]["test"] and not toolchain.get("ports")
     worker = services["worker-build"]
-    assert "TOOLCHAIN_JOBS_DIR" not in worker.get("environment", {})
-    assert "toolchain" not in worker.get("depends_on", {})
-    mounts = [v.get("source", "") for v in worker.get("volumes", [])]
-    assert not any("toolchain-jobs" in str(m) for m in mounts)
+    assert worker["environment"]["TOOLCHAIN_JOBS_DIR"] == "/jobs"
+    assert "toolchain" in worker["depends_on"]
+    mounts = [str(v.get("source", "")) for v in worker.get("volumes", [])]
+    assert any("toolchain-jobs" in m for m in mounts)
+    assert "docker.sock" not in json.dumps(services)
 
 
 @needs_docker
