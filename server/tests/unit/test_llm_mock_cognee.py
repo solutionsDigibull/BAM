@@ -27,11 +27,11 @@ gen = load("bifrost_gen_config_e5_7", BIFROST_DIR / "gen_config.py")
 srv = load("llm_mock_server_e5_7", REPO / "compose/docker/llm-mock/server.py")
 
 
-# The shape of Cognee 1.6.2's KnowledgeGraph (cognee.shared.data_models), restated so the unit test
+# The shape of Cognee 1.6.5's KnowledgeGraph (cognee.shared.data_models), restated so the unit test
 # does not import Cognee. The end-to-end check against Cognee itself is E5.7-T04 (integration).
 class Node(BaseModel):
     id: str
-    name: str
+    name: str = ""
     type: str
     description: str
 
@@ -40,6 +40,7 @@ class Edge(BaseModel):
     source_node_id: str
     target_node_id: str
     relationship_name: str
+    description: str | None = None
 
 
 class KnowledgeGraph(BaseModel):

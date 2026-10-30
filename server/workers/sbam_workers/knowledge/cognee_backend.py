@@ -1,4 +1,4 @@
-"""The real `CogneeBackend`: Cognee 1.6.2 as a library inside worker-knowledge (ADR 0001).
+"""The real `CogneeBackend`: Cognee 1.6.5 as a library inside worker-knowledge (ADR 0001).
 
 Cognee reads its configuration from the environment when it is first imported, so it is imported
 here lazily: only worker-knowledge (after its preflight check) ever loads it. Each call runs as
