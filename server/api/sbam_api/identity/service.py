@@ -8,7 +8,9 @@ The mirror runs on every tenant user's request (`core.auth.current_user`): the t
 be ACTIVE, the user's row is created on first sight (`ON CONFLICT DO NOTHING`, so two tabs make one
 row) and refreshed from the token when something changed. A user never moves to another tenant.
 `portal_roles` is taken from the token only on a new login: an admin's role change (E2.4) is
-written here first, and a still-valid older token must not write the old roles back. An INVITED
+written here first, and a still-valid older token must not write the old roles back. `sync` returns
+them and `core.auth.current_user` intersects them with the token's roles, so a demotion applies on
+the next request (A-04) and a role only the database has is never granted. An INVITED
 user becomes ACTIVE on first sight; a DEACTIVATED one gets 401 even with an unexpired token.
 """
 
@@ -418,9 +420,9 @@ class SqlUserDirectory:
         self.sessions = sessions
         self.audit = audit
 
-    def sync(self, user: CurrentUser) -> None:
+    def sync(self, user: CurrentUser) -> frozenset[str] | None:
         if user.tenant_id is None:  # current_user only syncs tenant users
-            return
+            return None
         with self.sessions()() as session:
             tenant = session.get(Tenant, user.tenant_id)
             if tenant is None:  # an organization SBAM doesn't know (or an orphan one)
@@ -440,6 +442,9 @@ class SqlUserDirectory:
                 self._deny(user, "deactivated")
                 raise unauthenticated()
             self._refresh(session, row, user, created)
+            return frozenset(
+                row.portal_roles
+            )  # what the database grants, after this request's refresh
 
     def _insert(self, session: Session, user: CurrentUser) -> bool:
         """Create the row if the subject is new; True when this request created it."""

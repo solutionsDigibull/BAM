@@ -11,7 +11,7 @@ from sbam_api.isatvon.models import SubSkill
 from sbam_api.manifests.models import SubSkillManifest, WorkflowManifestRow
 from sbam_contracts.canonical import sha256_of
 from sqlalchemy import update
-from test_auth import ADMIN_A, FDE_A2, TENANT_A, TENANT_B, problem
+from test_auth import FDE_A2, TENANT_A, TENANT_B, problem
 from test_isatvon_validate_api import Harness as WorkbenchHarness
 from test_isatvon_validate_api import sample
 
@@ -167,7 +167,7 @@ def test_e9_6_t06_another_tenant_or_an_unassigned_fde_gets_404(h: Harness) -> No
 def test_e9_6_only_the_fde_portal_reads_manifests(h: Harness) -> None:
     h.manifest(1)
     # refused before the handler; tests/security/rbac_matrix.yaml pins every role's answer
-    problem(h.read(f"/sub-skills/{h.sub}/manifest", h.realm.token(ADMIN_A)), 404, "NOT_FOUND")
+    problem(h.read(f"/sub-skills/{h.sub}/manifest", h.admin_a()), 403, "WRONG_PORTAL")
 
 
 @pytest.mark.parametrize("name", ["skill_manifest", "workflow_manifest"])
