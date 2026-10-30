@@ -47,3 +47,8 @@ On Git Bash set `MSYS_NO_PATHCONV=1` first, or it rewrites the `/tmp/...` paths.
 
 Every page is read at full size and at half size. One run per case, so a single miss is not shown to
 repeat. Cost is about $0.004 to $0.006 a page.
+
+To measure the provider's cheap image mode (`detail: "low"`), pass `OCR_DETAIL=low` to the model run
+(`docker exec -e OCR_DETAIL=low sbam-worker-llm-1 python /tmp/real/compare_llm.py ...`). The tool then
+adds `detail` to every image in the request and changes nothing else on the production path; the
+product itself sends no `detail`. Each result row records which `detail` was used.

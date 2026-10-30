@@ -1,7 +1,7 @@
 """The vision model (the production `ocr.read_page` path) over a folder of scans, in the worker
 container. Prints counts, tokens and cost, never the page text.
 
-    python compare_llm.py <folder> <results.json>
+    [OCR_DETAIL=low] python compare_llm.py <folder> <results.json>
 """
 import asyncio
 import json
@@ -26,6 +26,25 @@ from sbam_workers.settings import WorkerSettings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+import os
+
+DETAIL = os.environ.get("OCR_DETAIL")  # e.g. "low": ask the provider for its cheap image mode
+if DETAIL:
+    import sbam_workers.llm.client as client_module
+
+    _compose = client_module.compose
+
+    def compose_with_detail(*args, **kwargs):
+        messages, manifest = _compose(*args, **kwargs)
+        for message in messages:
+            if isinstance(message["content"], list):
+                for part in message["content"]:
+                    if part.get("type") == "image_url":
+                        part["image_url"]["detail"] = DETAIL
+        return messages, manifest
+
+    client_module.compose = compose_with_detail
 
 folder, out = Path(sys.argv[1]), Path(sys.argv[2])
 engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False},
@@ -60,7 +79,7 @@ async def main() -> None:
             tokens_out = sum(r.tokens_out or 0 for r in new)
             cost = sum(float(r.cost_usd or 0) for r in new)
             hit, total, missing = score_ids(page.markdown, key)
-            rows.append({"file": path.name, "engine": "vision", "variant": variant, "ids_found": hit,
+            rows.append({"file": path.name, "engine": "vision", "variant": variant, "detail": DETAIL or "auto", "ids_found": hit,
                          "ids_total": total, "seconds": round(seconds, 2), "tokens_in": tokens_in,
                          "tokens_out": tokens_out, "cost_usd": round(cost, 5), "chars": len(page.markdown),
                          "readable": bool(page.markdown)})

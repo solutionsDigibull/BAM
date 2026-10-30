@@ -79,6 +79,17 @@ real handwriting; the "photo" is a rendered page put through a perspective trans
 lighting; one run per case, so a single miss (the `QA-77310` one) is not shown to repeat; 49
 identifiers is a small sample; the vision model is a single model.
 
+### The provider's cheap image mode (`detail: "low"`)
+
+The same six documents were read again with `detail: "low"` added to every image in the request (the
+comparison tool does this with `OCR_DETAIL=low` and changes nothing else on the production path; the
+product itself sends no `detail`). Input tokens fell to 3,401 on every page and the cost to about
+$0.0006 a page, $0.0037 for the six against $0.0327 at the default: about 9 times cheaper. Accuracy fell
+to **32 of 49** identifiers at full size and at half size, against 48 of 49 at the default. At full
+size, by document: the photo 7/7 (unchanged), the handwriting-style note 6/7, the stamp 5/7, the invoice
+table 6/10, the small-print report 6/10 and the sideways memo 2/8. The small and dense pages lost the
+most. Low mode and half size did not stack: both gave 32 of 49. One run per case, on invented pages.
+
 ## Decision
 
 **Do not build the local-first pass now, for cost.** Recommended; the maintainer decides.
@@ -87,8 +98,10 @@ identifiers is a small sample; the vision model is a single model.
   clean ones, for about $0.006 a page ($6 per 1,000 pages). The saving of a local pass is small next
   to what a wrong identifier costs, and nothing here tells us when a local result can be trusted
   enough to skip the model, so a fallback rule cannot be tuned without real scans.
-- **Do not downscale pages to save money on this evidence.** Half size lost accuracy on the larger
-  pages for a 21 percent saving (see above). `detail: "low"` was not tried.
+- **Do not downscale pages, or use `detail: "low"`, to save money on this evidence.** Half size lost
+  accuracy on the larger pages for a 21 percent saving. `detail: "low"` is about 9 times cheaper but
+  lost a third of the identifiers (16 of 49), and most on tables, small print and a rotated page,
+  which are the pages where OCR matters. At $0.006 a page the full-quality read is already cheap.
 - **A different use of the local engine is worth testing on real scans: a second opinion, not a cost
   saver.** The two engines failed on different documents (stamp and handwriting against a sideways
   page). Running both and flagging an identifier that only one of them found would catch the model's
@@ -106,7 +119,7 @@ identifiers is a small sample; the vision model is a single model.
   makes $6 per 1,000 pages matter, reopen this: record the OCR source (`local` or `llm`) per block, fall
   back to the vision model on a low-confidence or short page, and never let the local engine raise the
   share of wrong text that reaches the knowledge base.
-- Not measured: real handwriting, real photographs, multi-page documents, `detail: "low"`, repeated
-  runs of the same page, the memory use of RapidOCR in the 1 GiB ingest worker, and any engine other
+- Not measured: real handwriting, real photographs, multi-page documents, repeated runs of the same
+  page, the memory use of RapidOCR in the 1 GiB ingest worker, and any engine other
   than RapidOCR (Tesseract, docTR, EasyOCR). Tables, a stamp over text, small print, a perspective
   photo and a sideways page were measured on invented documents only.
