@@ -178,6 +178,11 @@ class TestsResponse(_Strict):
     __test__ = False
 
     dataset: TestDatasetOut | None = None
+    input_schema: dict[str, JsonValue] | None = Field(
+        default=None,
+        description="the Sub-Skill's closed `contracts.input_schema` a case `input` must validate"
+        " against (E13.7: the panel checks it before saving; the server still decides)",
+    )
 
 
 class CasePut(_Strict):

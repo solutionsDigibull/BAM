@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:337c7ecc2531b9742eeced5fe75f50c491d22e4181ed8e13ce67487760d3c26a
+// source-sha256:9387d35833a7493b2f77183d686ec4906341ecdc5a62356cc98384772198fd9a
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -4089,6 +4089,12 @@ export interface Assertion {
  */
 export interface TestsResponse {
   dataset?: TestDatasetOut | null;
+  /**
+   * the Sub-Skill's closed `contracts.input_schema` a case `input` must validate against (E13.7: the panel checks it before saving; the server still decides)
+   */
+  input_schema?: {
+    [k: string]: JsonValue | undefined;
+  } | null;
 }
 /**
  * One version of a Sub-Skill's test data. `synthetic` is always true.
