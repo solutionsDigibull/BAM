@@ -6,6 +6,7 @@ Needs Docker and the image (`make up` builds `sbam-toolchain:local`, or
 started with the same isolation settings as the `toolchain` service in compose/compose.yaml.
 """
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -20,16 +21,34 @@ from sbam_workers.build.gates.toolchain import LocalExecutor, SidecarExecutor, T
 
 DOCKER = shutil.which("docker") or "docker"
 IMAGE = "sbam-toolchain:local"
-ISOLATION = [
-    "--network", "none",
-    "--read-only",
-    "--user", "10001:10001",
-    "--cap-drop", "ALL",
-    "--security-opt", "no-new-privileges:true",
-    "--pids-limit", "256",
-    "--tmpfs", "/tmp:size=64m,mode=1777",  # noqa: S108 - the container's own tmpfs
-    "--tmpfs", "/work:size=256m,uid=10001,gid=10001",
-]  # fmt: skip
+
+
+def isolation(uid: int, gid: int) -> list[str]:
+    """The isolation flags of the compose `toolchain` service, for the user `uid:gid`."""
+    return [
+        "--network", "none",
+        "--read-only",
+        "--user", f"{uid}:{gid}",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges:true",
+        "--pids-limit", "256",
+        "--tmpfs", "/tmp:size=64m,mode=1777",  # noqa: S108 - the container's own tmpfs
+        "--tmpfs", f"/work:size=256m,uid={uid},gid={gid}",
+    ]  # fmt: skip
+
+
+# What the image runs as (and what compose sets): the isolation tests check this exact user.
+ISOLATION = isolation(10001, 10001)
+
+
+def same_user_as_the_test() -> tuple[int, int]:
+    """In production the worker and the toolchain are both uid 10001, so they share the job
+    directory. Here the test process plays the worker, so the container must run as the same user:
+    on Linux (a CI runner is uid 1001) it could not read or write the directory the test created
+    otherwise. Docker Desktop's bind mounts hide the difference, so only the runner caught it."""
+    getuid, getgid = getattr(os, "getuid", None), getattr(os, "getgid", None)
+    return (getuid(), getgid()) if getuid and getgid else (10001, 10001)
+
 
 pytestmark = pytest.mark.integration
 
@@ -97,8 +116,9 @@ def toolchain() -> Iterator[Path]:
     """The runner container over a fresh jobs directory; yields the directory."""
     jobs = Path(tempfile.mkdtemp(prefix="sbam-jobs-"))
     name = f"sbam-toolchain-test-{uuid.uuid4().hex[:8]}"
+    uid, gid = same_user_as_the_test()
     docker(
-        "run", "-d", "--name", name, *ISOLATION, "-e", "TOOLCHAIN_JOBS=/jobs",
+        "run", "-d", "--name", name, *isolation(uid, gid), "-e", "TOOLCHAIN_JOBS=/jobs",
         "-v", f"{jobs}:/jobs", IMAGE,
     )  # fmt: skip
     try:
@@ -108,6 +128,10 @@ def toolchain() -> Iterator[Path]:
                 break
             time.sleep(0.5)
         time.sleep(1.5)  # the runner's first pass
+        running = docker("inspect", "-f", "{{.State.Running}}", name).stdout.strip()
+        assert running == "true", docker("logs", name, check=False).stderr[
+            -600:
+        ]  # it must be serving
         yield jobs
     finally:
         docker("rm", "-f", name, check=False)
