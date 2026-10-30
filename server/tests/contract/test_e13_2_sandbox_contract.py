@@ -1,4 +1,4 @@
-"""E13.2 contract: modes, digests, egress allowlist, run record, runner files (ADR 0021).
+"""E13.2 contract: modes, digests, egress allowlist, run record, runner files (ADR 0023).
 
 The egress parser is the part an attacker (a manifest, an LLM, a document) can feed, so it gets a
 hostile corpus and a property test against the parsers a real resolver uses.

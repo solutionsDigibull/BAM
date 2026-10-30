@@ -1,4 +1,4 @@
-"""The non-certifying backend: talks to the `sandbox-runner` agent over HTTP (ADR 0021, decision 6).
+"""The non-certifying backend: talks to the `sandbox-runner` agent over HTTP (ADR 0023, decision 6).
 
 The worker never touches a docker socket. It holds a bearer token for the agent on the internal
 `sbam_sandbox` network and nothing else. Isolation is a private directory, resource limits and a

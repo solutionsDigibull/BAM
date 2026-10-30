@@ -1,4 +1,4 @@
-"""The VM's network, decided before it exists (E13.2, E13.1 safety checks, ADR 0021).
+"""The VM's network, decided before it exists (E13.2, E13.1 safety checks, ADR 0023).
 
 Pinned resolution. CubeSandbox lets an allowlist hold names, but a name is learned through DNS
 inside the VM, and its precedence is allow > deny: a name that rebinds to a private address would

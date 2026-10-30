@@ -1,4 +1,4 @@
-# 0021 — Sandbox adapter: one backend protocol, the CubeSandbox SDK, a local runner, a vendored in-VM runner, evidence kept apart from enforcement
+# 0023 — Sandbox adapter: one backend protocol, the CubeSandbox SDK, a local runner, a vendored in-VM runner, evidence kept apart from enforcement
 
 - Status: Accepted
 - Date: 2026-10-29

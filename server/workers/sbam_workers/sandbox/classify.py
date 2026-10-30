@@ -1,4 +1,4 @@
-"""One place that turns what a run produced into an outcome (E13.2, ADR 0021, decision 9).
+"""One place that turns what a run produced into an outcome (E13.2, ADR 0023, decision 9).
 
 A wrong answer is expensive both ways. Calling a dead host a test failure burns the two corrections
 a Sub-Skill gets; calling a real bug an infrastructure error retries it forever and never reaches

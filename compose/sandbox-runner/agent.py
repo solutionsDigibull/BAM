@@ -1,4 +1,4 @@
-"""The local-docker sandbox agent (E13.2, ADR 0021 decision 6). Standard library only.
+"""The local-docker sandbox agent (E13.2, ADR 0023 decision 6). Standard library only.
 
 Runs inside the `sandbox-runner` container (internal network, read-only root, no capabilities,
 non-root) and gives the worker the same five verbs a CubeSandbox VM gives: create, put files, exec,

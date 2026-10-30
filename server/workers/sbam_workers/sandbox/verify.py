@@ -1,4 +1,4 @@
-"""Check every input before a VM exists (E13.2 safety checks, ADR 0021).
+"""Check every input before a VM exists (E13.2 safety checks, ADR 0023).
 
 Nothing here talks to a backend. A mismatch raises `HashMismatch` (reason HASH_MISMATCH): the run is
 INFRA_ERROR, no VM is created and the message names what failed, never its content.

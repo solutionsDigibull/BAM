@@ -1,4 +1,4 @@
-"""The one interface the executor knows (ADR 0021, decision 1).
+"""The one interface the executor knows (ADR 0023, decision 1).
 
 A backend creates an isolated environment, puts files in it, runs fixed commands as the
 unprivileged sandbox user, reads files back and destroys it. `CubeSandboxBackend` (certifying) and

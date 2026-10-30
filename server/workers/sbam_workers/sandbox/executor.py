@@ -1,4 +1,4 @@
-"""Run one code attempt against one dataset in one sandbox (E13.2, ADR 0021).
+"""Run one code attempt against one dataset in one sandbox (E13.2, ADR 0023).
 
 `execute` is the whole life of a run, in the order the safety checks need:
 
@@ -73,7 +73,7 @@ OUTPUTS_PATH: Final = f"{WORK_DIR}/out/outputs.json"
 HOSTS_PATH: Final = "/etc/hosts"
 RUNNER_ARGV: Final = ("python", "-I", "/opt/sbam/harness/run_cases.py", REQUEST_PATH)
 MAX_REQUEST_BYTES: Final = 4 * 1024 * 1024
-BOOT_GRACE_S: Final = 300  # the host's own backstop beyond the run (ADR 0021, decision 10)
+BOOT_GRACE_S: Final = 300  # the host's own backstop beyond the run (ADR 0023, decision 10)
 MAX_LOG_BYTES: Final = 10 * 1024 * 1024
 
 EgressReader = Callable[[str], Awaitable[list[EgressEvent]]]

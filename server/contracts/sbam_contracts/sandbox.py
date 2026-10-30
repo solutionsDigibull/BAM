@@ -1,4 +1,4 @@
-"""Sandbox contracts: modes, failure categories, limits, egress policy, run record (ADR 0021).
+"""Sandbox contracts: modes, failure categories, limits, egress policy, run record (ADR 0023).
 
 What the worker, the API and the in-VM runner agree on (E13.2). Nothing here does I/O.
 
@@ -115,7 +115,7 @@ def normalize_digest(value: str) -> str:
 
 
 def template_alias(digest: str) -> str:
-    """The CubeSandbox template alias bound to a skill-runtime digest (ADR 0021, decision 4).
+    """The CubeSandbox template alias bound to a skill-runtime digest (ADR 0023, decision 4).
 
     It carries the first 56 hex characters (the alias limit is 64). That is a lookup key, not the
     proof: the in-VM check compares the whole digest, so a prefix collision would still be caught.
@@ -265,7 +265,7 @@ class SandboxRun(_Dto):
         return self
 
 
-# --- the in-VM runner's files (ADR 0021, decision 7) ---------------------------------------
+# --- the in-VM runner's files (ADR 0023, decision 7) ---------------------------------------
 class RunnerCaseResult(_Dto):
     """One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker."""
 
