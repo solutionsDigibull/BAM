@@ -1,0 +1,12 @@
+{
+  "task": "testgen",
+  "score": 0.9944,
+  "items": 20,
+  "runs": 3,
+  "alias": "sbam-testgen",
+  "prompt_sha256": {
+    "testgen/1.1.0": "a8a6b169ff6817ded9fcb07f4434682088a159d7b30a8d8463eeae3fdbd13d1b"
+  },
+  "recorded_on": "2026-10-30",
+  "note": "recorded with --record; review before merging"
+}

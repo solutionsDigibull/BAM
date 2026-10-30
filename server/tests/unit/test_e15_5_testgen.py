@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from sbam_api.testgen.validate import input_schema
 from sbam_contracts.testgen import TestgenOutput
-from sbam_workers.evals.baseline import Verdict
+from sbam_workers.evals.baseline import Verdict, load_baseline, load_gate_config
 from sbam_workers.evals.gate import (
     EXIT,
     GateReport,
@@ -31,6 +31,7 @@ from sbam_workers.evals.golden import (
 from sbam_workers.evals.scoring import TESTGEN_CHECKS, score_testgen
 from sbam_workers.evals.testgen_set import BOUNDS, DOMAINS, render_json
 from sbam_workers.llm.client import LlmTransportError
+from sbam_workers.llm.registry import PromptRegistry
 from sbam_workers.test.testgen import allowed_kinds
 
 SET = load_testgen()
@@ -213,7 +214,9 @@ def test_e15_5_recording_a_testgen_baseline_pins_the_testgen_prompt(tmp_path: Pa
     written = json.loads((tmp_path / "baselines" / "testgen.json").read_text(encoding="utf-8"))
     assert report.decision.verdict is Verdict.PASS and report.score == 1.0
     assert written["task"] == "testgen" and written["alias"] == "sbam-testgen"
-    assert written["items"] == 20 and list(written["prompt_sha256"]) == ["testgen/1.0.0"]
+    newest = PromptRegistry().get("testgen")  # the version the baseline must pin
+    assert written["items"] == 20
+    assert written["prompt_sha256"] == {f"testgen/{newest.version}": newest.sha256}
     assert not (tmp_path / "baselines" / "ocr.json").exists()  # one task's baseline only
 
 
@@ -257,3 +260,12 @@ def test_e15_5_testgen_is_listed_as_a_ready_task() -> None:
 
     ready = sorted(t.task for t in load_tasks() if t.status == "ready")
     assert ready == sorted([Task.OCR, Task.TESTGEN])
+
+
+def test_e15_5_the_committed_testgen_baseline_is_valid_and_matches_the_set() -> None:
+    committed = load_baseline(Task.TESTGEN)
+    assert committed is not None  # the gate has something to compare with
+    assert committed.items == len(SET.items) and committed.alias == "sbam-testgen"
+    assert committed.runs == load_gate_config().runs
+    assert 0.0 <= committed.score <= 1.0
+    assert any(key.startswith("testgen/") for key in committed.prompt_sha256)
