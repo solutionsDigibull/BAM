@@ -131,3 +131,13 @@ class UserRepository(TenantScopedRepository[User]):
             self._scoped().where(User.id != user_id, User.status == UserStatus.ACTIVE.value)
         )
         return sum(ROLE_ADMIN in row.portal_roles for row in rows)
+
+
+def tenants_of_subs(session: Session, subs: Iterable[str]) -> dict[str, uuid.UUID]:
+    """System job only: the tenant of each Keycloak user id we know (users mirror). A super-admin
+    has none, an unknown id is absent."""
+    wanted = sorted(set(subs))
+    if not wanted:
+        return {}
+    query = select(User.keycloak_sub, User.tenant_id).where(User.keycloak_sub.in_(wanted))
+    return {sub: tenant for sub, tenant in session.execute(query) if tenant is not None}

@@ -224,6 +224,12 @@ services:
     environment:
       <<: *worker-deploy-env
       DATABASE_URL: !reset null
+      # Keycloak events into the audit log (A-18b): read as sbam-api-admin, the secret is a Docker secret.
+      KEYCLOAK_ADMIN_CLIENT_SECRET: !reset null
+      KEYCLOAK_ADMIN_CLIENT_SECRET_FILE: /run/secrets/keycloak_admin_client_secret
+    secrets:
+      - { source: sbam_db_password, target: sbam_db_password, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: keycloak_admin_client_secret, target: keycloak_admin_client_secret, uid: "10001", gid: "10001", mode: 0400 }
 
   worker-knowledge:
     <<: *worker-deploy

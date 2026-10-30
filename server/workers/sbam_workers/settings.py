@@ -26,6 +26,11 @@ class WorkerSettings(BaseSettings):
     storage_root: Path | None = None
     s3_bucket: str | None = None
     s3_endpoint_url: AnyHttpUrl | None = None
+    # Keycloak events into the audit log (A-18b): only the ingest worker is given the secret.
+    # Without it the import does nothing. The URL is the realm inside the network, like the API's.
+    keycloak_internal_url: AnyHttpUrl | None = None
+    keycloak_admin_client_id: str = Field(default="sbam-api-admin", min_length=1)
+    keycloak_admin_client_secret: SecretStr | None = None
     # ClamAV (#62): clamd on the internal network; scans are refused when its signatures are older.
     clamav_host: str = Field(default="clamav", min_length=1)
     clamav_port: int = Field(default=3310, ge=1, le=65535)
