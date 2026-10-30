@@ -139,19 +139,23 @@ def request_upload(
             code = ErrorCode.FILE_LIMIT_REACHED
         if code is not None:
             rejected.append(RejectedFile(name=file.name, code=code))
-            _audit(
-                session,
-                ctx.tenant_id,
-                user.user_id,
-                "UPLOAD_REJECTED",
-                batch_id,
-                {"name": file.name, "code": code.value},
-            )
             continue
         accepted.append(AcceptedFile(name=file.name, size=file.size, mime=file.mime))
 
+    if rejected:  # one row per request, not per file: a request cannot flood the audit log (A-08)
+        _audit(
+            session,
+            ctx.tenant_id,
+            user.user_id,
+            "UPLOAD_REJECTED",
+            batch_id,
+            {
+                "count": len(rejected),
+                "files": [{"name": f.name[:120], "code": f.code.value} for f in rejected[:10]],
+            },
+        )
     if not accepted:  # nothing is stored; the first reason answers the request
-        session.commit()  # the rejection audit rows stay
+        session.commit()  # the rejection audit row stays
         raise _limit_error(rejected[0].code)
 
     expires_at = now + timedelta(seconds=UPLOAD_TOKEN_TTL_SECONDS)

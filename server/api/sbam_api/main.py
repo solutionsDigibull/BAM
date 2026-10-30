@@ -21,6 +21,7 @@ from sbam_api.core.errors import install_error_handlers
 from sbam_api.core.health import Check, default_checks, health_router
 from sbam_api.core.logging import configure_logging
 from sbam_api.core.middleware import BodyLimitMiddleware, CorrelationIdMiddleware
+from sbam_api.core.ratelimit import AuditThrottle, RateLimiter
 from sbam_api.core.settings import Settings, jwks_url, keycloak_realm_url, load_settings
 from sbam_api.core.telemetry import configure_telemetry
 from sbam_api.db.session import app_sessions
@@ -65,7 +66,9 @@ def default_auth(app: FastAPI, settings: Settings) -> Auth:
     """Production wiring: Keycloak JWKS, the users mirror (#49), Keycloak organizations and
     users, and project memberships (#50)."""
     # Denials and identity events go to audit_log (#41, ADR 0017); one sessionmaker per app.
-    audit = AuditLogSecurityAudit(lambda: app_sessions(app.state))
+    audit = AuditLogSecurityAudit(
+        lambda: app_sessions(app.state), AuditThrottle(settings.audit_denied_per_minute)
+    )
     secret = settings.keycloak_admin_client_secret
     kc = (
         (keycloak_realm_url(settings), settings.keycloak_admin_client_id, secret.get_secret_value())
@@ -102,6 +105,9 @@ def create_app(
     )
     app.state.settings = settings
     app.state.auth = auth or default_auth(app, settings)
+    app.state.limiter = RateLimiter(
+        settings.rate_limit_writes_per_minute, settings.rate_limit_llm_per_minute
+    )
     install_error_handlers(app)
     app.include_router(health_router(checks if checks is not None else default_checks(settings)))
     routers = discover_routers()

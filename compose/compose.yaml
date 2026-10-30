@@ -351,6 +351,10 @@ services:
       UPLOAD_TOKEN_KEY: ${UPLOAD_TOKEN_KEY:-}
       TUSD_PUBLIC_URL: ${TUSD_PUBLIC_URL:-http://localhost:${TUSD_PORT:-1080}/files/}
       MAX_BODY_BYTES: ${MAX_BODY_BYTES:-10485760}
+      # Per-user request budgets per minute, per API process; 0 = off (A-08, core/ratelimit.py)
+      RATE_LIMIT_WRITES_PER_MINUTE: ${RATE_LIMIT_WRITES_PER_MINUTE:-120}
+      RATE_LIMIT_LLM_PER_MINUTE: ${RATE_LIMIT_LLM_PER_MINUTE:-10}
+      AUDIT_DENIED_PER_MINUTE: ${AUDIT_DENIED_PER_MINUTE:-30}
       # The masters workbook import (#56) scans uploads with clamd; down = the import answers 503.
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
