@@ -466,7 +466,8 @@ def test_e2_6_list_cursor_is_tamper_proof_and_tenant_bound(h: Harness) -> None:
     _add_fdes(h, 2)
     cursor = _list(h, limit="1").json()["next_cursor"]
     assert cursor
-    forged = cursor[:-2] + ("AA" if not cursor.endswith("AA") else "BB")
+    payload, mac = cursor.split(".")
+    forged = f"{payload}.{'B' if mac[0] == 'A' else 'A'}{mac[1:]}"
     problem(_list(h, cursor=forged), 400, "INVALID_CURSOR")
     problem(_list(h, cursor="not-a-cursor"), 400, "INVALID_CURSOR")
     problem(_list(h, h.admin_b(), cursor=cursor), 400, "INVALID_CURSOR")  # tenant A's cursor
