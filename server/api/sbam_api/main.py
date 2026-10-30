@@ -25,7 +25,7 @@ from sbam_api.core.middleware import (
     CorrelationIdMiddleware,
     NoStoreMiddleware,
 )
-from sbam_api.core.ratelimit import AuditThrottle, RateLimiter
+from sbam_api.core.ratelimit import AuditThrottle, RateLimiter, SharedBudget
 from sbam_api.core.settings import (
     Settings,
     deployed_env,
@@ -117,7 +117,18 @@ def create_app(
     app.state.settings = settings
     app.state.auth = auth or default_auth(app, settings)
     app.state.limiter = RateLimiter(
-        settings.rate_limit_writes_per_minute, settings.rate_limit_llm_per_minute
+        settings.rate_limit_writes_per_minute,
+        settings.rate_limit_llm_per_minute,
+        # several replicas: the budget is the cluster's, counted in PostgreSQL (A-08, #554)
+        shared=(
+            SharedBudget(
+                settings.rate_limit_writes_per_minute,
+                settings.rate_limit_llm_per_minute,
+                lambda: app_sessions(app.state),
+            )
+            if settings.sbam_api_replicas > 1
+            else None
+        ),
     )
     install_error_handlers(app)
     app.include_router(health_router(checks if checks is not None else default_checks(settings)))
