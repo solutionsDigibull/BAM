@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import Response
 from fastapi.testclient import TestClient
 from psycopg import errors as psycopg_errors
 from pydantic import BaseModel
@@ -19,6 +20,7 @@ from sbam_api.core.conventions import (
     replay_run_id,
 )
 from sbam_api.core.health import Check, default_checks
+from sbam_api.core.middleware import NoStoreMiddleware
 from sbam_api.core.settings import Settings, load_settings
 from sbam_api.main import create_app, discover_routers
 from sbam_contracts.api import PROBLEM_JSON, ProblemDetail
@@ -406,3 +408,46 @@ def test_a30_t11_any_other_database_error_is_still_a_generic_500(app_factory: Ap
         "/api/v1/_test/db"
     )
     assert response.status_code == 500 and "dup key secret" not in response.text
+
+
+# --- Hygiene (A-15) --------------------------------------------------------------------------
+
+DEPLOYED = {
+    "sbam_env": "staging",
+    "llm_provider": "bifrost",
+    "upload_token_key": "u" * 32,
+    "tusd_hook_secret": "t" * 32,
+}
+
+
+def test_a15_authenticated_json_is_never_cached(app_factory: AppFactory) -> None:
+    client = TestClient(app_factory())
+    signed_in = client.get("/api/v1/does-not-exist", headers={"Authorization": "Bearer x"})
+    assert signed_in.headers["content-type"].startswith("application/problem+json")
+    assert signed_in.headers["cache-control"] == "no-store"
+    assert "cache-control" not in client.get("/health/live").headers  # no credential, left alone
+
+
+def test_a15_a_route_that_sets_its_own_cache_control_keeps_it() -> None:
+    app = FastAPI()
+    app.add_middleware(NoStoreMiddleware)
+
+    @app.get("/own")
+    def own() -> Response:
+        return Response("{}", media_type="application/json", headers={"Cache-Control": "private"})
+
+    @app.get("/file")
+    def file() -> Response:
+        return Response(b"%PDF", media_type="application/pdf")
+
+    client = TestClient(app)
+    auth = {"Authorization": "Bearer x"}
+    assert client.get("/own", headers=auth).headers["cache-control"] == "private"
+    assert "cache-control" not in client.get("/file", headers=auth).headers  # not JSON
+
+
+def test_a15_docs_and_openapi_are_off_when_deployed(app_factory: AppFactory) -> None:
+    dev, deployed = TestClient(app_factory()), TestClient(app_factory(**DEPLOYED))
+    for path in ("/api/v1/openapi.json", "/api/v1/docs"):
+        assert dev.get(path).status_code == 200
+        assert deployed.get(path).status_code == 404

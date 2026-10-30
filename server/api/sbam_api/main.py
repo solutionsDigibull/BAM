@@ -20,9 +20,19 @@ from sbam_api.core.auth import POLICIES, Auth, Jwks, NoOrgs, NoUserAdmin, TokenV
 from sbam_api.core.errors import install_error_handlers
 from sbam_api.core.health import Check, default_checks, health_router
 from sbam_api.core.logging import configure_logging
-from sbam_api.core.middleware import BodyLimitMiddleware, CorrelationIdMiddleware
+from sbam_api.core.middleware import (
+    BodyLimitMiddleware,
+    CorrelationIdMiddleware,
+    NoStoreMiddleware,
+)
 from sbam_api.core.ratelimit import AuditThrottle, RateLimiter
-from sbam_api.core.settings import Settings, jwks_url, keycloak_realm_url, load_settings
+from sbam_api.core.settings import (
+    Settings,
+    deployed_env,
+    jwks_url,
+    keycloak_realm_url,
+    load_settings,
+)
 from sbam_api.core.telemetry import configure_telemetry
 from sbam_api.db.session import app_sessions
 from sbam_api.identity.keycloak_admin import KeycloakOrgs, KeycloakUsers
@@ -96,8 +106,9 @@ def create_app(
     configure_logging(settings.log_level)
     app = FastAPI(
         title="SBAM API",
-        docs_url=f"{API_BASE}/docs",
-        openapi_url=f"{API_BASE}/openapi.json",
+        # The API's own map is for dev and CI; a deployed environment does not publish it (A-15).
+        docs_url=None if deployed_env(settings.sbam_env) else f"{API_BASE}/docs",
+        openapi_url=None if deployed_env(settings.sbam_env) else f"{API_BASE}/openapi.json",
         redoc_url=None,
         # FastAPI's built-in OpenTelemetry would add a second exporter to our provider, own spans,
         # and metrics/log exporters (logs can carry request bodies). core/telemetry.py owns tracing.
@@ -126,6 +137,7 @@ def create_app(
             f"{API_BASE}/admin/master-documents": 16 * 1024 * 1024,
         },
     )
+    app.add_middleware(NoStoreMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
     configure_telemetry(app, settings)  # wraps the whole stack: one server span per request
     return app
