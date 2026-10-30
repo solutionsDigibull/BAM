@@ -7,7 +7,7 @@ machine. The repo keeps specs, not images; the gate draws the page when it runs.
 import io
 import random
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from sbam_workers.evals.golden import RenderSpec
 
@@ -53,7 +53,7 @@ def render_page(spec: RenderSpec) -> tuple[bytes, str]:
     if spec.speckle:
         _speckle(image, spec.speckle, spec.seed)
     if spec.shade:
-        _shade(image, spec.shade)
+        image = _shade(image, spec.shade)
     if spec.scale < 1.0:
         size = (round(image.width * spec.scale), round(image.height * spec.scale))
         image = image.resize(size, Image.Resampling.LANCZOS)
@@ -78,14 +78,12 @@ def _speckle(image: Image.Image, per_thousand: int, seed: int) -> None:
         pixels[x, y] = (max(r - darker, 0), max(g - darker, 0), max(b - darker, 0))
 
 
-def _shade(image: Image.Image, strength: float) -> None:
-    """Uneven light: up to `strength` darker towards the bottom right corner."""
-    pixels = image.load()
-    if pixels is None:
-        raise RuntimeError("the image has no pixel access")
-    width, height = image.size
-    for y in range(height):
-        for x in range(width):
-            factor = 1.0 - strength * ((x / width) * 0.5 + (y / height) * 0.5)
-            r, g, b = pixels[x, y]  # type: ignore[misc]
-            pixels[x, y] = (int(r * factor), int(g * factor), int(b * factor))
+def _shade(image: Image.Image, strength: float) -> Image.Image:
+    """Uneven light: up to `strength` darker towards the bottom right corner. A gradient is
+    multiplied in, which Pillow does in C (a per-pixel Python loop took seconds a page)."""
+    ramp = Image.linear_gradient("L")  # black at the top, white at the bottom
+    down = ramp.resize(image.size)
+    across = ramp.transpose(Image.Transpose.ROTATE_90).resize(image.size)  # black left, white right
+    towards_corner = ImageChops.add(down, across, scale=2)
+    light = towards_corner.point(lambda v: round(255 - strength * v))
+    return ImageChops.multiply(image, Image.merge("RGB", (light, light, light)))

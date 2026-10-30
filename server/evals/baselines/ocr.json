@@ -1,0 +1,12 @@
+{
+  "task": "ocr",
+  "score": 1.0,
+  "items": 20,
+  "runs": 3,
+  "alias": "sbam-ocr",
+  "prompt_sha256": {
+    "ocr-page/1.0.0": "eb17c5f7aef070f80aef7fded45209b5943187fac228fdae3fff4e501f3bfda8"
+  },
+  "recorded_on": "2026-10-30",
+  "note": "recorded with --record; review before merging"
+}
