@@ -8,12 +8,14 @@ claim to be ready without the items, so the gate never runs on a half-written se
 Nothing here calls a model. The runner that does is a separate change.
 """
 
+import copy
 import json
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Final, Literal
+from typing import Annotated, Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from sbam_contracts.isatvon14 import SubSkill
 
 EVALS_DIR: Final = Path(__file__).resolve().parents[3] / "evals"
 GOLDEN_DIR: Final = EVALS_DIR / "golden"
@@ -75,6 +77,32 @@ class OcrSet(_Strict):
     items: list[OcrItem]
 
 
+class GoldenTestgenOverrides(_Strict):
+    """What an item changes in the base Sub-Skill (`testgen-base.json`, the MS01.1 sample). The rest
+    of the document stays as it is."""
+
+    max_iterations: int = Field(ge=1, le=5)  # 1 removes PASS_AFTER_RETRY from the allowed kinds
+    required_inputs: Annotated[list[str], Field(min_length=2)]
+    fresh_state_parameters: Annotated[list[str], Field(min_length=1)]
+    tables: Annotated[list[str], Field(min_length=1)]
+    success_gate: str = Field(min_length=1)
+    no_op_condition: str = Field(min_length=1)
+    escalation_condition: str = Field(min_length=1)
+
+
+class GoldenTestgenItem(_Strict):
+    id: Annotated[str, Field(pattern=r"^testgen-\d{2}$")]
+    description: str = Field(min_length=1)
+    synthetic: Literal[True]
+    overrides: GoldenTestgenOverrides
+
+
+class GoldenTestgenSet(_Strict):
+    task: Literal[Task.TESTGEN]
+    version: int = Field(ge=1)
+    items: list[GoldenTestgenItem]
+
+
 def load_tasks(golden_dir: Path = GOLDEN_DIR) -> list[TaskEntry]:
     raw = json.loads((golden_dir / "tasks.json").read_text(encoding="utf-8"))
     return [TaskEntry.model_validate(row) for row in raw]
@@ -82,6 +110,35 @@ def load_tasks(golden_dir: Path = GOLDEN_DIR) -> list[TaskEntry]:
 
 def load_ocr(golden_dir: Path = GOLDEN_DIR) -> OcrSet:
     return OcrSet.model_validate_json((golden_dir / "ocr.json").read_text(encoding="utf-8"))
+
+
+def load_testgen(golden_dir: Path = GOLDEN_DIR) -> GoldenTestgenSet:
+    text = (golden_dir / "testgen.json").read_text(encoding="utf-8")
+    return GoldenTestgenSet.model_validate_json(text)
+
+
+def testgen_base(golden_dir: Path = GOLDEN_DIR) -> dict[str, Any]:
+    base: dict[str, Any] = json.loads(
+        (golden_dir / "testgen-base.json").read_text(encoding="utf-8")
+    )
+    return base
+
+
+def build_testgen_isatvon(item: GoldenTestgenItem, base: dict[str, Any]) -> dict[str, Any]:
+    """The item's Sub-Skill: the base with the item's overrides applied, and validated."""
+    document = copy.deepcopy(base)
+    definition = document["isatvon_definition"]
+    o = item.overrides
+    definition["s_source"]["required_inputs"] = list(o.required_inputs)
+    definition["s_source"]["fresh_state_parameters"] = list(o.fresh_state_parameters)
+    variables = definition["v_variables"]
+    variables["max_iterations"] = o.max_iterations
+    variables["tables"] = list(o.tables)
+    variables["success_gate"] = o.success_gate
+    variables["no_op_condition"] = o.no_op_condition
+    variables["escalation_condition"] = o.escalation_condition
+    SubSkill.model_validate(document)  # a variant that is not a valid Sub-Skill cannot be a test
+    return document
 
 
 def check_golden(
@@ -109,18 +166,27 @@ def check_golden(
 
 
 def _check_ready(entry: TaskEntry, golden_dir: Path) -> list[str]:
-    if entry.task is not Task.OCR:
-        return [f"{entry.task}: listed as ready, but no loader for its items exists yet"]
+    if entry.task is Task.OCR:
+        return _check_ocr(entry, golden_dir)
+    if entry.task is Task.TESTGEN:
+        return _check_testgen(entry, golden_dir)
+    return [f"{entry.task}: listed as ready, but no loader for its items exists yet"]
+
+
+def _check_count_and_ids(entry: TaskEntry, ids: list[str]) -> list[str]:
+    problems = []
+    if len(ids) < entry.min_items:
+        problems.append(f"{entry.task}: {len(ids)} items, at least {entry.min_items} needed")
+    problems += [f"{entry.task}: id {i} is used more than once" for i in _repeats(ids)]
+    return problems
+
+
+def _check_ocr(entry: TaskEntry, golden_dir: Path) -> list[str]:
     try:
         items = load_ocr(golden_dir).items
     except (OSError, ValidationError, ValueError) as exc:
         return [f"{entry.task}: {type(exc).__name__}"]
-    problems = []
-    if len(items) < entry.min_items:
-        problems.append(f"{entry.task}: {len(items)} items, at least {entry.min_items} needed")
-    problems += [
-        f"{entry.task}: id {i} is used more than once" for i in _repeats([x.id for x in items])
-    ]
+    problems = _check_count_and_ids(entry, [x.id for x in items])
     for item in items:
         printed = "\n".join(item.render.lines)
         problems += [
@@ -128,6 +194,21 @@ def _check_ready(entry: TaskEntry, golden_dir: Path) -> list[str]:
             for ident in item.identifiers
             if ident not in printed
         ]
+    return problems
+
+
+def _check_testgen(entry: TaskEntry, golden_dir: Path) -> list[str]:
+    try:
+        items = load_testgen(golden_dir).items
+        base = testgen_base(golden_dir)
+    except (OSError, ValidationError, ValueError) as exc:
+        return [f"{entry.task}: {type(exc).__name__}"]
+    problems = _check_count_and_ids(entry, [x.id for x in items])
+    for item in items:
+        try:
+            build_testgen_isatvon(item, base)
+        except (ValidationError, KeyError, TypeError, ValueError) as exc:
+            problems.append(f"{item.id}: not a valid Sub-Skill ({type(exc).__name__})")
     return problems
 
 

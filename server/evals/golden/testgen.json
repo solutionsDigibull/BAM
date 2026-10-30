@@ -1,0 +1,506 @@
+{
+  "task": "testgen",
+  "version": 1,
+  "items": [
+    {
+      "id": "testgen-01",
+      "description": "login with a one-time code, max_iterations 1",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 1,
+        "required_inputs": [
+          "mobile_number",
+          "otp_payload",
+          "device_fingerprint"
+        ],
+        "fresh_state_parameters": [
+          "failed_login_attempts",
+          "active_devices",
+          "user_status"
+        ],
+        "tables": [
+          "investor_profiles",
+          "auth_event_audit_handoff"
+        ],
+        "success_gate": "otp_match == True AND policy_violation == False",
+        "no_op_condition": "user_status is 'LOCKED'",
+        "escalation_condition": "failed_login_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-02",
+      "description": "login with a one-time code, max_iterations 2",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 2,
+        "required_inputs": [
+          "mobile_number",
+          "otp_payload",
+          "device_fingerprint"
+        ],
+        "fresh_state_parameters": [
+          "failed_login_attempts",
+          "active_devices",
+          "user_status"
+        ],
+        "tables": [
+          "investor_profiles",
+          "auth_event_audit_handoff"
+        ],
+        "success_gate": "otp_match == True AND policy_violation == False",
+        "no_op_condition": "user_status is 'LOCKED'",
+        "escalation_condition": "failed_login_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-03",
+      "description": "login with a one-time code, max_iterations 3",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 3,
+        "required_inputs": [
+          "mobile_number",
+          "otp_payload",
+          "device_fingerprint"
+        ],
+        "fresh_state_parameters": [
+          "failed_login_attempts",
+          "active_devices",
+          "user_status"
+        ],
+        "tables": [
+          "investor_profiles",
+          "auth_event_audit_handoff"
+        ],
+        "success_gate": "otp_match == True AND policy_violation == False",
+        "no_op_condition": "user_status is 'LOCKED'",
+        "escalation_condition": "failed_login_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-04",
+      "description": "login with a one-time code, max_iterations 5",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 5,
+        "required_inputs": [
+          "mobile_number",
+          "otp_payload",
+          "device_fingerprint"
+        ],
+        "fresh_state_parameters": [
+          "failed_login_attempts",
+          "active_devices",
+          "user_status"
+        ],
+        "tables": [
+          "investor_profiles",
+          "auth_event_audit_handoff"
+        ],
+        "success_gate": "otp_match == True AND policy_violation == False",
+        "no_op_condition": "user_status is 'LOCKED'",
+        "escalation_condition": "failed_login_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-05",
+      "description": "invoice matching, max_iterations 1",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 1,
+        "required_inputs": [
+          "invoice_number",
+          "supplier_code",
+          "amount_cents"
+        ],
+        "fresh_state_parameters": [
+          "mismatch_count",
+          "supplier_status",
+          "invoice_status"
+        ],
+        "tables": [
+          "invoices",
+          "supplier_master"
+        ],
+        "success_gate": "invoice_total == po_total AND supplier_active == True",
+        "no_op_condition": "invoice_status is 'PAID'",
+        "escalation_condition": "mismatch_count >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-06",
+      "description": "invoice matching, max_iterations 2",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 2,
+        "required_inputs": [
+          "invoice_number",
+          "supplier_code",
+          "amount_cents"
+        ],
+        "fresh_state_parameters": [
+          "mismatch_count",
+          "supplier_status",
+          "invoice_status"
+        ],
+        "tables": [
+          "invoices",
+          "supplier_master"
+        ],
+        "success_gate": "invoice_total == po_total AND supplier_active == True",
+        "no_op_condition": "invoice_status is 'PAID'",
+        "escalation_condition": "mismatch_count >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-07",
+      "description": "invoice matching, max_iterations 3",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 3,
+        "required_inputs": [
+          "invoice_number",
+          "supplier_code",
+          "amount_cents"
+        ],
+        "fresh_state_parameters": [
+          "mismatch_count",
+          "supplier_status",
+          "invoice_status"
+        ],
+        "tables": [
+          "invoices",
+          "supplier_master"
+        ],
+        "success_gate": "invoice_total == po_total AND supplier_active == True",
+        "no_op_condition": "invoice_status is 'PAID'",
+        "escalation_condition": "mismatch_count >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-08",
+      "description": "invoice matching, max_iterations 5",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 5,
+        "required_inputs": [
+          "invoice_number",
+          "supplier_code",
+          "amount_cents"
+        ],
+        "fresh_state_parameters": [
+          "mismatch_count",
+          "supplier_status",
+          "invoice_status"
+        ],
+        "tables": [
+          "invoices",
+          "supplier_master"
+        ],
+        "success_gate": "invoice_total == po_total AND supplier_active == True",
+        "no_op_condition": "invoice_status is 'PAID'",
+        "escalation_condition": "mismatch_count >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-09",
+      "description": "stock reservation, max_iterations 1",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 1,
+        "required_inputs": [
+          "sku",
+          "warehouse_code",
+          "quantity"
+        ],
+        "fresh_state_parameters": [
+          "reservation_attempts",
+          "stock_on_hand",
+          "order_status"
+        ],
+        "tables": [
+          "stock_levels",
+          "reservation_log"
+        ],
+        "success_gate": "reserved_quantity == requested_quantity",
+        "no_op_condition": "requested_quantity == 0",
+        "escalation_condition": "reservation_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-10",
+      "description": "stock reservation, max_iterations 2",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 2,
+        "required_inputs": [
+          "sku",
+          "warehouse_code",
+          "quantity"
+        ],
+        "fresh_state_parameters": [
+          "reservation_attempts",
+          "stock_on_hand",
+          "order_status"
+        ],
+        "tables": [
+          "stock_levels",
+          "reservation_log"
+        ],
+        "success_gate": "reserved_quantity == requested_quantity",
+        "no_op_condition": "requested_quantity == 0",
+        "escalation_condition": "reservation_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-11",
+      "description": "stock reservation, max_iterations 3",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 3,
+        "required_inputs": [
+          "sku",
+          "warehouse_code",
+          "quantity"
+        ],
+        "fresh_state_parameters": [
+          "reservation_attempts",
+          "stock_on_hand",
+          "order_status"
+        ],
+        "tables": [
+          "stock_levels",
+          "reservation_log"
+        ],
+        "success_gate": "reserved_quantity == requested_quantity",
+        "no_op_condition": "requested_quantity == 0",
+        "escalation_condition": "reservation_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-12",
+      "description": "stock reservation, max_iterations 5",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 5,
+        "required_inputs": [
+          "sku",
+          "warehouse_code",
+          "quantity"
+        ],
+        "fresh_state_parameters": [
+          "reservation_attempts",
+          "stock_on_hand",
+          "order_status"
+        ],
+        "tables": [
+          "stock_levels",
+          "reservation_log"
+        ],
+        "success_gate": "reserved_quantity == requested_quantity",
+        "no_op_condition": "requested_quantity == 0",
+        "escalation_condition": "reservation_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-13",
+      "description": "ticket triage, max_iterations 1",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 1,
+        "required_inputs": [
+          "ticket_id",
+          "customer_tier"
+        ],
+        "fresh_state_parameters": [
+          "assignment_attempts",
+          "queue_load",
+          "ticket_status"
+        ],
+        "tables": [
+          "tickets",
+          "sla_policies"
+        ],
+        "success_gate": "assigned_queue is not null AND sla_breach == False",
+        "no_op_condition": "ticket_status is 'CLOSED'",
+        "escalation_condition": "assignment_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-14",
+      "description": "ticket triage, max_iterations 2",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 2,
+        "required_inputs": [
+          "ticket_id",
+          "customer_tier"
+        ],
+        "fresh_state_parameters": [
+          "assignment_attempts",
+          "queue_load",
+          "ticket_status"
+        ],
+        "tables": [
+          "tickets",
+          "sla_policies"
+        ],
+        "success_gate": "assigned_queue is not null AND sla_breach == False",
+        "no_op_condition": "ticket_status is 'CLOSED'",
+        "escalation_condition": "assignment_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-15",
+      "description": "ticket triage, max_iterations 3",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 3,
+        "required_inputs": [
+          "ticket_id",
+          "customer_tier"
+        ],
+        "fresh_state_parameters": [
+          "assignment_attempts",
+          "queue_load",
+          "ticket_status"
+        ],
+        "tables": [
+          "tickets",
+          "sla_policies"
+        ],
+        "success_gate": "assigned_queue is not null AND sla_breach == False",
+        "no_op_condition": "ticket_status is 'CLOSED'",
+        "escalation_condition": "assignment_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-16",
+      "description": "ticket triage, max_iterations 5",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 5,
+        "required_inputs": [
+          "ticket_id",
+          "customer_tier"
+        ],
+        "fresh_state_parameters": [
+          "assignment_attempts",
+          "queue_load",
+          "ticket_status"
+        ],
+        "tables": [
+          "tickets",
+          "sla_policies"
+        ],
+        "success_gate": "assigned_queue is not null AND sla_breach == False",
+        "no_op_condition": "ticket_status is 'CLOSED'",
+        "escalation_condition": "assignment_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-17",
+      "description": "leave request, max_iterations 1",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 1,
+        "required_inputs": [
+          "employee_id",
+          "start_date",
+          "end_date",
+          "leave_type"
+        ],
+        "fresh_state_parameters": [
+          "validation_attempts",
+          "balance_days",
+          "request_status"
+        ],
+        "tables": [
+          "leave_balances",
+          "leave_requests"
+        ],
+        "success_gate": "balance_after >= 0 AND overlap == False",
+        "no_op_condition": "request_status is 'APPROVED'",
+        "escalation_condition": "validation_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-18",
+      "description": "leave request, max_iterations 2",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 2,
+        "required_inputs": [
+          "employee_id",
+          "start_date",
+          "end_date",
+          "leave_type"
+        ],
+        "fresh_state_parameters": [
+          "validation_attempts",
+          "balance_days",
+          "request_status"
+        ],
+        "tables": [
+          "leave_balances",
+          "leave_requests"
+        ],
+        "success_gate": "balance_after >= 0 AND overlap == False",
+        "no_op_condition": "request_status is 'APPROVED'",
+        "escalation_condition": "validation_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-19",
+      "description": "leave request, max_iterations 3",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 3,
+        "required_inputs": [
+          "employee_id",
+          "start_date",
+          "end_date",
+          "leave_type"
+        ],
+        "fresh_state_parameters": [
+          "validation_attempts",
+          "balance_days",
+          "request_status"
+        ],
+        "tables": [
+          "leave_balances",
+          "leave_requests"
+        ],
+        "success_gate": "balance_after >= 0 AND overlap == False",
+        "no_op_condition": "request_status is 'APPROVED'",
+        "escalation_condition": "validation_attempts >= max_iterations"
+      }
+    },
+    {
+      "id": "testgen-20",
+      "description": "leave request, max_iterations 5",
+      "synthetic": true,
+      "overrides": {
+        "max_iterations": 5,
+        "required_inputs": [
+          "employee_id",
+          "start_date",
+          "end_date",
+          "leave_type"
+        ],
+        "fresh_state_parameters": [
+          "validation_attempts",
+          "balance_days",
+          "request_status"
+        ],
+        "tables": [
+          "leave_balances",
+          "leave_requests"
+        ],
+        "success_gate": "balance_after >= 0 AND overlap == False",
+        "no_op_condition": "request_status is 'APPROVED'",
+        "escalation_condition": "validation_attempts >= max_iterations"
+      }
+    }
+  ]
+}

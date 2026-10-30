@@ -1,31 +1,34 @@
 """The regression gate runner (E15.5): a golden set through the model, against the baseline.
 
     uv run python -m sbam_workers.evals.gate --task ocr            # compare, exit 0/1/2/3
-    uv run python -m sbam_workers.evals.gate --task ocr --record   # write a baseline for review
+    uv run python -m sbam_workers.evals.gate --task testgen --record   # write a baseline for review
 
 Exit codes: 0 PASS, 1 REGRESSED, 2 INFRA_ERROR (the provider failed: never a pass), 3 NO_BASELINE.
 
-Only OCR has a golden set so far. The pages go through the production path (`ocr.read_page` over a
-real `LlmClient`), so the prompt, the image handling and the schema checks are the ones a document
-gets. Every run builds its own client and call store: the client caches answers, and runs that
-shared one would return the first run's answers and average nothing.
+OCR and test generation have golden sets so far. Both go through the production path (OCR through
+`ocr.read_page`, test generation through `testgen.generate`, each over a real `LlmClient`), so the
+prompt, the schema checks and the re-asks are the ones the build gets. Every run builds its own
+client and call store: the client caches answers, and runs that shared one would return the first
+run's answers and average nothing.
 """
 
 import argparse
 import asyncio
 import sys
 import uuid
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import httpx
 from pydantic import AnyHttpUrl
 from sbam_api.db.session import make_engine
 from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_contracts.pipeline import StageRef
-from sqlalchemy.orm import sessionmaker
+from sbam_contracts.testgen import TestgenOutput
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from sbam_workers.evals.baseline import (
@@ -41,23 +44,36 @@ from sbam_workers.evals.golden import (
     BASELINE_DIR,
     EVALS_DIR,
     GOLDEN_DIR,
+    GoldenTestgenItem,
     OcrItem,
     Task,
+    build_testgen_isatvon,
     load_ocr,
     load_tasks,
+    load_testgen,
+    testgen_base,
 )
 from sbam_workers.evals.render import render_page
-from sbam_workers.evals.scoring import ItemResult, score_ocr, task_score
+from sbam_workers.evals.scoring import ItemResult, score_ocr, score_testgen, task_score
 from sbam_workers.ingest import ocr
 from sbam_workers.ingest.ocr import OcrDeps, OcrRun
 from sbam_workers.ingest.rasterize import open_source
-from sbam_workers.llm.client import LlmClient, LlmTransportError
+from sbam_workers.llm.client import (
+    ContextTooLarge,
+    LlmClient,
+    LlmRequestRejected,
+    LlmTransportError,
+)
+from sbam_workers.llm.reask import SchemaInvalidAfterRetries
 from sbam_workers.llm.registry import PromptRegistry
-from sbam_workers.llm.store import SqlCallStore
+from sbam_workers.llm.store import LlmScope, SqlCallStore
 from sbam_workers.llm.trace import LangfuseTracer
 from sbam_workers.settings import WorkerSettings
+from sbam_workers.test import testgen
 
 OcrReader = Callable[[bytes, str], Awaitable[str]]  # (image bytes, media type) -> the text read
+# (the Sub-Skill's ISATVON) -> (the model's cases or None if it never gave valid ones, model calls)
+TestgenGenerator = Callable[[Mapping[str, Any]], Awaitable[tuple[TestgenOutput | None, int]]]
 EXIT = {Verdict.PASS: 0, Verdict.REGRESSED: 1, Verdict.INFRA_ERROR: 2, Verdict.NO_BASELINE: 3}
 
 
@@ -94,32 +110,59 @@ async def run_ocr(
     return out
 
 
+async def run_testgen(
+    make_generator: Callable[[], TestgenGenerator],
+    items: Sequence[GoldenTestgenItem],
+    base: dict[str, Any],
+    runs: int,
+) -> list[list[ItemResult]]:
+    """`runs` passes over the items, each with its own generator (so each with its own client)."""
+    documents = [(item, build_testgen_isatvon(item, base)) for item in items]
+    out: list[list[ItemResult]] = []
+    for _ in range(runs):
+        generate = make_generator()
+        results: list[ItemResult] = []
+        for item, isatvon in documents:
+            try:
+                output, attempts = await generate(isatvon)
+            except LlmTransportError as exc:
+                raise InfraError(
+                    f"the provider failed on {item.id}: {type(exc).__name__}"
+                ) from None
+            results.append(score_testgen(item.id, item.overrides.required_inputs, output, attempts))
+        out.append(results)
+    return out
+
+
+def _live_client(bifrost_url: str | None) -> tuple[LlmClient, sessionmaker[Session]]:
+    """A real `LlmClient` over Bifrost whose call store is a throwaway in-memory database, and the
+    sessions of that database."""
+    engine = make_engine(
+        "sqlite://",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+        execution_options={"schema_translate_map": {"sbam": None}},
+    )
+    LlmCall.metadata.create_all(engine, tables=[LlmCall.__table__, LlmDerivative.__table__])  # type: ignore[list-item]
+    sessions: sessionmaker[Session] = sessionmaker(bind=engine)
+    extra = {"bifrost_url": AnyHttpUrl(bifrost_url)} if bifrost_url else {}
+    conf = WorkerSettings(
+        _env_file=None,  # type: ignore[call-arg]
+        database_url="sqlite://",
+        llm_timeout_seconds=120,
+        **extra,  # type: ignore[arg-type]
+    )
+    client = LlmClient(
+        conf, PromptRegistry(), SqlCallStore(sessions), LangfuseTracer(conf), httpx.AsyncClient()
+    )
+    return client, sessions
+
+
 def live_reader_factory(bifrost_url: str | None = None) -> Callable[[], OcrReader]:
     """Readers on the real `ocr.read_page` and Bifrost, with a throwaway call store."""
 
     def make() -> OcrReader:
-        engine = make_engine(
-            "sqlite://",
-            poolclass=StaticPool,
-            connect_args={"check_same_thread": False},
-            execution_options={"schema_translate_map": {"sbam": None}},
-        )
-        LlmCall.metadata.create_all(engine, tables=[LlmCall.__table__, LlmDerivative.__table__])  # type: ignore[list-item]
-        sessions = sessionmaker(bind=engine)
-        extra = {"bifrost_url": AnyHttpUrl(bifrost_url)} if bifrost_url else {}
-        conf = WorkerSettings(
-            _env_file=None,  # type: ignore[call-arg]
-            database_url="sqlite://",
-            llm_timeout_seconds=120,
-            **extra,  # type: ignore[arg-type]
-        )
-        client = LlmClient(
-            conf,
-            PromptRegistry(),
-            SqlCallStore(sessions),
-            LangfuseTracer(conf),
-            httpx.AsyncClient(),
-        )
+        client, sessions = _live_client(bifrost_url)
         deps = OcrDeps(sessions=sessions, storage=None, reader=client)
 
         async def read(data: bytes, media_type: str) -> str:
@@ -143,6 +186,29 @@ def live_reader_factory(bifrost_url: str | None = None) -> Callable[[], OcrReade
     return make
 
 
+def live_testgen_factory(bifrost_url: str | None = None) -> Callable[[], TestgenGenerator]:
+    """Generators on the real `testgen.generate` (with its re-ask loop) and Bifrost."""
+
+    def make() -> TestgenGenerator:
+        client, _ = _live_client(bifrost_url)
+
+        async def generate(isatvon: Mapping[str, Any]) -> tuple[TestgenOutput | None, int]:
+            scope = LlmScope(
+                uuid.uuid4(), uuid.uuid4(), "eval-gate", f"wf-{uuid.uuid4()}:run", "act-eval"
+            )
+            try:
+                result = await testgen.generate(client, scope, isatvon)
+            except SchemaInvalidAfterRetries as exc:
+                return None, len(exc.attempts)  # the model never gave valid cases
+            except (LlmRequestRejected, ContextTooLarge):
+                return None, 0
+            return result.output, result.attempts
+
+        return generate
+
+    return make
+
+
 def prompt_shas(task: Task, golden_dir: Path = GOLDEN_DIR) -> dict[str, str]:
     """`prompt id/version -> sha256` of the latest version of every prompt the task uses."""
     registry = PromptRegistry()
@@ -155,6 +221,53 @@ def prompt_shas(task: Task, golden_dir: Path = GOLDEN_DIR) -> dict[str, str]:
     return shas
 
 
+async def run_task_gate(
+    task: Task,
+    execute: Callable[[int], Awaitable[list[list[ItemResult]]]],
+    *,
+    items: int,
+    record: bool = False,
+    runs: int | None = None,
+    golden_dir: Path = GOLDEN_DIR,
+    evals_dir: Path = EVALS_DIR,
+    baseline_dir: Path = BASELINE_DIR,
+    today: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> GateReport:
+    """What every task shares: run, score, then record a baseline or compare with the last one.
+    `execute(runs)` returns the item results of each run."""
+    config = load_gate_config(evals_dir)
+    count = runs or config.runs
+    try:
+        results = await execute(count)
+    except InfraError as exc:
+        return GateReport(Decision(Verdict.INFRA_ERROR, str(exc)), None, [])
+    score = task_score(results)
+    if record:
+        alias = next(e.alias for e in load_tasks(golden_dir) if e.task is task)
+        try:
+            path = write_baseline(
+                Baseline(
+                    task=task,
+                    score=round(score, 4),
+                    items=items,
+                    runs=count,
+                    alias=alias,
+                    prompt_sha256=prompt_shas(task, golden_dir),
+                    recorded_on=today().date(),
+                    note="recorded with --record; review before merging",
+                ),
+                baseline_dir,
+            )
+        except OSError as exc:  # paid calls must not vanish into a stack trace
+            reason = f"scored {score:.4f} but could not write the baseline: {type(exc).__name__}"
+            return GateReport(Decision(Verdict.INFRA_ERROR, reason), score, results)
+        return GateReport(
+            Decision(Verdict.PASS, f"baseline {score:.3f} written to {path.name}"), score, results
+        )
+    baseline = load_baseline(task, baseline_dir)
+    return GateReport(decide(baseline, score, config.threshold), score, results)
+
+
 async def run_gate(
     make_reader: Callable[[], OcrReader],
     *,
@@ -165,38 +278,45 @@ async def run_gate(
     baseline_dir: Path = BASELINE_DIR,
     today: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> GateReport:
-    config = load_gate_config(evals_dir)
+    """The OCR gate."""
     items = load_ocr(golden_dir).items
-    count = runs or config.runs
-    try:
-        results = await run_ocr(make_reader, items, count)
-    except InfraError as exc:
-        return GateReport(Decision(Verdict.INFRA_ERROR, str(exc)), None, [])
-    score = task_score(results)
-    if record:
-        alias = next(e.alias for e in load_tasks(golden_dir) if e.task is Task.OCR)
-        try:
-            path = write_baseline(
-                Baseline(
-                    task=Task.OCR,
-                    score=round(score, 4),
-                    items=len(items),
-                    runs=count,
-                    alias=alias,
-                    prompt_sha256=prompt_shas(Task.OCR, golden_dir),
-                    recorded_on=today().date(),
-                    note="recorded with --record; review before merging",
-                ),
-                baseline_dir,
-            )
-        except OSError as exc:  # sixty paid calls must not vanish into a stack trace
-            reason = f"scored {score:.4f} but could not write the baseline: {type(exc).__name__}"
-            return GateReport(Decision(Verdict.INFRA_ERROR, reason), score, results)
-        return GateReport(
-            Decision(Verdict.PASS, f"baseline {score:.3f} written to {path.name}"), score, results
-        )
-    baseline = load_baseline(Task.OCR, baseline_dir)
-    return GateReport(decide(baseline, score, config.threshold), score, results)
+    return await run_task_gate(
+        Task.OCR,
+        lambda count: run_ocr(make_reader, items, count),
+        items=len(items),
+        record=record,
+        runs=runs,
+        golden_dir=golden_dir,
+        evals_dir=evals_dir,
+        baseline_dir=baseline_dir,
+        today=today,
+    )
+
+
+async def run_testgen_gate(
+    make_generator: Callable[[], TestgenGenerator],
+    *,
+    record: bool = False,
+    runs: int | None = None,
+    golden_dir: Path = GOLDEN_DIR,
+    evals_dir: Path = EVALS_DIR,
+    baseline_dir: Path = BASELINE_DIR,
+    today: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> GateReport:
+    """The test-generation gate."""
+    items = load_testgen(golden_dir).items
+    base = testgen_base(golden_dir)
+    return await run_task_gate(
+        Task.TESTGEN,
+        lambda count: run_testgen(make_generator, items, base, count),
+        items=len(items),
+        record=record,
+        runs=runs,
+        golden_dir=golden_dir,
+        evals_dir=evals_dir,
+        baseline_dir=baseline_dir,
+        today=today,
+    )
 
 
 def render_report(report: GateReport) -> str:
@@ -212,16 +332,22 @@ def render_report(report: GateReport) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a golden set against the model")
-    parser.add_argument("--task", choices=[Task.OCR.value], default=Task.OCR.value)
+    parser.add_argument("--task", choices=[Task.OCR.value, Task.TESTGEN.value], default="ocr")
     parser.add_argument("--runs", type=int, default=None, help="override gate.json")
     parser.add_argument(
         "--record", action="store_true", help="write a baseline instead of comparing"
     )
     parser.add_argument("--bifrost-url", default=None)
     args = parser.parse_args(argv)
-    report = asyncio.run(
-        run_gate(live_reader_factory(args.bifrost_url), record=args.record, runs=args.runs)
-    )
+    if args.task == Task.TESTGEN.value:
+        coroutine = run_testgen_gate(
+            live_testgen_factory(args.bifrost_url), record=args.record, runs=args.runs
+        )
+    else:
+        coroutine = run_gate(
+            live_reader_factory(args.bifrost_url), record=args.record, runs=args.runs
+        )
+    report = asyncio.run(coroutine)
     print(render_report(report))
     return EXIT[report.decision.verdict]
 
