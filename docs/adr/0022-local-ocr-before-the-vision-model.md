@@ -40,26 +40,73 @@ The local engine misread identifiers with no warning (`ADX` came back as `ADx`, 
 so a high confidence score is not proof, as the issue feared. One vision page of 827 x 1169 pixels
 was 37,403 input tokens; the same page at half resolution was 14,735 and read just as well.
 
+## Second measurement: six harder demo documents
+
+The first five pages were clean typed text, the easy case. So six more were made, again **invented
+and rendered by a script, not scanned**: an invoice with a table (an image-only PDF, slightly
+crooked), a purchase order with a RECEIVED stamp across two lines of data, a delivery note photographed
+at an angle (perspective, a shadow, blur, JPEG), a test report in small print with a measurement
+table, a note in a handwriting-style font on lined paper, and a memo scanned sideways (rotated 90
+degrees). The same method: the identifiers printed on each page, scored exactly, one run per case.
+Each page was read at full size (1240 x 1754) and at half size.
+
+| Document | Vision model, full | Vision, half | RapidOCR, full | RapidOCR, half |
+|---|---|---|---|---|
+| invoice with a table (PDF) | 10/10, $0.0058 | 10/10, $0.0058 | 10/10 | 10/10 |
+| purchase order, stamp over data | 7/7, $0.0057 | 6/7, $0.0040 | 5/7 | 5/7 |
+| phone photo, perspective and shadow | 7/7, $0.0040 | 7/7, $0.0040 | 7/7 | 7/7 |
+| test report, small print and table | 10/10, $0.0058 | 8/10, $0.0041 | 9/10 | 10/10 |
+| handwriting-style note | 7/7, $0.0057 | 7/7, $0.0040 | 4/7 | 4/7 |
+| memo scanned sideways | 7/8, $0.0057 | 6/8, $0.0040 | 8/8 | 8/8 |
+| **Total** | **48/49, $0.0327** | **44/49, $0.0259** | **43/49** | **44/49** |
+
+Time per page: the vision model 4.5 to 16 s (68 s for the six at full size), RapidOCR 3 to 7 s
+(27 s). What the table shows:
+
+- **Neither engine wins everywhere.** The vision model read through the stamp (7/7 against 5/7) and
+  the handwriting-style text (7/7 against 4/7). RapidOCR read the sideways memo completely (8/8)
+  where the model missed `QA-77310`, the last item of the second column, at full size and the
+  title id too at half size.
+- **Half size is not free.** It saved only 21 percent of the cost on these larger pages (the image is
+  already scaled down before it is priced) and lost 4 of 49 identifiers, against saving 60 percent
+  with no loss on the earlier 827 x 1169 page. The saving depends on the page size, so a blanket
+  downscale is not supported by this data.
+- **The local engine misses by omission here**, in the stamp and handwriting cases, rather than
+  by reading a wrong character with confidence as in the first measurement.
+
+**Limits, which matter:** still no real scan. A handwriting font on a rendered page is far easier than
+real handwriting; the "photo" is a rendered page put through a perspective transform, with no lens or
+lighting; one run per case, so a single miss (the `QA-77310` one) is not shown to repeat; 49
+identifiers is a small sample; the vision model is a single model.
+
 ## Decision
 
-**Do not build the local-first pass now.** Recommended; the maintainer decides.
+**Do not build the local-first pass now, for cost.** Recommended; the maintainer decides.
 
-- The vision model read every identifier on every page, including the degraded ones, for about
-  $0.006 a page ($6 per 1,000 pages). The saving of a local pass is small next to what a wrong
-  identifier costs, and a local result cannot be trusted without a rule for when to fall back, which
-  cannot be tuned without real scans.
-- A cheaper lever is already visible: sending the page at half resolution cost 40 percent as much and
-  read just as well on this page. Test that on real scans (and `detail: "low"`, which is untested here)
-  before building anything.
+- The vision model read 48 of 49 identifiers on the harder documents and every identifier on the
+  clean ones, for about $0.006 a page ($6 per 1,000 pages). The saving of a local pass is small next
+  to what a wrong identifier costs, and nothing here tells us when a local result can be trusted
+  enough to skip the model, so a fallback rule cannot be tuned without real scans.
+- **Do not downscale pages to save money on this evidence.** Half size lost accuracy on the larger
+  pages for a 21 percent saving (see above). `detail: "low"` was not tried.
+- **A different use of the local engine is worth testing on real scans: a second opinion, not a cost
+  saver.** The two engines failed on different documents (stamp and handwriting against a sideways
+  page). Running both and flagging an identifier that only one of them found would catch the model's
+  misses at a cost of seconds of CPU and no extra model call. This is a hypothesis from six
+  documents, not a finding.
 
 ## Consequences
 
-- #318's first box (a measured comparison on real scans) stays open: this is a measurement on
-  synthetic and simulated pages. The decision should be confirmed on a few real scans (a PDF scan and
-  a phone photo) before it is accepted.
+- #318's first box (a measured comparison on real scans) stays open: both measurements are on
+  invented pages, clean and harder, and none is a real scan. The decision should be confirmed on a few
+  real scans (a PDF scan and a phone photo) before it is accepted. The comparison is a script that
+  takes a folder of scans, each with a list of its key identifiers, and records only counts, tokens,
+  cost and time, so it can be run on confidential documents without their content reaching a report.
 - If the real scans show the vision model failing where a local engine would not, or the page volume
   makes $6 per 1,000 pages matter, reopen this: record the OCR source (`local` or `llm`) per block, fall
   back to the vision model on a low-confidence or short page, and never let the local engine raise the
   share of wrong text that reaches the knowledge base.
-- Not measured: tables, handwriting, stamps, rotated originals, `detail: "low"`, the memory use of
-  RapidOCR in the 1 GiB ingest worker, and any engine other than RapidOCR (Tesseract, docTR, EasyOCR).
+- Not measured: real handwriting, real photographs, multi-page documents, `detail: "low"`, repeated
+  runs of the same page, the memory use of RapidOCR in the 1 GiB ingest worker, and any engine other
+  than RapidOCR (Tesseract, docTR, EasyOCR). Tables, a stamp over text, small print, a perspective
+  photo and a sideways page were measured on invented documents only.
