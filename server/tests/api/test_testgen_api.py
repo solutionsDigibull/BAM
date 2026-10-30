@@ -118,7 +118,7 @@ def h(tmp_path: Path) -> Iterator[Harness]:
 
 
 def test_e13_4_t01_no_dataset_yet_reads_as_none(h: Harness) -> None:
-    assert h.tests().json() == {"dataset": None}
+    assert h.tests().json() == {"dataset": None, "input_schema": None}
 
 
 def test_e13_4_t02_get_returns_the_cases_and_the_hash_as_etag(h: Harness) -> None:

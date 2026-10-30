@@ -206,6 +206,22 @@
         }
       ],
       "default": null
+    },
+    "input_schema": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "the Sub-Skill's closed `contracts.input_schema` a case `input` must validate against (E13.7: the panel checks it before saving; the server still decides)",
+      "title": "Input Schema"
     }
   },
   "title": "TestsResponse",
