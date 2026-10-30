@@ -1,10 +1,14 @@
-"""E13.2 end to end, nothing faked: a generated MS01.1 bundle, the in-VM runner and its vendored harness
-inside the hardened `sandbox-runner` container, the real PostgreSQL and FastMCP of the runtime image,
+"""E13.2 end to end, nothing faked: a generated MS01.1 bundle, the in-VM runner and its vendored
+harness
+inside the hardened `sandbox-runner` container, the real PostgreSQL and FastMCP of the runtime
+image,
 driven by the real executor over the real `LocalDockerBackend`.
 
-Needs Docker and the runtime image (`make runtime-registry` builds `skill-runtime:local`). The sandbox
+Needs Docker and the runtime image (`make runtime-registry` builds `skill-runtime:local`). The
+sandbox
 image is built from it here (layers are cached) and started with the isolation flags of the compose
-`sandbox-runner` service. A run executes one bundle and nothing else, so each test changes the bundle,
+`sandbox-runner` service. A run executes one bundle and nothing else, so each test changes the
+bundle,
 the dataset or the limits and reads what the platform would read: the classified outcome.
 
 CubeSandbox is not involved: this is the non-certifying local backend. What only a KVM host can show
@@ -46,7 +50,7 @@ pytestmark = pytest.mark.integration
 DOCKER = shutil.which("docker") or "docker"
 RUNTIME = "skill-runtime:local"
 IMAGE = "sbam-sandbox-runner:e13-2-test"
-TOKEN = "e132-runner-token-0123456789"
+TOKEN = "e132-runner-token-0123456789"  # noqa: S105 - a throwaway token for a throwaway container
 DIGEST = "sha256:" + "a" * 64
 M = "+919800000001"
 INPUT = {"mobile_number": M, "otp_payload": "123456", "device_fingerprint": "fp-1"}
@@ -67,7 +71,9 @@ UI = [
 ]
 
 
-def docker(*args: str, check: bool = True, timeout: float = 600.0) -> subprocess.CompletedProcess[str]:
+def docker(
+    *args: str, check: bool = True, timeout: float = 600.0
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 - a fixed docker CLI call
         [DOCKER, *args], capture_output=True, text=True, timeout=timeout, check=check
     )
@@ -101,7 +107,9 @@ def agent_url() -> Iterator[str]:
     deadline = time.monotonic() + 60
     while True:  # Docker's port proxy accepts at once; ask the agent itself
         try:
-            if httpx.get(f"{url}/v1/runtime", headers={"Authorization": f"Bearer {TOKEN}"}).is_success:
+            if httpx.get(
+                f"{url}/v1/runtime", headers={"Authorization": f"Bearer {TOKEN}"}
+            ).is_success:
                 break
         except httpx.TransportError:
             pass
@@ -115,20 +123,28 @@ def case(name: str, terminal: str, *seed: str) -> tuple[CaseKind, CaseBody]:
     kind = {"SUCCESS": CaseKind.PASS_FIRST, "ESCALATED": CaseKind.ESCALATION}.get(
         terminal, CaseKind.NO_OP
     )
-    body = {"name": name, "input": INPUT, "initial_state": list(seed), "expected_terminal": terminal}
+    body = {
+        "name": name,
+        "input": INPUT,
+        "initial_state": list(seed),
+        "expected_terminal": terminal,
+    }
     return kind, CaseBody.model_validate(body)
+
+
+def insert_auth(failed_attempts: int, status: str) -> str:
+    return f"INSERT INTO investor_auth VALUES ('{M}', {failed_attempts}, '{status}')"  # noqa: S608
+
+
+def insert_device() -> str:
+    return f"INSERT INTO investor_devices (mobile_number) VALUES ('{M}')"  # noqa: S608
 
 
 def good_cases() -> list[tuple[CaseKind, CaseBody]]:
     return [
-        case("pass-first", "SUCCESS", f"INSERT INTO investor_auth VALUES ('{M}', 0, 'active')"),
-        case(
-            "escalates",
-            "ESCALATED",
-            f"INSERT INTO investor_auth VALUES ('{M}', 3, 'active')",
-            *[f"INSERT INTO investor_devices (mobile_number) VALUES ('{M}')"] * 5,
-        ),
-        case("locked-no-op", "NO_OP", f"INSERT INTO investor_auth VALUES ('{M}', 0, 'LOCKED')"),
+        case("pass-first", "SUCCESS", insert_auth(0, "active")),
+        case("escalates", "ESCALATED", insert_auth(3, "active"), *[insert_device()] * 5),
+        case("locked-no-op", "NO_OP", insert_auth(0, "LOCKED")),
     ]
 
 
@@ -139,7 +155,8 @@ def run_input(
     cases: list[tuple[CaseKind, CaseBody]] | None = None,
     limits: SandboxLimits | None = None,
 ) -> RunInput:
-    """A MS01.1 run. `files` replaces whole bundle files after assembly (a bundle that is simply wrong)."""
+    """A MS01.1 run. `files` replaces whole bundle files after assembly (a bundle that is simply
+    wrong)."""
     params = ms01_params()
     template = load_template("fastmcp-loopy", "1.0.0")
     assembled = assemble_bundle(
@@ -187,14 +204,19 @@ def with_action(code: str, helpers: str = "") -> dict[str, Any]:
     return ms01_bodies(action_body=code, helpers=helpers or ms01_bodies()["helpers"])
 
 
-GOOD_RETURN = 'return {"auth_status": "DENIED", "user_role": None, "jwt_token": None, "state_handoff_id": None}\n'
+GOOD_RETURN = (
+    'return {"auth_status": "DENIED", "user_role": None, "jwt_token": None, '
+    '"state_handoff_id": None}\n'
+)
 APPEND = (
     "state_handoff.append(iteration_pass=1, device_fingerprint=device_fingerprint, "
     'otp_match=True, access_scope="none")\n'
 )
 
 
-def test_e13_2_t02_a_real_bundle_passes_all_three_scenarios_and_leaves_evidence(agent_url: str) -> None:
+def test_e13_2_t02_a_real_bundle_passes_all_three_scenarios_and_leaves_evidence(
+    agent_url: str,
+) -> None:
     result = run(agent_url, run_input())
     assert result.classified.category is None, result.classified
     assert verdicts(result) == {
@@ -249,7 +271,9 @@ def test_e13_2_t06_a_tool_that_overruns_its_budget_is_a_timeout_and_the_run_stil
 def test_e13_2_a_tool_that_prints_instead_of_returning_is_an_output_schema_mismatch(
     agent_url: str,
 ) -> None:
-    result = run(agent_url, run_input(bodies=with_action('print("done")\nreturn None  # type: ignore\n')))
+    result = run(
+        agent_url, run_input(bodies=with_action('print("done")\nreturn None  # type: ignore\n'))
+    )
     assert result.classified.category in (
         FailureCategory.OUTPUT_SCHEMA_MISMATCH,
         FailureCategory.RUNTIME_ERROR,
@@ -283,11 +307,8 @@ def test_e13_2_a_bundle_that_never_appends_its_handoff_row_fails_the_case(agent_
 
 
 def test_e13_2_a_bundle_cannot_rewrite_the_append_only_evidence(agent_url: str) -> None:
-    tamper = (
-        APPEND
-        + 'state._conn.execute("UPDATE auth_event_audit_handoff SET payload = \'{}\'")\n'
-        + GOOD_RETURN
-    )
+    rewrite = "UPDATE auth_event_audit_handoff SET payload = '{}'"
+    tamper = APPEND + f'state._conn.execute("{rewrite}")\n' + GOOD_RETURN
     result = run(agent_url, run_input(bodies=with_action(tamper)))
     assert result.classified.category is FailureCategory.RUNTIME_ERROR
     assert "append-only" in result.logs.decode() + (result.classified.findings()[0].message)
@@ -302,7 +323,9 @@ def test_e13_2_an_allocation_bomb_is_an_oom_case_not_a_dead_runner(agent_url: st
 
 
 def test_e13_2_nothing_survives_a_run_the_next_run_starts_clean(agent_url: str) -> None:
-    first = run(agent_url, run_input(bodies=with_action("time.sleep(70)\n" + GOOD_RETURN, "import time\n")))
+    first = run(
+        agent_url, run_input(bodies=with_action("time.sleep(70)\n" + GOOD_RETURN, "import time\n"))
+    )
     assert first.classified.category is FailureCategory.TIMEOUT
     second = run(agent_url, replace(run_input(), run_id=uuid.uuid4()))
     assert second.classified.category is None, second.classified  # no leftover database or port

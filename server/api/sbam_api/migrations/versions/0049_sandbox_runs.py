@@ -87,10 +87,10 @@ def upgrade() -> None:
             name=op.f("ck_sandbox_runs_failure_category_valid"),
         ),
         sa.CheckConstraint(
-            "infra_reason IS NULL OR infra_reason IN ('HOST_UNREACHABLE', 'HASH_MISMATCH',"
-            " 'TEMPLATE_DIGEST_MISMATCH', 'VM_CREATE_FAILED', 'VM_BOOT_TIMEOUT', 'RUNNER_FAILED',"
-            " 'DATASET_INVALID', 'EGRESS_LOG_UNAVAILABLE', 'DESTROY_FAILED', 'CANCELLED',"
-            " 'SUPERSEDED')",
+            "infra_reason IS NULL OR infra_reason IN ('NOT_CONFIGURED', 'HOST_UNREACHABLE',"
+            " 'HASH_MISMATCH', 'INPUT_MISMATCH', 'TEMPLATE_DIGEST_MISMATCH', 'VM_CREATE_FAILED',"
+            " 'VM_BOOT_TIMEOUT', 'RUNNER_FAILED', 'DATASET_INVALID', 'EGRESS_LOG_UNAVAILABLE',"
+            " 'DESTROY_FAILED', 'CANCELLED', 'SUPERSEDED')",
             name=op.f("ck_sandbox_runs_infra_reason_valid"),
         ),
         sa.CheckConstraint(
@@ -150,9 +150,27 @@ def upgrade() -> None:
         schema="sbam",
     )
     op.execute(create_frozen_trigger("sandbox_runs"))
+    # what a run stores in storage is indexed in `artifacts` like every other stored object (0036)
+    op.drop_constraint(op.f("ck_artifacts_kind_valid"), "artifacts", schema="sbam", type_="check")
+    op.create_check_constraint(
+        op.f("ck_artifacts_kind_valid"),
+        "artifacts",
+        "kind IN ('CODE_BUNDLE', 'SCHEMA_SQL', 'SANDBOX_OUTPUTS', 'SANDBOX_LOGS',"
+        " 'SANDBOX_EGRESS')",
+        schema="sbam",
+    )
 
 
 def downgrade() -> None:
+    # rows this revision's kinds allowed go first, or the old constraint can't come back
+    op.execute("DELETE FROM sbam.artifacts WHERE kind LIKE 'SANDBOX_%'")
+    op.drop_constraint(op.f("ck_artifacts_kind_valid"), "artifacts", schema="sbam", type_="check")
+    op.create_check_constraint(
+        op.f("ck_artifacts_kind_valid"),
+        "artifacts",
+        "kind IN ('CODE_BUNDLE', 'SCHEMA_SQL')",
+        schema="sbam",
+    )
     op.execute(drop_frozen_trigger("sandbox_runs"))
     op.drop_index(op.f("ix_sandbox_runs_tenant_id"), table_name="sandbox_runs", schema="sbam")
     op.drop_index(op.f("ix_sandbox_runs_project_id"), table_name="sandbox_runs", schema="sbam")

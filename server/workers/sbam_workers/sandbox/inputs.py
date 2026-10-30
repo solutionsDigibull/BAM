@@ -1,9 +1,9 @@
 """What the sandbox needs from the stored build, in the shapes the runner reads (E13.2, ADR 0023).
 
 The harness configuration is derived from the same render params the bundle was generated from
-(`params_from_manifest`), never from the bundle under test: the tool names, the fresh-state names, the
-key of the fresh-state queries and the handoff fields are what the Sub-Skill was *asked* to be, so a
-bundle that drifted from them fails its tests instead of redefining them.
+(`params_from_manifest`), never from the bundle under test: the tool names, the fresh-state names,
+the key of the fresh-state queries and the handoff fields are what the Sub-Skill was *asked* to be,
+so a bundle that drifted from them fails its tests instead of redefining them.
 """
 
 from collections.abc import Mapping, Sequence

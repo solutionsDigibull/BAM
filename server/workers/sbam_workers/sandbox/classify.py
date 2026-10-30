@@ -23,6 +23,7 @@ from typing import Final
 
 from pydantic import ValidationError
 from sbam_contracts.build_dashboard import Finding, GateName
+from sbam_contracts.harness import HarnessTrace
 from sbam_contracts.sandbox import (
     EgressEvent,
     EgressSource,
@@ -36,7 +37,6 @@ from sbam_contracts.sandbox import (
 )
 
 from sbam_workers.sandbox.backend import ExecResult
-from sbam_workers.test.harness import HarnessTrace
 
 EXIT_OK: Final = 0
 EXIT_DATABASE: Final = 71

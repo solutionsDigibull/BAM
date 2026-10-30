@@ -1,18 +1,19 @@
-"""The certifying backend: CubeSandbox microVMs through the official SDK (ADR 0023, decisions 2, 3, 4).
+"""The certifying backend: CubeSandbox microVMs through the official SDK (ADR 0023, d.2, 3, 4).
 
-Two planes, one SDK: control (`create`, `kill`, `list`) is REST on CubeAPI; data (`exec`, files) is Connect
-RPC to the guest's `envd` through CubeProxy. The SDK is synchronous and its REST calls carry no timeout, so
-every call runs in a worker thread under `asyncio.wait_for`.
+Two planes, one SDK: control (`create`, `kill`, `list`) is REST on CubeAPI; data (`exec`, files) is
+Connect RPC to the guest's `envd` through CubeProxy. The SDK is synchronous and its REST calls carry
+no timeout, so every call runs in a worker thread under `asyncio.wait_for`.
 
 Rules worth knowing
-  * Tests run as the unprivileged `sbam` user, never as root. Only `system=True` file writes (the hosts file)
-    are root's. The SDK runs `bash -l -c <cmd>`, so every argv element is quoted here and nothing else is ever
-    part of the command text.
-  * Output goes to files inside the VM and is read back through `head -c`, so a case that prints gigabytes
-    cannot fill the worker's memory (the SDK reads a whole stream into one string) and no tail is lost to a
-    pipe that is still draining when the process ends.
-  * Egress is the allowlist the planner pinned (IPv4 only) with internet access off. CubeSandbox's precedence
-    is allow > deny > default, and its L3/L4 drops are not logged; evidence comes from `egress_reader`.
+  * Tests run as the unprivileged `sbam` user, never as root. Only `system=True` file writes (the
+    hosts file) are root's. The SDK runs `bash -l -c <cmd>`, so every argv element is quoted here
+    and nothing else is ever part of the command text.
+  * Output goes to files inside the VM and is read back through `head -c`, so a case that prints
+    gigabytes cannot fill the worker's memory (the SDK reads a whole stream into one string) and no
+    tail is lost to a pipe that is still draining when the process ends.
+  * Egress is the allowlist the planner pinned (IPv4 only) with internet access off. CubeSandbox's
+    precedence is allow > deny > default, and its L3/L4 drops are not logged; evidence comes from
+    `egress_reader`.
   * `destroy` of a VM that is already gone succeeds.
 """
 
@@ -42,8 +43,8 @@ CONTROL_TIMEOUT_S: Final = 30.0
 EXEC_SLACK_S: Final = 30.0  # envd enforces the run's deadline; the client waits a bit longer
 TIMEOUT_EXIT_CODE: Final = 124
 RUNTIME_DIGEST_PATH: Final = "/etc/sbam-runtime"
-STDOUT_PATH: Final = "/tmp/.sbam-stdout"
-STDERR_PATH: Final = "/tmp/.sbam-stderr"
+STDOUT_PATH: Final = "/tmp/.sbam-stdout"  # noqa: S108 - inside the VM, written by the run user
+STDERR_PATH: Final = "/tmp/.sbam-stderr"  # noqa: S108
 
 
 @dataclass(frozen=True)
@@ -58,13 +59,14 @@ class CubeSettings:
 
 
 def _sdk() -> Any:
-    import cubesandbox
+    import cubesandbox  # type: ignore[import-untyped]  # the SDK ships no stubs
 
     return cubesandbox
 
 
 def redirected_command(argv: Sequence[str]) -> str:
-    """`argv` as one shell line that writes each stream to a file and keeps the command's exit code."""
+    """`argv` as one shell line that writes each stream to a file and keeps the command's exit
+    code."""
     return f"{shlex.join(argv)} > {STDOUT_PATH} 2> {STDERR_PATH}"
 
 
@@ -104,7 +106,9 @@ class CubeSandboxBackend:
         except SandboxInfraError:
             raise
         except TimeoutError:
-            raise SandboxInfraError(InfraReason.HOST_UNREACHABLE, "the sandbox host timed out") from None
+            raise SandboxInfraError(
+                InfraReason.HOST_UNREACHABLE, "the sandbox host timed out"
+            ) from None
         except sdk.TemplateNotFoundError:
             raise SandboxInfraError(
                 InfraReason.TEMPLATE_DIGEST_MISMATCH, "no template for this runtime digest"
@@ -114,11 +118,14 @@ class CubeSandboxBackend:
                 return None  # type: ignore[return-value]
             raise SandboxInfraError(reason, "the sandbox is gone") from None
         except sdk.CubeSandboxError as exc:
-            raise SandboxInfraError(reason, f"the sandbox host answered {exc.status_code}") from None
+            raise SandboxInfraError(
+                reason, f"the sandbox host answered {exc.status_code}"
+            ) from None
         except (httpx.TransportError, OSError, ConnectionError) as exc:
             # requests' ConnectionError is an OSError; so is a refused socket
             raise SandboxInfraError(
-                InfraReason.HOST_UNREACHABLE, f"the sandbox host is unreachable ({type(exc).__name__})"
+                InfraReason.HOST_UNREACHABLE,
+                f"the sandbox host is unreachable ({type(exc).__name__})",
             ) from None
         except RuntimeError as exc:
             raise SandboxInfraError(reason, f"the sandbox failed: {type(exc).__name__}") from None
@@ -127,7 +134,9 @@ class CubeSandboxBackend:
         try:
             return self._live[vm.vm_id]
         except KeyError:
-            raise SandboxInfraError(InfraReason.RUNNER_FAILED, "this worker does not hold the VM") from None
+            raise SandboxInfraError(
+                InfraReason.RUNNER_FAILED, "this worker does not hold the VM"
+            ) from None
 
     # --- the protocol --------------------------------------------------------------------------
 
@@ -180,7 +189,8 @@ class CubeSandboxBackend:
         envs = dict(env or {})
 
         def run(line: str, deadline: float) -> Any:
-            """The command's result, or None when its deadline passed (the process is the VM's to kill)."""
+            """The command's result, or None when its deadline passed (the process is the VM's to
+            kill)."""
             try:
                 return box.commands.run(line, timeout=deadline, envs=envs, user=RUN_USER)
             except httpx.TimeoutException:
@@ -250,7 +260,9 @@ class CubeSandboxBackend:
         for row in rows:
             started = row.get("startedAt")
             try:
-                when = datetime.fromisoformat(str(started).replace("Z", "+00:00")) if started else None
+                when = (
+                    datetime.fromisoformat(str(started).replace("Z", "+00:00")) if started else None
+                )
             except ValueError:
                 when = None
             out.append(VmInfo(str(row["sandboxID"]), when, dict(row.get("metadata") or {})))

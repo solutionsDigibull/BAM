@@ -79,8 +79,10 @@ class HandoffError(Exception):
 
 
 def runtime_digest() -> str:
-    for source in (Path(RUNTIME_FILE).read_text() if Path(RUNTIME_FILE).exists() else "",
-                   os.environ.get("SANDBOX_RUNTIME_DIGEST", "")):
+    for source in (
+        Path(RUNTIME_FILE).read_text() if Path(RUNTIME_FILE).exists() else "",
+        os.environ.get("SANDBOX_RUNTIME_DIGEST", ""),
+    ):
         try:
             return normalize_digest(source.strip())
         except ValueError:
@@ -93,8 +95,13 @@ class PgStore:
     `state.read`; handoff rows are written by the bundle and only checked here."""
 
     def __init__(
-        self, conn: Any, table: str, key_field: str, inputs: Mapping[str, Any],
-        state_module: Any, required: list[str],
+        self,
+        conn: Any,
+        table: str,
+        key_field: str,
+        inputs: Mapping[str, Any],
+        state_module: Any,
+        required: list[str],
     ) -> None:
         self.conn, self.table, self.required = conn, table, required
         self.key, self.state, self.seen = inputs.get(key_field), state_module, 0
@@ -256,9 +263,13 @@ class Database:
         )
         if started.returncode != 0:
             raise RuntimeError("the ephemeral database did not start")
-        self.admin = psycopg.connect(host="127.0.0.1", user="postgres", dbname="postgres", autocommit=True)
+        self.admin = psycopg.connect(
+            host="127.0.0.1", user="postgres", dbname="postgres", autocommit=True
+        )
         self.admin.execute(f"CREATE DATABASE {TEMPLATE_DB}")
-        with psycopg.connect(host="127.0.0.1", user="postgres", dbname=TEMPLATE_DB, autocommit=True) as conn:
+        with psycopg.connect(
+            host="127.0.0.1", user="postgres", dbname=TEMPLATE_DB, autocommit=True
+        ) as conn:
             conn.execute(self.schema_sql)
 
     def case(self, number: int) -> Any:
@@ -289,7 +300,9 @@ def import_bundle(bundle_dir: Path, tool_module: str) -> tuple[Any, Any, Any]:
         sys.path.insert(0, str(bundle_dir))
     package = tool_module.rpartition(".")[0]
     for name in [n for n in sys.modules if n == package or n.startswith(f"{package}.")]:
-        del sys.modules[name]  # a left-behind thread keeps the old copy, bound to the old connection
+        del sys.modules[
+            name
+        ]  # a left-behind thread keeps the old copy, bound to the old connection
     server = importlib.import_module(tool_module)
     prefix = f"{package}." if package else ""
     return (
@@ -314,12 +327,18 @@ async def run_case_in_db(
         try:
             mcp, state, handoff = import_bundle(bundle_dir, request.tool_module)
         except BaseException as exc:  # a bundle may raise anything, SystemExit included
-            return error_trace(str(raw["case_id"]), "IMPORT_ERROR", f"{type(exc).__name__}: {exc}"), []
+            return error_trace(
+                str(raw["case_id"]), "IMPORT_ERROR", f"{type(exc).__name__}: {exc}"
+            ), []
         add_memory_marker(mcp)
         state.configure(conn)
         handoff.configure(conn)
         store = PgStore(
-            conn, request.handoff_table, request.harness.key_field, raw["input"], state,
+            conn,
+            request.handoff_table,
+            request.harness.key_field,
+            raw["input"],
+            state,
             request.harness.handoff_fields,
         )
         spec = load_loop_spec(request.loop_spec)
@@ -334,7 +353,9 @@ async def run_case_in_db(
                     loop_case(raw, request),
                     fresh_state_parameters=config.fresh_state_parameters,
                     # the harness only needs a row to hand over; what the table must hold is checked on the table
-                    handoff=HandoffSpec(table=request.handoff_table, required_fields=[ITERATION_FIELD]),
+                    handoff=HandoffSpec(
+                        table=request.handoff_table, required_fields=[ITERATION_FIELD]
+                    ),
                     notification=notification(request),
                     tools=tools,
                     store=store,
@@ -354,7 +375,9 @@ async def run_case_in_db(
         conn.close()
 
 
-def result_of(raw: Mapping[str, Any], trace: HarnessTrace, rows: list[dict[str, Any]]) -> RunnerCaseResult:
+def result_of(
+    raw: Mapping[str, Any], trace: HarnessTrace, rows: list[dict[str, Any]]
+) -> RunnerCaseResult:
     expected = raw["expected_terminal"]
     passed = trace.passed(expected)
     category = None
@@ -369,7 +392,9 @@ def result_of(raw: Mapping[str, Any], trace: HarnessTrace, rows: list[dict[str, 
             "terminal": trace.terminal,
             "passed": passed,
             "failure_category": category,
-            "trace": json.loads(trace.model_dump_json(by_alias=True)),  # `terminal: null` stays: it is required
+            "trace": json.loads(
+                trace.model_dump_json(by_alias=True)
+            ),  # `terminal: null` stays: it is required
             "handoff_rows": rows,
         }
     )
@@ -425,8 +450,10 @@ def run_all(
             trace, rows = run_sync(run_case_in_db(request, raw, db, number, bundle_dir))
         except TimeoutError:
             trace = error_trace(
-                str(raw["case_id"]), "TIMEOUT",
-                f"the case overran its {request.limits.case_timeout_s} s limit", budget=True,
+                str(raw["case_id"]),
+                "TIMEOUT",
+                f"the case overran its {request.limits.case_timeout_s} s limit",
+                budget=True,
             )
             rows = []
         results.append(result_of(raw, trace, rows))

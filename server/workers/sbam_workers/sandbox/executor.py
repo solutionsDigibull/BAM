@@ -24,8 +24,9 @@ Rules worth knowing
 
 import asyncio
 import logging
+import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Final
 from uuid import UUID
 
@@ -71,6 +72,8 @@ BUNDLE_DIR: Final = f"{WORK_DIR}/bundle"
 REQUEST_PATH: Final = f"{WORK_DIR}/request.json"
 SCHEMA_PATH: Final = f"{WORK_DIR}/schema.sql"
 OUTPUTS_PATH: Final = f"{WORK_DIR}/out/outputs.json"
+DATA_DIR: Final = f"{WORK_DIR}/data"
+_DATA_NAME: Final = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,119}")
 HOSTS_PATH: Final = "/etc/hosts"
 RUNNER_ARGV: Final = ("python", "-I", "/opt/sbam/harness/run_cases.py", REQUEST_PATH)
 MAX_REQUEST_BYTES: Final = 4 * 1024 * 1024
@@ -78,6 +81,7 @@ BOOT_GRACE_S: Final = 300  # the host's own backstop beyond the run (ADR 0023, d
 MAX_LOG_BYTES: Final = 10 * 1024 * 1024
 
 EgressReader = Callable[[str], Awaitable[list[EgressEvent]]]
+VmCreated = Callable[[str], Awaitable[None]]  # told the VM id the moment the VM exists
 
 
 @dataclass(frozen=True)
@@ -109,6 +113,7 @@ class RunInput:
     schema_sql_sha256: str  # manifest `build.schema_sql_sha256`
     dataset: DatasetInput
     environment: str = "unknown"
+    data_files: Mapping[str, bytes] = field(default_factory=dict)  # name -> bytes, under /work/data
 
 
 @dataclass(frozen=True)
@@ -189,6 +194,7 @@ async def execute(
     *,
     egress_reader: EgressReader | None = None,
     resolver: Resolver = system_resolver,
+    on_created: VmCreated | None = None,
 ) -> ExecutionResult:
     if backend.mode is not run.mode:
         # the activity read the mode from config and built the backend from the same value;
@@ -200,6 +206,11 @@ async def execute(
 
     bundle_files = verify_inputs(run)  # before any VM exists
     request_body = build_request(run)
+    for name in run.data_files:  # a name is a file name, never a path
+        if not _DATA_NAME.fullmatch(name):
+            raise SandboxInfraError(
+                InfraReason.DATASET_INVALID, "a data file name is not a file name"
+            )
     try:
         plan = await plan_network(run.policy, run.mock_api, resolver)
     except EgressPolicyError as exc:
@@ -214,6 +225,8 @@ async def execute(
     egress: list[EgressEvent] = []
     classified: Classified
     try:
+        if on_created is not None:
+            await _announce(on_created, vm.vm_id)
         classified, result, outputs_raw, egress = await _run_in_vm(
             run, backend, vm, plan, bundle_files, request_body, egress_reader
         )
@@ -237,6 +250,15 @@ async def execute(
         tuple(egress),
         destroy_error,
     )
+
+
+async def _announce(on_created: VmCreated, vm_id: str) -> None:
+    """A callback that fails must not cost the run its VM: it is inside the `try` that destroys it,
+    and its own failure is only logged (the id is also in the result)."""
+    try:
+        await on_created(vm_id)
+    except Exception:
+        log.warning("recording the VM id failed", extra={"vm_id": vm_id})
 
 
 def _parsed_cases(raw: bytes | None) -> list[Any]:
@@ -277,8 +299,11 @@ async def _run_in_vm(
         return wrong, None, None, []
 
     await backend.put_files(vm, {HOSTS_PATH: render_hosts(plan.hosts)}, system=True)
-    package = run.tool_module.rpartition(".")[0]  # the bundle's modules import each other relatively
+    package = run.tool_module.rpartition(".")[
+        0
+    ]  # the bundle's modules import each other relatively
     files = {f"{BUNDLE_DIR}/{package}/{name}": data for name, data in bundle_files.items()}
+    files.update({f"{DATA_DIR}/{name}": data for name, data in run.data_files.items()})
     files[SCHEMA_PATH] = run.schema_sql
     files[REQUEST_PATH] = request_body
     await backend.put_files(vm, files)
@@ -288,7 +313,7 @@ async def _run_in_vm(
         vm,
         RUNNER_ARGV,
         timeout_s=total_timeout,
-        env={"SBAM_MODE": run.mode.value},
+        env=_runner_env(run),
         max_output_bytes=run.limits.max_output_bytes,
     )
     outputs_raw = await backend.get_file(vm, OUTPUTS_PATH, max_bytes=run.limits.max_output_bytes)
@@ -304,6 +329,17 @@ async def _run_in_vm(
         egress=egress,
     )
     return classified, result, outputs_raw, egress
+
+
+def _runner_env(run: RunInput) -> dict[str, str]:
+    """What the code under test may learn about its run: no secret, no tenant, no path outside
+    /work."""
+    env = {"SBAM_MODE": run.mode.value, "SBAM_RUN_ID": str(run.run_id)}
+    if run.data_files:
+        env["SBAM_DATA_DIR"] = DATA_DIR
+    if run.mock_api is not None:
+        env["SBAM_MOCK_API"] = f"http://{run.mock_api.host}:{run.mock_api.port}"
+    return env
 
 
 async def _alive(backend: SandboxBackend, vm: VmHandle) -> bool:

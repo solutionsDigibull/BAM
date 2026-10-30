@@ -7,14 +7,16 @@ mapping is tested against the real types. The drift test pins every SDK signatur
 
 import asyncio
 import inspect
+import time
 import types
 import uuid
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 
-import cubesandbox
+import cubesandbox  # type: ignore[import-untyped]  # the SDK ships no stubs
 import httpx
 import pytest
+import sbam_workers.sandbox.cube_backend as cube_module
 from sbam_contracts.sandbox import InfraReason, SandboxLimits, SandboxMode
 from sbam_workers.sandbox.backend import SandboxInfraError, VmHandle, VmSpec
 from sbam_workers.sandbox.cube_backend import (
@@ -78,10 +80,10 @@ class FakeBox:
 
 
 class FakeSandbox:
-    boxes: dict[str, FakeBox] = {}
-    created: list[dict[str, Any]] = []
-    create_error: Exception | None = None
-    listing: list[dict[str, Any]] = []
+    boxes: ClassVar[dict[str, FakeBox]] = {}
+    created: ClassVar[list[dict[str, Any]]] = []
+    create_error: ClassVar[Exception | None] = None
+    listing: ClassVar[list[dict[str, Any]]] = []
 
     @classmethod
     def reset(cls) -> None:
@@ -203,7 +205,10 @@ def test_e13_2_files_are_written_as_the_run_user_and_the_hosts_file_as_root() ->
     run(b.put_files(vm, {"/work/request.json": b"{}"}))
     writes = FakeSandbox.boxes["vm-1"].writes
     assert writes[0] == ("/etc/hosts", b"1.2.3.4 x\n", SYSTEM_USER)
-    assert writes[1] == ("/work/request.json", b"{}", RUN_USER) and RUN_USER != "root"
+    assert writes[1] == ("/work/request.json", b"{}", RUN_USER)
+    assert (
+        len({RUN_USER, SYSTEM_USER}) == 2
+    )  # tests never run as the user that writes the hosts file
 
 
 def test_e13_2_the_vms_own_digest_is_read_as_root() -> None:
@@ -339,21 +344,15 @@ def test_e13_2_list_vms_carries_the_tags_the_reaper_filters_on() -> None:
     assert vms[1].started_at is None and dict(vms[1].metadata) == {}
 
 
-def test_e13_2_a_hung_host_call_ends_as_host_unreachable() -> None:
+def test_e13_2_a_hung_host_call_ends_as_host_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
     b = backend()
-    import sbam_workers.sandbox.cube_backend as module
-
-    original = module.CONTROL_TIMEOUT_S
-    module.CONTROL_TIMEOUT_S = 0.05
-    try:
-        FakeSandbox.create_error = None
-        FakeSandbox.create = classmethod(lambda cls, template=None, **kw: __import__("time").sleep(0.5))  # type: ignore[method-assign,assignment,misc]
-        with pytest.raises(SandboxInfraError) as caught:
-            run(b.create(spec()))
-        assert caught.value.reason is InfraReason.HOST_UNREACHABLE
-    finally:
-        module.CONTROL_TIMEOUT_S = original
-        FakeSandbox.create = FakeSandbox.__dict__["create"]
+    monkeypatch.setattr(cube_module, "CONTROL_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(
+        FakeSandbox, "create", classmethod(lambda cls, template=None, **kw: time.sleep(0.5))
+    )
+    with pytest.raises(SandboxInfraError) as caught:
+        run(b.create(spec()))
+    assert caught.value.reason is InfraReason.HOST_UNREACHABLE
 
 
 # --- drift against the real SDK (ADR 0023, decision 2) ------------------------------------------
@@ -365,9 +364,14 @@ def params(fn: Any) -> set[str]:
 
 def test_e13_2_sdk_drift_the_calls_we_make_still_exist() -> None:
     assert cubesandbox.__version__ == "0.7.3"  # a bump is a deliberate, reviewed change
-    assert {"template", "timeout", "metadata", "allow_internet_access", "network", "config"} <= params(
-        cubesandbox.Sandbox.create
-    )
+    assert {
+        "template",
+        "timeout",
+        "metadata",
+        "allow_internet_access",
+        "network",
+        "config",
+    } <= params(cubesandbox.Sandbox.create)
     assert {"sandbox_id", "config"} <= params(cubesandbox.Sandbox.connect)
     assert "config" in params(cubesandbox.Sandbox.list_v2)
     assert params(cubesandbox.Sandbox.kill) == {"self"}

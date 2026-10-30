@@ -83,8 +83,12 @@ class FailureCategory(StrEnum):
 class InfraReason(StrEnum):
     """Why a run is INFRA_ERROR; stored in the run row so an operator sees the cause."""
 
+    NOT_CONFIGURED = "NOT_CONFIGURED"  # no sandbox mode or host settings: nothing can run
     HOST_UNREACHABLE = "HOST_UNREACHABLE"
     HASH_MISMATCH = "HASH_MISMATCH"  # an input changed after the gates: no VM was created
+    # an input is not what the build recorded (a gate did not pass, the schema is not the
+    # manifest's)
+    INPUT_MISMATCH = "INPUT_MISMATCH"
     # no template for this digest, or the wrong one
     TEMPLATE_DIGEST_MISMATCH = "TEMPLATE_DIGEST_MISMATCH"
     VM_CREATE_FAILED = "VM_CREATE_FAILED"
