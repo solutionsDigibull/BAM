@@ -1,1 +1,5 @@
-"""Sandbox runs: the `sandbox_runs` table and its repository (E13.2, ADR 0023)."""
+"""Sandbox runs: the `sandbox_runs` table, its repository and the logs endpoint (E13.2)."""
+
+from sbam_api.sandbox.router import router
+
+__all__ = ["router"]

@@ -34,6 +34,7 @@ from functools import lru_cache
 from typing import Any, Final
 from urllib.parse import urlsplit
 
+from pydantic import ValidationError
 from sbam_api.storage.factory import make_backend
 from sbam_contracts.build import TESTS_FAILED, BuildStageInput
 from sbam_contracts.pipeline import IdResult
@@ -61,6 +62,7 @@ from sbam_workers.sandbox.load import (
     IsatvonOf,
     Loaded,
     SqlSandboxInputs,
+    mismatch,
 )
 from sbam_workers.sandbox.policy import MockApi
 from sbam_workers.sandbox.store import Evidence, SqlRunStore
@@ -90,7 +92,7 @@ def unavailable(reason: InfraReason, detail: str = "") -> ApplicationError:
     )
 
 
-def tests_failed(identity: Identity) -> ApplicationError:
+def loop_tests_failed(identity: Identity) -> ApplicationError:
     return ApplicationError(
         "the tests ran and failed",
         [str(identity.attempt_id)],
@@ -101,12 +103,18 @@ def tests_failed(identity: Identity) -> ApplicationError:
 
 def limits_for(loop_spec: Mapping[str, Any]) -> SandboxLimits:
     """Room for the bound the Sub-Skill declared: `max_iterations` passes of two tools, each allowed
-    `budget_ms`, plus a margin. Never below the default and never above the policy's ceiling (a
-    Sub-Skill that needs more is refused by the contract, not clamped)."""
+    `budget_ms`, plus a margin. Never below the default. A Sub-Skill that needs more than the
+    policy's
+    ceiling can never be tested here, and retrying will not change that: refused, not clamped."""
     seconds = math.ceil(
         int(loop_spec["max_iterations"]) * 2 * int(loop_spec["budget_ms"]) / 1000 + 10
     )
-    return SandboxLimits(case_timeout_s=max(SandboxLimits().case_timeout_s, seconds))
+    try:
+        return SandboxLimits(case_timeout_s=max(SandboxLimits().case_timeout_s, seconds))
+    except ValidationError:
+        raise mismatch(
+            "the loop's declared bounds need more time per case than the sandbox allows"
+        ) from None
 
 
 def mock_api_of(settings: WorkerSettings) -> MockApi | None:
@@ -164,7 +172,7 @@ class RunSandboxTests:
         )
         if claimed.replay:  # the answer is already on the row; the code is not run twice
             if claimed.failure_category is not None:
-                raise tests_failed(identity)
+                raise loop_tests_failed(identity)
             return IdResult(id=claimed.run_id)
         beat = asyncio.create_task(self._heartbeat(str(claimed.run_id)))
         try:
@@ -238,7 +246,11 @@ class RunSandboxTests:
             await self._finish_infra(
                 inp, identity, run_id, InfraReason.HASH_MISMATCH, started=started
             )
-            raise unavailable(InfraReason.HASH_MISMATCH, exc.what) from None
+            raise ApplicationError(
+                f"{exc.what} does not match its recorded hash",
+                type=HASH_MISMATCH,
+                non_retryable=True,
+            ) from None
         except ApplicationError:  # only the loaders raise these: an input is not what was recorded
             await self._finish_infra(
                 inp, identity, run_id, InfraReason.INPUT_MISMATCH, started=started
@@ -324,7 +336,7 @@ class RunSandboxTests:
         )
         if classified.passed:
             return IdResult(id=run_id)
-        raise tests_failed(identity)
+        raise loop_tests_failed(identity)
 
     def _run_input(
         self, run_id: uuid.UUID, identity: Identity, sandbox: Sandbox, loaded: Loaded

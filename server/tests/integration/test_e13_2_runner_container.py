@@ -25,6 +25,7 @@ import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -48,6 +49,7 @@ from sbam_workers.sandbox.local_backend import LocalDockerBackend
 pytestmark = pytest.mark.integration
 
 DOCKER = shutil.which("docker") or "docker"
+REPO = Path(__file__).resolve().parents[3]  # the build context of the sandbox image
 RUNTIME = "skill-runtime:local"
 IMAGE = "sbam-sandbox-runner:e13-2-test"
 TOKEN = "e132-runner-token-0123456789"  # noqa: S105 - a throwaway token for a throwaway container
@@ -92,9 +94,9 @@ def agent_url() -> Iterator[str]:
     if docker("image", "inspect", RUNTIME, check=False).returncode != 0:
         pytest.skip(f"{RUNTIME} is not built (make runtime-registry)")
     docker(
-        "build", "-q", "-f", "compose/docker/sandbox-runner.Dockerfile", "-t", IMAGE,
-        "--build-arg", f"RUNTIME_IMAGE={RUNTIME}", ".",
-    )  # fmt: skip  # the build context is the repository root, which is where pytest runs from
+        "build", "-q", "-f", str(REPO / "compose/docker/sandbox-runner.Dockerfile"), "-t", IMAGE,
+        "--build-arg", f"RUNTIME_IMAGE={RUNTIME}", str(REPO),
+    )  # fmt: skip
     port, name = free_port(), f"sbx-e132-{uuid.uuid4().hex[:8]}"
     docker(
         "run", "-d", "--name", name, "-p", f"127.0.0.1:{port}:8091",
