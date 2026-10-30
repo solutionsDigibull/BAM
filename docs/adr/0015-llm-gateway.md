@@ -30,6 +30,12 @@ C-41 stays: there is **no budget limit by default**. Two additions reduce spend 
   and costs nothing, in any project of the same tenant; it never crosses tenants. Changing the prompt,
   the schema or any document is a different key, so a stale answer cannot be served. A hit writes a
   zero-cost `llm_calls` row (`model = derivative-cache`). `LLM_DERIVATIVE_CACHE=false` turns it off.
+  **Retention (#497):** the key is a hash, so a purged document's rows cannot be found by document. Instead
+  a daily schedule (`SweepLlmDerivatives`, 05:00 UTC, after the derived-file sweep) hard-deletes rows
+  unused for `LLM_DERIVATIVE_TTL_DAYS` (default 90, the document bin's retention; 0 keeps them); use is
+  `last_hit_at`, else `created_at`, and a hit refreshes it. Exact deletion by document (reference counts
+  per source version) was not chosen: a row built from several documents needs counting, and a bounded
+  lifetime is enough until policy asks for more. One audit row of counts per run that deleted anything.
 - **Opt-in budgets.** `LLM_PROJECT_BUDGET_USD` and `LLM_TENANT_BUDGET_USD` (unset = unlimited) refuse
   the next model call with the non-retryable `BudgetExceeded` once recorded spend (`llm_calls.cost_usd`,
   failed attempts included) reaches them. Cache hits are still served.
