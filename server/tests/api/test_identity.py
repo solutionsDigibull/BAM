@@ -403,3 +403,23 @@ def test_a04_t07_a_deactivated_user_is_still_401(h: Harness) -> None:
         row.status = "DEACTIVATED"
         s.commit()
     assert h.call("GET", "/admin/users", token).status_code == 401
+
+
+def test_a15b_t06_tenants_page_and_the_cursor_is_bound_to_the_caller(h: Harness) -> None:
+    for i in range(3):
+        h.add_tenant(uuid.uuid4(), f"Extra {i}")  # five tenants in all
+    seen: list[str] = []
+    cursor = ""
+    while True:
+        res = h.call("GET", f"/admin/tenants?limit=2&cursor={cursor}", h.root())
+        assert res.status_code == 200, res.text
+        seen += [t["id"] for t in res.json()["items"]]
+        cursor = res.json()["next_cursor"] or ""
+        if not cursor:
+            break
+    assert len(seen) == 5 == len(set(seen))
+    first = h.call("GET", "/admin/tenants?limit=2", h.root()).json()["next_cursor"]
+    other_root = h.realm.token(uuid.uuid4(), **SUPER)
+    problem(h.call("GET", f"/admin/tenants?cursor={first}", other_root), 400, "INVALID_CURSOR")
+    problem(h.call("GET", "/admin/tenants?cursor=junk", h.root()), 400, "INVALID_CURSOR")
+    assert h.call("GET", "/admin/tenants?limit=0", h.root()).status_code == 400

@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from sbam_api.core.auth import Auth, CurrentUser, admin, authenticated, super_admin
 from sbam_api.core.conventions import etag
 from sbam_api.db.session import app_sessions
-from sbam_api.identity import repository, service
+from sbam_api.identity import paging, repository, service
 from sbam_api.identity.models import Tenant, User
 
 router = APIRouter(tags=["identity"])
@@ -64,8 +64,21 @@ def create_tenant(
 
 
 @router.get("/admin/tenants")
-def list_tenants(user: SuperAdmin, session: Db) -> Page[TenantOut]:
-    return Page[TenantOut](items=[_out(t) for t in repository.list_tenants(session)])
+def list_tenants(
+    user: SuperAdmin,
+    session: Db,
+    request: Request,
+    limit: str | None = None,
+    cursor: str | None = None,
+) -> Page[TenantOut]:
+    """`?limit=1..100 (25)&cursor=`. Platform-wide, so the cursor is signed for the caller."""
+    secret = request.app.state.settings.cursor_secret.get_secret_value().encode()
+    scope = f"tenants:{user.keycloak_sub}"
+    size, after = paging.read_page(cursor, limit, scope, secret)
+    rows, next_cursor = paging.cut(
+        repository.list_tenants(session, after, size), size, scope, secret
+    )
+    return Page[TenantOut](items=[_out(t) for t in rows], next_cursor=next_cursor)
 
 
 @router.patch("/admin/tenants/{tenant_id}")
