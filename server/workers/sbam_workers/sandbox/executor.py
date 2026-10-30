@@ -344,7 +344,7 @@ def _runner_env(run: RunInput) -> dict[str, str]:
     if run.data_files:
         env["SBAM_DATA_DIR"] = DATA_DIR
     if run.mock_api is not None:
-        env["SBAM_MOCK_API"] = f"http://{run.mock_api.host}:{run.mock_api.port}"
+        env["SBAM_MOCK_BASE_URL"] = f"http://{run.mock_api.host}:{run.mock_api.port}"
     return env
 
 

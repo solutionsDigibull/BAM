@@ -31,7 +31,7 @@ The mode comes from the worker's environment and from nowhere else: no API or UI
 | `CUBE_API_KEY` | CubeSandbox | only when the host enables authentication (it does not by default) |
 | `SANDBOX_EGRESS_LOG_PATH` | CubeSandbox | the file of `EgressEvent` lines the host collector writes (required: no evidence, no certification) |
 | `SANDBOX_AGENT_URL`, `SANDBOX_AGENT_TOKEN` | local | the `sandbox-runner` agent (`make up PROFILES=sandbox-local`) |
-| `SANDBOX_RUNTIME_DIGEST` | local agent | the digest the local runtime reports; `make runtime-registry` prints it |
+| `SANDBOX_RUNTIME_DIGEST` | local agent | the digest the local runtime reports: `docker image inspect --format '{{.Id}}' skill-runtime:local`, the one `make runtime-registry` registers |
 | `MOCK_API_URL`, `MOCK_API_IP`, `MOCK_CONTROL_TOKEN` | both | the mock API for networked sources; the IP must be an address that carries nothing else (CubeSandbox opens every port of an allowed address) |
 
 A worker with `SANDBOX_MODE` set and something missing refuses to start and names the variable (never its value).

@@ -470,6 +470,6 @@ def test_e13_2_the_code_under_test_learns_its_run_id_and_nothing_else() -> None:
         {
             "SBAM_MODE": "CUBESANDBOX",
             "SBAM_RUN_ID": str(run_input.run_id),
-            "SBAM_MOCK_API": "http://sbam-mock-api:8080",
+            "SBAM_MOCK_BASE_URL": "http://sbam-mock-api:8080",
         }
     ]
