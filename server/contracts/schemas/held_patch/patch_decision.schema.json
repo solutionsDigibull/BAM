@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:held_patch/patch_decision:0.1.0",
+  "additionalProperties": false,
+  "description": "Body of both decisions. A reason is optional for accepting and recorded for rejecting.",
+  "properties": {
+    "reason": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    }
+  },
+  "title": "PatchDecision",
+  "type": "object"
+}

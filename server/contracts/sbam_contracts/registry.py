@@ -27,6 +27,7 @@ from sbam_contracts.documents import (
     UploadRequest,
     UploadToken,
 )
+from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
 from sbam_contracts.identity import (
     Me,
     Tenant,
@@ -146,6 +147,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/sub_skill_extraction", SubSkillExtraction),
     ("build/builds_response", BuildsResponse),
     ("build/gates_response", GatesResponse),
+    ("held_patch/held_patch_response", HeldPatchResponse),
+    ("held_patch/patch_decision", PatchDecision),
+    ("held_patch/patch_decided", PatchDecided),
     ("build/schema_sql", WorkflowSchemaSql),
     ("build/schema_sql_source_put", SchemaSqlSourcePut),
     ("manifest/isa14_manifest", Isa14Manifest),

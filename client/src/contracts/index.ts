@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:9c60713c9a66a4edec18e5aca4dffae38593f4eb5f5de8c89e288f79bed8b8f5
+// source-sha256:0300fb880f59a9f7fd9f2d599026c4c4dcdebb2ba318d71094201b6f93c2bb91
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -452,6 +452,9 @@ export interface SbamContracts {
   SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
+  HeldPatchResponse?: HeldPatchResponse;
+  PatchDecision?: PatchDecision;
+  PatchDecided?: PatchDecided;
   WorkflowSchemaSql?: WorkflowSchemaSql;
   SchemaSqlSourcePut?: SchemaSqlSourcePut;
   Isa14Manifest?: Isa14Manifest;
@@ -1166,6 +1169,64 @@ export interface Finding {
   actual?: string | null;
   package?: string | null;
   severity?: Severity | null;
+}
+/**
+ * `held` is null when no patch is waiting (none was proposed, or it was already decided).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HeldPatchResponse".
+ */
+export interface HeldPatchResponse {
+  held?: HeldPatch | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HeldPatch".
+ */
+export interface HeldPatch {
+  sub_skill_id: string;
+  attempt: number;
+  failed_gate: string;
+  rationale: string;
+  /**
+   * @maxItems 50
+   */
+  changed_paths?: string[];
+  /**
+   * @maxItems 50
+   */
+  ops?: HeldPatchOp[];
+  isatvon_sha256_before: string;
+  isatvon_sha256_after: string;
+}
+/**
+ * One RFC 6902 operation, as the build recorded it. `value` is empty for `remove`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HeldPatchOp".
+ */
+export interface HeldPatchOp {
+  op: "add" | "remove" | "replace" | "test";
+  path: string;
+  value?: JsonValue;
+}
+/**
+ * Body of both decisions. A reason is optional for accepting and recorded for rejecting.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PatchDecision".
+ */
+export interface PatchDecision {
+  reason?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PatchDecided".
+ */
+export interface PatchDecided {
+  sub_skill_id: string;
+  build_no: number;
+  decision: "ACCEPTED" | "REJECTED";
 }
 /**
  * One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no
