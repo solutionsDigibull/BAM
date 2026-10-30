@@ -35,14 +35,24 @@ baseline could not be written: never a pass), **3** NO_BASELINE (a new task: rec
 The first OCR baseline (score 1.0, 20 items, 3 runs, prompt `ocr-page/1.0.0`) was recorded on
 2026-10-30. Not built yet: pushing the scores to Langfuse datasets, and the CI job.
 
-### Test generation: no baseline, on purpose
+### Test generation: no baseline yet, on purpose
 
 An item scores three checks: the model produced cases the API accepts, it needed no re-ask, and the
-cases use every required input. The first live run with prompt `testgen/1.0.0` scored **0.361** over
-20 items x 3 runs, and a one-run check gave valid cases for only 9 of the 20 Sub-Skills. Nothing was
-recorded as the accepted baseline: a baseline that blesses that would make the gate guard a broken
-state. Most failures were `/assertions/N/type`, an assertion type the validator refuses, so the
-prompt change that fixes it is what records the first testgen baseline.
+cases use every required input. Each of the 20 items is a complete invented Sub-Skill (five domains
+at four iteration bounds); every part of a variant describes its own domain, and a test checks that
+no login text is left in the others.
+
+The gate found three problems before any baseline could be accepted, and recording a score now
+would make it guard a broken state:
+
+1. **The set itself** (fixed with this set): its first version swapped only the tables and inputs of
+   the login sample, so the model read two stories and wrote seed SQL into a table the Sub-Skill did
+   not declare.
+2. **The prompt** (`testgen/1.0.0`) never lists the allowed assertion types, so the model invents
+   one and its answer is refused; most failures on the corrected set involve `/assertions/N/type`.
+3. **The seed-SQL check** refuses an ordinary `WHERE a = 'x' AND b = 'y'` as a "function call".
+
+The first testgen baseline is recorded once the fixes for 2 and 3 are in.
 
 ## Rules
 
