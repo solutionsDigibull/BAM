@@ -50,6 +50,7 @@ import {
   showValue,
   summary,
 } from "./build-api";
+import { TestPanel } from "./test-panel";
 
 const BuildGrid = dynamic(() => import("./build-grid"), {
   ssr: false,
@@ -294,6 +295,7 @@ export function BuildScreen({ projectId, workflowId }: { projectId: string; work
   const [findings, setFindings] = useState<{ row: BuildRow; gate: GateName } | null>(null);
   const [retry, setRetry] = useState<BuildRow | null>(null);
   const [patch, setPatch] = useState<BuildRow | null>(null);
+  const [tests, setTests] = useState<BuildRow | null>(null);
   const [reason, setReason] = useState("");
   const { mutateAsync, mutation } = useCustomMutation<BaseRecord, ApiError>();
 
@@ -301,6 +303,7 @@ export function BuildScreen({ projectId, workflowId }: { projectId: string; work
     onFindings: (row, gate) => setFindings({ row, gate }),
     onRetry: (row) => setRetry(row),
     onPatch: (row) => setPatch(row),
+    onTests: (row) => setTests(row),
   };
 
   const sendRetry = async () => {
@@ -379,6 +382,16 @@ export function BuildScreen({ projectId, workflowId }: { projectId: string; work
           row={patch}
           onClose={() => setPatch(null)}
           onDecided={() => builds.query.refetch()}
+        />
+      )}
+      {tests && (
+        <TestPanel
+          projectId={projectId}
+          workflowId={workflowId}
+          // the row as the last poll saw it, so a state change (frozen, blocked) reaches the panel
+          row={rows.find((r) => r.sub_skill_id === tests.sub_skill_id) ?? tests}
+          onClose={() => setTests(null)}
+          onRetry={(row) => setRetry(row)}
         />
       )}
       <Modal

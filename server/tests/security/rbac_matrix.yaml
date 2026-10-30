@@ -880,6 +880,16 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # The harness traces of one run (E13.7): as the runs above; the run id is any id of no run.
+  get_test_run_traces_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__test_runs__run_id__traces_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/test-runs/{run_id}/traces
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a", run_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # The held ISATVON patch of a Sub-Skill (#499). The world seeds no ISATVON rows, so an assigned FDE
   # reaches the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
   held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_get:
