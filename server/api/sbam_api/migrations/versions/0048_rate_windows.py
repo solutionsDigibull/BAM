@@ -9,7 +9,8 @@ only your module's tables; downgrade() undoes exactly this revision and nothing 
 
 A-08 (#554): one counter per (bucket, minute), where bucket is `<kind>:<user id>`. UNLOGGED: a crash
 may forget a minute of counts, which only lets a few extra requests through, and nothing is written
-to the WAL. The API sweeps rows older than five minutes itself. Only used when SBAM_API_REPLICAS > 1.
+to the WAL. The API sweeps rows older than five minutes itself. Only used when
+SBAM_API_REPLICAS > 1.
 """
 
 from collections.abc import Sequence
