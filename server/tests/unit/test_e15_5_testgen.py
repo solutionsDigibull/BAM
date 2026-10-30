@@ -147,7 +147,13 @@ def test_e15_5_the_handoff_table_is_a_declared_table_and_the_conditions_match_th
 
 
 def test_e15_5_a_variant_that_is_not_a_valid_sub_skill_is_a_problem(tmp_path: Path) -> None:
-    for name in ("tasks.json", "ocr.json", "testgen.json"):
+    for name in (
+        "tasks.json",
+        "ocr.json",
+        "testgen.json",
+        "correction.json",
+        "correction-base.json",
+    ):
         (tmp_path / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
         )
@@ -197,7 +203,14 @@ def generator_of(attempts: int = 1, valid: bool = True) -> Callable[[], TestgenG
 def sandbox(tmp_path: Path) -> dict[str, Path]:
     golden = tmp_path / "golden"
     golden.mkdir(exist_ok=True)
-    for name in ("tasks.json", "ocr.json", "testgen.json", "testgen-base.json"):
+    for name in (
+        "tasks.json",
+        "ocr.json",
+        "testgen.json",
+        "testgen-base.json",
+        "correction.json",
+        "correction-base.json",
+    ):
         (golden / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
         )
@@ -259,7 +272,7 @@ def test_e15_5_testgen_is_listed_as_a_ready_task() -> None:
     from sbam_workers.evals.golden import load_tasks
 
     ready = sorted(t.task for t in load_tasks() if t.status == "ready")
-    assert ready == sorted([Task.OCR, Task.TESTGEN])
+    assert ready == sorted([Task.OCR, Task.TESTGEN, Task.CORRECTION])
 
 
 def test_e15_5_the_committed_testgen_baseline_is_valid_and_matches_the_set() -> None:

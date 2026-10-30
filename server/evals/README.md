@@ -16,7 +16,8 @@ model's answer. Nothing in this folder calls a model.
 |---|---|
 | `ocr` | **ready**, 20 items, baseline recorded |
 | `testgen` | **ready**, 20 items, baseline recorded |
-| `sow`, `isatvon`, `codegen`, `correction` | `todo`: each lands in its own change |
+| `correction` | **ready**, 20 items, baseline recorded |
+| `sow`, `isatvon`, `codegen` | `todo`: each lands in its own change |
 
 ## Running the gate
 
@@ -24,10 +25,12 @@ model's answer. Nothing in this folder calls a model.
 uv run python -m sbam_workers.evals.gate --task ocr            # compare with the baseline
 uv run python -m sbam_workers.evals.gate --task ocr --record   # write a baseline, to be reviewed
 uv run python -m sbam_workers.evals.gate --task testgen        # the same for test generation
+uv run python -m sbam_workers.evals.gate --task correction     # and for the corrector
 ```
 
-It sends each page (OCR) or Sub-Skill (test generation) through the production path (`ocr.read_page`
-or `testgen.generate`, each over `LlmClient`, through Bifrost) and needs a reachable Bifrost with a working provider key. A full run is 60 calls
+It sends each page (OCR), Sub-Skill (test generation) or flawed code (correction) through the
+production path (`ocr.read_page`, `testgen.generate` or `correct_code`, each over `LlmClient`,
+through Bifrost) and needs a reachable Bifrost with a working provider key. A full run is 60 calls
 (20 items x 3 runs), about $0.30 with the current OCR model. Exit codes: **0** PASS, **1** REGRESSED
 (the score fell by more than `gate.json`'s threshold), **2** INFRA_ERROR (the provider failed, or the
 baseline could not be written: never a pass), **3** NO_BASELINE (a new task: record and review one).
@@ -55,6 +58,28 @@ was recorded only after the gate had found three problems that a baseline would 
 With 1 and 3 fixed, the same 60 calls scored **0.661** under `1.0.0` (19 of 60 runs got no valid
 cases) and **0.994** under `1.1.0` (1 run needed a re-ask). Run the gate against the old prompt and it
 reports `REGRESSED`, which is how a bad prompt change is blocked.
+
+### Correction
+
+Twenty items, each the MS01.1 sample's working code bodies with one flaw put in, of a kind the
+build's own pre-check refuses: a manual loop, a forbidden import, a forbidden call, SQL built by
+hand, or an import outside the allowlist (four variants of each). The findings the corrector is shown
+are what `precheck` reports for the flawed bodies, so they are the ones a real build would give it;
+building the set checks that every flaw raises its code and that the unflawed bodies are clean.
+
+An item scores four checks: the corrector gave an answer the client accepts; the pipeline would take
+it as it is (no pre-check or patch finding); the code that makes the Sub-Skill work is still there
+(an emptied body passes the pre-check); and only the flawed body changed, with no rewrite of the
+Sub-Skill's behaviour to make the problem go away (#446).
+
+The baseline (score **0.983**, 20 items x 3 runs, prompt `correct-code/1.0.0`, recorded on
+2026-10-30) had four misses in 60 runs, all on "the pipeline would take it": three on
+`correction-02` (the model says it removed a `while` loop and leaves it in) and one on `correction-15`.
+
+**What it does not check:** it does not run the repaired code. A repair that passes the pre-check but
+fails at run time (one run of `correction-15` dropped the `otp_match = ...` line, and the token still
+appears elsewhere) scores as accepted; only the later static gate and the sandbox would catch it.
+Treat the score as the repair quality the pre-check and these structural checks can see.
 
 ## Rules
 

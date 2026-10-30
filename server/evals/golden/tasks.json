@@ -51,7 +51,7 @@
     "prompt_ids": [
       "correct-code"
     ],
-    "status": "todo",
-    "note": "Needs 20 failing bundles with the failure the correction must fix and the files it may touch."
+    "status": "ready",
+    "note": "20 items: the MS01.1 bodies with one flaw each of five kinds the build's pre-check refuses (correction.json, from sbam_workers.evals.correction_set); the findings are the pre-check's own."
   }
 ]
