@@ -16,6 +16,7 @@ from sbam_workers.build.gates.errors import (
     BUNDLE_TAMPERED,
     GATE_INPUT_MISMATCH,
     STATIC_GATE_INFRA,
+    SUITE_INVALID,
 )
 from sbam_workers.pipeline.sub_skill_build import SubSkillBuild
 from temporalio.client import WorkflowFailureError, WorkflowHistory
@@ -129,3 +130,18 @@ def test_record_platform_defect_history() -> None:  # pragma: no cover - mainten
 
     data = run(scenario, ast_gate=traced("ast_gate", [], raises(BUNDLE_TAMPERED)))
     save_history(PLATFORM_DEFECT_HISTORY, data)
+
+
+def test_e13_6_a_suite_that_cannot_be_built_is_a_build_error_not_a_correction() -> None:
+    corrections: list[Any] = []
+
+    async def scenario(build: Build) -> Any:
+        return await build.finish(), build.state(), notice(build)
+
+    result, state, said = run(
+        scenario,
+        build_promptfoo_suite=traced("build_promptfoo_suite", [], raises(SUITE_INVALID)),
+        correct=traced("correct", corrections),
+    )
+    assert not result.certified and state == "BUILD_ERROR"
+    assert said["error"] == SUITE_INVALID and corrections == []

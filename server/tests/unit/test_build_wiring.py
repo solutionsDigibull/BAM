@@ -40,6 +40,7 @@ from sbam_workers.build.wiring import (
     SqlBuildInputs,
     loop_spec_of,
 )
+from sbam_workers.test.promptfoo_suite import BuildPromptfooSuite
 from sbam_workers.test.testgen import GenerateTests
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.exceptions import ApplicationError
@@ -357,6 +358,7 @@ def test_e11_2b_t05_a_loop_spec_that_does_not_compile_is_not_retried() -> None:
         ("ast_gate", TaskQueue.BUILD),
         ("static_gate", TaskQueue.BUILD),
         ("generate_tests", TaskQueue.LLM),
+        ("build_promptfoo_suite", TaskQueue.TEST),
     ],
 )
 def test_e11_2b_t06_each_stage_is_registered_once_on_its_queue_by_the_wiring(
@@ -390,6 +392,7 @@ def test_e11_2b_t07_the_registered_stages_build_their_dependencies(
             (wiring._correct, Correct),
             (wiring._static_gate, StaticGate),
             (wiring._generate_tests, GenerateTests),
+            (wiring._build_promptfoo_suite, BuildPromptfooSuite),
         ):
             builder.cache_clear()
             assert isinstance(builder(), kind)

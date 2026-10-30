@@ -23,9 +23,7 @@ async def generate_tests(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "tests"))
 
 
-@activity_for(TaskQueue.TEST)
-@activity.defn(name="build_promptfoo_suite")
-@stub_activity
+@activity.defn(name="build_promptfoo_suite")  # registered by `build/wiring.py`; a typed handle
 async def build_promptfoo_suite(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "promptfoo_suite"))
 
