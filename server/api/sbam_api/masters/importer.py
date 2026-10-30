@@ -51,11 +51,12 @@ from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser
+from sbam_api.core.bulkhead import CLAMD, BulkheadFullError
 from sbam_api.core.conventions import ApiError
 from sbam_api.core.settings import Settings
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.filetypes.repository import current_payloads
-from sbam_api.masters.documents import TENANT_SCOPE_PROJECT
+from sbam_api.masters.documents import TENANT_SCOPE_PROJECT, scan_unavailable
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion
 from sbam_api.masters.repository import MasterEntryRepository
 from sbam_api.masters.service import _active_project, _audit, _correlation, _repo, version_conflict
@@ -166,14 +167,10 @@ def _scan(
 ) -> None:
     clamd = ClamdClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout)
     try:
-        verdict = clamd.scan(io.BytesIO(data))
-    except ClamdError:
-        raise ApiError(
-            503,
-            ErrorCode.SCAN_UNAVAILABLE,
-            "The virus scanner is unavailable",
-            "Nothing was imported. Try again in a few minutes.",
-        ) from None
+        with CLAMD.slot():
+            verdict = clamd.scan(io.BytesIO(data))
+    except (ClamdError, BulkheadFullError):
+        raise scan_unavailable() from None
     if verdict.infected:
         stored = storage.put(data, scope, Kind.QUARANTINE, XLSX, max_bytes=MAX_WORKBOOK_BYTES)
         record(

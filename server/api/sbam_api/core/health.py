@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from temporalio.client import Client
 
+from sbam_api.core.bulkhead import REGISTRY
 from sbam_api.core.settings import Settings, jwks_url
 from sbam_api.db.session import API_TIMEOUTS, make_engine, ping
 
@@ -83,8 +84,11 @@ def health_router(checks: Mapping[str, Check]) -> APIRouter:
             n: "ok" if ok else "fail" for n, ok in zip(names, results, strict=True)
         }
         healthy = all(results)
+        # Informational: a saturated dependency fails fast on its own; it does not make the API
+        # unready (that would pull a healthy replica out for a slow scanner).
+        bulkheads = {b.name: "saturated" if b.saturated else "ok" for b in REGISTRY}
         return JSONResponse(
-            {"status": "ok" if healthy else "fail", "checks": report},
+            {"status": "ok" if healthy else "fail", "checks": report, "bulkheads": bulkheads},
             status_code=200 if healthy else 503,
         )
 

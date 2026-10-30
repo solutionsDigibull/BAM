@@ -11,12 +11,14 @@ tenant's organization (so their token carries `tenant_id`) and is sent the execu
 
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 
 import httpx
 from sbam_contracts.api import ErrorCode
 
 from sbam_api.core.auth import idp_unavailable
+from sbam_api.core.bulkhead import KEYCLOAK_ADMIN, BulkheadFullError
 from sbam_api.core.conventions import ApiError
 
 TIMEOUT_SECONDS = 5
@@ -38,17 +40,27 @@ class _AdminApi:
         self.client_id = client_id
         self.client_secret = client_secret
 
-    def _client(self) -> httpx.Client:
-        # ponytail: a token per call; tenant creation is rare. Cache it if this gets hot.
-        res = httpx.post(
-            self.token_url,
-            data={"grant_type": "client_credentials"},
-            auth=(self.client_id, self.client_secret),
-            timeout=TIMEOUT_SECONDS,
-        )
-        res.raise_for_status()
-        token = res.json()["access_token"]
-        return httpx.Client(headers={"Authorization": f"Bearer {token}"}, timeout=TIMEOUT_SECONDS)
+    @contextmanager
+    def _client(self) -> Iterator[httpx.Client]:
+        """A client for one admin operation. It holds a Keycloak bulkhead slot for the whole
+        operation, so a hung Keycloak cannot take the API's thread pool; when no slot is free it
+        is 503 IDP_UNAVAILABLE at once."""
+        try:
+            with KEYCLOAK_ADMIN.slot():
+                # ponytail: a token per call; tenant creation is rare. Cache it if this gets hot.
+                res = httpx.post(
+                    self.token_url,
+                    data={"grant_type": "client_credentials"},
+                    auth=(self.client_id, self.client_secret),
+                    timeout=TIMEOUT_SECONDS,
+                )
+                res.raise_for_status()
+                token = res.json()["access_token"]
+                headers = {"Authorization": f"Bearer {token}"}
+                with httpx.Client(headers=headers, timeout=TIMEOUT_SECONDS) as client:
+                    yield client
+        except BulkheadFullError:
+            raise idp_unavailable() from None
 
 
 class KeycloakOrgs(_AdminApi):
@@ -73,7 +85,7 @@ class KeycloakOrgs(_AdminApi):
         try:
             with self._client() as client:
                 client.delete(f"{self.orgs_url}/{org_id}").raise_for_status()
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ApiError):
             # The tenant row is gone either way; an orphan org has no SBAM tenant, so it grants
             # nothing (its members get TENANT_MISMATCH).
             log.error("keycloak organization cleanup failed", extra={"target": org_id})
@@ -139,7 +151,7 @@ class KeycloakUsers(_AdminApi):
         try:
             with self._client() as client:
                 client.delete(f"{self.admin_url}/users/{user_id}").raise_for_status()
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ApiError):
             log.error("keycloak user cleanup failed", extra={"target": user_id})
 
     def _mappings(self, user_id: str) -> str:

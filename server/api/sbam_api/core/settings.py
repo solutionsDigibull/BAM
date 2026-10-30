@@ -74,7 +74,9 @@ class Settings(BaseSettings):
     # clamd = the import answers 503 SCAN_UNAVAILABLE; nothing is read unscanned.
     clamav_host: str = Field(default="clamav", min_length=1)
     clamav_port: int = Field(default=3310, ge=1, le=65535)
-    clamav_timeout: float = Field(default=60.0, gt=0)
+    # Per socket operation, on the request path only (the worker has its own, 60 s): under 10 s, so
+    # a hung clamd cannot hold an API thread for long (audit N-02).
+    clamav_timeout: float = Field(default=10.0, gt=0)
     log_level: str = "INFO"
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
     otel_exporter_otlp_endpoint: AnyHttpUrl | None = None
