@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:a706f73f0577ff3f0289bcb522f66073c073d2f80be8d647a5e6193dc3b479d2
+// source-sha256:0a028b4d5ea344503b11fe2b4c309f8fc7efda429c9b9c88828ba32fdd0c26b0
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -4942,6 +4942,7 @@ export interface RunnerRequest {
   loop_spec: {
     [k: string]: JsonValue | undefined;
   };
+  harness: HarnessConfig;
   /**
    * Pattern: `^[a-z_][a-z0-9_]{0,62}$`
    */
@@ -4963,6 +4964,184 @@ export interface RunnerRequest {
   egress_probe?: string[];
 }
 /**
+ * What the harness needs from the Sub-Skill's ISATVON that the loop spec does not carry:
+ * which two tools drive a pass, how fresh state is keyed, what a handoff row holds and what the
+ * Sub-Skill says to the user. Built by the worker from the stored Sub-Skill, never from the
+ * bundle under test.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HarnessConfig".
+ */
+export interface HarnessConfig {
+  /**
+   * Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  action_tool: string;
+  /**
+   * Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  fixed_check_tool: string;
+  /**
+   * @maxItems 50
+   *
+   * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  fresh_state_parameters: string[];
+  /**
+   * @maxItems 50
+   *
+   * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  required_inputs: string[];
+  /**
+   * Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  key_field: string;
+  /**
+   * @minItems 1
+   * @maxItems 50
+   *
+   * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  handoff_fields: [string, ...string[]];
+  /**
+   * @maxItems 20
+   */
+  ui_updates:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+}
+/**
  * `/work/out/outputs.json`, written by the runner as its last act.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -4981,6 +5160,10 @@ export interface RunnerOutputs {
 /**
  * One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker.
  *
+ * `handoff_rows` is the case's append-only table as the database holds it after the run (the
+ * "handoff rows dump" of the issue): evidence of what the bundle really wrote, not what the
+ * harness counted.
+ *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "RunnerCaseResult".
  */
@@ -4994,6 +5177,12 @@ export interface RunnerCaseResult {
   trace: {
     [k: string]: JsonValue | undefined;
   };
+  /**
+   * @maxItems 1000
+   */
+  handoff_rows?: {
+    [k: string]: JsonValue | undefined;
+  }[];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
