@@ -14,7 +14,7 @@ from sbam_contracts.masters_api import FiletypeInfo, ImportMode, ImportReport
 from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
 from sqlalchemy.orm import Session
 
-from sbam_api.core.auth import CurrentUser, authenticated, super_admin
+from sbam_api.core.auth import CurrentUser, admin_or_fde, super_admin
 from sbam_api.db.session import app_sessions
 from sbam_api.filetypes.config import Filetype, load
 from sbam_api.filetypes.repository import current_payloads
@@ -53,7 +53,7 @@ def _info(f: Filetype, row: FiletypePayload) -> FiletypeInfo:
     )
 
 
-@router.get("/admin/filetypes", dependencies=[Depends(authenticated)])
+@router.get("/admin/filetypes", dependencies=[Depends(admin_or_fde)])
 def list_filetypes(session: Db) -> list[FiletypeInfo]:
     """All 43, in row-label order (Filetype #1 .. #43), as they stand: a super-admin's newest
     version of a row, else the shipped row."""
