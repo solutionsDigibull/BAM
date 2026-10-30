@@ -24,6 +24,10 @@
   alone; another fingerprint regenerates. An FDE-edited dataset is never overwritten: if its
   fingerprint no longer matches, the stage fails with `TestDataStale` and the Sub-Skill waits in
   review.
+* Mocks follow the API references (#546): `fingerprint` does not cover `S.external_data`, so a
+  reused dataset whose stored mocks differ from `mock_definitions(isatvon, its cases)` is written
+  again as a new version with the same cases, files and FDE flag and the refreshed mocks. No model
+  call; the older versions stay as evidence. Unchanged references write nothing.
 """
 
 import csv
@@ -41,7 +45,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_api.testgen.repository import CaseRepository, DatasetRepository
-from sbam_api.testgen.service import files_hashes, mocks_hashes
+from sbam_api.testgen.service import body_of, files_hashes, mocks_hashes
 from sbam_api.testgen.validate import case_errors, declared_tables, input_schema
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.isatvon14 import SubSkill as SubSkillModel
@@ -59,7 +63,7 @@ from temporalio.exceptions import ApplicationError
 
 from sbam_workers.llm.client import LlmClient, LlmResult
 from sbam_workers.llm.store import LlmScope
-from sbam_workers.test.mocks import definition_bytes, mock_definitions
+from sbam_workers.test.mocks import definition_bytes, definition_hash, mock_definitions
 
 STAGE: Final = "generate_tests"
 ALIAS: Final = "sbam-testgen"
@@ -204,6 +208,34 @@ class SqlDatasetStore:
                 return None
             return Newest(latest.id, latest.generated_for, latest.edited_by_fde)
 
+    def _store_mocks(self, inp: BuildStageInput, mocks: Sequence[Mapping[str, Any]]) -> list[str]:
+        # Linted first: a definition that could forward or record raises here, before anything is
+        # stored, so the dataset is never created (E13.5-T06).
+        stored = [definition_bytes(m) for m in mocks]
+        scope = StorageScope(inp.tenant_id, inp.project_id, inp.workflow_id)
+        return [
+            self.storage.put(io.BytesIO(data), scope, Kind.TESTS, "application/json").storage_key
+            for data in stored
+        ]
+
+    def refresh_mocks(self, inp: BuildStageInput, isatvon: Mapping[str, Any]) -> uuid.UUID:
+        """The newest dataset, or a new version of it whose mocks answer the current API
+        references (#546). Cases, files, `edited_by_fde` and `generated_for` are carried over."""
+        with self.sessions() as session:
+            latest = DatasetRepository(session, self._ctx(inp)).latest(inp.sub_skill_id)
+            if latest is None:
+                raise RuntimeError("refresh_mocks needs a dataset")
+            rows = CaseRepository(session, self._ctx(inp)).of_dataset(latest.id)
+            cases = [(CaseKind(row.kind), body_of(row)) for row in rows]
+            latest_id, files_keys, mocks_keys = latest.id, latest.files_keys, latest.mocks_keys
+            edited, generated_for = latest.edited_by_fde, latest.generated_for
+        mocks = [d.model_dump(mode="json") for d in mock_definitions(isatvon, cases)]
+        if sorted(definition_hash(m) for m in mocks) == sorted(mocks_hashes(mocks_keys)):
+            return latest_id  # the references did not move: same dataset, same hash
+        return self._write(
+            inp, cases, files_keys, self._store_mocks(inp, mocks), generated_for, edited
+        )
+
     def record(
         self,
         inp: BuildStageInput,
@@ -212,18 +244,23 @@ class SqlDatasetStore:
         generated_for: str,
         mocks: Sequence[Mapping[str, Any]] = (),
     ) -> uuid.UUID:
-        # Linted first: a definition that could forward or record raises here, before anything is
-        # stored, so the dataset is never created (E13.5-T06).
-        stored = [definition_bytes(m) for m in mocks]
+        mock_keys = self._store_mocks(inp, mocks)
         scope = StorageScope(inp.tenant_id, inp.project_id, inp.workflow_id)
         keys = [
             self.storage.put(io.BytesIO(f.content), scope, Kind.TESTS, f.content_type).storage_key
             for f in files
         ]
-        mock_keys = [
-            self.storage.put(io.BytesIO(data), scope, Kind.TESTS, "application/json").storage_key
-            for data in stored
-        ]
+        return self._write(inp, cases, keys, mock_keys, generated_for, edited_by_fde=False)
+
+    def _write(
+        self,
+        inp: BuildStageInput,
+        cases: Sequence[tuple[CaseKind, CaseBody]],
+        keys: list[str],
+        mock_keys: list[str],
+        generated_for: str | None,
+        edited_by_fde: bool,
+    ) -> uuid.UUID:
         sha = dataset_sha256(cases, files_hashes(keys), mocks_hashes(mock_keys))
         with self.sessions() as session:
             repo = DatasetRepository(session, self._ctx(inp))
@@ -237,7 +274,7 @@ class SqlDatasetStore:
                 mocks_keys=mock_keys,
                 sha256=sha,
                 synthetic=True,
-                edited_by_fde=False,
+                edited_by_fde=edited_by_fde,
                 generated_for=generated_for,
                 created_by=SYSTEM_ACTOR,
             )
@@ -295,10 +332,11 @@ class GenerateTests:
         wanted = fingerprint(isatvon)
         newest = self.store.newest(inp)
         if newest is not None and newest.generated_for == wanted:
-            return IdResult(id=newest.id)  # same bounds, same tables: the tests stay as they are
+            # same bounds, same tables: the cases stay, the mocks follow the API references
+            return IdResult(id=self.store.refresh_mocks(inp, isatvon))
         if newest is not None and newest.edited_by_fde:
-            if newest.generated_for is None:
-                return IdResult(id=newest.id)  # written before the fingerprint: keep their cases
+            if newest.generated_for is None:  # written before the fingerprint: keep their cases
+                return IdResult(id=self.store.refresh_mocks(inp, isatvon))
             raise ApplicationError(
                 "the FDE's edited tests were written for other bounds",
                 type=TEST_DATA_STALE,
