@@ -10,8 +10,10 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from sbam_api.db.repository import TenantScopedRepository
+from sbam_api.identity.models import Tenant
 from sbam_api.ingest.models import Document, DocumentVersion, ReservationStatus, UploadReservation
 from sbam_api.masters.models import MasterDocument
+from sbam_api.projects.models import Project
 from sbam_api.state_machine.repository import StatefulRepository
 
 # A rejected, deleted or purged version no longer takes one of the 20 slots.
@@ -256,3 +258,68 @@ def delete_reservations(session: Session, ids: Sequence[uuid.UUID]) -> int:
         )
     )
     return int(result.rowcount or 0)  # type: ignore[attr-defined]
+
+
+NO_PROJECT = uuid.UUID(int=0)  # master documents of a tenant are stored under this project id
+
+
+def derived_scopes(session: Session) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """System job only (#533): every (tenant, project) that can own derived files, plus each
+    tenant's master-document scope (project id 0)."""
+    projects = [(t, p) for t, p in session.execute(select(Project.tenant_id, Project.id))]
+    tenants = [(t, NO_PROJECT) for t in session.scalars(select(Tenant.id))]
+    return [*projects, *tenants]
+
+
+def referenced_derived_keys(
+    session: Session, tenant_id: uuid.UUID, project_id: uuid.UUID
+) -> set[str]:
+    """System job only: every derived key a version or master document of this scope still points
+    at. Same rule as `derived_key_in_use`: only REJECTED / PURGED versions do not count."""
+    keys: set[str] = set()
+    versions = select(DocumentVersion.derived_md_key, DocumentVersion.derived_json_key).where(
+        DocumentVersion.tenant_id == tenant_id,
+        DocumentVersion.project_id == project_id,
+        DocumentVersion.state.not_in((S.REJECTED.value, S.PURGED.value)),
+    )
+    for pair in session.execute(versions):
+        keys.update(k for k in pair if k)
+    masters = select(MasterDocument.derived_md_key, MasterDocument.derived_json_key).where(
+        MasterDocument.tenant_id == tenant_id
+    )
+    if project_id == NO_PROJECT:
+        masters = masters.where(MasterDocument.project_id.is_(None))
+    else:
+        masters = masters.where(MasterDocument.project_id == project_id)
+    for pair in session.execute(masters):
+        keys.update(k for k in pair if k)
+    return keys
+
+
+def derived_key_referenced(
+    session: Session, tenant_id: uuid.UUID, project_id: uuid.UUID, key: str
+) -> bool:
+    """System job only: the one-key form of `referenced_derived_keys`, for the look right before a
+    delete."""
+    version = (
+        select(DocumentVersion.id)
+        .where(
+            DocumentVersion.tenant_id == tenant_id,
+            DocumentVersion.project_id == project_id,
+            or_(DocumentVersion.derived_md_key == key, DocumentVersion.derived_json_key == key),
+            DocumentVersion.state.not_in((S.REJECTED.value, S.PURGED.value)),
+        )
+        .limit(1)
+    )
+    if session.scalars(version).first() is not None:
+        return True
+    master = select(MasterDocument.id).where(
+        MasterDocument.tenant_id == tenant_id,
+        or_(MasterDocument.derived_md_key == key, MasterDocument.derived_json_key == key),
+    )
+    master = master.where(
+        MasterDocument.project_id.is_(None)
+        if project_id == NO_PROJECT
+        else MasterDocument.project_id == project_id
+    )
+    return session.scalars(master.limit(1)).first() is not None
