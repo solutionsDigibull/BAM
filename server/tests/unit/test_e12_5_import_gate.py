@@ -234,6 +234,15 @@ def test_e12_5_no_docker_is_an_infrastructure_error_never_a_finding() -> None:
     assert err.value.type == IMPORT_GATE_INFRA and not err.value.non_retryable
 
 
+def docker(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(  # noqa: S603
+        ["docker", *args],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def local_image() -> str | None:
     """A pinned reference to a Python image Docker already has: no pull, no network."""
     if shutil.which("docker") is None:
@@ -288,12 +297,19 @@ def test_e12_5_in_a_real_container_nothing_can_reach_out_or_write() -> None:
 def test_e12_5_t02_the_ms01_bundle_imports_in_the_skill_runtime_image(
     template: LoadedTemplate,  # noqa: F811
 ) -> None:
-    """`SKILL_RUNTIME_IMAGE=name@sha256:...` (the CI-built skill-runtime, or a local build of its
-    `libs` stage with `SKILL_RUNTIME_PYTHON=/opt/venv/bin/python`): FastMCP and pydantic import
-    without a single blocked side effect, and all six modules pass."""
-    image = os.environ.get("SKILL_RUNTIME_IMAGE")
+    """`SBAM_IMPORT_GATE_IMAGE=<a local skill-runtime image, tag or name@sha256:...>` (a local build
+    of its `libs` stage also needs `SBAM_IMPORT_GATE_PYTHON=/opt/venv/bin/python`): FastMCP and
+    pydantic import without a single blocked side effect, and all six modules pass. Not
+    `SKILL_RUNTIME_IMAGE`: compose-smoke sets that to a tag for another test, and this gate refuses
+    tags, so the tag is resolved to the image id here."""
+    image = os.environ.get("SBAM_IMPORT_GATE_IMAGE")
     if not image:
-        pytest.skip("SKILL_RUNTIME_IMAGE is not set")
+        pytest.skip("SBAM_IMPORT_GATE_IMAGE is not set")
+    if "@sha256:" not in image:
+        found = docker("image", "inspect", image, "--format", "{{.Id}}")
+        if found.returncode != 0:
+            pytest.skip(f"{image} is not a local image")
+        image = f"{image.split(':')[0]}@{found.stdout.strip()}"
     from codegen_cases import ms01_bodies, ms01_loop_spec, ms01_params
     from sbam_workers.build.codegen import render_skeleton
     from sbam_workers.build.codegen.bundle import assemble_bundle
@@ -308,7 +324,7 @@ def test_e12_5_t02_the_ms01_bundle_imports_in_the_skill_runtime_image(
     )
     assert out.bundle is not None
     files = dict(out.bundle.files)
-    runner = DockerImportRunner(python=os.environ.get("SKILL_RUNTIME_PYTHON", "python"))
+    runner = DockerImportRunner(python=os.environ.get("SBAM_IMPORT_GATE_PYTHON", "python"))
     outcomes = runner.run(files, module_names(files), image)
     assert len(outcomes) == 6 and import_findings(outcomes) == []
 
