@@ -27,6 +27,7 @@ export type GridActions = {
   onFindings: (row: BuildRow, gate: GateName) => void;
   onRetry: (row: BuildRow) => void;
   onPatch: (row: BuildRow) => void;
+  onTests: (row: BuildRow) => void;
 };
 
 // Plain glyphs styled by CSS, not icon components: ~450 gate cells are on screen at once (T06).
@@ -110,6 +111,15 @@ function RetryCell({ data, context }: ICellRendererParams<BuildRow, unknown, Ctx
       title={allowed ? "Retry after your fix" : "Retry is offered in NEEDS_FDE_REVIEW only"}
       style={{ display: "inline-flex", gap: 6 }}
     >
+      {/* the loop test cases and the harness trace (E13.7) */}
+      <Button
+        size="small"
+        aria-label={`Tests ${data.skill_id}`}
+        title="Test cases and harness trace" // its own title over the wrapper's Retry one
+        onClick={() => context.actions.onTests(data)}
+      >
+        Tests
+      </Button>
       {allowed && (
         // a held ISATVON patch (#499) is decided here; the drawer says when none is waiting
         <Button
@@ -173,7 +183,7 @@ const COLUMNS: (ColDef<BuildRow> | ColGroupDef<BuildRow>)[] = [
   {
     colId: "retry",
     headerName: "",
-    width: 190,
+    width: 250,
     pinned: "right",
     valueGetter: (p) => p.data?.state,
     cellRenderer: RetryCell,
@@ -209,6 +219,7 @@ export default function BuildGrid({
         onFindings: (r, g) => latest.current.onFindings(r, g),
         onRetry: (r) => latest.current.onRetry(r),
         onPatch: (r) => latest.current.onPatch(r),
+        onTests: (r) => latest.current.onTests(r),
       },
     }),
     [],

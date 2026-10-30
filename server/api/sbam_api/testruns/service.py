@@ -6,6 +6,7 @@ an unassigned project's or another Workflow's is 404.
 
 import uuid
 
+from sbam_contracts.harness import TestRunTraces
 from sbam_contracts.promptfoo import (
     AssertionResult,
     LoopTestsBadge,
@@ -50,12 +51,38 @@ def loop_tests_badge(
     return None if row is None else badge_of(run_out(row))
 
 
-def list_runs(
+def _sub_skill(
     session: Session, ctx: TenantContext, workflow_id: uuid.UUID, sub_id: uuid.UUID
-) -> TestRunsResponse:
+) -> SubSkill:
     sub: SubSkill | None = SubSkillRepository(session, ctx).get(sub_id)
     if sub is None or sub.workflow_id != workflow_id:
         raise not_found()
+    return sub
+
+
+def list_runs(
+    session: Session, ctx: TenantContext, workflow_id: uuid.UUID, sub_id: uuid.UUID
+) -> TestRunsResponse:
+    sub = _sub_skill(session, ctx, workflow_id, sub_id)
     return TestRunsResponse(
         runs=[run_out(row) for row in TestRunRepository(session, ctx).of_sub_skill(sub.id)]
     )
+
+
+def run_traces(
+    session: Session,
+    ctx: TenantContext,
+    workflow_id: uuid.UUID,
+    sub_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> TestRunTraces:
+    """The harness traces of one of the Sub-Skill's runs (E13.7). A run of another Sub-Skill is 404.
+
+    The traces are recorded with the run by the Promptfoo runner wiring (#526); until then a run has
+    none and the answer is an empty list, which the test panel shows as "No trace recorded".
+    """
+    sub = _sub_skill(session, ctx, workflow_id, sub_id)
+    row = TestRunRepository(session, ctx).get(run_id)
+    if row is None or row.sub_skill_id != sub.id:
+        raise not_found()
+    return TestRunTraces(run_id=row.id)

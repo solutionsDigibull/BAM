@@ -233,7 +233,7 @@ def test_e13_4_t08_add_and_delete_a_case(h: Harness) -> None:
 def test_e13_4_t08_the_last_three_cases_cannot_be_deleted(h: Harness) -> None:
     sha = h.seed()
     res = h.write("DELETE", f"/cases/{h.case_id('case-NO_OP')}", sha)
-    problem(res, 409, "CONFLICT")
+    problem(res, 409, "MIN_TEST_CASES")
     assert len(h.dataset_rows()) == 1
 
 
@@ -310,3 +310,26 @@ def test_e13_6_an_assertion_type_the_suite_does_not_know_is_422_with_its_path(h:
     assert res.json()["errors"][0]["path"] == "/assertions/0/type"
     ok = h.write("PUT", f"/cases/{cid}", sha, {"assertions": [{"type": "iterations_within_bound"}]})
     assert ok.status_code == 200, ok.text
+
+
+def test_e13_7_t03_the_server_keeps_three_cases_even_when_the_ui_is_bypassed(h: Harness) -> None:
+    sha = h.seed()
+    for name in ("case-PASS_FIRST", "case-ESCALATION", "case-NO_OP"):
+        problem(h.write("DELETE", f"/cases/{h.case_id(name)}", sha), 409, "MIN_TEST_CASES")
+    assert len(h.tests().json()["dataset"]["cases"]) == 3
+    assert len(h.dataset_rows()) == 1
+
+
+def test_e13_7_t08_a_direct_put_on_a_frozen_sub_skill_is_423(h: Harness) -> None:
+    sha = h.seed()
+    h.set_sub_state("FROZEN")
+    res = h.write("PUT", f"/cases/{h.case_id('case-NO_OP')}", sha, {"input": INPUT})
+    problem(res, 423, "RESOURCE_LOCKED")
+    assert len(h.dataset_rows()) == 1
+
+
+def test_e13_7_the_tests_answer_carries_the_closed_input_schema(h: Harness) -> None:
+    h.seed()
+    schema = h.tests().json()["input_schema"]
+    assert schema["additionalProperties"] is False
+    assert set(INPUT) <= set(schema["properties"])

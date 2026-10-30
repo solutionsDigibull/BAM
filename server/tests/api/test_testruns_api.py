@@ -124,3 +124,24 @@ def test_e13_6_another_tenant_or_workflow_or_unknown_sub_skill_is_404(h: Harness
     problem(h.runs(sub=uuid.uuid4()), 404, "NOT_FOUND")
     other_wf = h.workflow(2, sow_version=h.generated(h.structured))
     problem(h.runs(wf=other_wf), 404, "NOT_FOUND")
+
+
+def traces(h: Harness, run: uuid.UUID, token: str | None = None, sub: Any = None) -> Any:
+    path = f"/projects/{h.project}/workflows/{h.wf}/sub-skills/{sub or h.sub}/test-runs/{run}"
+    return h.call("GET", path + "/traces", token or h.fde())
+
+
+def test_e13_7_a_run_without_recorded_traces_answers_an_empty_list(h: Harness) -> None:
+    run = h.record()
+    res = traces(h, run)
+    assert res.status_code == 200, res.text
+    assert res.json() == {"run_id": str(run), "traces": []}
+
+
+def test_e13_7_traces_of_another_tenant_sub_skill_or_unknown_run_are_404(h: Harness) -> None:
+    run = h.record()
+    other = h.realm.token(uuid.uuid4(), tenant_id=[str(TENANT_B)])
+    problem(traces(h, run, token=other), 404, "NOT_FOUND")
+    problem(traces(h, uuid.uuid4()), 404, "NOT_FOUND")
+    second = h.add_sub_skill(sample(**{"skill_metadata.skill_id": "MS01.2_Other"}), order=2)
+    problem(traces(h, run, sub=second), 404, "NOT_FOUND")  # the run belongs to another Sub-Skill

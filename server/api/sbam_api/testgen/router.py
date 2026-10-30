@@ -4,8 +4,8 @@
   the dataset's `sha256`. No dataset yet: `{"dataset": null}`.
 * `PUT W/sub-skills/{sub_id}/tests/cases/{case_id}` (`CasePut`, `If-Match`): change a case.
 * `POST W/sub-skills/{sub_id}/tests/cases` (`CasePost`, `If-Match`): add a case (kind `FDE`), 201.
-* `DELETE W/sub-skills/{sub_id}/tests/cases/{case_id}` (`If-Match`): 204; 409 when fewer than three
-  cases would remain.
+* `DELETE W/sub-skills/{sub_id}/tests/cases/{case_id}` (`If-Match`): 204; 409 `MIN_TEST_CASES` when
+  fewer than three cases would remain.
 
 Every write makes a new dataset version and answers its `sha256` as the new `ETag`. 422 names the
 field (`/input/amount`); 423 a certified or frozen Sub-Skill; 428 / 412 for `If-Match`; 404 another

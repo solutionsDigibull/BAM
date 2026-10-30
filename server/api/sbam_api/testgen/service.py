@@ -17,6 +17,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
+from pydantic import JsonValue, ValidationError
 from sbam_contracts.api import ErrorCode, FieldError
 from sbam_contracts.testgen import (
     MAX_CASES,
@@ -42,7 +43,7 @@ from sbam_api.isatvon.models import SubSkill
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_api.testgen.repository import CaseRepository, DatasetRepository
-from sbam_api.testgen.validate import case_errors
+from sbam_api.testgen.validate import case_errors, input_schema
 
 HEX = set("0123456789abcdef")
 
@@ -124,8 +125,18 @@ def get_tests(
     if dataset is None:
         return TestsResponse()
     return TestsResponse(
-        dataset=dataset_out(dataset, CaseRepository(session, ctx).of_dataset(dataset.id))
+        dataset=dataset_out(dataset, CaseRepository(session, ctx).of_dataset(dataset.id)),
+        input_schema=_input_schema_or_none(sub.isatvon),
     )
+
+
+def _input_schema_or_none(isatvon: Mapping[str, Any]) -> dict[str, JsonValue] | None:
+    """The schema the panel checks an input against first (E13.7). An ISATVON it cannot be built
+    from leaves the check to the server's 422, which reports the real problem."""
+    try:
+        return input_schema(isatvon)
+    except ValidationError:
+        return None
 
 
 def _check_etag(if_match: str | None, sha: str) -> None:
@@ -297,7 +308,7 @@ def delete_case(
     if len(pairs) - 1 < MIN_CASES:
         raise ApiError(
             409,
-            ErrorCode.CONFLICT,
+            ErrorCode.MIN_TEST_CASES,
             "Too few cases",
             f"A Sub-Skill needs at least {MIN_CASES} test cases.",
         )
