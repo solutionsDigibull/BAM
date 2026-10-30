@@ -1,5 +1,6 @@
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 
 import { AppProviders } from "@/providers/app-providers";
@@ -11,7 +12,8 @@ export const metadata: Metadata = {
   description: "Skills Build Acceleration Manager",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  await connection(); // render per request: the CSP nonce cannot be stamped on a prerendered page
   return (
     <html lang="en">
       <body style={{ margin: 0 }}>

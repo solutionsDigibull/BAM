@@ -3,12 +3,25 @@
 // when its layout redirects or renders Forbidden. The layouts keep their guards as defence in depth.
 import { NextResponse, type NextRequest } from "next/server";
 
+import { buildCsp, newNonce } from "@/lib/csp";
 import { landing } from "@/lib/landing";
 import { isAdmin, isFde, isUuid } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
 export async function proxy(req: NextRequest) {
+  const nonce = newNonce();
+  const csp = buildCsp(nonce, process.env.NODE_ENV === "development");
+  const res = await route(req, nonce, csp);
+  res.headers.set("Content-Security-Policy", csp);
+  return res;
+}
+
+// The paths the auth checks apply to; every other page only gets the CSP.
+const GUARDED = /^\/(admin(\/|$)|projects(\/|$)|registry$|$)/;
+
+async function route(req: NextRequest, nonce: string, csp: string) {
   const { pathname } = req.nextUrl;
+  if (!GUARDED.test(pathname)) return passThrough(req, nonce, csp);
   const portal = pathname.startsWith("/admin") ? "admin" : "fde";
   const session = await getSession();
   if (pathname === "/") {
@@ -27,7 +40,10 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(login);
   }
   if (!(portal === "admin" ? isAdmin : isFde)(session.roles)) {
-    return NextResponse.rewrite(new URL(`/forbidden/${portal}`, req.url), { status: 403 });
+    return NextResponse.rewrite(new URL(`/forbidden/${portal}`, req.url), {
+      status: 403,
+      request: withNonce(req, nonce, csp),
+    });
   }
   // /projects/<projectId>/workflows/<workflowId>/...: ids are checked before any data fetch.
   const [, root, projectId, , workflowId] = pathname.split("/");
@@ -35,9 +51,35 @@ export async function proxy(req: NextRequest) {
     root === "projects" &&
     [projectId, workflowId].some((id) => id !== undefined && !isUuid(id))
   ) {
-    return NextResponse.rewrite(new URL("/not-found", req.url), { status: 404 });
+    return NextResponse.rewrite(new URL("/not-found", req.url), {
+      status: 404,
+      request: withNonce(req, nonce, csp),
+    });
   }
-  return NextResponse.next();
+  return passThrough(req, nonce, csp);
 }
 
-export const config = { matcher: ["/", "/admin/:path*", "/projects/:path*", "/registry"] };
+/** Next reads the nonce from the request's CSP header while rendering and stamps its own scripts. */
+function withNonce(req: NextRequest, nonce: string, csp: string) {
+  const headers = new Headers(req.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("Content-Security-Policy", csp);
+  return { headers };
+}
+
+function passThrough(req: NextRequest, nonce: string, csp: string) {
+  return NextResponse.next({ request: withNonce(req, nonce, csp) });
+}
+
+// Every page (the CSP header goes on all of them); the auth checks above only act on the portal paths.
+export const config = {
+  matcher: [
+    {
+      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
+  ],
+};
