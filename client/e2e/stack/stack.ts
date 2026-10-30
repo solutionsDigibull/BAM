@@ -82,10 +82,11 @@ export async function api<T = unknown>(
 type User = { id: string; email: string | null };
 
 /** A project of this run (named with PREFIX), with `fde` assigned. The FDE must have signed in once,
- * which creates their user row. Returns its id; `archive` it when done. */
+ * which creates their user row. Returns its id; `archive` it when done. Each call gets its own name,
+ * so a retried test never hits DUPLICATE_NAME on the attempt before it. */
 export async function newProject(admin: Page, title: string, fde: string): Promise<string> {
   const project = await api<{ id: string }>(admin, "POST", "/admin/projects", {
-    name: `${PREFIX} ${title}`.slice(0, 120),
+    name: `${PREFIX} ${title} ${randomBytes(2).toString("hex")}`.slice(0, 120),
   });
   const users = await api<{ items: User[] }>(admin, "GET", "/admin/users?limit=100");
   const member = users.items.find((u) => u.email?.startsWith(`${fde}@`));
