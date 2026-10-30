@@ -36,7 +36,7 @@ def load(name: str) -> dict[str, dict[str, object]]:
 
 
 def environment(services: dict[str, dict[str, object]], name: str) -> dict[str, str]:
-    env = services[name]["environment"]
+    env = services[name].get("environment", {})
     assert isinstance(env, dict)
     return {k: str(v) for k, v in env.items()}
 
