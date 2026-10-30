@@ -15,7 +15,7 @@ model's answer. Nothing in this folder calls a model.
 | Task | Set |
 |---|---|
 | `ocr` | **ready**, 20 items, baseline recorded |
-| `testgen` | **ready**, 20 items, **no baseline yet** (see below) |
+| `testgen` | **ready**, 20 items, baseline recorded |
 | `sow`, `isatvon`, `codegen`, `correction` | `todo`: each lands in its own change |
 
 ## Running the gate
@@ -35,24 +35,26 @@ baseline could not be written: never a pass), **3** NO_BASELINE (a new task: rec
 The first OCR baseline (score 1.0, 20 items, 3 runs, prompt `ocr-page/1.0.0`) was recorded on
 2026-10-30. Not built yet: pushing the scores to Langfuse datasets, and the CI job.
 
-### Test generation: no baseline yet, on purpose
+### Test generation
 
 An item scores three checks: the model produced cases the API accepts, it needed no re-ask, and the
 cases use every required input. Each of the 20 items is a complete invented Sub-Skill (five domains
 at four iteration bounds); every part of a variant describes its own domain, and a test checks that
 no login text is left in the others.
 
-The gate found three problems before any baseline could be accepted, and recording a score now
-would make it guard a broken state:
+The baseline (score **0.994**, 20 items x 3 runs, prompt `testgen/1.1.0`, recorded on 2026-10-30)
+was recorded only after the gate had found three problems that a baseline would have hidden:
 
-1. **The set itself** (fixed with this set): its first version swapped only the tables and inputs of
-   the login sample, so the model read two stories and wrote seed SQL into a table the Sub-Skill did
-   not declare.
-2. **The prompt** (`testgen/1.0.0`) never lists the allowed assertion types, so the model invents
-   one and its answer is refused; most failures on the corrected set involve `/assertions/N/type`.
-3. **The seed-SQL check** refuses an ordinary `WHERE a = 'x' AND b = 'y'` as a "function call".
+1. **The set itself:** its first version swapped only the tables and inputs of the login sample, so
+   the model read two stories and wrote seed SQL into a table the Sub-Skill did not declare.
+2. **The prompt** (`testgen/1.0.0`) never listed the allowed assertion types, so the model invented
+   one and its answer was refused. `1.1.0` lists them and spells out the seed-SQL rules.
+3. **The seed-SQL check** refused an ordinary `WHERE a = 'x' AND b = 'y'` as a "function call"
+   (fixed in #623).
 
-The first testgen baseline is recorded once the fixes for 2 and 3 are in.
+With 1 and 3 fixed, the same 60 calls scored **0.661** under `1.0.0` (19 of 60 runs got no valid
+cases) and **0.994** under `1.1.0` (1 run needed a re-ask). Run the gate against the old prompt and it
+reports `REGRESSED`, which is how a bad prompt change is blocked.
 
 ## Rules
 
