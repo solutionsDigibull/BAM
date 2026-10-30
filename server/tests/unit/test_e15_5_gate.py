@@ -37,7 +37,7 @@ def sandbox(tmp_path: Path) -> dict[str, Path]:
     """A copy of the golden dir and gate config, with an empty baseline dir."""
     golden = tmp_path / "golden"
     golden.mkdir(exist_ok=True)
-    for name in ("tasks.json", "ocr.json"):
+    for name in ("tasks.json", "ocr.json", "testgen.json", "testgen-base.json"):
         (golden / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
         )

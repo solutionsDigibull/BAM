@@ -2,42 +2,55 @@
   {
     "task": "ocr",
     "alias": "sbam-ocr",
-    "prompt_ids": ["ocr-page"],
+    "prompt_ids": [
+      "ocr-page"
+    ],
     "status": "ready",
     "note": "20 items: 5 synthetic business pages drawn 4 ways (ocr.json, from sbam_workers.evals.ocr_set)."
   },
   {
     "task": "sow",
     "alias": "sbam-sow",
-    "prompt_ids": ["sow-generate"],
+    "prompt_ids": [
+      "sow-generate"
+    ],
     "status": "todo",
     "note": "Needs 20 small OKF bundles with cited expectations; one real call is about $0.22 on a full bundle, so items are small."
   },
   {
     "task": "isatvon",
     "alias": "sbam-isatvon",
-    "prompt_ids": ["isatvon-macros", "isatvon-sub-skills"],
+    "prompt_ids": [
+      "isatvon-macros",
+      "isatvon-sub-skills"
+    ],
     "status": "todo",
     "note": "Needs 20 approved-SOW fragments with the Macro and Sub-Skill structure each must produce."
   },
   {
     "task": "codegen",
     "alias": "sbam-codegen",
-    "prompt_ids": ["codegen-bodies"],
+    "prompt_ids": [
+      "codegen-bodies"
+    ],
     "status": "todo",
     "note": "Needs 20 Sub-Skill specs whose generated bodies must pass the AST gate and compile."
   },
   {
     "task": "testgen",
     "alias": "sbam-testgen",
-    "prompt_ids": ["testgen"],
-    "status": "todo",
-    "note": "Needs 20 Sub-Skill manifests with the case kinds and assertions the suite must contain."
+    "prompt_ids": [
+      "testgen"
+    ],
+    "status": "ready",
+    "note": "20 items: 5 invented business Sub-Skills at 4 iteration bounds (testgen.json, from sbam_workers.evals.testgen_set), each the MS01.1 base with its own inputs, tables and conditions."
   },
   {
     "task": "correction",
     "alias": "sbam-corrector",
-    "prompt_ids": ["correct-code"],
+    "prompt_ids": [
+      "correct-code"
+    ],
     "status": "todo",
     "note": "Needs 20 failing bundles with the failure the correction must fix and the files it may touch."
   }

@@ -9,6 +9,8 @@ over its runs so one unlucky sample does not decide the gate (the model is not d
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from sbam_contracts.testgen import TestgenOutput
+
 from sbam_workers.evals.golden import OcrItem
 
 
@@ -46,3 +48,28 @@ def task_score(runs: Sequence[Sequence[ItemResult]]) -> float:
     if not runs:
         raise ValueError("no runs to score")
     return sum(run_score(r) for r in runs) / len(runs)
+
+
+TESTGEN_CHECKS = ("valid", "clean", "covers_inputs")
+
+
+def score_testgen(
+    item_id: str,
+    required_inputs: Sequence[str],
+    output: TestgenOutput | None,
+    attempts: int,
+) -> ItemResult:
+    """Three checks, each worth a third. `valid`: the model produced cases the API would accept
+    (the production re-ask loop validates every case; `None` means it never did). `clean`: it did so
+    with no re-ask (`attempts` is the number of model calls). `covers_inputs`: every input the
+    Sub-Skill requires appears in the input of at least one case, so the tests exercise it."""
+    covers = output is not None and all(
+        any(name in case.input for case in output.cases) for name in required_inputs
+    )
+    passed = {
+        "valid": output is not None,
+        "clean": output is not None and attempts == 1,
+        "covers_inputs": covers,
+    }
+    missing = tuple(name for name in TESTGEN_CHECKS if not passed[name])
+    return ItemResult(item_id, len(TESTGEN_CHECKS) - len(missing), len(TESTGEN_CHECKS), missing)

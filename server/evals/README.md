@@ -14,24 +14,35 @@ model's answer. Nothing in this folder calls a model.
 
 | Task | Set |
 |---|---|
-| `ocr` | **ready**, 20 items |
-| `sow`, `isatvon`, `codegen`, `testgen`, `correction` | `todo`: each lands in its own change |
+| `ocr` | **ready**, 20 items, baseline recorded |
+| `testgen` | **ready**, 20 items, **no baseline yet** (see below) |
+| `sow`, `isatvon`, `codegen`, `correction` | `todo`: each lands in its own change |
 
 ## Running the gate
 
 ```
 uv run python -m sbam_workers.evals.gate --task ocr            # compare with the baseline
 uv run python -m sbam_workers.evals.gate --task ocr --record   # write a baseline, to be reviewed
+uv run python -m sbam_workers.evals.gate --task testgen        # the same for test generation
 ```
 
-It sends each page through the production OCR path (`ocr.read_page` over `LlmClient`, through
-Bifrost) and needs a reachable Bifrost with a working provider key. A full run is 60 calls
+It sends each page (OCR) or Sub-Skill (test generation) through the production path (`ocr.read_page`
+or `testgen.generate`, each over `LlmClient`, through Bifrost) and needs a reachable Bifrost with a working provider key. A full run is 60 calls
 (20 items x 3 runs), about $0.30 with the current OCR model. Exit codes: **0** PASS, **1** REGRESSED
 (the score fell by more than `gate.json`'s threshold), **2** INFRA_ERROR (the provider failed, or the
 baseline could not be written: never a pass), **3** NO_BASELINE (a new task: record and review one).
 
 The first OCR baseline (score 1.0, 20 items, 3 runs, prompt `ocr-page/1.0.0`) was recorded on
 2026-10-30. Not built yet: pushing the scores to Langfuse datasets, and the CI job.
+
+### Test generation: no baseline, on purpose
+
+An item scores three checks: the model produced cases the API accepts, it needed no re-ask, and the
+cases use every required input. The first live run with prompt `testgen/1.0.0` scored **0.361** over
+20 items x 3 runs, and a one-run check gave valid cases for only 9 of the 20 Sub-Skills. Nothing was
+recorded as the accepted baseline: a baseline that blesses that would make the gate guard a broken
+state. Most failures were `/assertions/N/type`, an assertion type the validator refuses, so the
+prompt change that fixes it is what records the first testgen baseline.
 
 ## Rules
 
