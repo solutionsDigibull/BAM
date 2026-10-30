@@ -60,7 +60,7 @@ Code lives in `server/api/sbam_api/storage/`. Project files go only through a `S
 | Table               | Purpose                        | Key fields                                                                               | Relations      | Status / notes            |
 | ------------------- | ------------------------------ | ---------------------------------------------------------------------------------------- | -------------- | ------------------------- |
 | `tenants`         | Client organisation            | `id`, `name`, `keycloak_org_id`, `status`                                        | 1→N projects  | `ACTIVE`, `SUSPENDED` |
-| `users`           | Local mirror of Keycloak users | `id`, `keycloak_sub`, `tenant_id`, `email`, `display_name`, `portal_roles[]` | ← members     | Synced on login           |
+| `users`           | Local mirror of Keycloak users | `id`, `keycloak_sub`, `tenant_id`, `email`, `display_name`, `portal_roles[]`, `idp_sync_pending_at`, `idp_synced_roles[]` | ← members     | Synced on login; role/status changes are committed first, then converged to Keycloak (pending mark = outbox, A-13) |
 | `projects`        | Admin-created project          | `tenant_id`, `name`, `client_name`, `description`, `context_notes`, `status` | 1→N workflows | `ACTIVE`, `ARCHIVED`  |
 | `project_members` | FDE assignment                 | `project_id`, `user_id`, `role` (`FDE`)                                          | —             | —                        |
 

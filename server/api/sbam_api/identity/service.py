@@ -49,6 +49,7 @@ from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.identity import repository
+from sbam_api.identity.idp_sync import converge_user
 from sbam_api.identity.keycloak_admin import user_exists
 from sbam_api.identity.models import Tenant, User
 from sbam_api.identity.repository import UserRepository
@@ -134,9 +135,10 @@ def set_tenant_status(
 
 # --- Tenant users (sbam-admin, E2.4) -----------------------------------------------------------
 #
-# The row is written (flushed) first, then Keycloak, then the commit: a stale row is 412 before
-# Keycloak is touched, and a Keycloak failure is 503 and rolls the row back. Role changes and
-# deactivation revoke the user's sessions, so they apply at once.
+# The row is the source of truth. A role change or deactivation is committed with a pending mark
+# (a stale row is 412 before anything is saved), then Keycloak is converged outside the tenant
+# lock and its sessions revoked. If Keycloak is down the change stays saved and pending, a relay
+# retries it (A-13), and the DB status check already refuses a deactivated user.
 
 
 def last_admin() -> ApiError:
@@ -299,19 +301,17 @@ def update_user(
 
     old_roles, old_status = list(row.portal_roles), row.status
     row.portal_roles, row.status = roles, status
+    if row.idp_sync_pending_at is None:
+        row.idp_synced_roles = old_roles  # what Keycloak holds until it is told
+    row.idp_sync_pending_at = datetime.now(UTC)
     repo.update(row, row.row_version)  # flushed, not committed: a concurrent writer -> 412 here
-    if status_changed:
-        users.set_enabled(row.keycloak_sub, status != UserStatus.DEACTIVATED)
-    if roles_changed:
-        users.set_roles(row.keycloak_sub, old_roles, roles)
-    if status == UserStatus.DEACTIVATED or roles_changed:
-        users.logout(row.keycloak_sub)
     if roles_changed:
         _audit(session, actor, "ROLE_CHANGED", row, {"roles": old_roles}, {"roles": roles})
     if status_changed:
         action = "USER_DEACTIVATED" if status == UserStatus.DEACTIVATED else "USER_REACTIVATED"
         _audit(session, actor, action, row, {"status": old_status}, {"status": status})
-    session.commit()
+    session.commit()  # the tenant lock ends here, before any Keycloak call
+    converge_user(sessionmaker(bind=session.get_bind()), users, row.id)  # False: the relay retries
     return row
 
 

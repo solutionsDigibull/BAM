@@ -6,7 +6,8 @@ tests/integration/test_rbac_keycloak.py.
 """
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ from fastapi.testclient import TestClient
 from sbam_api.audit.models import AuditLog
 from sbam_api.core.auth import Auth, TokenVerifier, idp_unavailable
 from sbam_api.db.session import make_sessionmaker
+from sbam_api.identity.idp_sync import converge_pending
 from sbam_api.identity.keycloak_admin import user_exists
 from sbam_api.identity.models import Tenant, User
 from sbam_api.identity.service import SqlUserDirectory
@@ -48,9 +50,13 @@ class Users:
         self.calls: list[tuple[str, ...]] = []
         self.taken: set[str] = set()
         self.down = False
+        self.fail: set[str] = set()  # methods that answer 503 while the others work
+        self.seen: list[Callable[[], None]] = []  # run at the start of every call
 
     def _call(self, *call: str) -> None:
-        if self.down:
+        for look in self.seen:
+            look()
+        if self.down or call[0] in self.fail:
             raise idp_unavailable()
         self.calls.append(call)
 
@@ -127,6 +133,17 @@ class Harness:
             self.admin_a(),
             headers={"if-match": f'"{version}"'},
             json=body,
+        )
+
+    def pending(self, user_id: uuid.UUID) -> datetime | None:
+        with self.sessions() as s:
+            row = s.get(User, user_id)
+            assert row is not None
+            return row.idp_sync_pending_at
+
+    def relay(self, minutes: int) -> tuple[int, int]:
+        return converge_pending(
+            self.sessions, self.users, datetime.now(UTC) + timedelta(minutes=minutes)
         )
 
     def project(self) -> str:
@@ -299,7 +316,11 @@ def test_e2_4_demote_allowed_when_another_admin_is_active(h: Harness) -> None:
     assert res.status_code == 200, res.text
     assert res.json()["portal_roles"] == ["sbam-fde"] and res.headers["etag"] == '"2"'
     sub = str(ADMIN_A)
-    assert h.users.calls == [("set_roles", sub, "sbam-admin", "sbam-fde"), ("logout", sub)]
+    assert h.users.calls == [
+        ("set_enabled", sub, "True"),  # convergence restates the row; Keycloak ignores a no-op
+        ("set_roles", sub, "sbam-admin", "sbam-fde"),
+        ("logout", sub),
+    ]
     [row] = h.audit_rows("ROLE_CHANGED")
     assert row.before == {"roles": ["sbam-admin"]} and row.after == {"roles": ["sbam-fde"]}
 
@@ -345,11 +366,59 @@ def test_e2_4_deactivate_disables_revokes_and_blocks(h: Harness) -> None:
     assert h.call("GET", "/me", h.fde_a1()).status_code == 200
 
 
-def test_e2_4_keycloak_down_changes_nothing(h: Harness) -> None:
+def test_a13_t01_keycloak_down_keeps_the_saved_change_pending(h: Harness) -> None:
     h.users.down = True
-    problem(h.patch(FDE_A1, {"active": False}), 503, "IDP_UNAVAILABLE")
-    user = h.user(FDE_A1)
-    assert user["status"] == "ACTIVE" and user["row_version"] == 1
+    res = h.patch(FDE_A1, {"active": False})
+    assert res.status_code == 200 and res.json()["status"] == "DEACTIVATED"
+    assert res.json()["row_version"] == 2
+    assert h.pending(FDE_A1) is not None
+    problem(h.call("GET", "/me", h.fde_a1()), 401, "UNAUTHENTICATED")  # the DB already refuses
+
+
+def test_a13_t02_failing_logout_no_longer_splits_keycloak_and_the_row(h: Harness) -> None:
+    h.users.fail = {"logout"}
+    assert h.patch(FDE_A1, {"active": False}).status_code == 200
+    sub = str(FDE_A1)
+    assert h.users.calls == [("set_enabled", sub, "False")]  # Keycloak took the change
+    assert h.user(FDE_A1)["status"] == "DEACTIVATED"  # and so did the row
+    assert h.pending(FDE_A1) is not None
+    h.users.fail = set()
+    assert h.relay(minutes=2) == (1, 0)
+    assert h.users.calls[1:] == [("set_enabled", sub, "False"), ("logout", sub)]
+    assert h.pending(FDE_A1) is None and h.user(FDE_A1)["row_version"] == 2
+
+
+def test_a13_t03_relay_waits_for_the_request_that_is_still_converging(h: Harness) -> None:
+    h.users.down = True
+    assert h.patch(FDE_A1, {"roles": ["sbam-admin"]}).status_code == 200
+    h.users.down = False
+    assert h.relay(minutes=0) == (0, 0)
+    assert h.pending(FDE_A1) is not None
+    assert h.relay(minutes=2) == (1, 0)
+    sub = str(FDE_A1)
+    assert h.users.calls == [
+        ("set_enabled", sub, "True"),
+        ("set_roles", sub, "sbam-fde", "sbam-admin"),
+        ("logout", sub),
+    ]
+
+
+def test_a13_t04_the_change_is_committed_before_keycloak_is_called(h: Harness) -> None:
+    states: list[str] = []
+
+    def look() -> None:  # another connection: only a commit is visible to it
+        states.append(str(h.user(FDE_A1)["status"]))
+
+    h.users.seen.append(look)
+    assert h.patch(FDE_A1, {"active": False}).status_code == 200
+    assert states and set(states) == {"DEACTIVATED"}
+
+
+def test_a13_t05_a_failing_relay_keeps_the_mark_and_counts_it(h: Harness) -> None:
+    h.users.down = True
+    assert h.patch(FDE_A1, {"active": False}).status_code == 200
+    assert h.relay(minutes=2) == (0, 1)
+    assert h.pending(FDE_A1) is not None
 
 
 def test_e2_4_old_token_does_not_write_old_roles_back(h: Harness) -> None:

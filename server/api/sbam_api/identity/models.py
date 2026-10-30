@@ -54,3 +54,17 @@ class User(TenantOwned, Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_session_id: Mapped[str | None] = mapped_column(String(64))  # Keycloak `sid`
     status: Mapped[str] = mapped_column(String(20), default=UserStatus.ACTIVE.value)
+    # The outbox for Keycloak (A-13): set in the transaction that changes status or roles, cleared
+    # once Keycloak agrees. `idp_synced_roles` is what Keycloak held when the first unconfirmed
+    # change was made.
+    idp_sync_pending_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    idp_synced_roles: Mapped[list[str] | None] = mapped_column(
+        ARRAY(String(40)).with_variant(JSON(), "sqlite")
+    )
+
+
+Index(
+    "ix_users_idp_sync_pending",
+    User.idp_sync_pending_at,
+    postgresql_where=User.idp_sync_pending_at.is_not(None),
+)
