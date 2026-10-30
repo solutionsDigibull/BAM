@@ -2,7 +2,7 @@
 
 import json
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import ClassVar
@@ -196,23 +196,35 @@ def test_e1_4_fastapi_builtin_telemetry_stays_off_with_an_endpoint(
 def test_e1_4_full_queue_drops_spans_without_blocking(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import time
-
     from sbam_api.core import telemetry
 
     monkeypatch.setattr(telemetry, "_provider", None)  # a fresh provider with a real exporter
-    dead = make_settings(tmp_path, otel_exporter_otlp_endpoint="http://127.0.0.1:1")
-    provider = tracer_provider(dead)
-    try:
+    stuck, exported = threading.Event(), list[ReadableSpan]()
+
+    def export(_self: object, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        exported.extend(spans)
+        stuck.wait(30)  # the collector never answers: the worker stays inside its first batch
+        return SpanExportResult.FAILURE
+
+    monkeypatch.setattr(OTLPSpanExporter, "export", export)
+    provider = tracer_provider(make_settings(tmp_path, otel_exporter_otlp_endpoint="http://x:1"))
+
+    def produce() -> None:
         tracer = provider.get_tracer("e1_4")
-        start = time.perf_counter()
         for i in range(5000):  # > max_queue_size (2048): the overflow is dropped, not waited on
             tracer.start_span(f"s{i}").end()
-        assert time.perf_counter() - start < 1.0
+
+    # Behaviour, not speed: a producer that blocked on the full queue would still be running after
+    # a generous wait, whatever the runner's load.
+    producer = threading.Thread(target=produce, daemon=True)
+    try:
+        producer.start()
+        producer.join(timeout=20)
+        assert not producer.is_alive(), "ending a span blocked on a full queue"
     finally:
-        # Shutdown flushes the queue; against a dead port each batch waits its 2 s timeout.
-        monkeypatch.setattr(OTLPSpanExporter, "export", lambda *_: SpanExportResult.FAILURE)
+        stuck.set()
         provider.shutdown()
+    assert 0 < len(exported) < 5000  # the overflow was dropped, not waited on
 
 
 def test_e1_4_background_work_without_request_context(

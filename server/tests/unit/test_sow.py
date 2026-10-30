@@ -147,12 +147,23 @@ def large_sow(modules: int, per_module: int) -> dict[str, Any]:
     return data
 
 
+def _best_validation_seconds(data: dict[str, Any], rounds: int = 5) -> float:
+    best = float("inf")
+    for _ in range(rounds):  # CPU time, fastest round: the least disturbed by a loaded runner
+        start = time.process_time()
+        SowDocument.model_validate(data)
+        best = min(best, time.process_time() - start)
+    return best
+
+
 def test_e0_5_t08_large_sow_validates_quickly() -> None:
-    data = large_sow(50, 10)
-    start = time.perf_counter()
-    doc = SowDocument.model_validate(data)
-    assert time.perf_counter() - start < 0.5
-    assert len(doc.features) == 500
+    assert len(SowDocument.model_validate(large_sow(50, 10)).features) == 500
+    # Growth, not a stopwatch: 20x the features must cost about 20x, not 400x (quadratic).
+    small, large = _best_validation_seconds(large_sow(20, 10)), _best_validation_seconds(
+        large_sow(400, 10)
+    )
+    assert large < 40 * small, f"validation time grew {large / small:.0f}x for 20x the features"
+    assert large < 10.0  # a generous ceiling for a stuck validator
 
 
 # --- Edge cases and safety ------------------------------------------------------------------------
