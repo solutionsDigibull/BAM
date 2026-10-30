@@ -26,6 +26,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export type GridActions = {
   onFindings: (row: BuildRow, gate: GateName) => void;
   onRetry: (row: BuildRow) => void;
+  onPatch: (row: BuildRow) => void;
 };
 
 // Plain glyphs styled by CSS, not icon components: ~450 gate cells are on screen at once (T06).
@@ -105,7 +106,20 @@ function RetryCell({ data, context }: ICellRendererParams<BuildRow, unknown, Ctx
   const allowed = canRetry(data.state);
   return (
     // a native title, not a Tooltip per row; the wrapper keeps it on a disabled button
-    <span title={allowed ? "Retry after your fix" : "Retry is offered in NEEDS_FDE_REVIEW only"}>
+    <span
+      title={allowed ? "Retry after your fix" : "Retry is offered in NEEDS_FDE_REVIEW only"}
+      style={{ display: "inline-flex", gap: 6 }}
+    >
+      {allowed && (
+        // a held ISATVON patch (#499) is decided here; the drawer says when none is waiting
+        <Button
+          size="small"
+          aria-label={`Review patch ${data.skill_id}`}
+          onClick={() => context.actions.onPatch(data)}
+        >
+          Review patch
+        </Button>
+      )}
       <Button
         size="small"
         disabled={!allowed}
@@ -159,7 +173,7 @@ const COLUMNS: (ColDef<BuildRow> | ColGroupDef<BuildRow>)[] = [
   {
     colId: "retry",
     headerName: "",
-    width: 92,
+    width: 190,
     pinned: "right",
     valueGetter: (p) => p.data?.state,
     cellRenderer: RetryCell,
@@ -194,6 +208,7 @@ export default function BuildGrid({
       actions: {
         onFindings: (r, g) => latest.current.onFindings(r, g),
         onRetry: (r) => latest.current.onRetry(r),
+        onPatch: (r) => latest.current.onPatch(r),
       },
     }),
     [],
