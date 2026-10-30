@@ -14,7 +14,6 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
-from sbam_contracts.api import PAGE_LIMIT_MAX
 from sbam_contracts.identity import UserStatus
 from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select, update
 from sqlalchemy.dialects import postgresql, sqlite
@@ -30,9 +29,12 @@ def tenant_name_taken(session: Session, name: str) -> bool:
     return found is not None
 
 
-def list_tenants(session: Session) -> list[Tenant]:
-    # ponytail: one page of 100, oldest first; cursor paging when a platform has more tenants.
-    return list(session.scalars(select(Tenant).order_by(Tenant.id).limit(PAGE_LIMIT_MAX)))
+def list_tenants(session: Session, after: uuid.UUID | None, limit: int) -> list[Tenant]:
+    """Oldest first, after the previous page's last id; `limit + 1` rows say another page exists."""
+    query = select(Tenant).order_by(Tenant.id).limit(limit + 1)
+    if after is not None:
+        query = query.where(Tenant.id > after)
+    return list(session.scalars(query))
 
 
 def user_by_sub(session: Session, keycloak_sub: str) -> User | None:

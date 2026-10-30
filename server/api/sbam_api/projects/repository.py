@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Callable, Iterable
 
 from sbam_contracts.projects import ProjectStatus
-from sqlalchemy import delete, func, select
+from sqlalchemy import Select, delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.db.repository import TenantContext, TenantScopedRepository
@@ -22,12 +22,26 @@ class ProjectRepository(StatefulRepository):
             query = query.where(Project.id != exclude)
         return self.session.scalars(query.limit(1)).first() is not None
 
-    def active_among(self, ids: Iterable[uuid.UUID]) -> list[Project]:
-        """The ACTIVE projects among `ids` (an FDE's assignments), oldest first."""
+    def page(self, after: uuid.UUID | None, limit: int) -> list[Project]:
+        """The tenant's projects, oldest first, after the previous page's last id; `limit + 1`
+        rows say another page exists."""
+        return self._page(self._scoped(), after, limit)
+
+    def active_page(
+        self, ids: Iterable[uuid.UUID], after: uuid.UUID | None, limit: int
+    ) -> list[Project]:
+        """The ACTIVE projects among `ids` (an FDE's assignments), as `page`."""
         query = self._scoped().where(
             Project.id.in_(list(ids)), Project.status == ProjectStatus.ACTIVE.value
         )
-        return list(self.session.scalars(query.order_by(Project.id)))
+        return self._page(query, after, limit)
+
+    def _page(
+        self, query: Select[tuple[Project]], after: uuid.UUID | None, limit: int
+    ) -> list[Project]:
+        if after is not None:
+            query = query.where(Project.id > after)
+        return list(self.session.scalars(query.order_by(Project.id).limit(limit + 1)))
 
 
 class MemberRepository(TenantScopedRepository[ProjectMember]):

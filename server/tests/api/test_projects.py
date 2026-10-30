@@ -342,3 +342,66 @@ def test_e3_1_t08_parallel_create_lost_race_is_409(h: Harness) -> None:
         res = h.call("POST", "/admin/projects", h.admin_a(), json={"name": "ems quote bot"})
     problem(res, 409, "DUPLICATE_NAME")
     assert len(h.projects()) == 1
+
+
+# --- A-15b: cursor paging on /admin/projects and /projects -------------------------------------
+
+
+def _ids(res: Any) -> list[str]:
+    assert res.status_code == 200, res.text
+    return [x["id"] for x in res.json()["items"]]
+
+
+def test_a15b_t01_admin_projects_page_through_every_row_once(h: Harness) -> None:
+    made = [h.create(f"P{i}")["id"] for i in range(5)]
+    seen: list[str] = []
+    cursor = ""
+    for _ in range(5):
+        res = h.call("GET", f"/admin/projects?limit=2&cursor={cursor}", h.admin_a())
+        seen += _ids(res)
+        cursor = res.json()["next_cursor"] or ""
+        if not cursor:
+            break
+    assert seen == sorted(made) and len(seen) == 5
+
+
+def test_a15b_t02_page_boundaries_exactly_limit_limit_plus_one_and_empty(h: Harness) -> None:
+    assert h.call("GET", "/admin/projects?limit=2", h.admin_a()).json()["next_cursor"] is None
+    h.create("A"), h.create("B")
+    exact = h.call("GET", "/admin/projects?limit=2", h.admin_a()).json()
+    assert len(exact["items"]) == 2 and exact["next_cursor"] is None
+    h.create("C")
+    more = h.call("GET", "/admin/projects?limit=2", h.admin_a()).json()
+    assert len(more["items"]) == 2 and more["next_cursor"]
+    last = h.call("GET", f"/admin/projects?limit=2&cursor={more['next_cursor']}", h.admin_a())
+    assert len(last.json()["items"]) == 1 and last.json()["next_cursor"] is None
+
+
+def test_a15b_t03_a_tampered_or_foreign_cursor_is_invalid_and_leaks_nothing(h: Harness) -> None:
+    for i in range(3):
+        h.create(f"P{i}")
+    cursor = h.call("GET", "/admin/projects?limit=1", h.admin_a()).json()["next_cursor"]
+    problem(h.call("GET", f"/admin/projects?cursor={cursor}x", h.admin_a()), 400, "INVALID_CURSOR")
+    problem(h.call("GET", "/admin/projects?cursor=nope", h.admin_a()), 400, "INVALID_CURSOR")
+    # tenant B's admin replaying tenant A's cursor
+    problem(h.call("GET", f"/admin/projects?cursor={cursor}", h.admin_b()), 400, "INVALID_CURSOR")
+
+
+def test_a15b_t04_limit_is_bounded(h: Harness) -> None:
+    for bad in ("0", "101", "x"):
+        assert h.call("GET", f"/admin/projects?limit={bad}", h.admin_a()).status_code == 400
+    assert len(h.call("GET", "/admin/projects", h.admin_a()).json()["items"]) == 0
+
+
+def test_a15b_t05_fde_list_pages_only_assigned_active_projects(h: Harness) -> None:
+    mine = [h.create(f"M{i}")["id"] for i in range(3)]
+    h.create("Other")
+    h.members.assigned[FDE_A1] = {uuid.UUID(i) for i in mine}
+    fde = h.realm.token(FDE_A1)
+    first = h.call("GET", "/projects?limit=2", fde).json()
+    second = h.call("GET", f"/projects?limit=2&cursor={first['next_cursor']}", fde).json()
+    assert [x["id"] for x in first["items"] + second["items"]] == sorted(mine)
+    assert second["next_cursor"] is None
+    # another FDE of the same tenant cannot reuse this cursor
+    other = h.realm.token(uuid.uuid4())
+    problem(h.call("GET", f"/projects?cursor={first['next_cursor']}", other), 400, "INVALID_CURSOR")

@@ -33,6 +33,10 @@ def db(request: Request) -> Iterator[Session]:
 Db = Annotated[Session, Depends(db)]
 
 
+def _secret(request: Request) -> bytes:
+    return bytes(request.app.state.settings.cursor_secret.get_secret_value().encode())
+
+
 def _out(project: Project, response: Response | None = None) -> ProjectOut:
     if response is not None:
         response.headers["ETag"] = etag(project.row_version)
@@ -50,8 +54,18 @@ def create_project(body: ProjectCreate, user: Admin, session: Db, response: Resp
 
 
 @router.get("/admin/projects")
-def list_projects(user: Admin, session: Db) -> Page[ProjectOut]:
-    return Page[ProjectOut](items=[_out(p) for p in service.list_all(session, user)])
+def list_projects(
+    user: Admin,
+    session: Db,
+    request: Request,
+    limit: str | None = None,
+    cursor: str | None = None,
+) -> Page[ProjectOut]:
+    """`?limit=1..100 (25)&cursor=`."""
+    rows, next_cursor = service.list_all(
+        session, user, _secret(request), limit=limit, cursor=cursor
+    )
+    return Page[ProjectOut](items=[_out(p) for p in rows], next_cursor=next_cursor)
 
 
 @router.get("/admin/projects/{project_id}")
@@ -95,5 +109,15 @@ def put_members(
 
 
 @router.get("/projects")
-def my_projects(user: Annotated[CurrentUser, Depends(fde)], session: Db) -> Page[ProjectOut]:
-    return Page[ProjectOut](items=[_out(p) for p in service.list_assigned(session, user)])
+def my_projects(
+    user: Annotated[CurrentUser, Depends(fde)],
+    session: Db,
+    request: Request,
+    limit: str | None = None,
+    cursor: str | None = None,
+) -> Page[ProjectOut]:
+    """`?limit=1..100 (25)&cursor=`."""
+    rows, next_cursor = service.list_assigned(
+        session, user, _secret(request), limit=limit, cursor=cursor
+    )
+    return Page[ProjectOut](items=[_out(p) for p in rows], next_cursor=next_cursor)

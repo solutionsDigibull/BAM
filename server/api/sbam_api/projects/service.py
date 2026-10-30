@@ -28,6 +28,7 @@ from sbam_api.audit.repository import record
 from sbam_api.core.auth import ROLE_FDE, CurrentUser
 from sbam_api.core.conventions import ApiError, check_if_match, not_found
 from sbam_api.core.logging import correlation_id_var
+from sbam_api.identity import paging
 from sbam_api.identity.models import User
 from sbam_api.identity.repository import UserRepository
 from sbam_api.projects.models import Project, ProjectMember
@@ -81,14 +82,24 @@ def get(session: Session, user: CurrentUser, project_id: uuid.UUID) -> Project:
     return project
 
 
-def list_all(session: Session, user: CurrentUser) -> list[Project]:
-    # ponytail: one page of 100, oldest first; cursor paging when a tenant has more projects.
-    return list(_repo(session, user).list())
+def list_all(
+    session: Session, user: CurrentUser, secret: bytes, *, limit: str | None, cursor: str | None
+) -> tuple[list[Project], str | None]:
+    """One page of the tenant's projects, oldest first, and the cursor of the next (or None)."""
+    scope = f"projects:{user.tenant_id}"
+    size, after = paging.read_page(cursor, limit, scope, secret)
+    return paging.cut(_repo(session, user).page(after, size), size, scope, secret)
 
 
-def list_assigned(session: Session, user: CurrentUser) -> list[Project]:
-    """FDE `/projects`: assigned and ACTIVE only; an archived project disappears."""
-    return _repo(session, user).active_among(user.assigned_project_ids)
+def list_assigned(
+    session: Session, user: CurrentUser, secret: bytes, *, limit: str | None, cursor: str | None
+) -> tuple[list[Project], str | None]:
+    """FDE `/projects`: assigned and ACTIVE only (an archived project disappears), paged. The
+    cursor is signed for this tenant and this FDE."""
+    scope = f"my-projects:{user.tenant_id}:{user.keycloak_sub}"
+    size, after = paging.read_page(cursor, limit, scope, secret)
+    rows = _repo(session, user).active_page(user.assigned_project_ids, after, size)
+    return paging.cut(rows, size, scope, secret)
 
 
 def create(session: Session, user: CurrentUser, body: ProjectCreate) -> Project:
