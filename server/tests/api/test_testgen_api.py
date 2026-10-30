@@ -300,3 +300,13 @@ def test_e13_5_the_mock_hash_ignores_which_folder_a_definition_is_stored_under()
         == mocks_hashes(elsewhere)
         == {"a" * 64: "a" * 64, "b" * 64: "b" * 64}
     )
+
+
+def test_e13_6_an_assertion_type_the_suite_does_not_know_is_422_with_its_path(h: Harness) -> None:
+    sha = h.seed()
+    cid = h.case_id("case-PASS_FIRST")
+    res = h.write("PUT", f"/cases/{cid}", sha, {"assertions": [{"type": "looks_fine"}]})
+    problem(res, 422, "VALIDATION_ERROR")
+    assert res.json()["errors"][0]["path"] == "/assertions/0/type"
+    ok = h.write("PUT", f"/cases/{cid}", sha, {"assertions": [{"type": "iterations_within_bound"}]})
+    assert ok.status_code == 200, ok.text

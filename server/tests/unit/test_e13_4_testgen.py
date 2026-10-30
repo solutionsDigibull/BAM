@@ -309,3 +309,13 @@ def test_e11_4b_edited_tests_from_before_the_fingerprint_are_kept() -> None:
     mark_edited(w, first, generated_for=None)
     after_a_correction(w, sample(**{IDEF + "v_variables.max_iterations": 1}))
     assert w.run() == first and len(w.datasets()) == 1
+
+
+def test_e13_6_an_assertion_type_the_suite_does_not_know_is_re_asked_and_never_stored() -> None:
+    typo = case("typo", "EDGE", "SUCCESS", assertions=[{"type": "looks_fine"}])
+    w = World([{"cases": [*GOOD["cases"], typo]}, GOOD])
+    w.run()
+    assert len(w.bifrost.requests) == 2 and "/assertions/0/type" in json.dumps(
+        w.bifrost.requests[1]
+    )
+    assert "typo" not in {c.name for c in w.cases()}

@@ -76,7 +76,9 @@ from sbam_workers.llm.store import SqlCallStore
 from sbam_workers.llm.trace import LangfuseTracer
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
+from sbam_workers.test import promptfoo_suite as suite_stage
 from sbam_workers.test import testgen as testgen_stage
+from sbam_workers.test.promptfoo_suite import BuildPromptfooSuite
 from sbam_workers.test.testgen import GenerateTests, SqlDatasetStore
 
 INPUT_MISMATCH = assemble_stage.INPUT_MISMATCH
@@ -303,6 +305,12 @@ def _generate_tests() -> GenerateTests:
     )
 
 
+@lru_cache(maxsize=1)
+def _build_promptfoo_suite() -> BuildPromptfooSuite:
+    sessions = mirror.sessions()
+    return BuildPromptfooSuite(SqlBuildInputs(sessions).tests_sub_skill, sessions)
+
+
 @activity_for(TaskQueue.BUILD)
 @activity.defn(name=ast_gate_stage_module.STAGE)
 async def ast_gate_stage_activity(inp: BuildStageInput) -> IdResult:
@@ -324,6 +332,13 @@ async def static_gate_stage_activity(inp: BuildStageInput) -> IdResult:
 async def generate_tests_stage_activity(inp: BuildStageInput) -> IdResult:
     """Synthetic test cases and files for the Sub-Skill, stored as a new dataset version (E13.4)."""
     return await _generate_tests().run(inp)
+
+
+@activity_for(TaskQueue.TEST)
+@activity.defn(name=suite_stage.STAGE)
+async def build_promptfoo_suite_stage_activity(inp: BuildStageInput) -> IdResult:
+    """The Promptfoo suite of this build, built and checked from the stored test data (E13.6)."""
+    return await _build_promptfoo_suite().run(inp)
 
 
 @activity_for(TaskQueue.LLM)

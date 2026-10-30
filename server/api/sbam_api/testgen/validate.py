@@ -7,6 +7,7 @@ can mark the field (`/input/amount`, `/initial_state/0`).
 * The seed SQL (`initial_state`, `state_script`) passes the statement allowlist and, together,
   writes at most `MAX_SEED_ROWS` rows.
 * `expected_terminal` is one the case's kind can reach.
+* every assertion has a type the Promptfoo suite knows (`sbam_contracts.promptfoo.AssertionType`).
 """
 
 import re
@@ -17,6 +18,7 @@ from jsonschema import Draft202012Validator
 from sbam_contracts.api import FieldError
 from sbam_contracts.isatvon14 import SubSkill as SubSkillModel
 from sbam_contracts.isatvon14 import build_contracts
+from sbam_contracts.promptfoo import AssertionType
 from sbam_contracts.testgen import KIND_TERMINAL, MAX_SEED_ROWS, CaseBody, CaseKind
 
 from sbam_api.testgen import seed_sql
@@ -74,6 +76,15 @@ def case_errors(isatvon: Mapping[str, Any], kind: CaseKind, case: CaseBody) -> l
                 FieldError(
                     path="/initial_state",
                     message=f"a case may write at most {MAX_SEED_ROWS} rows in total",
+                )
+            )
+    known = sorted(t.value for t in AssertionType)
+    for index, assertion in enumerate(case.assertions):
+        if assertion.type not in known:  # a typo must not become a test that checks nothing (E13.6)
+            errors.append(
+                FieldError(
+                    path=f"/assertions/{index}/type",
+                    message=f"unknown assertion type; use one of {', '.join(known)}",
                 )
             )
     if case.expected_terminal not in KIND_TERMINAL[kind]:

@@ -201,6 +201,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "ast_gate": build_stubs.ast_gate,
     "static_gate": build_stubs.static_gate,
     "generate_tests": test_stubs.generate_tests,
+    "build_promptfoo_suite": test_stubs.build_promptfoo_suite,
     "correct": build_stubs.correct,
 }
 
