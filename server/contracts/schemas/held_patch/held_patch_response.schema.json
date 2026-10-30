@@ -10,6 +10,11 @@
           "title": "Sub Skill Id",
           "type": "string"
         },
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
         "attempt": {
           "minimum": 1,
           "title": "Attempt",
@@ -56,6 +61,7 @@
       },
       "required": [
         "sub_skill_id",
+        "content_sha256",
         "attempt",
         "failed_gate",
         "rationale",

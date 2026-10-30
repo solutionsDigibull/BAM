@@ -12,7 +12,8 @@ These are the bodies of the three endpoints that let the FDE decide it:
 - `POST W/sub-skills/{sub_id}/held-patch/reject` -> `PatchDecided`: record the rejection and retry
   from the approved ISATVON.
 
-Both decisions take an `Idempotency-Key` and the Sub-Skill's content hash as `If-Match`.
+Both decisions take an `Idempotency-Key`; accepting also takes the Sub-Skill's content hash as
+`If-Match` (`HeldPatch.content_sha256`).
 """
 
 from typing import Annotated, Any, Final, Literal
@@ -40,6 +41,8 @@ class HeldPatchOp(_Strict):
 
 class HeldPatch(_Strict):
     sub_skill_id: UUID
+    # the Sub-Skill's `content_sha256`: send it as `If-Match` to accept (its edits' ETag)
+    content_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
     attempt: Annotated[int, Field(ge=1)]  # the attempt the patch produced
     failed_gate: Annotated[str, Field(max_length=100)]  # the gate whose failure it answered
     rationale: Annotated[str, Field(max_length=4_000)]  # the model's reason; text, never markup
