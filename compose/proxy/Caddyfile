@@ -5,6 +5,9 @@
 #   SBAM_TLS          ""                        ACME (Let's Encrypt) with automatic renewal
 #                     "/certs/fullchain.pem /certs/privkey.pem"  certificate files you provide (mounted at /certs)
 #                     "internal"                Caddy's own CA (dev only, browsers will warn)
+# No `log` directive anywhere, on purpose: Caddy then writes no access log, so a signed download URL (its
+# signature is in the query string, A-15/F-20) never reaches a log. test_a15_proxy_logging.py holds this; a
+# future access log must delete the query from `request>uri` first.
 # Default-deny: a path not listed here is a 404. HTTP on port 80 is redirected to HTTPS by Caddy itself
 # (automatic HTTPS) for every hostname below.
 
