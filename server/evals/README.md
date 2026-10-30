@@ -7,7 +7,8 @@ model's answer. Nothing in this folder calls a model.
 |---|---|
 | `golden/tasks.json` | every task, its `sbam-*` alias, the prompt ids it uses, and whether its set is `ready` or `todo` |
 | `golden/<task>.json` | the items of a ready task (at least 20) |
-| `baselines/<task>.json` | the last accepted scores (added with the gate runner, not yet) |
+| `baselines/<task>.json` | the last accepted score of a task, with the prompt versions it was measured on |
+| `gate.json` | the threshold (the largest drop that still passes) and the runs averaged per item |
 
 ## Status
 
@@ -15,6 +16,22 @@ model's answer. Nothing in this folder calls a model.
 |---|---|
 | `ocr` | **ready**, 20 items |
 | `sow`, `isatvon`, `codegen`, `testgen`, `correction` | `todo`: each lands in its own change |
+
+## Running the gate
+
+```
+uv run python -m sbam_workers.evals.gate --task ocr            # compare with the baseline
+uv run python -m sbam_workers.evals.gate --task ocr --record   # write a baseline, to be reviewed
+```
+
+It sends each page through the production OCR path (`ocr.read_page` over `LlmClient`, through
+Bifrost) and needs a reachable Bifrost with a working provider key. A full run is 60 calls
+(20 items x 3 runs), about $0.30 with the current OCR model. Exit codes: **0** PASS, **1** REGRESSED
+(the score fell by more than `gate.json`'s threshold), **2** INFRA_ERROR (the provider failed, or the
+baseline could not be written: never a pass), **3** NO_BASELINE (a new task: record and review one).
+
+The first OCR baseline (score 1.0, 20 items, 3 runs, prompt `ocr-page/1.0.0`) was recorded on
+2026-10-30. Not built yet: pushing the scores to Langfuse datasets, and the CI job.
 
 ## Rules
 
