@@ -196,7 +196,12 @@ def test_a18b_t06_a_worker_that_was_down_catches_up_from_its_last_row(
     sessions: sessionmaker[Session],
 ) -> None:
     feed = Feed([login_error(1, minutes_ago=300)])
-    run(sessions, feed, now=NOW - timedelta(minutes=290))  # imported while it was up
+    up = NOW - timedelta(minutes=290)
+    run(sessions, feed, now=up)  # imported while it was up
+    with sessions() as session:  # its rows carry the real clock: say when the worker really ran
+        for row in session.scalars(select(AuditLog)):
+            row.at = up
+        session.commit()
     feed.stored.append(login_error(2, minutes_ago=100))  # happened while the worker was down
     feed.stored.append(login_error(3, minutes_ago=1))
     result = run(sessions, feed)
