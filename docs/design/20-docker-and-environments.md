@@ -58,6 +58,7 @@ profile core (always):
   sbam-web · sbam-api · api-migrate (one-off) · tusd · postgres (sbam, temporal, temporal_visibility, keycloak, langfuse)
   keycloak (+ realm import) · temporal (+ temporal-schema, temporal-namespace one-offs) · temporal-ui · bifrost
   clamav (clamd + freshclam) · storage-init (one-off) · schema-check (scratch PostgreSQL for the SCHEMA_SQL gate)
+  toolchain (+ toolchain-init one-off; Ruff, MyPy and Bandit for the static gate, no network, E12.4b)
   worker-ingest · worker-knowledge · worker-llm · worker-build · worker-test · worker-certify
   sbam-mock-api · sbam-llm-mock
   volumes: pgdata, storage (uploads, derived, okf, code, tests, exports), cognee_data, clamav_db
@@ -88,6 +89,7 @@ or not, so profile-only required secrets would break plain `make up` for an `.en
 | clamav                 | not published (internal only)   | `clamdcheck.sh`                     | —                                     |
 | workers (×6)           | not published                   | heartbeat file younger than 30 s    | temporal, postgres, bifrost           |
 | sbam-mock-api          | not published                   | HTTP `/health`                      | —                                     |
+| toolchain              | not published, no network       | heartbeat file younger than 30 s    | toolchain-init (the job volume)       |
 | sbam-llm-mock          | not published                   | HTTP `/health`                      | — (bifrost waits for it)              |
 | langfuse (obs)         | 3001                            | HTTP                                | postgres, clickhouse, redis, minio    |
 | grafana-lgtm (obs)     | 3002 / 4317 / 4318              | HTTP                                | —                                     |

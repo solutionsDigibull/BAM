@@ -243,6 +243,7 @@ def test_e16_3_t04_cli_passes_on_repo_and_fails_on_placeholder_release(
                 ("SBAM_WEB_IMAGE", "sbam-web"),
                 ("SBAM_PROXY_IMAGE", "sbam-proxy"),
                 ("SBAM_MOCK_API_IMAGE", "sbam-mock-api"),
+                ("SBAM_TOOLCHAIN_IMAGE", "sbam-toolchain"),
             )
         ),
         encoding="utf-8",

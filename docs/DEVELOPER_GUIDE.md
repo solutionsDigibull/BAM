@@ -194,7 +194,7 @@ LLM-dependent tests run against the **mock LLM provider** in CI (issue E1.15). F
 | `contract-drift` | `make contracts-check` (in `contracts.yml`) | yes |
 | `secret-scan` | gitleaks over the PR's commits (full history on push/nightly) | yes |
 | `hadolint` | every `compose/docker/*.Dockerfile` | yes |
-| `image-scan` | builds `sbam-api`, `sbam-worker`, `sbam-web`, `sbam-proxy`, `sbam-mock-api`; Trivy fails on fixable CRITICAL; Syft SPDX SBOM; pushes `ghcr.io/<owner>/<image>:<sha>` + `:main` (or the tag) **only** on push to `main` or a `v*` tag | yes |
+| `image-scan` | builds `sbam-api`, `sbam-worker`, `sbam-web`, `sbam-proxy`, `sbam-mock-api`, `sbam-toolchain`; Trivy fails on fixable CRITICAL; Syft SPDX SBOM; pushes `ghcr.io/<owner>/<image>:<sha>` + `:main` (or the tag) **only** on push to `main` or a `v*` tag | yes |
 | `compose-smoke` | `make up` + `make test-int` + Keycloak login e2e with a generated `compose/.env.ci` (gitignored, random passwords); retries `make up` once. **Gated (E1.23)**: see below | yes (skipped counts as passing) |
 | `playwright-smoke` | `pnpm --dir client e2e` | no |
 
