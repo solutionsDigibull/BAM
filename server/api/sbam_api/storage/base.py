@@ -8,8 +8,9 @@ never changes once written. File metadata (filename, content type, size, sha256)
 import hashlib
 import re
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from functools import partial
 from typing import IO, BinaryIO, Protocol
@@ -48,6 +49,13 @@ class StoredObject:
     sha256: str
     size: int
     content_type: str
+
+
+@dataclass(frozen=True)
+class ListedObject:
+    storage_key: str
+    size: int
+    modified_at: datetime  # timezone-aware UTC; refreshed when identical content is stored again
 
 
 class InvalidStorageKey(ApiError):  # noqa: N818 - name from the E1.6 spec
@@ -120,3 +128,12 @@ def hash_into(data: BinaryIO | bytes, sink: IO[bytes], max_bytes: int | None) ->
         digest.update(block)
         sink.write(block)
     return digest.hexdigest(), size
+
+
+class ListableStorage(StorageBackend, Protocol):
+    """A backend that can say what it holds: only the system sweep of unreferenced files needs it
+    (#533), so it is a separate interface and the plain `StorageBackend` fakes stay valid."""
+
+    def list_keys(self, prefix: str) -> Iterator[ListedObject]:
+        """Every object whose key starts with `prefix` (`<tenant>/<project>/<kind>/`), lazily."""
+        ...

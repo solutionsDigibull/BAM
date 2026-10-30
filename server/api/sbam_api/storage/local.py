@@ -8,6 +8,8 @@ import contextlib
 import hashlib
 import os
 import time
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO
 
@@ -15,6 +17,7 @@ from sbam_api.core.ids import uuid7
 from sbam_api.storage.base import (
     InvalidStorageKey,
     Kind,
+    ListedObject,
     StorageIntegrityError,
     StorageScope,
     StorageUnavailable,
@@ -65,6 +68,10 @@ class LocalDiskBackend:
             final.parent.mkdir(parents=True, exist_ok=True)
             if final.exists():  # dedupe: identical content is already stored
                 tmp.unlink()
+                with contextlib.suppress(OSError):
+                    os.utime(
+                        final
+                    )  # in use again: the sweep of unreferenced files must not take it
             else:
                 try:
                     os.replace(tmp, final)  # atomic
@@ -112,3 +119,19 @@ class LocalDiskBackend:
             return
         except OSError:
             raise StorageUnavailable() from None
+
+    def list_keys(self, prefix: str) -> Iterator[ListedObject]:
+        """Objects under `<tenant>/<project>/<kind>/` (a directory on disk), lazily. A stray file
+        that is not a valid key is skipped, never returned."""
+        directory = Path(os.path.normpath(self.root / prefix))
+        if not directory.is_relative_to(self.root) or not directory.is_dir():
+            return
+        for entry in sorted(directory.iterdir()):
+            key = f"{prefix.rstrip('/')}/{entry.name}"
+            try:
+                parse_key(key)
+                info = entry.stat()
+            except (InvalidStorageKey, OSError):
+                continue
+            if entry.is_file():
+                yield ListedObject(key, info.st_size, datetime.fromtimestamp(info.st_mtime, UTC))
