@@ -19,7 +19,7 @@
     "JsonValue": {},
     "RunnerCaseResult": {
       "additionalProperties": false,
-      "description": "One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker.",
+      "description": "One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker.\n\n`handoff_rows` is the case's append-only table as the database holds it after the run (the\n\"handoff rows dump\" of the issue): evidence of what the bundle really wrote, not what the\nharness counted.",
       "properties": {
         "case_id": {
           "maxLength": 200,
@@ -78,6 +78,17 @@
           },
           "title": "Trace",
           "type": "object"
+        },
+        "handoff_rows": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "maxItems": 1000,
+          "title": "Handoff Rows",
+          "type": "array"
         }
       },
       "required": [

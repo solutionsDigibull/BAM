@@ -267,7 +267,11 @@ class SandboxRun(_Dto):
 
 # --- the in-VM runner's files (ADR 0023, decision 7) ---------------------------------------
 class RunnerCaseResult(_Dto):
-    """One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker."""
+    """One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker.
+
+    `handoff_rows` is the case's append-only table as the database holds it after the run (the
+    "handoff rows dump" of the issue): evidence of what the bundle really wrote, not what the
+    harness counted."""
 
     case_id: Annotated[str, Field(min_length=1, max_length=200)]
     expected_terminal: Literal["SUCCESS", "ESCALATED", "NO_OP"]
@@ -276,6 +280,7 @@ class RunnerCaseResult(_Dto):
     failure_category: FailureCategory | None = None
     truncated: bool = False
     trace: dict[str, JsonValue]
+    handoff_rows: list[dict[str, JsonValue]] = Field(default_factory=list, max_length=1000)
 
 
 class RunnerResources(_Dto):
@@ -302,6 +307,30 @@ class RunnerOutputs(_Dto):
         return value
 
 
+_IDENT = r"^[A-Za-z_][A-Za-z0-9_]{0,99}$"
+
+
+class HarnessConfig(_Dto):
+    """What the harness needs from the Sub-Skill's ISATVON that the loop spec does not carry:
+    which two tools drive a pass, how fresh state is keyed, what a handoff row holds and what the
+    Sub-Skill says to the user. Built by the worker from the stored Sub-Skill, never from the
+    bundle under test."""
+
+    action_tool: Annotated[str, Field(pattern=_IDENT)]
+    fixed_check_tool: Annotated[str, Field(pattern=_IDENT)]
+    fresh_state_parameters: list[Annotated[str, Field(pattern=_IDENT)]] = Field(max_length=50)
+    required_inputs: list[Annotated[str, Field(pattern=_IDENT)]] = Field(max_length=50)
+    key_field: Annotated[str, Field(pattern=_IDENT)]  # the input that keys fresh state
+    handoff_fields: list[Annotated[str, Field(pattern=_IDENT)]] = Field(min_length=1, max_length=50)
+    ui_updates: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(max_length=20)
+
+    @model_validator(mode="after")
+    def _tools_differ(self) -> Self:
+        if self.action_tool == self.fixed_check_tool:
+            raise ValueError("the action and the check tool must be different tools")
+        return self
+
+
 class RunnerRequest(_Dto):
     """`/work/request.json`, the only way data reaches the runner besides the files it reads."""
 
@@ -310,6 +339,7 @@ class RunnerRequest(_Dto):
     mode: SandboxMode
     tool_module: Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_.]*$", max_length=200)]
     loop_spec: dict[str, JsonValue]
+    harness: HarnessConfig
     handoff_table: Annotated[str, Field(pattern=r"^[a-z_][a-z0-9_]{0,62}$")]
     cases: list[dict[str, JsonValue]] = Field(min_length=1)
     egress_probe: list[str] = Field(default_factory=list, max_length=MAX_EGRESS_ENTRIES)

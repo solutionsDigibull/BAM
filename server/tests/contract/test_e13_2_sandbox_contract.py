@@ -393,6 +393,15 @@ def request(**fields: Any) -> RunnerRequest:
         "tool_module": "skill.server",
         "loop_spec": {"semantics": "TD §15.2"},
         "handoff_table": "handoff_rows",
+        "harness": {
+            "action_tool": "act",
+            "fixed_check_tool": "check",
+            "fresh_state_parameters": ["balance"],
+            "required_inputs": ["q"],
+            "key_field": "q",
+            "handoff_fields": ["iteration_pass"],
+            "ui_updates": ["Looping [Pass 1/3]", "Status: Completed"],
+        },
         "cases": [{"case_id": "c1"}],
     }
     return RunnerRequest.model_validate({**base, **fields})
@@ -474,3 +483,23 @@ def test_e13_2_property_address_shaped_strings_never_pass(raw: str) -> None:
     # `abc.def` is a legal name made only of hex digits; it must also not resolve numerically
     with pytest.raises(socket.gaierror):
         socket.getaddrinfo(target.host, None, flags=socket.AI_NUMERICHOST)
+
+
+def test_e13_2_harness_config_tools_must_differ_and_names_are_identifiers() -> None:
+    good = request().harness.model_dump()
+    with pytest.raises(ValidationError):
+        request(harness={**good, "fixed_check_tool": good["action_tool"]})
+    for bad in ["", "a b", "a;b", "a-b", "1a", "a" * 101]:
+        with pytest.raises(ValidationError):
+            request(harness={**good, "action_tool": bad})
+    with pytest.raises(ValidationError):
+        request(harness={**good, "handoff_fields": []})
+    with pytest.raises(ValidationError):
+        request(harness={**good, "key_field": "q; DROP TABLE x"})
+
+
+def test_e13_2_the_runner_request_without_a_harness_block_is_refused() -> None:
+    body = request().model_dump(mode="json")
+    del body["harness"]
+    with pytest.raises(ValidationError):
+        RunnerRequest.model_validate(body)

@@ -34,6 +34,7 @@ from sbam_contracts.sandbox import (
     EgressEvent,
     EgressPolicy,
     FailureCategory,
+    HarnessConfig,
     InfraReason,
     RunnerOutputs,
     RunnerRequest,
@@ -102,6 +103,7 @@ class RunInput:
     bundle_sha256: str
     tool_module: str
     loop_spec: dict[str, Any]
+    harness: HarnessConfig
     handoff_table: str
     schema_sql: bytes
     schema_sql_sha256: str  # manifest `build.schema_sql_sha256`
@@ -147,6 +149,7 @@ def build_request(run: RunInput) -> bytes:
         mode=run.mode,
         tool_module=run.tool_module,
         loop_spec=run.loop_spec,
+        harness=run.harness,
         handoff_table=run.handoff_table,
         cases=_cases_for_runner(run.dataset),
         egress_probe=list(run_probe(run)),
@@ -274,7 +277,8 @@ async def _run_in_vm(
         return wrong, None, None, []
 
     await backend.put_files(vm, {HOSTS_PATH: render_hosts(plan.hosts)}, system=True)
-    files = {f"{BUNDLE_DIR}/{name}": data for name, data in bundle_files.items()}
+    package = run.tool_module.rpartition(".")[0]  # the bundle's modules import each other relatively
+    files = {f"{BUNDLE_DIR}/{package}/{name}": data for name, data in bundle_files.items()}
     files[SCHEMA_PATH] = run.schema_sql
     files[REQUEST_PATH] = request_body
     await backend.put_files(vm, files)

@@ -20,6 +20,7 @@ from sbam_contracts.sandbox import (
     EgressSource,
     EgressVerdict,
     FailureCategory,
+    HarnessConfig,
     InfraReason,
     SandboxLimits,
     SandboxMode,
@@ -114,6 +115,17 @@ class FakeBackend:
         return [VmInfo("vm-1", NOW)] if self.alive else []
 
 
+HARNESS = HarnessConfig(
+    action_tool="do_it",
+    fixed_check_tool="check_it",
+    fresh_state_parameters=["balance"],
+    required_inputs=["q"],
+    key_field="q",
+    handoff_fields=["iteration_pass"],
+    ui_updates=["Looping [Pass 1/3]", "Status: Completed"],
+)
+
+
 def cases() -> list[tuple[CaseKind, CaseBody]]:
     def body(name: str, terminal: str) -> CaseBody:
         return CaseBody.model_validate(
@@ -142,6 +154,7 @@ def make_run(**changes: Any) -> RunInput:
         "bundle_sha256": bundle.bundle_sha256,
         "tool_module": "skill_server",
         "loop_spec": {"max_iterations": 3},
+        "harness": HARNESS,
         "handoff_table": "handoff",
         "schema_sql": SCHEMA,
         "schema_sql_sha256": hashlib.sha256(SCHEMA).hexdigest(),

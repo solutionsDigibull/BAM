@@ -192,6 +192,8 @@ class Agent:
             ):
                 raise Refused(422, "bad environment")
             env[key] = value
+        # what a microVM's /etc/sbam-runtime says; set last, so a request cannot change it
+        env["SANDBOX_RUNTIME_DIGEST"] = self.runtime_digest
         mapped = [self._map_arg(vm, a) for a in argv]
         return self._spawn(vm, mapped, env, timeout, cap)
 
