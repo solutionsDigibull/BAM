@@ -67,8 +67,15 @@ def test_e16_4_ci_writes_the_release_manifest_for_every_deployed_image() -> None
     names = [m["name"] for m in ci["jobs"]["image-scan"]["strategy"]["matrix"]["include"]]
     assert "sbam-llm-mock" in names
     job = ci["jobs"]["release-manifest"]
-    assert job["needs"] == ["image-scan"] and "refs/heads/main" in job["if"]
+    assert job["needs"] == ["image-scan"]
+    # runs on every build (#575): a real release only on a push to main or a v* tag, else a dry run
+    assert "if" not in job
+    publish = job["env"]["PUBLISH"]
+    assert "push" in publish and "refs/heads/main" in publish and "refs/tags/v" in publish
     script = next(s["run"] for s in job["steps"] if s.get("name") == "Write release.env")
+    assert "DRY RUN" in script and "$PUBLISH" in script  # a dry run says so in the file itself
+    uploads = [s["with"]["name"] for s in job["steps"] if "upload-artifact" in s.get("uses", "")]
+    assert len(uploads) == 1 and "release-dry-run" in uploads[0] and "PUBLISH" in uploads[0]
     listed = re.search(r"for name in ([\w -]+); do", script)
     assert listed and "compose_lint.py --release release.env" in script
     made = {
