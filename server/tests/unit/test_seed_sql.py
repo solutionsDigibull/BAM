@@ -72,7 +72,7 @@ def test_e13_4_the_row_count_of_a_statement_with_an_and_is_unchanged() -> None:
 def test_e13_4_check_statements_reports_only_the_statement_that_is_refused() -> None:
     problems = check_statements(
         [
-            "UPDATE stock_levels SET stock_on_hand = 5 WHERE sku = 'P-1' AND warehouse_code = 'WH1'",
+            "UPDATE stock_levels SET stock_on_hand = 5 WHERE sku = 'P-1' AND warehouse = 'W1'",
             "UPDATE orders SET placed = NOW() WHERE id = 1",
         ],
         TABLES,
