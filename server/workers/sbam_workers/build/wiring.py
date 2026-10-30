@@ -28,6 +28,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from sbam_api.audit import repository as audit
@@ -66,6 +67,8 @@ from sbam_workers.build.gates import ast_gate as ast_gate_stage_module
 from sbam_workers.build.gates import static_gate as static_gate_stage_module
 from sbam_workers.build.gates.ast_gate import AstGate
 from sbam_workers.build.gates.static_gate import StaticGate
+from sbam_workers.build.gates.static_tools import make_tools
+from sbam_workers.build.gates.toolchain import Executor, LocalExecutor, SidecarExecutor
 from sbam_workers.isatvon.loop_spec import LoopSpecError, compile_definition
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.registry import PromptRegistry
@@ -282,7 +285,12 @@ async def assemble_stage_activity(inp: BuildStageInput) -> IdResult:
 def _static_gate() -> StaticGate:
     settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
     clamd = ClamdClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout_seconds)
-    return StaticGate(make_backend(settings), sessions, clamd)
+    executor: Executor = (
+        SidecarExecutor(Path(settings.toolchain_jobs_dir), settings.toolchain_timeout_seconds)
+        if settings.toolchain_jobs_dir
+        else LocalExecutor()
+    )
+    return StaticGate(make_backend(settings), sessions, clamd, make_tools(executor))
 
 
 @lru_cache(maxsize=1)

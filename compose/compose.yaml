@@ -93,6 +93,52 @@ services:
       retries: 20
     restart: unless-stopped
 
+  toolchain-init:
+    # The job directory is shared by worker-build and toolchain, both uid 10001 (E12.4b).
+    image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+    command: ["sh", "-c", "chown 10001:10001 /jobs && chmod 700 /jobs"]
+    volumes: [toolchain-jobs:/jobs]
+    network_mode: none
+    cpus: 0.25
+    mem_limit: 32m
+
+  toolchain:
+    # Static gate tools (E12.4b, TD 12.6): Ruff, MyPy and Bandit read generated source here, not in the
+    # worker. No network at all, a read-only root, tmpfs scratch, uid 10001, no capabilities, and limits
+    # on CPU, memory and processes. It is reached only through the shared job directory (worker-build
+    # writes a job, this container writes the result), so there is no socket to attack and no Docker
+    # socket anywhere. Nothing the bundle contains is ever executed; the tools only parse it.
+    image: sbam-toolchain:local
+    build:
+      context: ..
+      dockerfile: compose/docker/toolchain.Dockerfile
+    network_mode: none
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    cpus: 1.0
+    mem_limit: 1g
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /work:size=256m,uid=10001,gid=10001
+    environment:
+      TOOLCHAIN_JOBS: /jobs
+      TOOLCHAIN_SCRATCH: /work
+      TOOLCHAIN_TIMEOUT: "240"
+    volumes: [toolchain-jobs:/jobs]
+    healthcheck:
+      # the runner touches /tmp/heartbeat on every pass; a stale one means it is stuck
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time()-os.stat('/tmp/heartbeat').st_mtime < 30 else 1)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      toolchain-init: { condition: service_completed_successfully }
+    restart: unless-stopped
+
   storage-init:
     image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
     command:
@@ -445,13 +491,16 @@ services:
         SBAM_RECONCILE_EVERY: "60",
         STORAGE_ROOT: /data/storage,
         SCHEMA_CHECK_DSN: postgresql://postgres@schema-check:5432/postgres,
+        # E12.4b: Ruff, MyPy and Bandit run in the network-less toolchain container, through this directory.
+        TOOLCHAIN_JOBS_DIR: /jobs,
       }
-    volumes: [storage:/data/storage]
+    volumes: [storage:/data/storage, toolchain-jobs:/jobs]
     # schema-check (E9.4): the SCHEMA_SQL gate's scratch PostgreSQL, reachable from this worker only
     networks: [sbam_internal, sbam_schema_check]
     depends_on:
       <<: *worker-depends
       schema-check: { condition: service_healthy }
+      toolchain: { condition: service_healthy }
   worker-test:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-test }
@@ -513,3 +562,4 @@ volumes:
   storage:
   cognee_data:
   clamav_db:
+  toolchain-jobs:

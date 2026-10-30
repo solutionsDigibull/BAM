@@ -31,7 +31,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from sbam_workers.build.gates.errors import STATIC_GATE_INFRA
-from sbam_workers.build.gates.static_tools import TOOLS, ToolFailure, ToolResult, finding
+from sbam_workers.build.gates.static_tools import TOOLS, ToolResult, finding
 from sbam_workers.build.gates.stored_bundle import (
     StoredBundle,
     Verdict,
@@ -40,6 +40,7 @@ from sbam_workers.build.gates.stored_bundle import (
     read_verified,
     record_verdicts,
 )
+from sbam_workers.build.gates.toolchain import ToolFailure
 
 STAGE = "static_gate"
 GATES = (GateName.RUFF, GateName.BLACK, GateName.MYPY, GateName.BANDIT, GateName.CLAMAV)

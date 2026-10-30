@@ -38,6 +38,10 @@ class WorkerSettings(BaseSettings):
     # ClamAV publishes one database a day (about 06:25 UTC) and freshclam checks every 2 h, so a
     # 24 h limit would refuse scans for a few hours on most days (#62).
     clamav_max_signature_age_hours: float = Field(default=48.0, gt=0)
+    # Static gate (E12.4b): a shared directory the `sbam-toolchain` container watches. Empty runs
+    # Ruff, MyPy and Bandit as child processes of the worker (laptops, tests).
+    toolchain_jobs_dir: str = ""
+    toolchain_timeout_seconds: float = Field(default=300.0, gt=0)
     # LLM layer (E6.1): every call goes through Bifrost with an `sbam-*` alias. Defaults match
     # Compose.
     bifrost_url: AnyHttpUrl = AnyHttpUrl("http://bifrost:8080")
