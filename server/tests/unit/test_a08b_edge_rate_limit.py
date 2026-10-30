@@ -135,3 +135,10 @@ def test_a08b_t05_a_refusal_carries_retry_after(proxy: str) -> None:
 
 def test_a08b_t06_the_keycloak_admin_console_is_still_404_not_429(proxy: str) -> None:
     assert get("portal.test", "/admin/master/console/") == "404"
+
+
+def test_a15_a_signed_url_is_not_in_the_proxy_log(proxy: str) -> None:
+    secret = "SIGNED" + uuid.uuid4().hex  # what a download URL's `sig` would hold
+    get("portal.test", f"/api/v1/files/some/key?exp=1999999999&sig={secret}")
+    logs = docker("logs", proxy)
+    assert secret not in logs.stdout + logs.stderr
