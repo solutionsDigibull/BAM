@@ -19,7 +19,7 @@ from sbam_workers.test.mocks import (
     route_of,
     tool_headers,
 )
-from test_e13_4_testgen import GOOD, INPUT, World, sample
+from test_e13_4_testgen import GOOD, INPUT, World, after_a_correction, mark_edited, sample
 from test_e13_5_mock_api import RUN_A, TOKEN, Service, srv
 
 
@@ -173,6 +173,92 @@ def test_e13_5_t06_a_forwarding_definition_is_refused_before_anything_is_stored(
         store.record(w.inp, CASES, [], "g" * 64, [forwarding])
     assert len(w.datasets()) == before  # no dataset row, no cases
     assert len(w.cases()) == 3
+
+
+# --- refreshed when an API reference changes (#546) -----------------------------------------
+
+CRM_V2 = {**CRM, "ref": "GET /crm/v2/accounts/{id} (OpenAPI crm.yaml)"}
+
+
+def stored_paths(w: World, dataset: Any) -> set[str]:
+    out: set[str] = set()
+    for key in dataset.mocks_keys:
+        definition = MockDefinition.model_validate(json.loads((w.storage.root / key).read_bytes()))
+        out |= {stub.path for stub in definition.stubs}
+    return out
+
+
+def case_rows(w: World, dataset_id: Any) -> list[tuple[str, str, str, Any]]:
+    rows = [c for c in w.cases() if c.dataset_id == dataset_id]
+    return sorted((c.name, c.kind, c.expected_terminal, c.input) for c in rows)
+
+
+def test_e13_5c_a_changed_route_gives_a_new_version_with_the_same_cases() -> None:
+    w = World([GOOD], with_refs(CRM))
+    first = w.run()
+    after_a_correction(w, with_refs(CRM_V2))
+    second = w.run()
+    one, two = w.datasets()
+    assert second == two.id != first and (one.version, two.version) == (1, 2)
+    assert stored_paths(w, one) == {"/crm/accounts/{id}"}  # the old version stays as evidence
+    assert stored_paths(w, two) == {"/crm/v2/accounts/{id}"}
+    assert case_rows(w, first) == case_rows(w, second)
+    assert one.sha256 != two.sha256 and two.generated_for == one.generated_for
+    assert two.edited_by_fde is False and len(w.bifrost.requests) == 1  # no model call
+
+
+def test_e13_5c_untouched_references_change_nothing() -> None:
+    w = World([GOOD], with_refs(CRM))
+    first = w.run()
+    patched = with_refs(CRM)
+    patched["isatvon_definition"]["t_tech_stack"]["fixed_check_tool"] = "other_check_tool"
+    after_a_correction(w, patched)
+    assert w.run() == first
+    (only,) = w.datasets()
+    assert only.version == 1 and len(w.cases()) == 3
+
+
+def test_e13_5c_a_retry_after_the_refresh_writes_no_third_version() -> None:
+    w = World([GOOD], with_refs(CRM))
+    w.run()
+    after_a_correction(w, with_refs(CRM_V2))
+    second = w.run()
+    assert w.run() == second and len(w.datasets()) == 2
+
+
+def test_e13_5c_an_fde_edited_dataset_keeps_its_cases_and_flag() -> None:
+    w = World([GOOD], with_refs(CRM))
+    first = w.run()
+    mark_edited(w, first)
+    after_a_correction(w, with_refs(CRM_V2))
+    second = w.run()
+    one, two = w.datasets()
+    assert second == two.id and two.edited_by_fde is True and two.version == 2
+    assert two.generated_for == one.generated_for and case_rows(w, first) == case_rows(w, second)
+    assert stored_paths(w, two) == {"/crm/v2/accounts/{id}"}
+
+
+def test_e13_5c_fde_tests_from_before_the_fingerprint_get_the_new_mocks_too() -> None:
+    w = World([GOOD], with_refs(CRM))
+    first = w.run()
+    mark_edited(w, first, generated_for=None)
+    after_a_correction(w, with_refs(CRM_V2))
+    second = w.run()
+    two = w.datasets()[-1]
+    assert second != first and two.edited_by_fde is True and two.generated_for is None
+
+
+@pytest.mark.parametrize(("before", "after"), [((), (CRM,)), ((CRM,), ())])
+def test_e13_5c_an_added_or_removed_reference_refreshes_the_mocks(
+    before: tuple[dict[str, str], ...], after: tuple[dict[str, str], ...]
+) -> None:
+    w = World([GOOD], with_refs(*before))
+    first = w.run()
+    after_a_correction(w, with_refs(*after))
+    second = w.run()
+    two = w.datasets()[-1]
+    assert second != first and len(two.mocks_keys) == len(after)
+    assert case_rows(w, first) == case_rows(w, second)
 
 
 # --- the worker's side of the control protocol -----------------------------------------
