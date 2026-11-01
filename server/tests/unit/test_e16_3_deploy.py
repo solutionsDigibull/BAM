@@ -612,6 +612,8 @@ def test_e16_3_t07_groups_workers_to_sandbox_and_platform_only_prod_ops() -> Non
     }
     for vm in ("vm-dev", "vm-staging", "vm-prod"):
         assert matrix.is_allowed(policy, vm, "sandbox-host", "sandbox-api")
+        # the data plane too: a worker that can create a VM but not reach CubeProxy runs no test
+        assert matrix.is_allowed(policy, vm, "sandbox-host", "sandbox-proxy")
         assert not matrix.is_allowed(policy, "sandbox-host", vm, "ssh")
     for service in policy["ops_services"] + ["ssh"]:
         sources = {

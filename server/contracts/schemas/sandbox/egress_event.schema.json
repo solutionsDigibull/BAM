@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:sandbox/egress_event:0.1.0",
+  "$defs": {
+    "EgressSource": {
+      "enum": [
+        "L7_PROXY",
+        "GUEST_PROBE",
+        "HOST_TAP"
+      ],
+      "title": "EgressSource",
+      "type": "string"
+    },
+    "EgressVerdict": {
+      "enum": [
+        "ALLOW",
+        "BLOCK",
+        "UNKNOWN"
+      ],
+      "title": "EgressVerdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "vm_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Vm Id",
+      "type": "string"
+    },
+    "at": {
+      "format": "date-time",
+      "title": "At",
+      "type": "string"
+    },
+    "dst_host": {
+      "maxLength": 253,
+      "minLength": 1,
+      "title": "Dst Host",
+      "type": "string"
+    },
+    "dst_port": {
+      "maximum": 65535,
+      "minimum": 0,
+      "title": "Dst Port",
+      "type": "integer"
+    },
+    "verdict": {
+      "$ref": "#/$defs/EgressVerdict"
+    },
+    "source": {
+      "$ref": "#/$defs/EgressSource"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    }
+  },
+  "required": [
+    "vm_id",
+    "at",
+    "dst_host",
+    "dst_port",
+    "verdict",
+    "source"
+  ],
+  "title": "EgressEvent",
+  "type": "object"
+}

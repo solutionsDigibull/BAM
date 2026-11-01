@@ -910,6 +910,18 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # The logs of a sandbox run (E13.2): the run id is any id of no run, so an assigned FDE reaches the
+  # handler and gets 404; the other roles are refused before it. A real run of another tenant is
+  # covered with seeded rows in tests/api/test_e13_2_sandbox_logs_api.py.
+  run_logs_api_v1_projects__project_id__workflows__workflow_id__sandbox_runs__run_id__logs_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sandbox-runs/{run_id}/logs
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", run_id: "@sub_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # The held ISATVON patch of a Sub-Skill (#499). The world seeds no ISATVON rows, so an assigned FDE
   # reaches the handler and gets 404 for the unknown Sub-Skill; the other roles are refused before it.
   held_patch_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__held_patch_get:

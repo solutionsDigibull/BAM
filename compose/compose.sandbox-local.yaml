@@ -1,26 +1,32 @@
 # SBAM `sandbox-local` profile (TD §20.3, E1.11). Load with `make up PROFILES=sandbox-local`.
 # Local-docker sandbox for laptops without the KVM host. It can NEVER certify: runs are recorded as
 # LOCAL_DOCKER_NONCERT and the certification checklist rejects them.
-# Stub (TD §20.3.6): the runner keeps its final name, network and limits; the adapter that executes tool
-# code, maps failures to EGRESS_BLOCKED and writes sandbox_runs.mode lands with #123 (E13.2).
+# The runner is the skill-runtime image plus a small agent (compose/sandbox-runner/agent.py). The test worker
+# reaches it over the internal sbam_sandbox network with a bearer token; nothing mounts a docker socket.
 services:
   sandbox-runner:
-    image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
-    command: ["sh", "-c", "echo 'sandbox-runner stub (#123), mode=$$SANDBOX_MODE' && exec sleep 2147483647"]
+    build:
+      context: ..
+      dockerfile: compose/docker/sandbox-runner.Dockerfile
+      args:
+        RUNTIME_IMAGE: ${SKILL_RUNTIME_IMAGE:-skill-runtime:local} # `make runtime-registry` builds skill-runtime:local
+    image: sbam-sandbox-runner:local
     environment:
-      SANDBOX_MODE: LOCAL_DOCKER_NONCERT # never CERTIFYING; #123 reads this and certification rejects it
+      SANDBOX_MODE: LOCAL_DOCKER_NONCERT # never CERTIFYING; the run row stores the mode and certification rejects it
+      SANDBOX_AGENT_TOKEN: ${SANDBOX_AGENT_TOKEN:?is required with the sandbox-local profile - set it in compose/.env}
+      SANDBOX_RUNTIME_DIGEST: ${SANDBOX_RUNTIME_DIGEST:-}
     networks: [sbam_sandbox] # internal; the only peer is sbam-mock-api, no route to the internet
     read_only: true
-    tmpfs: ["/tmp:size=64m"]
+    tmpfs: ["/tmp:size=512m,mode=1777"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     user: "10001:10001"
     cpus: 1.0
-    mem_limit: 512m
+    mem_limit: 1g
     pids_limit: 128
     healthcheck:
-      test: ["CMD", "true"]
-      interval: 30s
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8091), 2)"]
+      interval: 15s
       timeout: 3s
       retries: 3
     restart: unless-stopped
@@ -28,6 +34,14 @@ services:
   # Merged into the core block: the mock API (tool targets in tests) is the sandbox's only reachable peer.
   sbam-mock-api:
     networks: [sbam_internal, sbam_sandbox]
+
+  # The worker that runs the tests joins the sandbox network to reach the runner's agent (and only that).
+  worker-test:
+    networks: [sbam_internal, sbam_sandbox]
+    environment:
+      SANDBOX_MODE: LOCAL_DOCKER_NONCERT
+      SANDBOX_AGENT_URL: http://sandbox-runner:8091
+      SANDBOX_AGENT_TOKEN: ${SANDBOX_AGENT_TOKEN:?is required with the sandbox-local profile - set it in compose/.env}
 
 networks:
   sbam_sandbox:

@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sbam_api.core.settings import posthog_problem
+from sbam_contracts.sandbox import SandboxMode
 
 
 class WorkerSettings(BaseSettings):
@@ -77,6 +78,27 @@ class WorkerSettings(BaseSettings):
     # Redaction policy: prompts and answers hold client documents, so they are exported only as
     # sizes and hashes unless this is switched on (development).
     langfuse_log_content: bool = False
+    # Sandbox (E13.2, ADR 0023). The mode comes from here and from nowhere else: no API or UI field
+    # can pick it. Unset means no sandbox is configured, and `run_sandbox_tests` then ends as an
+    # infrastructure error (retried, then TESTING_BLOCKED), never as a pass. CUBESANDBOX needs the
+    # CUBE_* host settings and an egress evidence file; LOCAL_DOCKER_NONCERT needs the agent's.
+    # Compose passes "" when unset, which every field below reads as unset.
+    sandbox_mode: SandboxMode | None = None
+    cube_api_url: str | None = None  # CubeAPI :3000 (control plane)
+    cube_api_key: SecretStr | None = None
+    cube_proxy_node_ip: str | None = None  # CubeProxy (data plane: exec, files)
+    cube_proxy_port_http: int = Field(default=80, ge=1, le=65535)
+    cube_sandbox_domain: str = Field(default="cube.app", min_length=1)
+    # JSONL of `EgressEvent`s written by the host collector (compose/sandbox-host), one per attempt
+    sandbox_egress_log_path: str | None = None
+    sandbox_agent_url: str | None = None  # the local-docker agent
+    sandbox_agent_token: SecretStr | None = None
+    # The mock API (E13.5): tools under test reach it by name; the worker controls it by token.
+    mock_api_url: str | None = None
+    mock_api_ip: str | None = None  # the address the sandbox may reach (a dedicated one)
+    mock_control_token: SecretStr | None = None
+    # A VM older than its own timeout plus this is an orphan, and the reaper destroys it
+    sandbox_reaper_grace_seconds: int = Field(default=300, ge=60)
     # SCHEMA_SQL gate (E9.4): the isolated `schema-check` PostgreSQL the build worker applies each
     # Workflow's schema.sql to, in a throwaway database. Never SBAM's own database (refused).
     schema_check_dsn: SecretStr | None = None
@@ -86,6 +108,23 @@ class WorkerSettings(BaseSettings):
     posthog_host: str | None = None  # Compose passes "" when unset: a str, not a URL
     posthog_api_key: SecretStr | None = None
     posthog_distinct_id_salt: SecretStr | None = None
+
+    @field_validator(
+        "sandbox_mode",
+        "cube_api_url",
+        "cube_api_key",
+        "cube_proxy_node_ip",
+        "sandbox_egress_log_path",
+        "sandbox_agent_url",
+        "sandbox_agent_token",
+        "mock_api_url",
+        "mock_api_ip",
+        "mock_control_token",
+        mode="before",
+    )
+    @classmethod
+    def _empty_sandbox_value_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("llm_project_budget_usd", "llm_tenant_budget_usd", mode="before")
     @classmethod

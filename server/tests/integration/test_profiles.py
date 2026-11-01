@@ -146,18 +146,23 @@ def test_e1_11_t04_sandbox_has_no_egress_but_reaches_mock_api() -> None:
     require("sandbox-runner")
     cid = container("sandbox-runner")
     assert cid
-    # Busybox wget; -T bounds each attempt. A DNS failure or connect error both mean "no route out".
-    out = docker("exec", cid, "wget", "-q", "-T", "5", "-O", "/dev/null", "https://example.org")
-    assert out.returncode != 0, "sandbox-runner reached the internet"
-    internal = docker(
-        "exec", cid, "wget", "-q", "-T", "5", "-O", "/dev/null", "http://postgres:5432"
+    # The runner is the skill-runtime image (no wget): Python's urllib, 5 s per attempt. A DNS
+    # failure or a connect error both mean "no route out"; any HTTP answer, even an error, means
+    # "reached".
+    probe = (
+        "import sys,urllib.request,urllib.error\n"
+        "try:\n    urllib.request.urlopen(sys.argv[1], timeout=5)\n"
+        "except urllib.error.HTTPError:\n    pass\n"
     )
+
+    def reach(url: str) -> subprocess.CompletedProcess[str]:
+        return docker("exec", cid, "python", "-c", probe, url)
+
+    assert reach("https://example.org").returncode != 0, "sandbox-runner reached the internet"
     assert (
-        internal.returncode != 0
+        reach("http://postgres:5432").returncode != 0
     ), "sandbox-runner reached a core service other than sbam-mock-api"
-    mock = docker(
-        "exec", cid, "wget", "-q", "-T", "5", "-O", "-", "http://sbam-mock-api:8090/health"
-    )
+    mock = reach("http://sbam-mock-api:8090/health")
     assert mock.returncode == 0, mock.stderr
     mode = docker("exec", cid, "printenv", "SANDBOX_MODE").stdout.strip()
     assert mode == "LOCAL_DOCKER_NONCERT"

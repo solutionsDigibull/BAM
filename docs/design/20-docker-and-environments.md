@@ -217,7 +217,7 @@ service block in `compose.yaml` (and its config folder), never other blocks.
 | sbam-mock-api | real: per-run stubs, request journal, never forwards, stdlib only (#126 E13.5, §15.2) | — |
 | otel-collector / langfuse (obs) | real (`compose.obs.yaml`, #42 E1.11) | — |
 | posthog (analytics) | busybox health endpoint on 8010 | #141 E16.2 / #142 E16.3 |
-| sandbox-runner (sandbox-local) | hardened idle container on internal `sbam_sandbox` (peer: `sbam-mock-api` only), `SANDBOX_MODE=LOCAL_DOCKER_NONCERT` | #123 E13.2 (adapter, `EGRESS_BLOCKED`, non-certifying runs) |
+| sandbox-runner (sandbox-local) | skill-runtime image + stdlib agent on internal `sbam_sandbox` (peers: `sbam-mock-api` and `worker-test`), read-only root, non-root, no capabilities, one run at a time, `SANDBOX_MODE=LOCAL_DOCKER_NONCERT`; the worker authenticates with `SANDBOX_AGENT_TOKEN` | #123 E13.2 (adapter, `EGRESS_BLOCKED`, non-certifying runs) |
 
 ### 20.3.7 Running it
 

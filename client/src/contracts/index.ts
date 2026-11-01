@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:9387d35833a7493b2f77183d686ec4906341ecdc5a62356cc98384772198fd9a
+// source-sha256:2ae9aae4dc7d21e035fe6ad1a3d85c4885a24f57ce0662dd6a6c4e66f635b2d4
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -429,6 +429,59 @@ export type AssertionType =
   | "handoff_rows"
   | "ui_updates"
   | "llm_rubric";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "EgressVerdict".
+ */
+export type EgressVerdict = "ALLOW" | "BLOCK" | "UNKNOWN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "EgressSource".
+ */
+export type EgressSource = "L7_PROXY" | "GUEST_PROBE" | "HOST_TAP";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SandboxMode".
+ */
+export type SandboxMode = "CUBESANDBOX" | "LOCAL_DOCKER_NONCERT";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SandboxRunStatus".
+ */
+export type SandboxRunStatus = "STARTED" | "FINISHED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FailureCategory".
+ */
+export type FailureCategory =
+  | "IMPORT_ERROR"
+  | "RUNTIME_ERROR"
+  | "TIMEOUT"
+  | "OOM"
+  | "OUTPUT_SCHEMA_MISMATCH"
+  | "ASSERTION_FAILED"
+  | "EGRESS_BLOCKED"
+  | "INFRA_ERROR";
+/**
+ * Why a run is INFRA_ERROR; stored in the run row so an operator sees the cause.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "InfraReason".
+ */
+export type InfraReason =
+  | "NOT_CONFIGURED"
+  | "HOST_UNREACHABLE"
+  | "HASH_MISMATCH"
+  | "INPUT_MISMATCH"
+  | "TEMPLATE_DIGEST_MISMATCH"
+  | "VM_CREATE_FAILED"
+  | "VM_BOOT_TIMEOUT"
+  | "RUNNER_FAILED"
+  | "DATASET_INVALID"
+  | "EGRESS_LOG_UNAVAILABLE"
+  | "DESTROY_FAILED"
+  | "CANCELLED"
+  | "SUPERSEDED";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -552,6 +605,12 @@ export interface SbamContracts {
   TestRunOut?: TestRunOut;
   TestRunsResponse?: TestRunsResponse;
   TestRunTraces?: TestRunTraces;
+  SandboxLimits?: SandboxLimits;
+  EgressPolicy?: EgressPolicy;
+  EgressEvent?: EgressEvent;
+  SandboxRun?: SandboxRun;
+  RunnerRequest?: RunnerRequest;
+  RunnerOutputs?: RunnerOutputs;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -4801,4 +4860,338 @@ export interface HarnessError {
   message: string;
   budget_exceeded?: boolean;
   elapsed_ms: number;
+}
+/**
+ * VM resources and time. Anything outside the policy is rejected, never clamped.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SandboxLimits".
+ */
+export interface SandboxLimits {
+  cpu?: number;
+  memory_mb?: number;
+  case_timeout_s?: number;
+  max_output_bytes?: number;
+}
+/**
+ * `runtime.network.allowlist` of a Sub-Skill. The platform adds the mock API on its own.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "EgressPolicy".
+ */
+export interface EgressPolicy {
+  /**
+   * @maxItems 50
+   */
+  allow?: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "EgressEvent".
+ */
+export interface EgressEvent {
+  vm_id: string;
+  at: string;
+  dst_host: string;
+  dst_port: number;
+  verdict: EgressVerdict;
+  source: EgressSource;
+  reason?: string | null;
+}
+/**
+ * One row of `sandbox_runs` as the API returns it (TD §7.7).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SandboxRun".
+ */
+export interface SandboxRun {
+  id: string;
+  code_attempt_id: string;
+  dataset_id: string;
+  run_no: number;
+  mode: SandboxMode;
+  status: SandboxRunStatus;
+  /**
+   * Pattern: `^sha256:[0-9a-f]{64}$`
+   */
+  runtime_digest: string;
+  vm_id?: string | null;
+  duration_ms?: number | null;
+  exit_code?: number | null;
+  failure_category?: FailureCategory | null;
+  infra_reason?: InfraReason | null;
+  egress_log_key?: string | null;
+  outputs_key?: string | null;
+  logs_key?: string | null;
+  truncated?: boolean;
+  started_at: string;
+  finished_at?: string | null;
+}
+/**
+ * `/work/request.json`, the only way data reaches the runner besides the files it reads.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RunnerRequest".
+ */
+export interface RunnerRequest {
+  schema_version?: 1;
+  limits: SandboxLimits;
+  mode: SandboxMode;
+  /**
+   * Pattern: `^[A-Za-z_][A-Za-z0-9_.]*$`
+   */
+  tool_module: string;
+  loop_spec: {
+    [k: string]: JsonValue | undefined;
+  };
+  harness: HarnessConfig;
+  /**
+   * Pattern: `^[a-z_][a-z0-9_]{0,62}$`
+   */
+  handoff_table: string;
+  /**
+   * @minItems 1
+   */
+  cases: [
+    {
+      [k: string]: JsonValue | undefined;
+    },
+    ...{
+      [k: string]: JsonValue | undefined;
+    }[]
+  ];
+  /**
+   * @maxItems 50
+   */
+  egress_probe?: string[];
+}
+/**
+ * What the harness needs from the Sub-Skill's ISATVON that the loop spec does not carry:
+ * which two tools drive a pass, how fresh state is keyed, what a handoff row holds and what the
+ * Sub-Skill says to the user. Built by the worker from the stored Sub-Skill, never from the
+ * bundle under test.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "HarnessConfig".
+ */
+export interface HarnessConfig {
+  /**
+   * Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  action_tool: string;
+  /**
+   * Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  fixed_check_tool: string;
+  /**
+   * @maxItems 50
+   *
+   * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  fresh_state_parameters: string[];
+  /**
+   * @maxItems 50
+   *
+   * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  required_inputs: string[];
+  /**
+   * Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  key_field: string;
+  /**
+   * @minItems 1
+   * @maxItems 50
+   *
+   * Items: Pattern: `^[A-Za-z_][A-Za-z0-9_]{0,99}$`
+   */
+  handoff_fields: [string, ...string[]];
+  /**
+   * @maxItems 20
+   */
+  ui_updates:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+}
+/**
+ * `/work/out/outputs.json`, written by the runner as its last act.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RunnerOutputs".
+ */
+export interface RunnerOutputs {
+  schema_version?: 1;
+  /**
+   * Pattern: `^sha256:[0-9a-f]{64}$`
+   */
+  runtime_digest: string;
+  cases: RunnerCaseResult[];
+  resources: RunnerResources;
+  mode: SandboxMode;
+}
+/**
+ * One test case's outcome. `trace` is a `HarnessTrace` object, validated by the worker.
+ *
+ * `handoff_rows` is the case's append-only table as the database holds it after the run (the
+ * "handoff rows dump" of the issue): evidence of what the bundle really wrote, not what the
+ * harness counted.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RunnerCaseResult".
+ */
+export interface RunnerCaseResult {
+  case_id: string;
+  expected_terminal: "SUCCESS" | "ESCALATED" | "NO_OP";
+  terminal: ("SUCCESS" | "ESCALATED" | "NO_OP") | null;
+  passed: boolean;
+  failure_category?: FailureCategory | null;
+  truncated?: boolean;
+  trace: {
+    [k: string]: JsonValue | undefined;
+  };
+  /**
+   * @maxItems 1000
+   */
+  handoff_rows?: {
+    [k: string]: JsonValue | undefined;
+  }[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RunnerResources".
+ */
+export interface RunnerResources {
+  wall_ms: number;
+  cpu_ms: number;
+  peak_rss_kb: number;
 }

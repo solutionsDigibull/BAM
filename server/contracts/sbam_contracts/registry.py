@@ -111,6 +111,14 @@ from sbam_contracts.projects import (
 from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
+from sbam_contracts.sandbox import (
+    EgressEvent,
+    EgressPolicy,
+    RunnerOutputs,
+    RunnerRequest,
+    SandboxLimits,
+    SandboxRun,
+)
 from sbam_contracts.schema_sql import SchemaSqlSourcePut, WorkflowSchemaSql
 from sbam_contracts.sow import SowDocument
 from sbam_contracts.sow_api import (
@@ -248,4 +256,10 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("promptfoo/test_run", TestRunOut),
     ("promptfoo/test_runs_response", TestRunsResponse),
     ("promptfoo/test_run_traces", TestRunTraces),
+    ("sandbox/limits", SandboxLimits),
+    ("sandbox/egress_policy", EgressPolicy),
+    ("sandbox/egress_event", EgressEvent),
+    ("sandbox/run", SandboxRun),
+    ("sandbox/runner_request", RunnerRequest),
+    ("sandbox/runner_outputs", RunnerOutputs),
 )

@@ -46,6 +46,8 @@ SubSkillBuild.run_sandbox_tests
   → Promptfoo (sbam-promptfoo container) evaluates outputs + harness trace + handoff rows → results
 ```
 
+Implementation (E13.2): the adapter, the two backends (CubeSandbox through the official SDK, a local non-certifying runner), the in-VM runner and the activity are described in [ADR 0023](../adr/0023-sandbox-adapter.md); operating it is [the sandbox runbook](../runbooks/sandbox-host.md). The activity records one `sandbox_runs` row per run (mode, VM, runtime digest, exit code, failure category, evidence keys) and a LOOP_TESTS gate verdict; `GET W/sandbox-runs/{run_id}/logs` serves the logs.
+
 The harness is SBAM's emulation of runtime looping for **testing only**. It does not replace SRIM's BuLLM DMR. Its semantics are documented in `loop_spec.json`, which is part of the manifest package, so SRIM can confirm parity (O-17).
 
 | Concern            | Design                                                                                                                                                                                       |

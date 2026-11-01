@@ -642,6 +642,19 @@ wheels = [
 ]
 
 [[package]]
+name = "cubesandbox"
+version = "0.7.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/88/8268b855f8b8cced152bdc20377b2ac112a0cfd00314f0483863eaced23b/cubesandbox-0.7.3.tar.gz", hash = "sha256:70f5615603ce07d0885c5ae7142746157cad71b0e04bbf7cc07456eb924e501c", size = 76843, upload-time = "2026-10-12T08:40:50.855Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a2/07/da5528b21fdd3116411ab12d269cb28fb23caba76efb95d405ffb13be49a/cubesandbox-0.7.3-py3-none-any.whl", hash = "sha256:811ba07d97b2756f68299213881f93f04bc4e61f89bf60ed870a923807a9d087", size = 50875, upload-time = "2026-10-12T08:40:49.794Z" },
+]
+
+[[package]]
 name = "datamodel-code-generator"
 version = "0.84.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3187,6 +3200,7 @@ dependencies = [
     { name = "bandit" },
     { name = "black" },
     { name = "cognee" },
+    { name = "cubesandbox" },
     { name = "defusedxml" },
     { name = "jinja2" },
     { name = "jsonschema" },
@@ -3212,6 +3226,7 @@ requires-dist = [
     { name = "bandit", specifier = "==1.9.4" },
     { name = "black", specifier = "==26.10.1" },
     { name = "cognee", specifier = "==1.6.5" },
+    { name = "cubesandbox", specifier = "==0.7.3" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "jinja2", specifier = ">=3.1.6,<4" },
     { name = "jsonschema", specifier = ">=4.25" },

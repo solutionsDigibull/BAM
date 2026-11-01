@@ -12,7 +12,6 @@ from sbam_workers import registry
 from sbam_workers.build import stubs as build_stubs
 from sbam_workers.certify import stubs as certify_stubs
 from sbam_workers.stub_ids import STUB_MARK
-from sbam_workers.test import stubs as test_stubs
 from temporalio.exceptions import ApplicationError
 
 DEPLOYED = ["staging", "production", "prod", " Production ", "prod-eu", "live", "uat", "stage"]
@@ -31,7 +30,6 @@ WF = WorkflowRef(**_COMMON)
 # every stub family: (activity, input)
 STUBS = [
     (build_stubs.render_skeleton, STAGE),
-    (test_stubs.run_sandbox_tests, STAGE),
     (certify_stubs.certify_sub_skill, STAGE),
     (certify_stubs.certify_macros, WF),
     (certify_stubs.validate_workflow, WF),

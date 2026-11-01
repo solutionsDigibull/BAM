@@ -15,6 +15,9 @@ from sbam_api.db.base import Base, ProjectOwned, status_check
 class ArtifactKind(StrEnum):
     CODE_BUNDLE = "CODE_BUNDLE"  # E11.3: the assembled Sub-Skill tar
     SCHEMA_SQL = "SCHEMA_SQL"  # E9.4: a Workflow's foundational schema.sql
+    SANDBOX_OUTPUTS = "SANDBOX_OUTPUTS"  # E13.2: the runner's outputs.json of one run
+    SANDBOX_LOGS = "SANDBOX_LOGS"  # E13.2: stdout and stderr of one run
+    SANDBOX_EGRESS = "SANDBOX_EGRESS"  # E13.2: the egress evidence of one run
 
 
 class Artifact(ProjectOwned, Base):
