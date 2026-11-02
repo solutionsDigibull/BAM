@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 from httpx2 import Response
 from rbac_world import (
+    AUDIT_TABLES,
     PROBLEM_JSON,
     ROLES,
     Request,
@@ -23,6 +24,7 @@ from rbac_world import (
     load_matrix,
 )
 from sbam_api.core.ids import uuid7
+from sbam_api.db.base import Base
 
 MATRIX = load_matrix()
 CASES = [pytest.param(op, role, id=f"{op}-{role}") for op in MATRIX for role in ROLES]
@@ -128,6 +130,15 @@ def test_e2_7_t02_stale_or_mismatched_entries_fail(world: World) -> None:
 
     assert any(p.startswith("ghost_route:") and "stale" in p for p in problems)
     assert any(p.startswith("me_api_v1_me_get:") and "POST" in p for p in problems)
+
+
+def test_e2_7b_world_creates_every_table_the_app_knows(world: World) -> None:
+    """The world's schema does not depend on import order: after `create_app` has imported every
+    router's models, `counts()` still finds a table for each one (#647)."""
+    counts = world.counts()
+
+    assert "code_attempts" in counts
+    assert set(counts) == {t.name for t in Base.metadata.sorted_tables} - AUDIT_TABLES
 
 
 # --- the matrix itself ----------------------------------------------------------------------

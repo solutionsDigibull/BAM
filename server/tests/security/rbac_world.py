@@ -68,6 +68,7 @@ from sbam_workers.knowledge import okf
 from sbam_workers.sow.export.activity import ExportDeps, export_version
 from sqlalchemy import func, pool, select
 from sqlalchemy.orm import Session, sessionmaker
+from state_checks import import_models
 
 ISSUER = "http://kc.test/realms/bullm"
 AUDIENCE = "sbam-api"
@@ -214,6 +215,9 @@ class World:
         engine = make_engine(
             "sqlite://", poolclass=pool.StaticPool, connect_args={"check_same_thread": False}
         ).execution_options(schema_translate_map={"sbam": None})
+        # Every model, not just the ones imported so far: `create_app` imports more on router
+        # discovery, and `counts()` reads every table the metadata knows (#647).
+        import_models()
         Base.metadata.create_all(engine)
         self.sessions: sessionmaker[Session] = make_sessionmaker(engine)
         self.tenant_a, self.tenant_b = uuid.uuid4(), uuid.uuid4()
