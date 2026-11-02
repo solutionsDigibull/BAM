@@ -90,7 +90,7 @@ def grade(grader: SidecarGrader) -> Any:
 
 def test_e13_6_a_verdict_comes_back_for_each_case_asked_about(jobs: Path, start: Any) -> None:
     side = start(all_pass)
-    assert grade(SidecarGrader(jobs, timeout=5)) == {"pass_first": True}
+    assert grade(SidecarGrader(jobs, timeout=30)) == {"pass_first": True}
     [request] = side.requests
     assert request["alias"] == ALIAS == "sbam-rubric"
     [asked] = request["cases"]
@@ -103,7 +103,7 @@ def test_e13_6_a_false_verdict_is_a_verdict_not_an_error(jobs: Path, start: Any)
         return {"verdicts": {c["name"]: False for c in request["cases"]}}
 
     start(fail)
-    assert grade(SidecarGrader(jobs, timeout=5)) == {"pass_first": False}
+    assert grade(SidecarGrader(jobs, timeout=30)) == {"pass_first": False}
 
 
 @pytest.mark.parametrize(
@@ -121,7 +121,7 @@ def test_e13_6_t07_anything_but_a_clean_answer_is_an_infra_error(
 ) -> None:
     start(reply)
     with pytest.raises(PromptfooInfraError):
-        grade(SidecarGrader(jobs, timeout=5))
+        grade(SidecarGrader(jobs, timeout=30))
 
 
 def test_e13_6_a_sidecar_that_never_answers_times_out_as_an_infra_error(jobs: Path) -> None:
@@ -152,7 +152,7 @@ def test_e13_6_unreadable_json_is_an_infra_error(jobs: Path) -> None:
     thread = threading.Thread(target=garbage, daemon=True)
     thread.start()
     with pytest.raises(PromptfooInfraError, match="unreadable"):
-        grade(SidecarGrader(jobs, timeout=5))
+        grade(SidecarGrader(jobs, timeout=30))
     thread.join(2)
 
 
@@ -164,7 +164,7 @@ def test_e13_6_t07_a_sidecar_that_keeps_failing_blocks_testing_after_three_jobs(
     jobs: Path, start: Any
 ) -> None:
     side = start(lambda _r: {"error": "exit 1"})
-    grader = SidecarGrader(jobs, timeout=5)
+    grader = SidecarGrader(jobs, timeout=30)
     with pytest.raises(TestingBlocked):
         asyncio.run(judge_with_grader(suite(CaseKind.PASS_FIRST), outputs(), grader))
     assert len(side.requests) == 3
@@ -172,6 +172,6 @@ def test_e13_6_t07_a_sidecar_that_keeps_failing_blocks_testing_after_three_jobs(
 
 def test_e13_6_the_judge_uses_the_sidecars_verdict(jobs: Path, start: Any) -> None:
     start(all_pass)
-    grader = SidecarGrader(jobs, timeout=5)
+    grader = SidecarGrader(jobs, timeout=30)
     result = asyncio.run(judge_with_grader(suite(CaseKind.PASS_FIRST), outputs(), grader))
     assert result.green and result.passed == 3

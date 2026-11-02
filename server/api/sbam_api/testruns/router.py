@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.projects.guard import active_project
+from sbam_api.storage.base import StorageBackend
+from sbam_api.storage.router import backend
 from sbam_api.temporal.deps import session_factory
 from sbam_api.testruns import service
 
@@ -26,6 +28,7 @@ W = "/projects/{project_id}/workflows/{workflow_id}"
 Project = Annotated[UUID, Depends(active_project)]
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
+Storage = Annotated[StorageBackend, Depends(backend)]
 
 
 @router.get(W + "/sub-skills/{sub_id}/test-runs")
@@ -44,6 +47,9 @@ def get_test_run_traces(
     run_id: UUID,
     user: User,
     sessions: Sessions,
+    storage: Storage,
 ) -> TestRunTraces:
     with sessions() as session:
-        return service.run_traces(session, user.context(project_id), workflow_id, sub_id, run_id)
+        return service.run_traces(
+            session, storage, user.context(project_id), workflow_id, sub_id, run_id
+        )
