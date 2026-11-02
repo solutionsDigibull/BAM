@@ -290,6 +290,12 @@ services:
     image: ${SBAM_TOOLCHAIN_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-toolchain@sha256:...)}
     build: !reset null
 
+  # E13.6c / #638: the rubric grader sidecar, from its release digest. worker-test keeps PROMPTFOO_JOBS_DIR=/jobs
+  # and the shared job volume from compose.yaml.
+  promptfoo:
+    image: ${SBAM_PROMPTFOO_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-promptfoo@sha256:...)}
+    build: !reset null
+
   sbam-mock-api:
     image: ${SBAM_MOCK_API_IMAGE:?set in the release env file (ghcr.io/solutionsdigibull/sbam-mock-api@sha256:...)}
     build: !reset null

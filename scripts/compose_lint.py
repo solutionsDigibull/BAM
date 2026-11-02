@@ -411,6 +411,7 @@ def check_release_file(path: Path) -> list[Finding]:
         "SBAM_PROXY_IMAGE",
         "SBAM_MOCK_API_IMAGE",
         "SBAM_TOOLCHAIN_IMAGE",
+        "SBAM_PROMPTFOO_IMAGE",
     ):
         value = seen.get(key, "")
         if not DIGEST_RE.match(value):
