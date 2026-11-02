@@ -6,6 +6,8 @@
 * `POST W/isatvon/validate` (E8.3): every Sub-Skill of the Workflow revalidated with the extraction
   and build validator (`ValidationReport`). Read-only. FDE portal; another tenant's or an
   unassigned project, or a Workflow of another project, is 404.
+* `GET W/macro-skills` (E8.7): the workbench's Macro → Sub-Skill tree (`WorkbenchTree`); see
+  `isatvon/tree.py`.
 * `PATCH W/sub-skills/{sub_id}` (E8.4, `SubSkillPatch` + `If-Match` = the row's `content_sha256`):
   merges the edit, revalidates, 200 the whole row (VALID, or INVALID with findings); a type error is
   422 and stores nothing. `PATCH W/macro-skills/{macro_id}` (`MacroSkillPatch`, `If-Match` =
@@ -32,6 +34,7 @@ from sbam_contracts.isatvon_workbench import (
     SubSkillPatch,
     ValidationReport,
     WorkbenchSubSkill,
+    WorkbenchTree,
 )
 from sbam_contracts.runs import RunAccepted
 from sqlalchemy.orm import Session, sessionmaker
@@ -42,9 +45,10 @@ from sbam_api.core.settings import Settings
 from sbam_api.isatvon import edits
 from sbam_api.isatvon.export import export_workbook
 from sbam_api.isatvon.grid import IsatvonSchemaResponse, render
-from sbam_api.isatvon.models import MacroSkill, SubSkill
+from sbam_api.isatvon.models import MacroSkill
 from sbam_api.isatvon.regenerate import start_regenerate
 from sbam_api.isatvon.service import revalidate
+from sbam_api.isatvon.tree import workbench_row, workbench_tree
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
 from sbam_api.projects.guard import active_project
 from sbam_api.storage.router import backend
@@ -101,18 +105,19 @@ IfMatch = Annotated[str | None, Header()]
 IdempotencyKey = Annotated[str | None, Header(min_length=1, max_length=MAX_IDEMPOTENCY_KEY)]
 
 
-def _row(sub: SubSkill) -> WorkbenchSubSkill:
-    return WorkbenchSubSkill.model_validate(
-        {
-            "id": sub.id,
-            "macro_id": sub.macro_skill_id,
-            "state": sub.state,
-            "content_sha256": sub.content_sha256,
-            "validation_errors": sub.validation_errors,
-            "sow_refs": sub.sow_refs,
-            "sub_skill": sub.isatvon,
-        }
-    )
+_row = workbench_row
+
+
+@router.get(W + "/macro-skills")
+def macro_skills(
+    project_id: Annotated[UUID, Depends(project_access)],
+    workflow_id: UUID,
+    user: User,
+    sessions: Sessions,
+) -> WorkbenchTree:
+    """The workbench's tree (E8.7); readable in every state, so an archived project reads too."""
+    with sessions() as session:
+        return workbench_tree(session, user.context(project_id), workflow_id)
 
 
 @router.patch(W + "/sub-skills/{sub_id}")

@@ -627,6 +627,16 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "409 CONFLICT"
 
+  # The workbench's Macro -> Sub-Skill tree (E8.7); readable in every Workflow state.
+  macro_skills_api_v1_projects__project_id__workflows__workflow_id__macro_skills_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/macro-skills
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   validate_api_v1_projects__project_id__workflows__workflow_id__isatvon_validate_post:
     request:
       method: POST
