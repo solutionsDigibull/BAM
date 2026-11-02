@@ -44,6 +44,7 @@ from sbam_contracts.sandbox import (
     EgressPolicy,
     FailureCategory,
     InfraReason,
+    RunnerOutputs,
     SandboxLimits,
 )
 from temporalio import activity
@@ -56,6 +57,7 @@ from sbam_workers.sandbox.backend import SandboxInfraError
 from sbam_workers.sandbox.classify import Classified
 from sbam_workers.sandbox.executor import ExecutionResult, RunInput, execute
 from sbam_workers.sandbox.factory import Sandbox, make_sandbox
+from sbam_workers.sandbox.judging import JudgeBlocked, StageJudge
 from sbam_workers.sandbox.load import (
     TOOL_MODULE,
     Identity,
@@ -138,6 +140,7 @@ class RunSandboxTests:
         settings: WorkerSettings,
         sandbox_factory: Callable[[WorkerSettings], Sandbox] = make_sandbox,
         mock: MockApiClient | None = None,
+        judge: StageJudge | None = None,
     ) -> None:
         self.inputs = inputs
         self.store = store
@@ -145,6 +148,7 @@ class RunSandboxTests:
         self.settings = settings
         self.sandbox_factory = sandbox_factory
         self.mock = mock
+        self.judge = judge
 
     async def _heartbeat(self, run_id: str) -> None:
         """HEARTBEAT_SECONDS is how long Temporal waits (the stage's heartbeat timeout): three beats
@@ -309,6 +313,21 @@ class RunSandboxTests:
                 exit_code=result.exit_code,
             )
             raise unavailable(reason, "; ".join(classified.notes))
+        if self.judge is not None and result.outputs_json is not None:
+            try:
+                classified = await self._judged(inp, identity, run_id, result, classified)
+            except JudgeBlocked as blocked:
+                await self._finish_infra(
+                    inp,
+                    identity,
+                    run_id,
+                    blocked.reason,
+                    vm_id=result.vm_id,
+                    started=started,
+                    evidence=evidence,
+                    exit_code=result.exit_code,
+                )
+                raise unavailable(blocked.reason, blocked.detail) from None
         await asyncio.to_thread(
             self.store.finish,
             inp,
@@ -340,6 +359,21 @@ class RunSandboxTests:
         if classified.passed:
             return IdResult(id=run_id)
         raise loop_tests_failed(identity)
+
+    async def _judged(
+        self,
+        inp: BuildStageInput,
+        identity: Identity,
+        run_id: uuid.UUID,
+        result: ExecutionResult,
+        classified: Classified,
+    ) -> Classified:
+        """The suite's verdict on the run (`judging.py`); a runner file that does not parse was
+        already classified as infrastructure trouble, so it never reaches here."""
+        if self.judge is None or result.outputs_json is None:
+            raise RuntimeError("_judged needs a judge and the runner's outputs")
+        outputs = RunnerOutputs.model_validate_json(result.outputs_json)
+        return await self.judge.judge(inp, identity, run_id, outputs, classified)
 
     def _run_input(
         self, run_id: uuid.UUID, identity: Identity, sandbox: Sandbox, loaded: Loaded
@@ -401,6 +435,7 @@ def _stage() -> RunSandboxTests:
         SqlBuildInputs(sessions).tests_sub_skill,
         settings,
         mock=mock,
+        judge=StageJudge(sessions, SqlBuildInputs(sessions).tests_sub_skill),
     )
 
 
