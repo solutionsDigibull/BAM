@@ -23,6 +23,8 @@
             "sbam-testgen-fallback",
             "sbam-corrector-primary",
             "sbam-corrector-fallback",
+            "sbam-rubric-primary",
+            "sbam-rubric-fallback",
             "sbam-knowledge-primary",
             "sbam-knowledge-fallback",
             "sbam-embed-primary",
@@ -143,6 +145,23 @@
         "priority": 6
       },
       {
+        "id": "alias-sbam-rubric",
+        "name": "sbam-rubric",
+        "cel_expression": "model == \"sbam-rubric\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-rubric-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-rubric-fallback"
+        ],
+        "enabled": true,
+        "priority": 7
+      },
+      {
         "id": "alias-sbam-knowledge",
         "name": "sbam-knowledge",
         "cel_expression": "model == \"sbam-knowledge\"",
@@ -157,7 +176,7 @@
           "openrouter/sbam-knowledge-fallback"
         ],
         "enabled": true,
-        "priority": 7
+        "priority": 8
       },
       {
         "id": "alias-sbam-embed",
@@ -174,7 +193,7 @@
           "openrouter/sbam-embed-fallback"
         ],
         "enabled": true,
-        "priority": 8
+        "priority": 9
       }
     ]
   },

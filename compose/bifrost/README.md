@@ -1,6 +1,6 @@
 # Bifrost aliases and the mock LLM (E1.15)
 
-Callers send `model: "sbam-sow"` (one of the six aliases in `aliases.json`) to Bifrost at
+Callers send `model: "sbam-sow"` (one of the aliases in `aliases.json`) to Bifrost at
 `http://bifrost:8080/v1/chat/completions`. Nothing else is accepted.
 
 Cognee, inside `worker-knowledge`, has two aliases of its own (#78, #259): `sbam-knowledge` for graph

@@ -139,6 +139,52 @@ services:
       toolchain-init: { condition: service_completed_successfully }
     restart: unless-stopped
 
+  promptfoo-init:
+    # The job directory is shared by worker-test and promptfoo, both uid 10001 (E13.6c).
+    image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+    command: ["sh", "-c", "chown 10001:10001 /jobs && chmod 700 /jobs"]
+    volumes: [promptfoo-jobs:/jobs]
+    network_mode: none
+    cpus: 0.25
+    mem_limit: 32m
+
+  promptfoo:
+    # Rubric grading of free-text outputs (E13.6c, #638). Jobs come in through the shared directory and
+    # verdicts go out the same way: no socket, no Docker socket. A read-only root, tmpfs scratch, uid 10001,
+    # no capabilities and limits. It sits on the internal network (no internet route) and asks Bifrost for the
+    # `sbam-rubric` alias only; it holds no provider key (ADR 0001).
+    image: sbam-promptfoo:local
+    build:
+      context: ..
+      dockerfile: compose/docker/promptfoo.Dockerfile
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    cpus: 1.0
+    mem_limit: 1g
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /work:size=256m,uid=10001,gid=10001
+    environment:
+      PROMPTFOO_JOBS: /jobs
+      PROMPTFOO_SCRATCH: /work
+      PROMPTFOO_TIMEOUT: "240"
+      BIFROST_URL: http://bifrost:8080/v1
+    volumes: [promptfoo-jobs:/jobs]
+    networks: [sbam_internal]
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(Date.now()-require('fs').statSync('/tmp/heartbeat').mtimeMs<30000?0:1)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      promptfoo-init: { condition: service_completed_successfully }
+      bifrost: { condition: service_healthy }
+    restart: unless-stopped
+
   storage-init:
     image: busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
     command:
@@ -513,6 +559,8 @@ services:
       <<: *worker-env
       SBAM_QUEUES: sbam-test
       SANDBOX_MODE: ${SANDBOX_MODE:-}
+      # E13.6c: llm-rubric grading runs in the promptfoo container, through this directory.
+      PROMPTFOO_JOBS_DIR: /jobs
       CUBE_API_URL: ${CUBE_API_URL:-}
       CUBE_API_KEY: ${CUBE_API_KEY:-}
       CUBE_PROXY_NODE_IP: ${CUBE_PROXY_NODE_IP:-}
@@ -522,6 +570,10 @@ services:
       MOCK_API_URL: ${MOCK_API_URL:-}
       MOCK_API_IP: ${MOCK_API_IP:-}
       MOCK_CONTROL_TOKEN: ${MOCK_CONTROL_TOKEN:?is required - set it in compose/.env (copy compose/.env.example)}
+    volumes: [promptfoo-jobs:/jobs]
+    depends_on:
+      <<: *worker-depends
+      promptfoo: { condition: service_healthy }
   worker-certify:
     <<: *worker
     environment: { <<: *worker-env, SBAM_QUEUES: sbam-certify }
@@ -581,3 +633,4 @@ volumes:
   cognee_data:
   clamav_db:
   toolchain-jobs:
+  promptfoo-jobs:
