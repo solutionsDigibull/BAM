@@ -21,7 +21,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.testgen.repository import CaseRepository, DatasetRepository
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.pipeline import IdResult
-from sbam_contracts.promptfoo import suite_sha256
+from sbam_contracts.promptfoo import Suite, suite_sha256
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -36,6 +36,34 @@ def _invalid(message: str) -> ApplicationError:
     return ApplicationError(message, type=SUITE_INVALID, non_retryable=True)
 
 
+def load_suite(
+    sessions: sessionmaker[Session], inp: BuildStageInput, isatvon: Mapping[str, Any]
+) -> tuple[Suite, uuid.UUID]:
+    """The suite for this build and the id of the dataset it came from. `SuiteInvalid` (an
+    ApplicationError) when there is no test data or the suite cannot be built from it."""
+    ctx = TenantContext(inp.tenant_id, inp.project_id)
+    with sessions() as session:
+        dataset = DatasetRepository(session, ctx).latest(inp.sub_skill_id)
+        if dataset is None:
+            raise _invalid("the Sub-Skill has no test data to build a suite from")
+        cases = [
+            {
+                "name": row.name,
+                "kind": row.kind,
+                "input": row.input,
+                "expected_terminal": row.expected_terminal,
+                "expected_output": row.expected_output,
+                "assertions": row.assertions,
+            }
+            for row in CaseRepository(session, ctx).of_dataset(dataset.id)
+        ]
+        dataset_id = dataset.id
+    try:
+        return build_suite(isatvon, cases), dataset_id
+    except (SuiteBuildError, ValueError) as exc:  # pydantic's ValidationError is a ValueError
+        raise _invalid(f"the suite cannot be built: {type(exc).__name__}") from None
+
+
 class BuildPromptfooSuite:
     """`build_promptfoo_suite` with its dependencies injected (see the module docstring)."""
 
@@ -48,27 +76,7 @@ class BuildPromptfooSuite:
         self.sessions = sessions
 
     def _build(self, inp: BuildStageInput, isatvon: Mapping[str, Any]) -> uuid.UUID:
-        ctx = TenantContext(inp.tenant_id, inp.project_id)
-        with self.sessions() as session:
-            dataset = DatasetRepository(session, ctx).latest(inp.sub_skill_id)
-            if dataset is None:
-                raise _invalid("the Sub-Skill has no test data to build a suite from")
-            cases = [
-                {
-                    "name": row.name,
-                    "kind": row.kind,
-                    "input": row.input,
-                    "expected_terminal": row.expected_terminal,
-                    "expected_output": row.expected_output,
-                    "assertions": row.assertions,
-                }
-                for row in CaseRepository(session, ctx).of_dataset(dataset.id)
-            ]
-            dataset_id = dataset.id
-        try:
-            suite = build_suite(isatvon, cases)
-        except (SuiteBuildError, ValueError) as exc:  # pydantic's ValidationError is a ValueError
-            raise _invalid(f"the suite cannot be built: {type(exc).__name__}") from None
+        suite, dataset_id = load_suite(self.sessions, inp, isatvon)
         activity.logger.info(
             "promptfoo suite built",
             extra={
