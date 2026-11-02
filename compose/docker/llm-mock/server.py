@@ -27,6 +27,9 @@ Cognee's aliases (E5.7, #259) are marked in `aliases.json` and need no recorded 
                           hashed from its words, so the same text always gives the same vector and texts
                           that share words are close. Size: `dimensions` in the request, else
                           LLM_MOCK_EMBEDDING_DIMENSIONS (default 1536).
+    "mock": "rubric"      (`sbam-rubric`, #638) Promptfoo's `llm-rubric` grader asks for
+                          `{"pass", "score", "reason"}`: an unseen input passes, unless the request holds
+                          the marker `MOCK_RUBRIC_FAIL`, which makes the same request fail. Deterministic.
     "mock": "ocr"         (`sbam-ocr`, E4.8) an unseen input is answered with a page of text for the
                           page the request names (`<data name="page_number">N</data>`): the mock cannot
                           read an image, so the text is always `Mock OCR text of page N.`, and a
@@ -130,12 +133,14 @@ class Mock:
         generated: frozenset[str] = frozenset(),
         embedding: frozenset[str] = frozenset(),
         ocr: frozenset[str] = frozenset(),
+        rubric: frozenset[str] = frozenset(),
     ):
         self.fixtures = fixtures
         self.aliases = aliases
         self.generated = generated  # unseen inputs are answered from the request's schema
         self.embedding = embedding  # served on /v1/embeddings only
         self.ocr = ocr  # unseen inputs get a page of mock text for the page asked for
+        self.rubric = rubric  # unseen inputs get Promptfoo's grading JSON
         self.scenarios: dict[str, str] = {}
         self.calls: list[dict[str, str]] = []
         self.timeout_s = float(os.environ.get("LLM_MOCK_TIMEOUT_S", "65"))
@@ -201,7 +206,12 @@ class Mock:
             time.sleep(self.timeout_s)
             return error(504, "MOCK_TIMEOUT", f"mock timeout for {model}")
         fixture = self.fixtures.get((alias, prompt_id, digest))
-        if fixture is None and alias not in self.generated and alias not in self.ocr:
+        if (
+            fixture is None
+            and alias not in self.generated
+            and alias not in self.ocr
+            and alias not in self.rubric
+        ):
             return error(
                 422,
                 "MOCK_FIXTURE_MISSING",
@@ -215,6 +225,8 @@ class Mock:
                 content = INVALID_BODY
             elif alias in self.ocr:
                 content = ocr_answer(messages)
+            elif alias in self.rubric:
+                content = rubric_answer(messages)
             else:
                 content = generated_answer(body)
         else:
@@ -323,6 +335,18 @@ def ocr_answer(messages: list[Any]) -> str:
     if not has_image(messages):
         return dump({"page": page, "markdown": "", "unreadable": True})
     return dump({"page": page, "markdown": f"Mock OCR text of page {page}.", "unreadable": False})
+
+
+RUBRIC_FAIL_MARKER = "MOCK_RUBRIC_FAIL"
+
+
+def rubric_answer(messages: list[Any]) -> str:
+    """The grading JSON Promptfoo's `llm-rubric` reads. It passes, unless the request carries the
+    marker that asks the mock to fail it."""
+    text = " ".join(message_text(m) for m in messages if isinstance(m, dict))
+    passed = RUBRIC_FAIL_MARKER not in text
+    reason = "mock grader: rubric met" if passed else "mock grader: rubric not met"
+    return dump({"pass": passed, "score": 1 if passed else 0, "reason": reason})
 
 
 def generated_answer(body: dict[str, Any]) -> str:
@@ -559,6 +583,7 @@ def build(fixtures_dir: Path, aliases_file: Path) -> Mock:
         generated=frozenset(a for a, s in specs.items() if s.get("mock") == "generated"),
         embedding=frozenset(a for a, s in specs.items() if s.get("kind") == "embedding"),
         ocr=frozenset(a for a, s in specs.items() if s.get("mock") == "ocr"),
+        rubric=frozenset(a for a, s in specs.items() if s.get("mock") == "rubric"),
     )
 
 

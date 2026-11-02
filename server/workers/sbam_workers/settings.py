@@ -43,6 +43,10 @@ class WorkerSettings(BaseSettings):
     # Ruff, MyPy and Bandit as child processes of the worker (laptops, tests).
     toolchain_jobs_dir: str = ""
     toolchain_timeout_seconds: float = Field(default=300.0, gt=0)
+    # Rubric grading (E13.6c): a shared directory the `sbam-promptfoo` container watches. Empty
+    # means no grader, so a suite with an `llm-rubric` case blocks testing, never gets scored.
+    promptfoo_jobs_dir: str = ""
+    promptfoo_timeout_seconds: float = Field(default=300.0, gt=0)
     # LLM layer (E6.1): every call goes through Bifrost with an `sbam-*` alias. Defaults match
     # Compose.
     bifrost_url: AnyHttpUrl = AnyHttpUrl("http://bifrost:8080")

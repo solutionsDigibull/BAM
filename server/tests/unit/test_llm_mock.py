@@ -22,6 +22,7 @@ REPO = Path(__file__).resolve().parents[3]
 BIFROST_DIR = REPO / "compose/bifrost"
 FIXTURES = REPO / "server/tests/llm-mock"
 ALIASES = ["sbam-ocr", "sbam-sow", "sbam-isatvon", "sbam-codegen", "sbam-testgen", "sbam-corrector"]
+RUBRIC_ALIASES = ["sbam-rubric"]  # E13.6c: the promptfoo sidecar grades through Bifrost
 COGNEE_ALIASES = ["sbam-knowledge", "sbam-embed"]  # E5.7: generated answers, no recorded fixtures
 
 
@@ -55,10 +56,10 @@ def chat(
 
 def test_e1_15_t01_six_aliases_each_with_primary_and_fallback() -> None:
     aliases = gen.load_aliases()
-    assert list(aliases) == ALIASES + COGNEE_ALIASES
+    assert list(aliases) == ALIASES + RUBRIC_ALIASES + COGNEE_ALIASES
     for mode in gen.MODES:
         rules = gen.build_config(mode)["governance"]["routing_rules"]
-        assert [r["name"] for r in rules] == ALIASES + COGNEE_ALIASES
+        assert [r["name"] for r in rules] == ALIASES + RUBRIC_ALIASES + COGNEE_ALIASES
         assert len({r["priority"] for r in rules}) == len(rules)  # Bifrost: one rule per priority
         for rule in rules:
             alias = rule["name"]

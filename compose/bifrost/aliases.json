@@ -30,6 +30,12 @@
     "primary": "openai/gpt-4o-mini",
     "fallback": "openai/gpt-4o"
   },
+  "sbam-rubric": {
+    "use": "Promptfoo llm-rubric grading of free-text outputs in the sbam-promptfoo sidecar (E13.6c)",
+    "primary": "openai/gpt-4o-mini",
+    "fallback": "openai/gpt-4o",
+    "mock": "rubric"
+  },
   "sbam-knowledge": {
     "use": "Cognee graph extraction and summaries in worker-knowledge (KnowledgeGraph JSON)",
     "primary": "google/gemini-3.8-flash",

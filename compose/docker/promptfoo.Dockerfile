@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# sbam-promptfoo (TD §20.2): pinned Promptfoo CLI. #127 (E13.6) extends this image.
+# sbam-promptfoo (TD §20.2): pinned Promptfoo CLI. Runs compose/docker/promptfoo/runner.mjs: rubric
+# grading jobs in, verdicts out, the grading model reached only through Bifrost (E13.6c, #638).
 FROM node:22.23-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
 LABEL org.opencontainers.image.source="https://github.com/solutionsDigibull/BAM" \
       org.opencontainers.image.vendor="Digibull" \
@@ -16,7 +17,10 @@ RUN npm install --global --no-audit --no-fund promptfoo@0.124.0 \
  && npm cache clean --force \
  && groupadd --gid 10001 sbam \
  && useradd --uid 10001 --gid sbam --create-home --shell /usr/sbin/nologin sbam
+COPY compose/docker/promptfoo/runner.mjs /opt/sbam/runner.mjs
 WORKDIR /work
 USER 10001:10001
-HEALTHCHECK --interval=60s --timeout=20s CMD ["promptfoo", "--version"]
-CMD ["promptfoo", "--version"]
+# The runner touches /tmp/heartbeat on every pass (a tmpfs); a stale one means it is stuck.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["node", "-e", "process.exit(Date.now()-require('fs').statSync('/tmp/heartbeat').mtimeMs<30000?0:1)"]
+CMD ["node", "/opt/sbam/runner.mjs"]

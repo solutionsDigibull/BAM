@@ -31,6 +31,7 @@ import time
 import uuid
 from collections.abc import Callable, Mapping
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Final
 from urllib.parse import urlsplit
 
@@ -70,6 +71,7 @@ from sbam_workers.sandbox.policy import MockApi
 from sbam_workers.sandbox.store import Evidence, SqlRunStore
 from sbam_workers.sandbox.verify import HashMismatch
 from sbam_workers.settings import WorkerSettings
+from sbam_workers.test.grader import SidecarGrader
 from sbam_workers.test.mocks import MockApiClient
 
 STAGE: Final = "run_sandbox_tests"
@@ -435,7 +437,15 @@ def _stage() -> RunSandboxTests:
         SqlBuildInputs(sessions).tests_sub_skill,
         settings,
         mock=mock,
-        judge=StageJudge(sessions, SqlBuildInputs(sessions).tests_sub_skill),
+        judge=StageJudge(
+            sessions,
+            SqlBuildInputs(sessions).tests_sub_skill,
+            (
+                SidecarGrader(Path(settings.promptfoo_jobs_dir), settings.promptfoo_timeout_seconds)
+                if settings.promptfoo_jobs_dir
+                else None
+            ),
+        ),
     )
 
 

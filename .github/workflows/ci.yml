@@ -188,6 +188,7 @@ jobs:
           - { name: skill-runtime, file: skill-runtime.Dockerfile, target: "", args: "" } # #67
           - { name: sbam-llm-mock, file: llm-mock.Dockerfile, target: "", args: "" } # dev VM only (#143)
           - { name: sbam-toolchain, file: toolchain.Dockerfile, target: "", args: "" } # static-gate sidecar (#522, #575)
+          - { name: sbam-promptfoo, file: promptfoo.Dockerfile, target: "", args: "" } # rubric grader sidecar (#638)
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
       PUSH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
@@ -295,7 +296,7 @@ jobs:
           {
             if [ "$PUBLISH" != "true" ]; then echo "# DRY RUN: image IDs, not registry digests. Never deploy this file."; fi
             echo "# release ${{ github.sha }} (${{ github.ref_name }})"
-            for name in sbam-api sbam-worker sbam-web sbam-proxy sbam-mock-api sbam-llm-mock sbam-toolchain; do
+            for name in sbam-api sbam-worker sbam-web sbam-proxy sbam-mock-api sbam-llm-mock sbam-toolchain sbam-promptfoo; do
               var="$(echo "${name#sbam-}" | tr 'a-z-' 'A-Z_')"
               echo "SBAM_${var}_IMAGE=$(cat "digest/$name")"
             done
