@@ -145,3 +145,90 @@ def test_e13_7_traces_of_another_tenant_sub_skill_or_unknown_run_are_404(h: Harn
     problem(traces(h, uuid.uuid4()), 404, "NOT_FOUND")
     second = h.add_sub_skill(sample(**{"skill_metadata.skill_id": "MS01.2_Other"}), order=2)
     problem(traces(h, run, sub=second), 404, "NOT_FOUND")  # the run belongs to another Sub-Skill
+
+
+# --- stored traces (#526) ------------------------------------------------------------------------
+
+
+def trace_doc(case_ids: list[str]) -> dict[str, Any]:
+    return {
+        "traces": [
+            {
+                "case_id": cid,
+                "terminal": None if cid == "failed" else "SUCCESS",
+                "iterations": 0,
+                "passes": [],
+                "ui_updates": [],
+                "handoff_rows": 0,
+                "error": None,
+            }
+            for cid in case_ids
+        ]
+    }
+
+
+class MemoryStorage:
+    """The few `StorageBackend` calls the traces endpoint makes, over a dict (content-addressed)."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+
+    def put(self, data: bytes, scope: Any, kind: Any, content_type: str) -> Any:
+        import hashlib
+
+        from sbam_api.storage.base import StoredObject
+
+        key = scope.key(kind, hashlib.sha256(data).hexdigest())
+        self.objects[key] = data
+        return StoredObject(key, hashlib.sha256(data).hexdigest(), len(data), content_type)
+
+    def exists(self, key: str) -> bool:
+        return key in self.objects
+
+    def get(self, key: str, *, verify: bool = False) -> bytes:
+        return self.objects[key]
+
+
+def store_traces(h: Harness, document: Any, tenant: uuid.UUID = TENANT_A) -> str:
+    import json
+
+    from sbam_api.storage.base import Kind, StorageScope
+
+    storage = getattr(h.client.app.state, "storage", None)  # type: ignore[attr-defined]
+    if not isinstance(storage, MemoryStorage):
+        storage = MemoryStorage()
+        h.client.app.state.storage = storage  # type: ignore[attr-defined]
+    scope = StorageScope(tenant, uuid.UUID(h.project), h.wf)
+    data = document if isinstance(document, bytes) else json.dumps(document).encode()
+    return str(storage.put(data, scope, Kind.TESTS, "application/json").storage_key)
+
+
+def test_e13_7_the_stored_traces_of_a_run_come_back_one_per_case(h: Harness) -> None:
+    run = h.record(report_key=store_traces(h, trace_doc(["pass_first", "failed", "no_op"])))
+    res = traces(h, run)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert [t["case_id"] for t in body["traces"]] == ["pass_first", "failed", "no_op"]
+    assert body["traces"][1]["terminal"] is None  # a failed case keeps its null terminal
+
+
+@pytest.mark.parametrize(
+    "document", [b"{not json", {"traces": "nope"}, {"other": []}, {"traces": [{"case_id": 1}]}]
+)
+def test_e13_7_an_unreadable_trace_document_answers_an_empty_list(
+    h: Harness, document: Any
+) -> None:
+    run = h.record(report_key=store_traces(h, document))
+    assert traces(h, run).json() == {"run_id": str(run), "traces": []}
+
+
+def test_e13_7_a_trace_object_stored_for_another_tenant_is_never_served(h: Harness) -> None:
+    key = store_traces(h, trace_doc(["pass_first"]), tenant=TENANT_B)
+    run = h.record(report_key=key)
+    assert traces(h, run).json() == {"run_id": str(run), "traces": []}
+
+
+def test_e13_7_a_trace_key_with_no_object_answers_an_empty_list(h: Harness) -> None:
+    key = f"{TENANT_A}/{h.project}/{h.wf}/tests/{'ab' * 32}"
+    run = h.record(report_key=key)
+    assert traces(h, run).json() == {"run_id": str(run), "traces": []}

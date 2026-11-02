@@ -445,6 +445,7 @@ def _stage() -> RunSandboxTests:
                 if settings.promptfoo_jobs_dir
                 else None
             ),
+            storage,
         ),
     )
 

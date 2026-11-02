@@ -40,7 +40,10 @@ def rec(monkeypatch: pytest.MonkeyPatch) -> Recorded:
 
 
 def judge_over(
-    monkeypatch: pytest.MonkeyPatch, rubric_on: CaseKind | None, grader: Grader | None = None
+    monkeypatch: pytest.MonkeyPatch,
+    rubric_on: CaseKind | None,
+    grader: Grader | None = None,
+    storage: Any = None,
 ) -> StageJudge:
     built = suite(rubric_on)
     monkeypatch.setattr(judging, "load_suite", lambda *_: (built, uuid.uuid4()))
@@ -48,12 +51,15 @@ def judge_over(
     async def isatvon_of(_: BuildStageInput) -> dict[str, Any]:
         return {}
 
-    return StageJudge(None, isatvon_of, grader)  # type: ignore[arg-type]
+    return StageJudge(None, isatvon_of, grader, storage)  # type: ignore[arg-type]
 
 
 def inp() -> BuildStageInput:
     return BuildStageInput.model_construct(
-        tenant_id=uuid.uuid4(), project_id=uuid.uuid4(), sub_skill_id=uuid.uuid4()
+        tenant_id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        workflow_id=uuid.uuid4(),
+        sub_skill_id=uuid.uuid4(),
     )
 
 
@@ -120,3 +126,36 @@ def test_e13_6_a_graded_rubric_passes_through_to_the_row(
     result = run(judge_over(monkeypatch, CaseKind.PASS_FIRST, Grader()), outputs(), PASSED)
     assert result is PASSED and rec.rows[0]["state"] == "PASS"
     assert AssertionType.LLM_RUBRIC.value in {r["type"] for r in rec.rows[0]["results"]}
+
+
+class Store:
+    """The one `StorageBackend.put` the judge makes, over a dict."""
+
+    def __init__(self) -> None:
+        self.puts: list[tuple[Any, Any, bytes, str]] = []
+
+    def put(self, data: bytes, scope: Any, kind: Any, content_type: str) -> Any:
+        self.puts.append((scope, kind, data, content_type))
+        return type("Stored", (), {"storage_key": f"k/{len(self.puts)}"})()
+
+
+def test_e13_7_the_per_case_traces_are_stored_with_the_run_and_the_key_is_the_report_key(
+    monkeypatch: pytest.MonkeyPatch, rec: Recorded
+) -> None:
+    import json
+
+    store = Store()
+    run(judge_over(monkeypatch, None, storage=store), outputs(), PASSED)
+    [(_scope, kind, data, content_type)] = store.puts
+    document = json.loads(data)
+    assert [t["case_id"] for t in document["traces"]] == ["pass_first", "escalation", "no_op"]
+    assert document["traces"][0]["passes"][0]["pass"] == 1  # by alias, as the API reads it back
+    assert kind.value == "tests" and content_type == "application/json"
+    assert rec.rows[0]["report_key"] == "k/1"
+
+
+def test_e13_7_without_a_storage_backend_nothing_is_stored_and_the_key_is_empty(
+    monkeypatch: pytest.MonkeyPatch, rec: Recorded
+) -> None:
+    run(judge_over(monkeypatch, None), outputs(), PASSED)
+    assert rec.rows[0]["report_key"] is None

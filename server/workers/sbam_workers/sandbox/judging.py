@@ -15,11 +15,14 @@ run the classifier passed can still fail here. `StageJudge.judge` runs the suite
 """
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from sbam_api.db.repository import TenantContext
+from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_contracts.build import BuildStageInput
+from sbam_contracts.harness import HarnessTrace
 from sbam_contracts.promptfoo import AssertionResult, Suite
 from sbam_contracts.sandbox import FailureCategory, InfraReason, RunnerOutputs
 from sqlalchemy.orm import Session, sessionmaker
@@ -73,10 +76,25 @@ class StageJudge:
         sessions: sessionmaker[Session],
         isatvon_of: IsatvonOf,
         grader: Grader | None = None,
+        storage: StorageBackend | None = None,
     ) -> None:
         self.sessions = sessions
         self.isatvon_of = isatvon_of
         self.grader = grader
+        self.storage = storage
+
+    def _store_traces(self, inp: BuildStageInput, outputs: RunnerOutputs) -> str | None:
+        """The run's per-case harness traces, stored with the run for the test panel (E13.7). The
+        key goes in `report_key`. Without a storage backend (unit tests) nothing is stored."""
+        if self.storage is None:
+            return None
+        traces = [HarnessTrace.model_validate(case.trace) for case in outputs.cases]
+        document = {"traces": [t.model_dump(mode="json", by_alias=True) for t in traces]}
+        scope = StorageScope(inp.tenant_id, inp.project_id, inp.workflow_id)
+        stored = self.storage.put(
+            json.dumps(document, sort_keys=True).encode(), scope, Kind.TESTS, "application/json"
+        )
+        return stored.storage_key
 
     async def _suite(self, inp: BuildStageInput) -> Suite:
         isatvon = await self.isatvon_of(inp)
@@ -109,6 +127,7 @@ class StageJudge:
             sandbox_run_id=run_id,
             suite=suite,
             judgement=judgement,
+            report_key=await asyncio.to_thread(self._store_traces, inp, outputs),
         )
         await record_run(self.sessions, TenantContext(inp.tenant_id, inp.project_id), values)
         if not classified.passed or judgement.green:
