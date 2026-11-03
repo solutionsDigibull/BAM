@@ -14,7 +14,7 @@ needs:
 `problems` returns short reasons that name constructs, never the query text: an identifier the
 model chose is echoed only when it is a plain lower-case identifier. It is a fast fail; the
 authority is the database role the sandbox runs the query under (read-only, scoped to the workflow's
-schema, with a statement timeout; docs/adr/0025).
+schema, with a statement timeout; docs/adr/0026).
 """
 
 import re
