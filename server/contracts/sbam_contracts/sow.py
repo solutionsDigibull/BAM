@@ -27,6 +27,7 @@ from typing import Annotated, Any, Final, Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
+from pydantic_core import PydanticCustomError
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.isatvon14 import MAX_ITERATIONS_RANGE, RULE_REF, ShortText, Text
@@ -155,7 +156,11 @@ class FeatureTools(_Strict):
     def _decoupled(self) -> Self:
         shared = sorted({t.casefold() for t in self.action} & {t.casefold() for t in self.check})
         if shared:
-            raise ValueError(f"check tool must differ from action tool: {', '.join(shared)}")
+            raise PydanticCustomError(
+                "ACTION_CHECK_OVERLAP",
+                "check tool must differ from action tool: {tools}",
+                {"tools": ", ".join(shared)},
+            )
         return self
 
 
@@ -230,24 +235,56 @@ class SowDocument(_Strict):
     def _ids(self) -> Self:
         module_ids = [m.id for m in self.modules]
         for dup in _duplicates(module_ids):
-            raise ValueError(f"duplicate module id {dup}")
-        for dup in _duplicates([f.id for f in self.features]):
-            raise ValueError(f"duplicate feature id {dup}")
+            where = f"modules[{module_ids.index(dup)}]"
+            raise _coded("DUPLICATE_ID", f"duplicate module id {dup}", where, dup)
+        feature_ids = [f.id for f in self.features]
+        for dup in _duplicates(feature_ids):
+            where = f"features[{feature_ids.index(dup)}]"
+            raise _coded("DUPLICATE_ID", f"duplicate feature id {dup}", where, dup)
         known = set(module_ids)
-        for feature in self.features:
+        for i, feature in enumerate(self.features):
             if feature.module_id not in known:
-                raise ValueError(f"feature {feature.id} names unknown module {feature.module_id}")
+                raise _coded(
+                    "UNKNOWN_MODULE",
+                    f"feature {feature.id} names unknown module {feature.module_id}",
+                    f"features[{i}].module_id",
+                    feature.module_id,
+                )
         used = {f.module_id for f in self.features}
-        for module_id in module_ids:
+        for i, module_id in enumerate(module_ids):
             if module_id not in used:
-                raise ValueError(f"module {module_id} requires at least 1 feature")
-        for ref in self.rules_constraints.rule_refs:
-            if not RULE_REF.match(ref):
-                raise ValueError(f"rule_refs: {ref!r} is not a Rules master id RULE-*")
+                raise _coded(
+                    "MODULE_WITHOUT_FEATURE",
+                    f"module {module_id} requires at least 1 feature",
+                    f"modules[{i}]",
+                    module_id,
+                )
+        for i, ref in enumerate(self.rules_constraints.rule_refs):
+            if not RULE_REF.match(ref):  # the text is the model's own: named by position only
+                raise _coded(
+                    "NOT_A_RULE_ID",
+                    f"rule_refs: {ref!r} is not a Rules master id RULE-*",
+                    f"rules_constraints.rule_refs[{i}]",
+                    None,
+                )
         return self
 
     def features_of(self, module_id: str) -> list[FeatureItem]:
         return [f for f in self.features if f.module_id == module_id]
+
+
+def _coded(code: str, message: str, where: str, ident: str | None) -> PydanticCustomError:
+    """A document-level failure the re-ask can act on: `where` (a path built from positions) and
+    an id the schema already validated. Never document text (E1.21): `error_lines` reads only
+    `where` and `id` from the context, and `message` stays out of the feedback."""
+    return PydanticCustomError(
+        code,
+        message,
+        {
+            "where": where,
+            "id": ident,
+        },
+    )
 
 
 def _duplicates(ids: list[str]) -> list[str]:
