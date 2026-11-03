@@ -100,7 +100,9 @@ def agent_url() -> Iterator[str]:
         "--read-only", "--tmpfs", "/tmp:size=512m,mode=1777",  # noqa: S108
         "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
         "--user", "10001:10001", "--memory", "1g", "--cpus", "1", "--pids-limit", "128",
-        "-e", f"SANDBOX_AGENT_TOKEN={TOKEN}", "-e", f"SANDBOX_RUNTIME_DIGEST={DIGEST}", IMAGE,
+        "-e", f"SANDBOX_AGENT_TOKEN={TOKEN}", "-e", f"SANDBOX_RUNTIME_DIGEST={DIGEST}",
+        "-e", "SANDBOX_AGENT_NPROC=0",  # NPROC is per uid on the host; --pids-limit is the cap
+        IMAGE,
     )  # fmt: skip
     url = f"http://127.0.0.1:{port}"
     deadline = time.monotonic() + 60
