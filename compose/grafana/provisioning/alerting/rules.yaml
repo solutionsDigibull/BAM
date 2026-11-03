@@ -523,3 +523,60 @@ groups:
       severity: warning
       team: platform
       environment: ${SBAM_ENV}
+  - uid: sbam-bulkhead-saturated
+    title: An API dependency bulkhead has been saturated for 5 minutes
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max by (bulkhead) (sbam_bulkhead_saturated)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    noDataState: OK
+    execErrState: Error
+    for: 5m
+    isPaused: false
+    annotations:
+      summary: Every slot of an API dependency bulkhead is in use
+      description: The {{ $$labels.bulkhead }} bulkhead has had no free slot for 5 minutes, so calls to that dependency are failing fast (503). A brief burst is not an incident, a sustained one means the dependency is hung or slow.
+      runbook: docs/runbooks/bulkhead-saturated.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}
