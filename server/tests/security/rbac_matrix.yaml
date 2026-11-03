@@ -112,6 +112,16 @@ routes:
     request: {method: GET, path: /api/v1/admin/audit}
     expect: *tenant_admin_list
 
+  # #421: invalidating cached model answers is tenant-admin only. By prompt a tenant with nothing
+  # cached for it still gets 200 (zero removed); another tenant's `cache_key` is a 404 and its
+  # answer stays (tests/api/test_e421_llm_cache_invalidate.py, which seeds the cache rows).
+  invalidate_api_v1_admin_llm_cache_invalidate_post:
+    request:
+      method: POST
+      path: /api/v1/admin/llm-cache/invalidate
+      json: {prompt_id: rbac-matrix-nothing-cached}
+    expect: *tenant_admin_list
+
   invite_user_api_v1_admin_users_invite_post:
     request:
       method: POST

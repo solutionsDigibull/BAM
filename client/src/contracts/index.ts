@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:2ae9aae4dc7d21e035fe6ad1a3d85c4885a24f57ce0662dd6a6c4e66f635b2d4
+// source-sha256:234516baae4dc8c42eedafa73e267a8f4d71d12374d05cc43029f9561d305895
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -605,6 +605,8 @@ export interface SbamContracts {
   TestRunOut?: TestRunOut;
   TestRunsResponse?: TestRunsResponse;
   TestRunTraces?: TestRunTraces;
+  LlmCacheInvalidate?: LlmCacheInvalidate;
+  LlmCacheInvalidated?: LlmCacheInvalidated;
   SandboxLimits?: SandboxLimits;
   EgressPolicy?: EgressPolicy;
   EgressEvent?: EgressEvent;
@@ -4860,6 +4862,25 @@ export interface HarnessError {
   message: string;
   budget_exceeded?: boolean;
   elapsed_ms: number;
+}
+/**
+ * By `cache_key` (one answer) or by `prompt_id` (every answer of that prompt, optionally of
+ * one `prompt_version`), in the caller's tenant.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LlmCacheInvalidate".
+ */
+export interface LlmCacheInvalidate {
+  cache_key?: string | null;
+  prompt_id?: string | null;
+  prompt_version?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LlmCacheInvalidated".
+ */
+export interface LlmCacheInvalidated {
+  invalidated: number;
 }
 /**
  * VM resources and time. Anything outside the policy is rejected, never clamped.

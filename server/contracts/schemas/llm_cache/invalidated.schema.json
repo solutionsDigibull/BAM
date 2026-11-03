@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:llm_cache/invalidated:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "invalidated": {
+      "minimum": 0,
+      "title": "Invalidated",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "invalidated"
+  ],
+  "title": "LlmCacheInvalidated",
+  "type": "object"
+}

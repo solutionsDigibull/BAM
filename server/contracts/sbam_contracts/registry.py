@@ -56,6 +56,7 @@ from sbam_contracts.knowledge import (
     KnowledgeNodeDetail,
     KnowledgeVersionList,
 )
+from sbam_contracts.llm_cache import LlmCacheInvalidate, LlmCacheInvalidated
 from sbam_contracts.manifest import (
     Isa14Manifest,
     LoopSpec,
@@ -256,6 +257,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("promptfoo/test_run", TestRunOut),
     ("promptfoo/test_runs_response", TestRunsResponse),
     ("promptfoo/test_run_traces", TestRunTraces),
+    ("llm_cache/invalidate", LlmCacheInvalidate),
+    ("llm_cache/invalidated", LlmCacheInvalidated),
     ("sandbox/limits", SandboxLimits),
     ("sandbox/egress_policy", EgressPolicy),
     ("sandbox/egress_event", EgressEvent),
