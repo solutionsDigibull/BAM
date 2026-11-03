@@ -253,6 +253,13 @@ make down                                 # stop (data kept);  make reset CONFIR
 | http://localhost:8025 | Mailpit: catches Keycloak invite and password emails (dev only) |
 | http://localhost:3001 / :3002 | Langfuse / Grafana (profile `obs`) |
 
+**Calling the API from its docs.** On http://localhost:8000/api/v1/docs click **Authorize**, then
+**Authorize** again in the dialog (leave `client_secret` empty). Sign in as a seeded user (`admin-a`, `fde-a1`, …,
+password `SEED_USER_PASSWORD`). "Try it out" then calls the API as that user, with the same RBAC as the web app.
+The public client `sbam-swagger` (PKCE) is created only by the dev seed (`compose/keycloak/seed.sh`), and a
+deployed environment publishes no docs (A-15). Writes still need their headers: `If-Match` on PATCH,
+`Idempotency-Key` on start commands.
+
 If a port is already in use on your machine, change it in `compose/.env` (`API_PORT`, `WEB_PORT`, …).
 Code changes reload automatically: `compose.override.yaml` mounts `server/` and `client/` into the containers.
 The API reloads (`uvicorn --reload`), the web app hot-reloads (`next dev`), and every worker restarts when a `.py`
