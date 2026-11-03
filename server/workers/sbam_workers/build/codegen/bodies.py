@@ -25,6 +25,7 @@ from typing import Annotated, Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from sbam_workers.build.codegen import allowlist as body_rules
 from sbam_workers.build.codegen.render import RenderedSkeleton, params_json, str_literal
 from sbam_workers.build.codegen.store import LoadedTemplate
 from sbam_workers.llm.client import LlmClient
@@ -83,6 +84,10 @@ class BodyFindingCode(StrEnum):
     SQL_UNSAFE = "SQL_UNSAFE"  # f-string / concatenated / formatted SQL, or a handoff write
     STATE_QUERY_INVALID = "STATE_QUERY_INVALID"  # not one SELECT with one %s per fresh-state name
     SHADOWS_SKELETON = "SHADOWS_SKELETON"  # a helper rebinds a name the skeleton defines
+    # The allowlist layer (A-02, #428). FORBIDDEN_CALL is reused for a builtin that is not allowed.
+    DISALLOWED_SYNTAX = "DISALLOWED_SYNTAX"  # a construct a tool body may not use (class, del, ...)
+    PRIVATE_ATTRIBUTE = "PRIVATE_ATTRIBUTE"  # `_x` / dunder attribute or interpreter internals
+    RESOURCE_BOMB = "RESOURCE_BOMB"  # a literal repeat, range or integer of absurd size
 
 
 @dataclass(frozen=True)
@@ -341,6 +346,9 @@ def precheck(
         checker = _Checker(field, allowed, 1 if wrap else 0, handoff)
         checker.visit(tree)
         findings.extend(checker.findings)
+        for code, node, message in body_rules.check(tree):
+            line = max(getattr(node, "lineno", 1) - (1 if wrap else 0), 1)
+            findings.append(BodyFinding(BodyFindingCode(code), field, message, line))
         if field == "helpers":
             findings.extend(_shadowing(tree, skeleton))
     findings.extend(_check_state_queries(bodies.state_queries, params.get("fresh_state", [])))
