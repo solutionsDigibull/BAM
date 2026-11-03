@@ -73,7 +73,18 @@ C-41 stays: there is **no budget limit by default**. Two additions reduce spend 
   `compose/compose.yaml` (before this, setting them in the environment did nothing) and documented in
   `compose/.env.example`.
 
-Not covered: cached answers are not purged with `llm_calls` yet (#497).
+- **Retention of cached answers and of their provenance (#421 part 4).** The two are kept apart on
+  purpose. The cached *answer* (`llm_derivatives`) expires: a daily system job deletes a row whose last
+  use (`last_hit_at`, else `created_at`) is older than `LLM_DERIVATIVE_TTL_DAYS` (default 90, the
+  document bin's retention; 0 keeps everything), in every tenant, bounded per run and audited with
+  counts only (#497). The `llm_calls` row of a hit (model `derivative-cache`, cost 0) is *not* swept
+  with it: `llm_calls` is the ledger for budgets, spend and provenance, `sow_versions.llm_call_id`
+  points at it by foreign key and `code_attempts.llm_call_ids` by id, so deleting a row would leave a
+  generated artifact with a dangling source. Its growth is one small row per hit, bounded by usage.
+  If volume ever needs a limit, the answer is to archive `llm_calls` by age (a separate decision,
+  with the real numbers), never to delete the rows an artifact still names. Rejected: deleting the
+  `derivative-cache` rows together with the answer (breaks provenance) and writing no row for a hit
+  (loses the replay key and the per-project hit count).
 
 ## Sources
 
