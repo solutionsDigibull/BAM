@@ -106,7 +106,7 @@ jobs:
           echo "::add-mask::$pw"
           (cd server && DATABASE_URL="postgresql://sbam:$pw@127.0.0.1:${port:-5432}/sbam" \
             uv run python -m sbam_api.registry.sync ../runtime_registry.json --activate)
-      - name: Integration tests (E13.2: runner container, activity stack)
+      - name: "Integration tests (E13.2, runner container and activity stack)"
         run: cd server && uv run pytest -m integration -k e13_2 -v
       - if: failure()
         run: |
