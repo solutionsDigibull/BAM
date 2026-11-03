@@ -42,5 +42,5 @@ def test_n02_t03_a_waiting_call_gets_the_slot_that_frees_within_the_wait() -> No
 
 
 def test_n02_t04_the_request_path_dependencies_are_sized_under_the_thread_pool() -> None:
-    assert {b.name for b in REGISTRY} == {"clamd", "keycloak_admin"}
+    assert {b.name for b in REGISTRY} == {"clamd", "keycloak_admin", "keycloak_jwks"}
     assert all(0 < b.limit < 40 and b.wait < 2 for b in REGISTRY)  # anyio's pool is 40 threads
