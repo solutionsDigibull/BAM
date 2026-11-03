@@ -1,0 +1,114 @@
+# The sandbox-runner image and its integration tests (#629, E13.2 follow-up).
+#
+# `sandbox-runner` is the local-docker sandbox: skill-runtime plus the agent and the in-VM runner with
+# its vendored harness. It is not released or deployed (it never certifies), so it is not in ci.yml's
+# image-scan matrix or in the release manifest. This workflow is what builds and scans it, and what runs
+# the tests that prove a real bundle runs in the hardened container and that the vendored harness still
+# imports in an image without the platform packages. They need the Compose stack, so they run here and
+# not in the unit job.
+#
+# Runs on changes to the runner, its Dockerfile, the sandbox adapter, the harness and the contracts it
+# vendors, nightly, and on demand.
+name: sandbox-runner
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths: &paths
+      - .github/workflows/sandbox-runner.yml
+      - compose/sandbox-runner/**
+      - compose/docker/sandbox-runner.Dockerfile
+      - compose/docker/skill-runtime.Dockerfile
+      - compose/docker/skill-runtime/**
+      - server/workers/sbam_workers/sandbox/**
+      - server/workers/sbam_workers/test/harness.py
+      - server/contracts/sbam_contracts/sandbox.py
+      - server/contracts/sbam_contracts/harness.py
+      - server/contracts/sbam_contracts/isatvon14.py
+      - server/tests/integration/test_e13_2_*.py
+  push:
+    branches: [dev, main]
+    paths: *paths
+  schedule:
+    - cron: "40 3 * * *" # nightly (a schedule only fires from the default branch)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sandbox-runner-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  LLM_PROVIDER: mock # no external LLM calls anywhere in CI
+  TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+
+jobs:
+  image:
+    name: sandbox-runner image (build + scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Build skill-runtime and sandbox-runner
+        run: |
+          docker build -q -f compose/docker/skill-runtime.Dockerfile -t skill-runtime:local .
+          docker build -q -f compose/docker/sandbox-runner.Dockerfile \
+            --build-arg RUNTIME_IMAGE=skill-runtime:local -t sbam-sandbox-runner:ci .
+      - name: Trivy (fails on fixable CRITICAL)
+        run: |
+          mkdir -p reports
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/reports:/reports" "$TRIVY_IMAGE" \
+            image --scanners vuln --format json --output /reports/trivy-sandbox-runner.json sbam-sandbox-runner:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
+            image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 sbam-sandbox-runner:ci
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: scan-sandbox-runner, path: reports/, if-no-files-found: ignore }
+
+  integration:
+    name: sandbox-runner integration (e13_2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ENV_FILE: compose/.env.ci # gitignored via .env.*
+      CI: "true" # a missing stack fails the tests instead of skipping them (conftest)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: server/uv.lock
+      - run: cd server && uv sync --locked
+      - name: CI env file (random 64-hex secrets, never committed)
+        run: |
+          while IFS= read -r line; do
+            case "$line" in *=change-me-*) echo "${line%%=*}=$(openssl rand -hex 32)" ;; *) echo "$line" ;; esac
+          done < compose/.env.example > "$ENV_FILE"
+      # The dev override bind-mounts client/ into sbam-web, which runs as uid 10001.
+      - name: Make the checkout writable for the dev containers
+        run: chmod -R a+rwX client
+      - name: make up
+        run: make up ENV_FILE="$ENV_FILE" || { echo "::warning::make up failed, retrying once"; make down ENV_FILE="$ENV_FILE"; make up ENV_FILE="$ENV_FILE"; }
+      # The tests start the runner container from `skill-runtime:local` themselves.
+      - name: skill-runtime and its runtime registry
+        run: |
+          docker build -q -f compose/docker/skill-runtime.Dockerfile -t skill-runtime:local .
+          digest="$(docker image inspect --format '{{.Id}}' skill-runtime:local)"
+          docker run --rm --network none skill-runtime:local \
+            sbam-runtime-registry --image-digest "$digest" > runtime_registry.json
+          pw="$(sed -n 's/^SBAM_DB_PASSWORD=//p' "$ENV_FILE")"
+          port="$(sed -n 's/^POSTGRES_PORT=//p' "$ENV_FILE")"
+          echo "::add-mask::$pw"
+          (cd server && DATABASE_URL="postgresql://sbam:$pw@127.0.0.1:${port:-5432}/sbam" \
+            uv run python -m sbam_api.registry.sync ../runtime_registry.json --activate)
+      - name: "Integration tests (E13.2, runner container and activity stack)"
+        run: cd server && uv run pytest -m integration -k e13_2 -v
+      - if: failure()
+        run: |
+          docker compose --env-file "$ENV_FILE" -f compose/compose.yaml -f compose/compose.override.yaml ps -a
+          docker compose --env-file "$ENV_FILE" -f compose/compose.yaml -f compose/compose.override.yaml logs --tail=100

@@ -15,6 +15,10 @@ services:
       SANDBOX_MODE: LOCAL_DOCKER_NONCERT # never CERTIFYING; the run row stores the mode and certification rejects it
       SANDBOX_AGENT_TOKEN: ${SANDBOX_AGENT_TOKEN:?is required with the sandbox-local profile - set it in compose/.env}
       SANDBOX_RUNTIME_DIGEST: ${SANDBOX_RUNTIME_DIGEST:-}
+      # RLIMIT_NPROC counts every process (and thread) of uid 10001 on the whole host, not the container:
+      # next to sbam-api and the workers (same uid) the runner could not fork at all (BlockingIOError, #629).
+      # pids_limit below is the per-container cap; a microVM keeps the agent's own default of 64.
+      SANDBOX_AGENT_NPROC: "0"
     networks: [sbam_sandbox] # internal; the only peer is sbam-mock-api, no route to the internet
     read_only: true
     tmpfs: ["/tmp:size=512m,mode=1777"]
