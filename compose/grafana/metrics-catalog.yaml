@@ -12,7 +12,7 @@
 # `labels` is every label the dashboards may use. Tenant ids are allowed as labels; personal data, document
 # names/contents and unbounded ids (user, email, file, project, run) are not (the test enforces the allowlist).
 
-label_allowlist: [service, span_name, span_kind, status_code, task_queue, namespace, stage, outcome, gate, attempt, mode, alias, state, mountpoint, tenant_id]
+label_allowlist: [bulkhead, service, span_name, span_kind, status_code, task_queue, namespace, stage, outcome, gate, attempt, mode, alias, state, mountpoint, tenant_id]
 
 metrics:
   # --- Tempo span-metrics: derived by grafana/otel-lgtm from the spans sbam-api already exports (E1.4). ---
@@ -29,6 +29,14 @@ metrics:
     status: emitted
     labels: [service, span_name, span_kind, status_code]
     evidence: {file: server/api/sbam_api/core/telemetry.py, contains: FastAPIInstrumentor.instrument_app}
+
+  # --- API bulkheads (N-02b, #609): the saturation `/health/ready` already reports, as a gauge. ---
+  - name: sbam_bulkhead_saturated
+    type: gauge
+    source: sbam-otel-meter
+    status: emitted
+    labels: [bulkhead]
+    evidence: {file: server/api/sbam_api/core/bulkhead_metrics.py, contains: sbam_bulkhead_saturated}
 
   # --- Temporal SDK metrics: need a Temporal Runtime with an OTLP metrics exporter in the workers. ---
   - name: temporal_activity_schedule_to_start_latency_seconds_bucket
