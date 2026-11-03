@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { providerId, signIn, signOut as authSignOut, type Portal } from "@/auth";
+import { revokeApiSession } from "@/lib/api-logout";
 import { landing, safeCallback } from "@/lib/landing";
 import { isAdmin, parseRoles } from "@/lib/roles";
 import { DEV_ROLES_COOKIE, devAuthEnabled, keycloakEnabled, logoutHint } from "@/lib/session";
@@ -37,8 +38,11 @@ export async function keycloakSignIn(formData: FormData) {
 export async function signOut() {
   (await cookies()).delete(DEV_ROLES_COOKIE);
   if (keycloakEnabled()) {
-    const { portal = "fde", idToken } = await logoutHint();
+    const { portal = "fde", idToken, accessToken } = await logoutHint();
     if (idToken) {
+      // The API verifies access tokens offline, so tell it first (A-32): a copy of this token stops
+      // working now, not when it expires. Best effort; the redirect below happens either way.
+      await revokeApiSession(accessToken, process.env.SBAM_API_URL ?? "http://localhost:8000");
       // RP-initiated logout: clear the Auth.js session, then end the Keycloak SSO session too, so
       // the next "Sign in" asks for credentials again. Keycloak returns to this portal's login.
       await authSignOut({ redirect: false });

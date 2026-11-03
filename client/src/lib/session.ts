@@ -50,10 +50,15 @@ export async function getSession(): Promise<Session | null> {
 }
 
 /** Portal and id token of the Keycloak session, for RP-initiated logout. */
-export async function logoutHint(): Promise<{ portal?: Portal; idToken?: string }> {
+export async function logoutHint(): Promise<{
+  portal?: Portal;
+  idToken?: string;
+  accessToken?: string;
+}> {
   const token = await sessionToken();
   return {
     portal: token?.portal as Portal | undefined,
     idToken: token?.idToken as string | undefined,
+    accessToken: token?.error ? undefined : (token?.accessToken as string | undefined),
   };
 }

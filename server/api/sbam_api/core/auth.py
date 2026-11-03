@@ -324,6 +324,24 @@ class NoUserAdmin:
         return None
 
 
+class SessionRevocations(Protocol):
+    """Sessions that signed out (A-32): their access tokens are refused before `exp`."""
+
+    def is_revoked(self, sid: str) -> bool: ...
+
+    def revoke(self, sid: str, keycloak_sub: str) -> None: ...
+
+
+class NoRevocations:
+    """No database behind the auth (unit tests of the verifier): nothing is revoked."""
+
+    def is_revoked(self, sid: str) -> bool:
+        return False
+
+    def revoke(self, sid: str, keycloak_sub: str) -> None:
+        return None
+
+
 @dataclass
 class Auth:
     verifier: TokenVerifier
@@ -333,6 +351,7 @@ class Auth:
     orgs: OrgDirectory = field(default_factory=NoOrgs)
     users: UserAdmin = field(default_factory=NoUserAdmin)
     state_cache: AuthStateCache = field(default_factory=lambda: AuthStateCache(0))  # off (A-12)
+    revocations: SessionRevocations = field(default_factory=NoRevocations)
 
 
 # --- Dependencies ----------------------------------------------------------------------------
@@ -344,6 +363,8 @@ def current_user(request: Request) -> CurrentUser:
         raise unauthenticated()
     auth: Auth = request.app.state.auth
     user = auth.verifier.verify(token.strip())
+    if user.session_id is not None and auth.revocations.is_revoked(user.session_id):
+        raise unauthenticated()  # signed out: the token is good until `exp`, the session is not
     # after verify: a forged token spends nobody's budget
     limiter = getattr(request.app.state, "limiter", None)
     if limiter is not None:
