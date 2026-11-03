@@ -31,7 +31,7 @@ def inputs(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def key_of(data: dict[str, Any]) -> str:
-    return next(f["name"] for f in inputs(data) if f["required"])
+    return str(next(f["name"] for f in inputs(data) if f["required"]))
 
 
 def test_e11_1c_the_key_and_the_signature_survive_a_jsonb_round_trip() -> None:
