@@ -403,13 +403,10 @@ def jsonb(value: Any) -> Any:
     return value
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#624: the key of fresh state follows property order, which JSONB changes"
-)
 def test_e13_2_the_fresh_state_key_survives_a_postgres_round_trip() -> None:
     """The harness reads state with the key the bundle's tools use. Both come from the render
     params, so they agree with each other; what is wrong is the key itself (MS01.1 should be keyed
-    by `mobile_number` and is keyed by `otp_payload` after Postgres). Fails until #624 is fixed."""
+    by `mobile_number`; it was keyed by `otp_payload` after Postgres until #624)."""
     from fixtures import fixture_path
     from sbam_contracts.manifest import SkillManifest
     from sbam_workers.build.codegen import params_from_manifest
