@@ -49,4 +49,5 @@ class Bulkhead:
 # can never take it all.
 CLAMD = Bulkhead("clamd", limit=8)
 KEYCLOAK_ADMIN = Bulkhead("keycloak_admin", limit=8)
-REGISTRY: tuple[Bulkhead, ...] = (CLAMD, KEYCLOAK_ADMIN)
+KEYCLOAK_JWKS = Bulkhead("keycloak_jwks", limit=8)  # the JWKS fetch on a cold cache or unknown kid
+REGISTRY: tuple[Bulkhead, ...] = (CLAMD, KEYCLOAK_ADMIN, KEYCLOAK_JWKS)

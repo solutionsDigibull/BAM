@@ -103,7 +103,7 @@ def test_e1_3_t03_ready_503_when_temporal_down(app_factory: AppFactory) -> None:
         "keycloak_jwks": "ok",
     }
     # N-02: how full each dependency's bulkhead is; informational, it never changes the status.
-    assert body["bulkheads"] == {"clamd": "ok", "keycloak_admin": "ok"}
+    assert body["bulkheads"] == {"clamd": "ok", "keycloak_admin": "ok", "keycloak_jwks": "ok"}
 
 
 def _closed_port() -> int:

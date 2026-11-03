@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from fastapi import Depends, Request
 from sbam_contracts.api import ErrorCode
 
+from sbam_api.core.bulkhead import KEYCLOAK_JWKS, BulkheadFullError
 from sbam_api.core.conventions import ApiError, not_found
 from sbam_api.core.telemetry import set_request_context
 from sbam_api.db.repository import TenantContext
@@ -75,6 +76,16 @@ class Jwks(jwt.PyJWKClient):
             timeout=3,
         )
         self.last_keys: list[jwt.PyJWK] = []
+
+    def fetch_data(self) -> Any:
+        """The network fetch, behind a bulkhead: a hung Keycloak on a cold cache or an unknown kid
+        holds at most `KEYCLOAK_JWKS.limit` request threads. A full bulkhead reads like Keycloak
+        being down: tokens signed with a known key still verify, others get 503 (N-02b)."""
+        try:
+            with KEYCLOAK_JWKS.slot():
+                return super().fetch_data()
+        except BulkheadFullError:
+            raise jwt.PyJWKClientConnectionError("JWKS fetch bulkhead is full") from None
 
     def get_signing_keys(self, refresh: bool = False) -> list[jwt.PyJWK]:
         keys = super().get_signing_keys(refresh)
