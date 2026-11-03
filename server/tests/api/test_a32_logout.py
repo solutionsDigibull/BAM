@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sbam_api.core.auth_cache import AuthStateCache
 from sbam_api.identity.models import RevokedSession
 from sbam_api.identity.revocation import REVOCATION_TTL, SqlSessionRevocations
 from test_auth import FDE_A1, problem
@@ -90,3 +91,16 @@ def test_a32_t08_a_user_can_only_sign_out_their_own_session(h: Harness) -> None:
     with h.sessions() as s:
         assert [r.sid for r in s.query(RevokedSession)] == ["s1"]
     assert h.me("s9", other).status_code == 200  # someone else's session is not touched
+
+
+def test_a32_t09_the_auth_state_cache_cannot_keep_a_signed_out_session_alive(h: Harness) -> None:
+    """With the cache on (A-12), the denylist is asked before it, so a cached state is not a way
+    back in, and a logout drops the user's cached entries too."""
+    auth = h.client.app.state.auth  # type: ignore[attr-defined]
+    auth.state_cache = AuthStateCache(60)
+    assert h.me("s1").status_code == 200
+    assert auth.state_cache.get(str(FDE_A1), "s1") is not None  # cached by the first request
+    h.logout("s1")
+    assert auth.state_cache.get(str(FDE_A1), "s1") is None
+    problem(h.me("s1"), 401, "UNAUTHENTICATED")
+    assert h.me("s2").status_code == 200  # another session of the user still works

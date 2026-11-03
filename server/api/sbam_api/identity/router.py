@@ -194,8 +194,10 @@ def logout(request: Request, user: Annotated[CurrentUser, Depends(authenticated)
     """The caller's session signed out: its tokens stop working now, not at `exp` (A-32). The
     portal calls this just before the Keycloak end-session redirect. Idempotent; a token without a
     `sid` has nothing to revoke."""
+    auth: Auth = request.app.state.auth
     if user.session_id is not None:
-        request.app.state.auth.revocations.revoke(user.session_id, user.keycloak_sub)
+        auth.revocations.revoke(user.session_id, user.keycloak_sub)
+    auth.state_cache.invalidate(user.keycloak_sub)  # A-12: what a logout should drop
     return Response(status_code=204)
 
 

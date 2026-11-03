@@ -14,6 +14,7 @@ from typing import Final
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from sbam_api.core.request_session import request_scoped
 from sbam_api.identity import repository
 
 REVOCATION_TTL: Final = timedelta(hours=1)
@@ -29,13 +30,14 @@ class SqlSessionRevocations:
         self.clock = clock
 
     def is_revoked(self, sid: str) -> bool:
-        with self.sessions()() as session:
+        # the request's own session (A-12): the denylist read costs no connection of its own
+        with request_scoped(self.sessions()) as session:
             return repository.session_is_revoked(session, sid, self.clock())
 
     def revoke(self, sid: str, keycloak_sub: str) -> None:
         """Idempotent: signing out twice is the same as once."""
         now = self.clock()
-        with self.sessions()() as session:
+        with request_scoped(self.sessions()) as session:
             repository.sweep_revoked_sessions(session, now)
             repository.add_revoked_session(session, sid, keycloak_sub, now + REVOCATION_TTL)
             try:
