@@ -206,14 +206,18 @@ def test_e13_2_state_script_step_i_runs_before_pass_i_plus_2(runner: ModuleType)
 def test_e13_2_a_failed_case_trace_still_validates_with_its_null_terminal(
     runner: ModuleType,
 ) -> None:
-    """`HarnessTrace.to_json_object()` drops `terminal: null` and the result no longer validates
-    (#626)."""
+    """A failed case's trace survives a round trip through `to_json_object()` (#626)."""
     failed = runner.error_trace("c1", "IMPORT_ERROR", "ModuleNotFoundError: x")
     dumped = json.loads(failed.model_dump_json(by_alias=True))
     assert dumped["terminal"] is None
     assert HarnessTrace.model_validate(dumped) == failed
-    with pytest.raises(ValueError):  # the pre-existing helper's output is not valid input
-        HarnessTrace.model_validate(failed.to_json_object())
+    assert HarnessTrace.model_validate(failed.to_json_object()) == failed
+    assert failed.to_json_object()["terminal"] is None
+
+
+def test_e13_2_a_passing_trace_round_trips_through_to_json_object() -> None:
+    ok = trace()
+    assert HarnessTrace.model_validate(ok.to_json_object()) == ok
 
 
 def test_e13_2_result_categories_come_from_the_trace(runner: ModuleType) -> None:

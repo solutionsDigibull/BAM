@@ -72,7 +72,11 @@ class HarnessTrace(_Strict):
     error: HarnessError | None = None
 
     def to_json_object(self) -> dict[str, Any]:
-        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
+        """Plain JSON that validates as a `HarnessTrace` again: unset optional fields are left out,
+        but a failed case keeps its `terminal: null` because the field is required (#626)."""
+        dumped = self.model_dump(mode="json", by_alias=True, exclude_none=True)
+        dumped.setdefault("terminal", None)
+        return dumped
 
     def passed(self, expected: Terminal) -> bool:
         return self.error is None and self.terminal == expected
