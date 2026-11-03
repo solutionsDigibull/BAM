@@ -86,6 +86,9 @@ _TYPE_SEGMENTS = frozenset(
 _CONSTRAINT_CTX = ("ge", "gt", "le", "lt", "min_length", "max_length", "multiple_of", "expected")
 
 
+_SAFE_WHERE = re.compile(r"^[a-z_]+(\[\d+\])?(\.[a-z_]+(\[\d+\])?)*$")
+
+
 def schema_names(output_type: type[BaseModel]) -> frozenset[str]:
     """Every property name the output schema defines, in the model and in the models it contains."""
     names: set[str] = set()
@@ -116,6 +119,22 @@ def _path(loc: tuple[int | str, ...], names: frozenset[str]) -> str:
     return out or "<root>"
 
 
+_SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+
+
+def _coded_line(err: Any) -> str | None:
+    """A document-level rule that names its own position (`where`) and, when it has one, an id the
+    schema already validated: `modules[2]: MODULE_WITHOUT_FEATURE M-X`. Anything else in its
+    context, and its message, stay out (E1.21)."""
+    ctx = err.get("ctx") or {}
+    where = ctx.get("where")
+    if not isinstance(where, str) or not _SAFE_WHERE.match(where):
+        return None
+    ident = ctx.get("id")
+    suffix = f" {ident}" if isinstance(ident, str) and _SAFE_ID.match(ident) else ""
+    return f"{where}: {err['type']}{suffix}"
+
+
 def error_lines(exc: ValidationError, names: frozenset[str]) -> tuple[str, ...]:
     """`path: type (constraint)` per error, built only from what the schema defines (E1.21).
 
@@ -125,6 +144,10 @@ def error_lines(exc: ValidationError, names: frozenset[str]) -> tuple[str, ...]:
     """
     lines: list[str] = []
     for err in exc.errors():
+        coded = _coded_line(err)
+        if coded is not None:
+            lines.append(coded)
+            continue
         hint = ", ".join(
             f"{key}={err['ctx'][key]}"
             for key in _CONSTRAINT_CTX
