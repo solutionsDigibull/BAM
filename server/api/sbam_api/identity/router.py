@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import Auth, CurrentUser, admin, authenticated, super_admin
 from sbam_api.core.conventions import etag
+from sbam_api.core.request_session import request_scoped
 from sbam_api.db.session import app_sessions
 from sbam_api.identity import paging, repository, service
 from sbam_api.identity.models import Tenant, User
@@ -37,7 +38,7 @@ Admin = Annotated[CurrentUser, Depends(admin)]
 
 
 def db(request: Request) -> Iterator[Session]:
-    with app_sessions(request.app.state)() as session:
+    with request_scoped(app_sessions(request.app.state), settle=False) as session:
         yield session
 
 

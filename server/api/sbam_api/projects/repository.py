@@ -7,6 +7,7 @@ from sbam_contracts.projects import ProjectStatus
 from sqlalchemy import Select, delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from sbam_api.core.request_session import request_scoped
 from sbam_api.db.repository import TenantContext, TenantScopedRepository
 from sbam_api.projects.models import Project, ProjectMember
 from sbam_api.state_machine.repository import StatefulRepository
@@ -75,5 +76,5 @@ class SqlMemberships:
         self.sessions = sessions
 
     def assigned_projects(self, tenant_id: uuid.UUID, user_id: uuid.UUID) -> frozenset[uuid.UUID]:
-        with self.sessions()() as session:
+        with request_scoped(self.sessions()) as session:
             return MemberRepository(session, TenantContext(tenant_id)).projects_of(user_id)

@@ -34,6 +34,7 @@ from sbam_api.core.auth import CurrentUser, admin
 from sbam_api.core.conventions import ApiError, content_disposition, etag
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
+from sbam_api.core.request_session import request_scoped
 from sbam_api.db.session import app_sessions
 from sbam_api.masters import documents, exporter, importer, ingestion, models, service
 from sbam_api.storage.router import backend
@@ -45,7 +46,7 @@ Admin = Annotated[CurrentUser, Depends(admin)]
 
 
 def db(request: Request) -> Iterator[Session]:
-    with app_sessions(request.app.state)() as session:
+    with request_scoped(app_sessions(request.app.state), settle=False) as session:
         yield session
 
 

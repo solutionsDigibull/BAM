@@ -49,6 +49,7 @@ from sbam_api.core.conventions import (
 )
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
+from sbam_api.core.request_session import request_scoped
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.identity import repository
 from sbam_api.identity.idp_sync import converge_user
@@ -423,7 +424,7 @@ class SqlUserDirectory:
     def sync(self, user: CurrentUser) -> frozenset[str] | None:
         if user.tenant_id is None:  # current_user only syncs tenant users
             return None
-        with self.sessions()() as session:
+        with request_scoped(self.sessions()) as session:
             tenant = session.get(Tenant, user.tenant_id)
             if tenant is None:  # an organization SBAM doesn't know (or an orphan one)
                 self._deny(user, "unknown tenant")

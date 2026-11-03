@@ -15,6 +15,7 @@ from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
 from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser, admin_or_fde, super_admin
+from sbam_api.core.request_session import request_scoped
 from sbam_api.db.session import app_sessions
 from sbam_api.filetypes.config import Filetype, load
 from sbam_api.filetypes.repository import current_payloads
@@ -30,7 +31,7 @@ SuperAdmin = Annotated[CurrentUser, Depends(super_admin)]
 
 
 def db(request: Request) -> Iterator[Session]:
-    with app_sessions(request.app.state)() as session:
+    with request_scoped(app_sessions(request.app.state), settle=False) as session:
         yield session
 
 

@@ -70,6 +70,14 @@ class Settings(BaseSettings):
     rate_limit_llm_per_minute: int = Field(default=10, ge=0)
     # access_denied audit rows written per actor per minute; further denials are only logged.
     audit_denied_per_minute: int = Field(default=30, ge=0)
+    # The API's PostgreSQL pool, per process (A-12). Sync handlers run on a 40-thread pool and one
+    # request holds one session, so the pool should cover a busy moment: 10 steady + 20 burst = 30
+    # connections per replica. Mind `max_connections` on the server when running several replicas.
+    database_pool_size: int = Field(default=10, ge=1, le=200)
+    database_max_overflow: int = Field(default=20, ge=0, le=400)
+    # Seconds "which projects, which granted roles" is kept per (user, session). 0 = off, the
+    # default: a role or assignment taken away is then gone on the very next request (A-04).
+    auth_state_cache_seconds: float = Field(default=0, ge=0, le=60)
     # The masters workbook import (E3.3) scans the upload with clamd before reading it. Unreachable
     # clamd = the import answers 503 SCAN_UNAVAILABLE; nothing is read unscanned.
     clamav_host: str = Field(default="clamav", min_length=1)

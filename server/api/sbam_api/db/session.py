@@ -55,6 +55,18 @@ def make_engine(database_url: str, *, timeouts: Timeouts | None = None, **kwargs
     return create_engine(engine_url(database_url), pool_pre_ping=True, **kwargs)
 
 
+def api_engine(settings: Any) -> Engine:
+    """The API process's engine: API timeouts and an explicit pool (A-12). SQLite (tests) has no
+    pool to size, so the pool settings only apply to PostgreSQL URLs."""
+    kwargs: dict[str, Any] = {}
+    if engine_url(settings.database_url).startswith("postgresql"):
+        kwargs = {
+            "pool_size": settings.database_pool_size,
+            "max_overflow": settings.database_max_overflow,
+        }
+    return make_engine(settings.database_url, timeouts=API_TIMEOUTS, **kwargs)
+
+
 def make_sessionmaker(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(engine, expire_on_commit=False)
 
@@ -68,8 +80,6 @@ def ping(engine: Engine) -> bool:
 def app_sessions(state: State) -> sessionmaker[Session]:
     """The app's sessionmaker, built on first use from its settings (tests set `state.sessions`)."""
     if getattr(state, "sessions", None) is None:
-        state.sessions = make_sessionmaker(
-            make_engine(state.settings.database_url, timeouts=API_TIMEOUTS)
-        )
+        state.sessions = make_sessionmaker(api_engine(state.settings))
     sessions: sessionmaker[Session] = state.sessions
     return sessions
