@@ -7,7 +7,8 @@ a Sub-Skill gets; calling a real bug an infrastructure error retries it forever 
 Rules worth knowing
   * Runner exit codes are a protocol: 0 outputs written (cases may still have failed), 71 the
     ephemeral database could not be set up, 72 the dataset's seed SQL failed, anything else is the
-    runner itself failing.
+    runner itself failing. An `outputs.json` is evidence only from a runner that exited 0: the code
+    under test shares the VM's user and could write the file, then end the runner (#625).
   * A runner that overran the whole deadline is the *code's* fault (TIMEOUT) only if the VM still
     answers a liveness probe afterwards; a VM that does not answer is infrastructure.
   * Each case's verdict is recomputed here from its trace. The runner's own `passed` flag is checked
@@ -169,8 +170,9 @@ def classify(
     egress: list[EgressEvent],
 ) -> Classified:
     seen_blocks = blocked(egress)
-    if outputs is None:
-        return _without_outputs(exec_result, vm_alive, seen_blocks)
+    refused = outputs is not None and not _clean_exit(exec_result)
+    if outputs is None or refused:
+        return _without_outputs(exec_result, vm_alive, seen_blocks, refused=refused)
     if outputs.mode is not mode:
         return infra(InfraReason.RUNNER_FAILED, "the runner reported a different mode")
     try:
@@ -204,8 +206,17 @@ def classify(
     return Classified(category, None, tuple(verdicts), seen_blocks)
 
 
+def _clean_exit(result: ExecResult | None) -> bool:
+    """Only a runner that ran to its own end (exit 0, not cut off) wrote its outputs itself."""
+    return result is not None and result.exit_code == EXIT_OK and not result.timed_out
+
+
 def _without_outputs(
-    result: ExecResult | None, vm_alive: bool, seen_blocks: tuple[EgressEvent, ...]
+    result: ExecResult | None,
+    vm_alive: bool,
+    seen_blocks: tuple[EgressEvent, ...],
+    *,
+    refused: bool = False,
 ) -> Classified:
     if result is None:
         return infra(InfraReason.RUNNER_FAILED, "the runner never started")
@@ -218,4 +229,9 @@ def _without_outputs(
     if result.timed_out:
         category = FailureCategory.EGRESS_BLOCKED if seen_blocks else FailureCategory.TIMEOUT
         return Classified(category, None, blocked_egress=seen_blocks, notes=("the run overran",))
+    if refused:
+        return infra(
+            InfraReason.RUNNER_FAILED,
+            f"the runner exited {result.exit_code}; the outputs file it left is not evidence",
+        )
     return infra(InfraReason.RUNNER_FAILED, f"the runner exited {result.exit_code} with no outputs")

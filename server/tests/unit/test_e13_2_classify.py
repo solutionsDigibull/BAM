@@ -264,6 +264,34 @@ def test_e13_2_the_timeout_rule_beats_the_database_rule_because_a_timeout_says_n
 # --- a runner that cannot be trusted ----------------------------------------------------------
 
 
+@pytest.mark.parametrize("code", [-9, 1, 70, 137])
+def test_e13_2_625_an_outputs_file_from_a_runner_that_did_not_exit_cleanly_is_not_evidence(
+    code: int,
+) -> None:
+    """The code under test shares the VM's user: it can write a perfect `outputs.json` and then end
+    the runner. The file is only the runner's own when the runner exited 0 (#625)."""
+    forged = outputs(case("a"), case("b"))  # every case passing
+    result = run(forged, ["a", "b"], exec_result=ExecResult(exit_code=code, stdout=b"", stderr=b""))
+    assert not result.passed and result.category is FailureCategory.INFRA_ERROR
+    assert result.infra_reason is InfraReason.RUNNER_FAILED
+    assert any("not evidence" in note for note in result.notes)
+
+
+def test_e13_2_625_outputs_from_a_runner_that_was_cut_off_are_not_evidence() -> None:
+    cut_off = ExecResult(exit_code=0, stdout=b"", stderr=b"", timed_out=True)
+    result = run(outputs(case("a")), ["a"], exec_result=cut_off)
+    assert not result.passed and result.category is not None
+
+
+def test_e13_2_625_outputs_with_no_exec_result_are_not_evidence() -> None:
+    result = run(outputs(case("a")), ["a"], exec_result=None)
+    assert not result.passed and result.infra_reason is InfraReason.RUNNER_FAILED
+
+
+def test_e13_2_625_a_clean_exit_is_still_trusted_as_before() -> None:
+    assert run(outputs(case("a")), ["a"]).passed
+
+
 def test_e13_2_a_runner_claiming_another_mode_is_rejected() -> None:
     result = run(outputs(case("a"), mode="LOCAL_DOCKER_NONCERT"), ["a"])
     assert result.infra_reason is InfraReason.RUNNER_FAILED
