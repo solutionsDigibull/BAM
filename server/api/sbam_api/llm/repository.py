@@ -74,6 +74,21 @@ class LlmDerivativeRepository(TenantScopedRepository[LlmDerivative]):
         query = self._scoped().where(LlmDerivative.cache_key == cache_key)
         return self.session.scalars(query).one_or_none()
 
+    def invalidate(
+        self, *, cache_key: str | None, prompt_id: str | None, prompt_version: str | None
+    ) -> int:
+        """Delete this tenant's matching answers; how many went. The next identical request is
+        asked again. A cross-tenant key matches nothing (the query is tenant-scoped)."""
+        query = delete(LlmDerivative).where(LlmDerivative.tenant_id == self.ctx.tenant_id)
+        if cache_key is not None:
+            query = query.where(LlmDerivative.cache_key == cache_key)
+        if prompt_id is not None:
+            query = query.where(LlmDerivative.prompt_id == prompt_id)
+        if prompt_version is not None:
+            query = query.where(LlmDerivative.prompt_version == prompt_version)
+        result = self.session.execute(query.execution_options(synchronize_session=False))
+        return int(getattr(result, "rowcount", 0) or 0)
+
     def hit(self, row: LlmDerivative) -> None:
         """Count a hit with an atomic UPDATE: concurrent hits must not trip the row-version
         check."""

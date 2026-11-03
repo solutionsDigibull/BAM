@@ -28,6 +28,7 @@ from sbam_contracts import (
     isatvon_macros,
     isatvon_workbench,
     knowledge,
+    llm_cache,
     manifest,
     manifest_api,
     masters,
@@ -248,6 +249,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("promptfoo", promptfoo),
             ("promptfoo", harness),
             ("held_patch", held_patch),
+            ("llm_cache", llm_cache),
         )
         for stem in module.schemas()
     }
