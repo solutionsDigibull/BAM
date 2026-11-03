@@ -15,7 +15,7 @@ indirection (`getattr(__builtins__, "ev" + "al")`, `().__class__.__base__...`, `
     resource bomb (`RESOURCE_BOMB`).
 
 This is a fast fail before assembly, not the boundary: the AST gate runs on the assembled files and
-the sandbox contains whatever both miss (docs/adr/0025). It returns plain tuples so it does not
+the sandbox contains whatever both miss (docs/adr/0026). It returns plain tuples so it does not
 depend on `bodies.py`; the caller turns them into `BodyFinding`s.
 
 Messages name constructs, never the body's text.
