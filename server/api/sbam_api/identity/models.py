@@ -68,3 +68,17 @@ Index(
     User.idp_sync_pending_at,
     postgresql_where=User.idp_sync_pending_at.is_not(None),
 )
+
+
+class RevokedSession(Base):
+    """A Keycloak session (`sid`) that signed out (A-32, #458). The API verifies access tokens
+    offline until `exp`, so without this a token copied before sign-out keeps working for up to
+    five minutes. Not tenant data: the `sid` is unguessable and is only ever looked up by itself.
+    A row is only needed until the tokens of that session have expired; `revoke` sweeps the rest."""
+
+    __tablename__ = "revoked_sessions"
+    __table_args__ = (Index("ix_revoked_sessions_expires_at", "expires_at"),)
+
+    sid: Mapped[str] = mapped_column(String(64), primary_key=True)
+    keycloak_sub: Mapped[str] = mapped_column(String(255))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

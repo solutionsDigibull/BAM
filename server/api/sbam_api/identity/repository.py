@@ -15,13 +15,13 @@ from datetime import datetime
 from typing import Any
 
 from sbam_contracts.identity import UserStatus
-from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select, update
+from sqlalchemy import ColumnElement, String, and_, cast, delete, func, or_, select, update
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import ROLE_ADMIN
 from sbam_api.db.repository import TenantScopedRepository
-from sbam_api.identity.models import Tenant, User
+from sbam_api.identity.models import RevokedSession, Tenant, User
 
 
 def tenant_name_taken(session: Session, name: str) -> bool:
@@ -166,3 +166,25 @@ def tenants_of_subs(session: Session, subs: Iterable[str]) -> dict[str, uuid.UUI
         return {}
     query = select(User.keycloak_sub, User.tenant_id).where(User.keycloak_sub.in_(wanted))
     return {sub: tenant for sub, tenant in session.execute(query) if tenant is not None}
+
+
+# --- Signed-out sessions (A-32, #458) -------------------------------------------------------------
+
+
+def session_is_revoked(session: Session, sid: str, now: datetime) -> bool:
+    found = session.scalar(
+        select(RevokedSession.sid).where(RevokedSession.sid == sid, RevokedSession.expires_at > now)
+    )
+    return found is not None
+
+
+def sweep_revoked_sessions(session: Session, now: datetime) -> None:
+    session.execute(delete(RevokedSession).where(RevokedSession.expires_at <= now))
+
+
+def add_revoked_session(
+    session: Session, sid: str, keycloak_sub: str, expires_at: datetime
+) -> None:
+    """Insert the row unless it is there; the caller commits."""
+    if session.get(RevokedSession, sid) is None:
+        session.add(RevokedSession(sid=sid, keycloak_sub=keycloak_sub, expires_at=expires_at))

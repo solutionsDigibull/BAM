@@ -38,6 +38,7 @@ from sbam_api.core.settings import (
 from sbam_api.core.telemetry import configure_telemetry
 from sbam_api.db.session import app_sessions
 from sbam_api.identity.keycloak_admin import KeycloakOrgs, KeycloakUsers
+from sbam_api.identity.revocation import SqlSessionRevocations
 from sbam_api.identity.service import SqlUserDirectory
 from sbam_api.projects.repository import SqlMemberships
 
@@ -94,6 +95,7 @@ def default_auth(app: FastAPI, settings: Settings) -> Auth:
         audit=audit,
         directory=SqlUserDirectory(lambda: app_sessions(app.state), audit),
         memberships=SqlMemberships(lambda: app_sessions(app.state)),
+        revocations=SqlSessionRevocations(lambda: app_sessions(app.state)),
         orgs=KeycloakOrgs(*kc) if kc else NoOrgs(),
         users=KeycloakUsers(*kc) if kc else NoUserAdmin(),
         state_cache=AuthStateCache(settings.auth_state_cache_seconds),

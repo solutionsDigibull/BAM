@@ -189,6 +189,16 @@ def list_audit(
     return Page[AuditEntry](items=items, next_cursor=next_cursor)
 
 
+@router.post("/auth/logout", status_code=204)
+def logout(request: Request, user: Annotated[CurrentUser, Depends(authenticated)]) -> Response:
+    """The caller's session signed out: its tokens stop working now, not at `exp` (A-32). The
+    portal calls this just before the Keycloak end-session redirect. Idempotent; a token without a
+    `sid` has nothing to revoke."""
+    if user.session_id is not None:
+        request.app.state.auth.revocations.revoke(user.session_id, user.keycloak_sub)
+    return Response(status_code=204)
+
+
 @router.get("/me")
 def me(user: Annotated[CurrentUser, Depends(authenticated)], session: Db) -> Me:
     row = repository.user_by_sub(session, user.keycloak_sub) if user.tenant_id else None
