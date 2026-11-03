@@ -87,13 +87,26 @@ def tool_name(text: str) -> str:
     return _NON_ALNUM.sub("_", text).strip("_").lower()
 
 
-def _field_specs(schema: Mapping[str, Any], where: str) -> list[dict[str, Any]]:
+def _field_specs(
+    schema: Mapping[str, Any], where: str, *, stable_order: bool = False
+) -> list[dict[str, Any]]:
     properties = schema.get("properties")
     if not isinstance(properties, Mapping):
         raise invalid([f"{where}: properties must be an object"])
-    required = set(schema.get("required") or [])
+    required_list = [n for n in schema.get("required") or [] if isinstance(n, str)]
+    required = set(required_list)
     fields: list[dict[str, Any]] = []
-    for name, spec in properties.items():
+    names = list(properties)
+    if stable_order:
+        # The key of the fresh-state reader is the first required input, so that order has to come
+        # from data that has one. `properties` is a JSON object and a JSONB column does not keep
+        # object key order (it sorts by length, then bytes): a manifest read back from the database
+        # would key on another field (#624). `required` is an array, so its order survives; the
+        # other properties follow, sorted by name.
+        names = [n for n in dict.fromkeys(required_list) if n in properties]
+        names += sorted(n for n in properties if n not in required)
+    for name in names:
+        spec = properties[name]
         if not isinstance(spec, Mapping):
             raise invalid([f"{where}.{name}: property must be an object"])
         field: dict[str, Any] = {
@@ -129,7 +142,7 @@ def params_from_parts(
         detail[k] for k in ("t_tech_stack", "a_automation", "v_variables", "o_outcome")
     )
     handoff = outcome["state_handoff_file"]
-    inputs = _field_specs(contracts["input_schema"], "contracts.input_schema")
+    inputs = _field_specs(contracts["input_schema"], "contracts.input_schema", stable_order=True)
     parameters = [
         {"name": p["name"], "value": p["value"] if p.get("value") is not None else p.get("default")}
         for p in variables.get("parameters") or []
