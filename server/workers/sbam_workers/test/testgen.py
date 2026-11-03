@@ -34,7 +34,9 @@ import csv
 import hashlib
 import io
 import json
+import re
 import uuid
+import zipfile
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -148,6 +150,26 @@ def _rows(columns: Sequence[str]) -> list[list[str]]:
     return [list(columns), [f"sample-{i + 1}" for i in range(len(columns))]]
 
 
+_MODIFIED: Final = re.compile(rb"(<dcterms:modified[^>]*>)[^<]*(</dcterms:modified>)")
+
+
+def _pinned_xlsx(raw: bytes) -> bytes:
+    """The same workbook with no wall-clock time in it: openpyxl stamps `modified` with the save
+    time and every zip entry with the current time, so two saves a second apart differ (#642)."""
+    stamp = FIXED_TIME.strftime("%Y-%m-%dT%H:%M:%SZ").encode()
+    sink = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(raw)) as source, zipfile.ZipFile(sink, "w") as target:
+        for item in source.infolist():
+            body = source.read(item.filename)
+            if item.filename == "docProps/core.xml":
+                body = _MODIFIED.sub(rb"\g<1>" + stamp + rb"\g<2>", body)
+            pinned = zipfile.ZipInfo(item.filename, date_time=FIXED_TIME.timetuple()[:6])
+            pinned.compress_type = zipfile.ZIP_DEFLATED
+            pinned.external_attr = item.external_attr
+            target.writestr(pinned, body)
+    return sink.getvalue()
+
+
 def data_files(isatvon: Mapping[str, Any]) -> list[DataFile]:
     """One synthetic file per FILE reference, with the Sub-Skill's declared inputs as columns."""
     definition = SubSkillModel.model_validate(isatvon).isatvon_definition
@@ -173,7 +195,7 @@ def data_files(isatvon: Mapping[str, Any]) -> list[DataFile]:
                 sheet.append(row)
             sink_b = io.BytesIO()
             book.save(sink_b)
-            data = sink_b.getvalue()
+            data = _pinned_xlsx(sink_b.getvalue())
             kind = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         if len(data) <= MAX_FILE_BYTES:
             files.append(DataFile(name, data, kind))

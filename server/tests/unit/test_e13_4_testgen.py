@@ -3,13 +3,17 @@
 import asyncio
 import json
 import tempfile
+import time
+import types
 import uuid
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fixtures import fixture_path
 from llm_db import FakeBifrost, completion, make_client
+from openpyxl.writer import excel as excel_writer
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_contracts.build import BuildStageInput
@@ -231,6 +235,31 @@ def test_e13_4_one_deterministic_file_per_file_reference(extension: str) -> None
     (one,) = data_files(isatvon)
     assert one.name == f"rates.{extension}" and one.content
     assert data_files(isatvon)[0].content == one.content  # the same bytes every run
+
+
+def test_e13_4_t09_an_xlsx_has_the_same_bytes_whatever_the_time_it_is_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """openpyxl stamps `modified` and every zip entry with the clock (#642): move the clock
+    between two builds instead of relying on timing."""
+    isatvon = sample()
+    isatvon["isatvon_definition"]["s_source"]["external_data"] = [
+        {"name": "rates", "kind": "FILE", "ref": "rates.xlsx"}
+    ]
+    now = [datetime(2026, 11, 3, 9, 0, 0, tzinfo=UTC)]
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz: Any = None) -> "Clock":
+            return cls.fromtimestamp(now[0].timestamp(), tz or UTC)
+
+    monkeypatch.setattr(
+        excel_writer, "datetime", types.SimpleNamespace(datetime=Clock, timezone=timezone)
+    )
+    monkeypatch.setattr(time, "time", lambda: now[0].timestamp())
+    first = data_files(isatvon)[0].content
+    now[0] += timedelta(seconds=7, days=3)
+    assert data_files(isatvon)[0].content == first
 
 
 def test_e13_4_the_dataset_hash_covers_the_files(tmp_path: Path) -> None:
