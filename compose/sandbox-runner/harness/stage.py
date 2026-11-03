@@ -2,7 +2,7 @@
 
     python stage.py <repo-root> <out-dir>
 
-`<out-dir>` becomes the contents of /opt/sbam/harness: `run_cases.py` plus the packages it imports,
+`<out-dir>` becomes the contents of /opt/sbam/harness: `run_cases.py`, `child_server.py` plus the packages the runner imports,
 laid out the way `python -I run_cases.py` finds them. The runtime image's registry is generated from
 what is installed, so none of this is installed: it is only copied.
 """
@@ -13,6 +13,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOTS = ("server/contracts/", "server/workers/")
+# the runner (trusted) and the code under test's process (child_server.py, #625); neither is installed
+OWN_FILES = ("run_cases.py", "child_server.py")
 # files the VM cannot use as they are, and what stands in for them (see each stand-in's docstring)
 STAND_INS = {
     "server/contracts/sbam_contracts/_jsonschema.py": "vendored_jsonschema.py",
@@ -39,8 +41,9 @@ def stage(repo: Path, out: Path) -> list[str]:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(HERE / STAND_INS[source] if source in STAND_INS else repo / source, target)
         copied.append(str(target.relative_to(out)))
-    shutil.copyfile(HERE / "run_cases.py", out / "run_cases.py")
-    copied.append("run_cases.py")
+    for name in OWN_FILES:
+        shutil.copyfile(HERE / name, out / name)
+        copied.append(name)
     return sorted(copied)
 
 
