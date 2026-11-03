@@ -16,6 +16,7 @@ from sbam_contracts.api import API_BASE
 
 import sbam_api
 from sbam_api.audit.security import AuditLogSecurityAudit
+from sbam_api.core.api_docs import docs_options, install_docs_security
 from sbam_api.core.auth import POLICIES, Auth, Jwks, NoOrgs, NoUserAdmin, TokenVerifier
 from sbam_api.core.errors import install_error_handlers
 from sbam_api.core.health import Check, default_checks, health_router
@@ -28,7 +29,6 @@ from sbam_api.core.middleware import (
 from sbam_api.core.ratelimit import AuditThrottle, RateLimiter, SharedBudget
 from sbam_api.core.settings import (
     Settings,
-    deployed_env,
     jwks_url,
     keycloak_realm_url,
     load_settings,
@@ -107,14 +107,14 @@ def create_app(
     app = FastAPI(
         title="SBAM API",
         # The API's own map is for dev and CI; a deployed environment does not publish it (A-15).
-        docs_url=None if deployed_env(settings.sbam_env) else f"{API_BASE}/docs",
-        openapi_url=None if deployed_env(settings.sbam_env) else f"{API_BASE}/openapi.json",
+        **docs_options(settings),
         redoc_url=None,
         # FastAPI's built-in OpenTelemetry would add a second exporter to our provider, own spans,
         # and metrics/log exporters (logs can carry request bodies). core/telemetry.py owns tracing.
         telemetry={"auto_configure": False, "tracing": False, "metrics": False, "logs": False},
     )
     app.state.settings = settings
+    install_docs_security(app, settings)  # the docs' Authorize button (#656)
     app.state.auth = auth or default_auth(app, settings)
     app.state.limiter = RateLimiter(
         settings.rate_limit_writes_per_minute,

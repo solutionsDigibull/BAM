@@ -80,12 +80,44 @@ ensure_api_admin_client() { # sbam-api's service account for tenant organization
     --cclientid realm-management --rolename view-events
 }
 
+ensure_swagger_client() { # the local API docs' Authorize button (#656): PKCE, like the web clients
+  local origin="http://localhost:${API_PORT:-8000}" cid
+  cid=$(csv clients -q clientId=sbam-swagger --fields id)
+  if [ -z "$cid" ]; then
+    "$kc" create clients -r "$realm" -f - >/dev/null <<JSON
+{
+  "clientId": "sbam-swagger",
+  "name": "SBAM API docs (dev only)",
+  "publicClient": true,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": false,
+  "implicitFlowEnabled": false,
+  "serviceAccountsEnabled": false,
+  "redirectUris": ["$origin/api/v1/docs/oauth2-redirect"],
+  "webOrigins": ["$origin"],
+  "attributes": {"pkce.code.challenge.method": "S256"},
+  "defaultClientScopes": ["basic", "profile", "email", "roles", "organization"],
+  "protocolMappers": [{
+    "name": "sbam-api audience",
+    "protocol": "openid-connect",
+    "protocolMapper": "oidc-audience-mapper",
+    "config": {"included.custom.audience": "sbam-api", "access.token.claim": "true", "id.token.claim": "false"}
+  }]
+}
+JSON
+    echo "created client sbam-swagger"
+  else # re-run: follow a changed API_PORT
+    "$kc" update "clients/$cid" -r "$realm" -s "redirectUris=[\"$origin/api/v1/docs/oauth2-redirect\"]"       -s "webOrigins=[\"$origin\"]"
+  fi
+}
+
 ensure_smtp() { # invite emails (#50) go to Mailpit locally; staging/prod configure a real server
   "$kc" update "realms/$realm" -s smtpServer.host=mailpit -s smtpServer.port=1025 \
     -s smtpServer.from=no-reply@sbam.test -s smtpServer.fromDisplayName=SBAM
 }
 
 ensure_api_admin_client
+ensure_swagger_client
 ensure_smtp
 ensure_org "$TENANT_A" "Tenant A" tenant-a.test
 ensure_org "$TENANT_B" "Tenant B" tenant-b.test
