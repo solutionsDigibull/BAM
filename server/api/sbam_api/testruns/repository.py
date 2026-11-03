@@ -27,6 +27,16 @@ class TestRunRepository(TenantScopedRepository[TestRunRow]):
         rows = self.of_sub_skill(sub_skill_id, limit=1)
         return rows[0] if rows else None
 
+    def of_code_attempt(self, code_attempt_id: uuid.UUID) -> TestRunRow | None:
+        """The newest run that judged this code attempt (E14.1 certifies on it)."""
+        query = (
+            self._scoped()
+            .where(TestRunRow.code_attempt_id == code_attempt_id)
+            .order_by(TestRunRow.id.desc())
+            .limit(1)
+        )
+        return self.session.scalars(query).first()
+
     def for_sandbox_run(self, sandbox_run_id: uuid.UUID) -> TestRunRow | None:
         query = self._scoped().where(TestRunRow.sandbox_run_id == sandbox_run_id)
         return self.session.scalars(query).first()

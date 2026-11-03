@@ -13,11 +13,9 @@ from sbam_workers.registry import activity_for
 from sbam_workers.stub_ids import stage_stub_id, stub_activity, stub_id
 
 
-@activity_for(TaskQueue.CERTIFY)
-@activity.defn(name="certify_sub_skill")
-@stub_activity
+@activity.defn(name="certify_sub_skill")  # registered by `certify/subskill.py`; a typed handle
 async def certify_sub_skill(inp: BuildStageInput) -> IdResult:
-    """Real: hashes the passing build, writes the certificate; non-retryable HashMismatch."""
+    """Real (E14.1): checks the evidence, writes the certificate, approves the manifest."""
     return IdResult(id=stage_stub_id(inp, "certify_sub_skill"))
 
 
