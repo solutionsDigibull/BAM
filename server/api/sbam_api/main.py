@@ -18,6 +18,7 @@ import sbam_api
 from sbam_api.audit.security import AuditLogSecurityAudit
 from sbam_api.core.api_docs import docs_options, install_docs_security
 from sbam_api.core.auth import POLICIES, Auth, Jwks, NoOrgs, NoUserAdmin, TokenVerifier
+from sbam_api.core.auth_cache import AuthStateCache
 from sbam_api.core.errors import install_error_handlers
 from sbam_api.core.health import Check, default_checks, health_router
 from sbam_api.core.logging import configure_logging
@@ -27,6 +28,7 @@ from sbam_api.core.middleware import (
     NoStoreMiddleware,
 )
 from sbam_api.core.ratelimit import AuditThrottle, RateLimiter, SharedBudget
+from sbam_api.core.request_session import RequestSessionMiddleware
 from sbam_api.core.settings import (
     Settings,
     jwks_url,
@@ -94,6 +96,7 @@ def default_auth(app: FastAPI, settings: Settings) -> Auth:
         memberships=SqlMemberships(lambda: app_sessions(app.state)),
         orgs=KeycloakOrgs(*kc) if kc else NoOrgs(),
         users=KeycloakUsers(*kc) if kc else NoUserAdmin(),
+        state_cache=AuthStateCache(settings.auth_state_cache_seconds),
     )
 
 
@@ -149,6 +152,7 @@ def create_app(
         },
     )
     app.add_middleware(NoStoreMiddleware)
+    app.add_middleware(RequestSessionMiddleware)  # one session per request (A-12)
     app.add_middleware(CorrelationIdMiddleware)
     configure_telemetry(app, settings)  # wraps the whole stack: one server span per request
     return app

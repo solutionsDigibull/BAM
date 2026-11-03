@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from fastapi import Depends, Request
 from sbam_contracts.api import ErrorCode
 
+from sbam_api.core.auth_cache import AuthState, AuthStateCache
 from sbam_api.core.bulkhead import KEYCLOAK_JWKS, BulkheadFullError
 from sbam_api.core.conventions import ApiError, not_found
 from sbam_api.core.telemetry import set_request_context
@@ -331,6 +332,7 @@ class Auth:
     directory: UserDirectory = field(default_factory=NoDirectory)
     orgs: OrgDirectory = field(default_factory=NoOrgs)
     users: UserAdmin = field(default_factory=NoUserAdmin)
+    state_cache: AuthStateCache = field(default_factory=lambda: AuthStateCache(0))  # off (A-12)
 
 
 # --- Dependencies ----------------------------------------------------------------------------
@@ -347,12 +349,22 @@ def current_user(request: Request) -> CurrentUser:
     if limiter is not None:
         limiter.check(str(user.user_id), request.method, request.url.path)
     if user.tenant_id is not None:
-        assigned = auth.memberships.assigned_projects(user.tenant_id, user.user_id)
-        user = CurrentUser(**{**user.__dict__, "assigned_project_ids": assigned})
         set_request_context(tenant_id=str(user.tenant_id))  # logs + span, only after verification
-        granted = auth.directory.sync(user)
-        if granted is not None:
-            user = CurrentUser(**{**user.__dict__, "roles": effective_roles(user.roles, granted)})
+        state = auth.state_cache.get(user.keycloak_sub, user.session_id)
+        if state is None:
+            assigned = auth.memberships.assigned_projects(user.tenant_id, user.user_id)
+            user = CurrentUser(**{**user.__dict__, "assigned_project_ids": assigned})
+            granted = auth.directory.sync(user)  # raises for a deactivated user: never cached
+            state = AuthState(assigned, granted)
+            auth.state_cache.put(user.keycloak_sub, user.session_id, state)
+        else:
+            user = CurrentUser(
+                **{**user.__dict__, "assigned_project_ids": state.assigned_project_ids}
+            )
+        if state.granted_roles is not None:
+            user = CurrentUser(
+                **{**user.__dict__, "roles": effective_roles(user.roles, state.granted_roles)}
+            )
     return user
 
 

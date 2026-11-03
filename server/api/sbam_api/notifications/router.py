@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser, authenticated
 from sbam_api.core.conventions import ApiError, not_found
+from sbam_api.core.request_session import request_scoped
 from sbam_api.db.session import app_sessions
 from sbam_api.notifications.models import Notification
 from sbam_api.notifications.repository import NotificationRepository
@@ -27,7 +28,7 @@ Me = Annotated[CurrentUser, Depends(authenticated)]
 
 
 def db(request: Request) -> Iterator[Session]:
-    with app_sessions(request.app.state)() as session:
+    with request_scoped(app_sessions(request.app.state), settle=False) as session:
         yield session
 
 
