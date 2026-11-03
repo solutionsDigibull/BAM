@@ -99,7 +99,7 @@ def test_e13_2_staging_copies_the_closure_and_the_runner_and_nothing_else(
     stage: ModuleType, tmp_path: Path
 ) -> None:
     copied = stage.stage(ROOT, tmp_path)
-    assert "run_cases.py" in copied and "sbam_contracts/harness.py" in copied
+    assert {"run_cases.py", "child_server.py", "sbam_contracts/harness.py"} <= set(copied)
     assert {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*.py")} == set(copied)
     assert not any("import rfc8785" in p.read_text() for p in tmp_path.rglob("*.py"))
 
@@ -301,30 +301,40 @@ class FakeConn:
 
     def execute(self, sql: str, params: Any = None) -> "FakeConn":
         self.executed.append(sql)
+        self.params = params
         return self
 
     def fetchall(self) -> list[tuple[dict[str, Any]]]:
         return [(row,) for row in self.rows]
 
+    def fetchone(self) -> tuple[int] | None:
+        assert self.params == ("k1",)  # the case's key is the only parameter
+        return None if self.executed[-1].endswith("NOTHING") else (5,)
 
-class FakeState:
-    def read(self, key: Any) -> Any:
-        assert key == "k1"
 
-        class Fresh:
-            balance = 5
-
-        return Fresh()
+QUERIES = {"balance": "SELECT balance FROM accounts WHERE id = %s"}
 
 
 def store(runner: ModuleType, rows: list[dict[str, Any]]) -> Any:
     return runner.PgStore(
-        FakeConn(rows), "handoff", "q", {"q": "k1"}, FakeState(), ["iteration_pass", "x"]
+        FakeConn(rows), "handoff", "q", {"q": "k1"}, QUERIES, ["iteration_pass", "x"]
     )
 
 
-def test_e13_2_fresh_state_comes_through_the_bundles_own_reader(runner: ModuleType) -> None:
+def test_e13_2_fresh_state_is_read_by_the_runner_with_the_bundles_queries(
+    runner: ModuleType,
+) -> None:
     assert store(runner, []).read_state(["balance"]) == {"balance": 5}
+    assert store(runner, []).read_state(["balance", "unknown"]) == {"balance": 5, "unknown": None}
+
+
+def test_e13_2_a_state_query_that_is_not_one_parameterised_select_is_refused(
+    runner: ModuleType,
+) -> None:
+    for sql in ("DELETE FROM accounts WHERE id = %s", "SELECT 1", "SELECT %s, %s"):
+        s = runner.PgStore(FakeConn([]), "handoff", "q", {"q": "k1"}, {"balance": sql}, [])
+        with pytest.raises(ValueError, match="exactly one %s"):
+            s.read_state(["balance"])
 
 
 def test_e13_2_state_script_changes_are_the_cases_own_sql(runner: ModuleType) -> None:
