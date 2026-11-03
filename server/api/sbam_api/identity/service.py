@@ -81,6 +81,8 @@ def create_tenant(
     if repository.tenant_name_taken(session, name):
         raise duplicate_name()  # the unique index still decides a race, below
     tenant_id = uuid7()
+    # Only reads so far: end that transaction, so no connection is held across Keycloak (N-02b).
+    session.rollback()
     org_id = orgs.create(tenant_id, name)  # 503 before any row exists
     tenant = Tenant(id=tenant_id, name=name, keycloak_org_id=org_id, created_by=actor)
     session.add(tenant)
@@ -213,8 +215,11 @@ def invite_user(session: Session, users: UserAdmin, actor: CurrentUser, body: Us
     if repository.email_in_tenant(session, tenant.id, body.email):
         raise user_exists()
     roles = sorted(map(str, body.roles))
+    tenant_id, org_id = tenant.id, tenant.keycloak_org_id
+    # Only reads so far: end that transaction, so no connection is held across Keycloak (N-02b).
+    session.rollback()
     try:
-        kc_id = users.invite(tenant.id, tenant.keycloak_org_id, body.email, roles)
+        kc_id = users.invite(tenant_id, org_id, body.email, roles)
     except ApiError as exc:
         if exc.code != ErrorCode.USER_EXISTS:
             raise
