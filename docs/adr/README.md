@@ -32,6 +32,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0024](0024-promptfoo-rubric-grader-sidecar.md) | Rubric grading in the sbam-promptfoo sidecar: job directory, Bifrost only, an API error is never a verdict (#638) | Accepted | refines 0012, 0023 |
 | [0025](0025-sign-out-revokes-the-session-at-the-api.md) | Signing out revokes the session at the API: a denylist of signed-out `sid`s, recorded by the portal before the Keycloak redirect (#458) | Accepted | refines 0002 |
 | [0026](0026-generated-code-threat-model.md) | Generated code is untrusted: static checks are a fast fail, the sandbox is the boundary (A-02, #428) | Proposed | refines 0012, 0023 |
+| [0027](0027-code-under-test-runs-in-its-own-process.md) | The code under test runs in a child process of its own; the runner never imports it, and an outputs file from a runner that did not exit cleanly is not evidence (#625) | Accepted | refines 0012, 0023 |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 

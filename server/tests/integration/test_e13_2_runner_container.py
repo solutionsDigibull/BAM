@@ -345,13 +345,14 @@ def test_e13_2_a_tool_that_tries_to_exit_the_runner_fails_its_case_and_not_the_r
     assert result.classified.infra_reason is None and result.exit_code == 0
 
 
-def test_e13_2_a_tool_that_kills_the_runner_outright_is_known_to_be_infrastructure_for_now(
+def test_e13_2_a_tool_that_kills_its_own_process_fails_the_case_and_not_the_run(
     agent_url: str,
 ) -> None:
-    """`os._exit` cannot be caught: the runner dies and writes nothing. Until the code under test
-    runs in its own process (#625) the platform cannot tell this from a dead runner, so it retries
-    and then blocks testing. This test records that limit so nobody mistakes it for a verdict."""
-    result = run(agent_url, run_input(bodies=with_action("import os\nos._exit(7)\n" + GOOD_RETURN)))
-    assert result.classified.category is FailureCategory.INFRA_ERROR
-    assert result.classified.infra_reason is InfraReason.RUNNER_FAILED
-    assert result.exit_code == 7 and result.destroy_error is None
+    """`os._exit` cannot be caught, but it only ends the code under test's own process (#625): the
+    runner survives, the case fails as the code's fault, and nothing is retried as infrastructure.
+    """
+    bomb = "import os\nos._exit(7)\n" + GOOD_RETURN
+    result = run(agent_url, run_input(bodies=with_action(bomb)))
+    assert result.classified.category is FailureCategory.RUNTIME_ERROR, result.classified
+    assert result.classified.infra_reason is None and not result.classified.passed
+    assert result.exit_code == 0 and result.destroy_error is None

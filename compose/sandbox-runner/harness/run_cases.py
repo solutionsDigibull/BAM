@@ -9,7 +9,7 @@ that schema. For each case it seeds the fresh state, starts the bundle's FastMCP
 process of its own (`child_server.py`), runs the harness against it over a pipe and records the trace
 plus the handoff rows the database really holds.
 
-The runner is the trusted side and never imports the bundle (#625, ADR 0025). What the LLM wrote runs in
+The runner is the trusted side and never imports the bundle (#625, ADR 0027). What the LLM wrote runs in
 the child, so it cannot patch the harness, replace `write_outputs` or reach the trace; the runner reads
 the fresh state itself, from the literal `QUERIES` the assembler wrote. The runner marks itself
 non-dumpable (no ptrace, no /proc/<pid>/mem for a same-uid child) and is a child subreaper, so a
@@ -685,7 +685,12 @@ def fit(outputs: RunnerOutputs, limit: int) -> RunnerOutputs:
 def write_outputs(path: Path, outputs: RunnerOutputs) -> None:
     """Only called once nothing of the code under test is alive. Whatever it left in `out/` (a forged
     outputs.json, a symlink, a directory in the file's place) is removed first."""
-    shutil.rmtree(path.parent, ignore_errors=True)
+    if (
+        path.parent.is_symlink()
+    ):  # `rmtree` refuses a symlink; the link itself is what to remove
+        path.parent.unlink()
+    else:
+        shutil.rmtree(path.parent, ignore_errors=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
     temp.write_text(outputs.model_dump_json())

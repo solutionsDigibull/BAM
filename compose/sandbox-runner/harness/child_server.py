@@ -1,4 +1,4 @@
-"""The code under test's own process (#625, ADR 0025).
+"""The code under test's own process (#625, ADR 0027).
 
     python -I child_server.py <bundle_dir> <tool_module> <database> <request_fd> <reply_fd> <memory_mb>
 

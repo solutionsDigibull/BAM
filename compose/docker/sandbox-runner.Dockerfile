@@ -14,8 +14,13 @@ COPY compose/sandbox-runner/harness /src/compose/sandbox-runner/harness
 RUN python -I /src/compose/sandbox-runner/harness/stage.py /src /tmp/harness
 
 FROM ${RUNTIME_IMAGE}
-COPY --from=harness --chown=10001:10001 /tmp/harness/ /opt/sbam/harness/
-COPY --chown=10001:10001 compose/sandbox-runner/agent.py /opt/sbam/agent.py
+# root-owned and not writable by the sandbox user (#625): the code under test runs as that user and
+# must not be able to change the runner, its child entrypoint or the agent on disk. The base image owns
+# /opt/sbam/harness as 10001, so ownership is taken back as root, and the user drops again after.
+USER root
+COPY --from=harness /tmp/harness/ /opt/sbam/harness/
+COPY compose/sandbox-runner/agent.py /opt/sbam/agent.py
+RUN chown -R root:root /opt/sbam && chmod -R go-w /opt/sbam
 USER 10001:10001
 EXPOSE 8091
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD ["python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8091), 2)"]
