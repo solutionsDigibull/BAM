@@ -58,6 +58,7 @@ from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_work
 from sbam_workers import mirror, registry
 from sbam_workers.build import stubs as build_stubs
 from sbam_workers.build.plan import make_plan
+from sbam_workers.certify import stubs as certify_stubs
 from sbam_workers.pipeline.project_pipeline import ProjectPipeline
 from sbam_workers.stub_ids import stage_stub_id, stub_id
 from sbam_workers.test import stubs as test_stubs
@@ -204,6 +205,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "build_promptfoo_suite": test_stubs.build_promptfoo_suite,
     "run_sandbox_tests": test_stubs.run_sandbox_tests,  # the real one (E13.2) needs a sandbox
     "correct": build_stubs.correct,
+    "certify_sub_skill": certify_stubs.certify_sub_skill,  # the real one (E14.1) needs the evidence
 }
 
 
