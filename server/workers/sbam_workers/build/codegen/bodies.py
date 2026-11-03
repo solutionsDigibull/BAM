@@ -26,6 +26,7 @@ from typing import Annotated, Any, Final
 from pydantic import BaseModel, ConfigDict, Field
 
 from sbam_workers.build.codegen import allowlist as body_rules
+from sbam_workers.build.codegen import state_sql
 from sbam_workers.build.codegen.render import RenderedSkeleton, params_json, str_literal
 from sbam_workers.build.codegen.store import LoadedTemplate
 from sbam_workers.llm.client import LlmClient
@@ -296,7 +297,7 @@ def _bound_names(tree: ast.Module) -> dict[str, int]:
 
 
 def _check_state_queries(
-    queries: Mapping[str, str], fresh_state: Iterable[str]
+    queries: Mapping[str, str], fresh_state: Iterable[str], tables: Iterable[str] | None = None
 ) -> list[BodyFinding]:
     field = STATE_QUERIES_FIELD
     expected = list(fresh_state)
@@ -322,6 +323,11 @@ def _check_state_queries(
         elif text.replace("%s", "").count("%") or "{" in text:
             findings.append(
                 BodyFinding(BodyFindingCode.SQL_UNSAFE, field, f"{name!r} has a format placeholder")
+            )
+        else:  # parsed, not pattern-matched (A-02): shape, tables and functions
+            findings.extend(
+                BodyFinding(BodyFindingCode.STATE_QUERY_INVALID, field, f"{name!r}: {reason}")
+                for reason in state_sql.problems(text, tables)
             )
     return findings
 
@@ -351,7 +357,11 @@ def precheck(
             findings.append(BodyFinding(BodyFindingCode(code), field, message, line))
         if field == "helpers":
             findings.extend(_shadowing(tree, skeleton))
-    findings.extend(_check_state_queries(bodies.state_queries, params.get("fresh_state", [])))
+    findings.extend(
+        _check_state_queries(
+            bodies.state_queries, params.get("fresh_state", []), params.get("tables")
+        )
+    )
     return findings
 
 
