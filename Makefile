@@ -1,5 +1,5 @@
 # SBAM developer commands. On Windows run these from Git Bash or WSL2.
-.PHONY: doctor install lint typecheck test check contracts contracts-check migrations-check up ps down logs seed test-int e2e reset runtime-registry compose-lint
+.PHONY: doctor install lint typecheck test check contracts contracts-check migrations-check up ps down logs seed test-int e2e reset runtime-registry runtime-registry-load compose-lint
 
 # Compose stack (TD §20.3). ENV_FILE can point at another env file, e.g. `make up ENV_FILE=/tmp/ci.env`.
 ENV_FILE ?= compose/.env
@@ -58,9 +58,21 @@ migrations-check:
 record-histories:
 	cd server && RECORD_HISTORY=1 uv run pytest tests/temporal -k test_record_ -q
 
+# The image `make runtime-registry` builds. With PROFILES=sandbox-local, `up` hands its digest to sandbox-runner
+# (a shell variable beats .env in compose substitution) and then loads the registry through the API container.
+SKILL_RUNTIME_IMAGE ?= skill-runtime:local
+SANDBOX_LOCAL := $(filter sandbox-local,$(PROFILE_LIST))
+
 up:
 	@test -f $(ENV_FILE) || { echo "$(ENV_FILE) not found: cp compose/.env.example compose/.env and set the passwords" >&2; exit 1; }
+ifneq ($(SANDBOX_LOCAL),)
+	@d="$(SANDBOX_RUNTIME_DIGEST)"; test -n "$$d" || d="$$(docker image inspect --format '{{.Id}}' $(SKILL_RUNTIME_IMAGE) 2>/dev/null)"; \
+	if [ -n "$$d" ]; then export SANDBOX_RUNTIME_DIGEST="$$d"; else echo "sandbox-local: $(SKILL_RUNTIME_IMAGE) not built yet; run 'make runtime-registry' (builds it), then 'make up PROFILES=sandbox-local' again" >&2; fi; \
 	$(COMPOSE) up -d --build --wait --wait-timeout 900
+	@docker image inspect $(SKILL_RUNTIME_IMAGE) >/dev/null 2>&1 && { $(MAKE) --no-print-directory runtime-registry-load PROFILES=$(PROFILES) || echo "sandbox-local: registry not loaded; fix the error above and run 'make runtime-registry-load PROFILES=$(PROFILES)'" >&2; } || true
+else
+	$(COMPOSE) up -d --build --wait --wait-timeout 900
+endif
 
 ps:
 	$(COMPOSE) ps
@@ -89,6 +101,15 @@ runtime-registry:
 	  --image-digest "$$(docker image inspect --format '{{.Id}}' skill-runtime:local)" > runtime_registry.json
 	cd server && DATABASE_URL="postgresql://sbam:$$(sed -n 's/^SBAM_DB_PASSWORD=//p' ../$(ENV_FILE))@127.0.0.1:$${POSTGRES_PORT:-5432}/sbam" \
 	  uv run python -m sbam_api.registry.sync ../runtime_registry.json --activate
+
+# Loads the registry of $(SKILL_RUNTIME_IMAGE) through the running API container, so it needs no host uv or DB access.
+# Safe to repeat: the sync upserts by image digest. Needs `make up` and a built image (`make runtime-registry` builds it).
+runtime-registry-load:
+	@d="$$(docker image inspect --format '{{.Id}}' $(SKILL_RUNTIME_IMAGE) 2>/dev/null)"; \
+	test -n "$$d" || { echo "$(SKILL_RUNTIME_IMAGE) not found: run 'make runtime-registry' first" >&2; exit 1; }; \
+	$(COMPOSE) ps --status running --services 2>/dev/null | grep -qx sbam-api || { echo "sbam-api is not running: run 'make up' first" >&2; exit 1; }; \
+	docker run --rm --network none $(SKILL_RUNTIME_IMAGE) sbam-runtime-registry --image-digest "$$d" \
+	  | $(COMPOSE) exec -T sbam-api python -m sbam_api.registry.sync /dev/stdin --activate
 
 # The only destructive target: stops the stack and deletes every volume (database, storage, signatures,
 # and the profile volumes such as Langfuse's).
