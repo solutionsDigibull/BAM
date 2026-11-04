@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from sbam_workers.build.bodies import precheck_failed
 from sbam_workers.build.codegen.bundle import (
     BLACK_CONFIG_SHA256,
     BLACK_VERSION,
@@ -186,6 +187,10 @@ class Assemble:
             return IdResult(id=row.id)
         if row.status == CodeAttemptStatus.ASSEMBLY_FAILED:
             raise assembly_failed(row.id)
+        if row.status == CodeAttemptStatus.PRECHECK_FAILED:
+            # A correction the pre-check rejected (correct.py): GateFailed, so the loop corrects
+            # again or escalates, instead of ending the build (#686).
+            raise precheck_failed(row.id)
         if row.status != CodeAttemptStatus.BODIES_GENERATED:
             raise ApplicationError(
                 f"code_attempts {row.id} is {row.status}, not ready to assemble",
