@@ -31,19 +31,13 @@ PACKAGE: Final = "skill"
 MAX_FINDINGS: Final = 200
 MAX_MESSAGE: Final = 500
 
-# `current` is the one name the fastmcp-loopy template itself assigns before the LLM body
-# (`current: state.FreshState = state.read(...)`); a body that does not use it must not fail F841
-# on a line it did not write (#684). Ruff's default dummy names (`_`, `_x`) stay exempt; any other
-# unused variable still fails.
-DUMMY_VARIABLE_RGX: Final = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?)|current)$"
-RUFF_TOML: Final = f"""\
+RUFF_TOML: Final = """\
 line-length = 100
 target-version = "py312"
 
 [lint]
 select = ["E", "F", "W", "B", "UP", "I"]
 ignore = ["E501"]
-dummy-variable-rgx = '{DUMMY_VARIABLE_RGX}'
 """
 MYPY_INI: Final = """\
 [mypy]

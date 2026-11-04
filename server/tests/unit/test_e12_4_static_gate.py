@@ -63,20 +63,58 @@ def test_e12_4_t01_ruff_error_unused_variable() -> None:
     assert (hit["file"], hit["line"]) == ("action.py", 2)
 
 
-def test_684_the_templates_own_current_is_not_an_unused_variable() -> None:
-    # The fastmcp-loopy template assigns `current` before the body; a body that ignores it
-    # must not fail on that line.
+def test_684_an_unused_current_in_a_bare_source_fails_f841_again() -> None:
+    # #696: the gate has no exemption for `current`; the template emits lint-clean code itself.
     source = "def action() -> None:\n    current = 1\n"
-    result = run_ruff(files(source))
-    assert (result.status, result.findings) == (GateStatus.PASSED, []), result
-
-
-def test_684_any_other_unused_variable_in_a_body_still_fails() -> None:
-    source = "def action() -> None:\n    current = 1\n    order_details = 2\n"
     result = run_ruff(files(source))
     assert result.status is GateStatus.FAILED
     (hit,) = [f for f in result.findings if f["code"] == "F841"]
-    assert (hit["file"], hit["line"]) == ("action.py", 3) and "order_details" in hit["message"]
+    assert (hit["file"], hit["line"]) == ("action.py", 2) and "current" in hit["message"]
+
+
+def test_696_t01_the_1_0_1_template_passes_ruff_black_mypy_with_a_body_ignoring_current() -> None:
+    from codegen_cases import ms01_bodies, ms01_loop_spec, ms01_params
+    from sbam_workers.build.codegen import load_template, render_skeleton
+    from sbam_workers.build.codegen.bundle import assemble_bundle
+
+    loopy = load_template("fastmcp-loopy", "1.0.1")
+    params = ms01_params()
+    recorded = ms01_bodies()["action_body"]
+    action = (
+        recorded.replace('current.user_status == "active"', "True")
+        .replace("_within_device_limit(current)", "True")
+        .replace("int(current.failed_login_attempts or 0) + 1", "1")
+    )
+    assert "current" not in action  # the body ignores the template's `current` line
+    bodies = ms01_bodies(
+        action_body=action,
+        check_body='return {"otp_match": True, "policy_violation": False}\n',
+        helpers="",
+    )
+    out = assemble_bundle(
+        loopy,
+        render_skeleton(loopy, params),
+        bodies,
+        params.get("fresh_state", []),
+        ms01_loop_spec(),
+    )
+    assert out.bundle is not None, out.findings
+    assert "current: state.FreshState" in out.bundle.files["action_tool.py"].decode()
+    sources = {n: d for n, d in out.bundle.files.items() if n.endswith(".py")}
+    for run in (run_ruff, run_black, run_mypy):
+        result = run(sources)
+        assert (result.status, result.findings) == (GateStatus.PASSED, []), (
+            run.__name__,
+            [(f["file"], f["code"], f["message"]) for f in result.findings],
+        )
+
+
+def test_684_any_other_unused_variable_in_a_body_still_fails() -> None:
+    source = "def action() -> None:\n    unused = 1\n"
+    result = run_ruff(files(source))
+    assert result.status is GateStatus.FAILED
+    (hit,) = [f for f in result.findings if f["code"] == "F841"]
+    assert (hit["file"], hit["line"]) == ("action.py", 2) and "unused" in hit["message"]
 
 
 def test_684_ruffs_default_dummy_names_stay_exempt() -> None:
