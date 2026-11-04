@@ -419,16 +419,27 @@ def test_e11_3_skeleton_must_match_the_attempt(template: LoadedTemplate, tmp_pat
     assert attempt(sessions, inp).status == CodeAttemptStatus.BODIES_GENERATED
 
 
-@pytest.mark.parametrize("status", [None, CodeAttemptStatus.PRECHECK_FAILED])
-def test_e11_3_needs_generated_bodies(
-    template: LoadedTemplate, tmp_path: Path, status: CodeAttemptStatus | None
-) -> None:
+def test_e11_3_needs_generated_bodies(template: LoadedTemplate, tmp_path: Path) -> None:
     sessions, storage, inp = db(), LocalDiskBackend(tmp_path), stage_input()
-    if status is not None:
-        seed(sessions, template, inp, status=status)
-    with pytest.raises(ApplicationError) as caught:
+    with pytest.raises(ApplicationError) as caught:  # no attempt row at all: a wiring bug
         run(activity(template, sessions, storage), inp)
     assert caught.value.type == INPUT_MISMATCH and caught.value.non_retryable
+
+
+def test_686_a_rejected_correction_is_a_gate_failure_not_an_input_mismatch(
+    template: LoadedTemplate, tmp_path: Path
+) -> None:
+    # correct.py records a correction the pre-check rejected as PRECHECK_FAILED and documents that
+    # `assemble` raises GateFailed for it, so the loop corrects again or escalates.
+    sessions, storage, inp = db(), LocalDiskBackend(tmp_path), stage_input()
+    attempt_id = seed(sessions, template, inp, status=CodeAttemptStatus.PRECHECK_FAILED)
+    with pytest.raises(ApplicationError) as caught:
+        run(activity(template, sessions, storage), inp)
+    assert caught.value.type == GATE_FAILED and caught.value.non_retryable
+    assert caught.value.details[0] == [str(attempt_id)]
+    row = attempt(sessions, inp)
+    assert row.status == CodeAttemptStatus.PRECHECK_FAILED and row.bundle_key is None
+    assert artifacts(sessions, inp) == []
 
 
 def test_e11_3_bundles_are_tenant_scoped(template: LoadedTemplate, tmp_path: Path) -> None:
