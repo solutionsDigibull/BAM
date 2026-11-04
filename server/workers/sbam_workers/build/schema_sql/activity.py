@@ -255,9 +255,13 @@ async def run_stage(deps: SchemaDeps, inp: WorkflowRef, temporal_workflow_id: st
     schema_id = await asyncio.to_thread(deps.store.save, inp, loaded, outcome)
     if outcome.problems:
         codes = sorted({p.code.value for p in outcome.problems})
+        owners = declared(loaded.sub_skills).tables  # table -> skill_ids that declare it
+        skills = sorted({s for p in outcome.problems for s in owners.get(p.table or "", ())})
         raise ApplicationError(
             f"schema.sql failed SCHEMA_SQL ({', '.join(codes)}); workflow_schemas {schema_id}",
             str(schema_id),
+            ",".join(codes),  # details[1], [2]: the pipeline's notification names them (#694)
+            ",".join(skills),
             type=SCHEMA_INVALID,
             non_retryable=True,
         )

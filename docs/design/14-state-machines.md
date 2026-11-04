@@ -34,7 +34,7 @@ CREATED → ISATVON_EXTRACTING → ISATVON_REVIEW → BUILDING → CERTIFYING �
 |---|---|---|---|
 | CREATED → ISATVON_EXTRACTING | SBAM created the Workflow after SOW approval | Extraction done → ISATVON_REVIEW / EXTRACTION_FAILED | System |
 | ISATVON_REVIEW | Breakdown ready | FDE clicks Generate (all valid) → BUILDING | FDE |
-| BUILDING | Generate | all Sub-Skills certified → CERTIFYING; any needs review → NEEDS_FDE_REVIEW (others continue) | System |
+| BUILDING | Generate (a failed schema.sql goes back to ISATVON_REVIEW, the Sub-Skills to VALID) | all Sub-Skills certified → CERTIFYING; any needs review → NEEDS_FDE_REVIEW (others continue) | System |
 | CERTIFYING | All Sub-Skills certified | Macros + Workflow certified → CERTIFIED / WORKFLOW_VALIDATION_FAILED | System |
 | CERTIFIED → FROZEN | Certified | Freeze + version completed | System |
 
@@ -49,7 +49,7 @@ CREATED → ISATVON_EXTRACTING → ISATVON_REVIEW → BUILDING → CERTIFYING �
 ## 14.4 Sub-Skill
 
 ```text
-DRAFT → (VALID | INVALID) ──Generate──► BUILDING
+DRAFT → (VALID | INVALID) ──Generate──► BUILDING   (Workflow schema.sql failed: ──► VALID again)
 BUILDING: MANIFEST → CODEGEN → AST → STATIC → TESTING (loop harness + Promptfoo in CubeSandbox)
    any gate fails → CORRECTING (attempt 1..2) → back to failing stage
    attempts exhausted → NEEDS_FDE_REVIEW ──FDE fix + Retry──► BUILDING
@@ -126,6 +126,7 @@ The machines above are implemented in `server/contracts/sbam_contracts/state_mac
 | ISATVON_REVIEW | `generate` | BUILDING | FDE |
 | BUILDING | `all_sub_skills_certified` | CERTIFYING | SYSTEM |
 | BUILDING | `sub_skill_needs_review` | NEEDS_FDE_REVIEW | SYSTEM |
+| BUILDING | `schema_failed` | ISATVON_REVIEW | SYSTEM |
 | NEEDS_FDE_REVIEW | `retry` | BUILDING | FDE |
 | CERTIFYING | `workflow_certified` | CERTIFIED | SYSTEM |
 | CERTIFYING | `workflow_validation_failed` | WORKFLOW_VALIDATION_FAILED | SYSTEM |
@@ -187,6 +188,7 @@ The machines above are implemented in `server/contracts/sbam_contracts/state_mac
 | VALID | `edit` | DRAFT | FDE |
 | INVALID | `edit` | DRAFT | FDE |
 | VALID | `generate` | BUILDING | FDE |
+| BUILDING | `build_aborted` | VALID | SYSTEM |
 | BUILDING | `tests_started` | TESTING | SYSTEM |
 | BUILDING | `gate_failed` | CORRECTING | SYSTEM |
 | BUILDING | `dependency_missing` | DEPENDENCY_FAILED | SYSTEM |

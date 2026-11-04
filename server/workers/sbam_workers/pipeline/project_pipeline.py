@@ -136,6 +136,9 @@ EXTRACTION_PATCH = "e8-3-bounded-extraction"
 CARRY_OVER_PATCH = "e7-2-scope-change-carry-over"
 # E9.5: the Workflow manifest draft once the Sub-Skills are built. Older runs: no draft.
 MANIFEST_DRAFT_PATCH = "e9-5-workflow-manifest-draft"
+# #694: a failed schema.sql returns the Workflow to ISATVON_REVIEW and the Sub-Skills that Generate
+# sent to BUILDING back to VALID, and the notification names them. Older runs: nothing applied.
+SCHEMA_FAILURE_PATCH = "e10-1c-schema-failure-recovery"
 MAX_PARALLEL_EXTRACTIONS = 4
 WAITING_FOR = {
     PipelineStage.WAIT_SOW_APPROVAL: "sow_approved",
@@ -371,7 +374,12 @@ class ProjectPipeline:
 
     async def _stage_build_schema_sql(self) -> None:
         await self._enter(PipelineStage.BUILD_SCHEMA_SQL)
-        await self._attempt(build_schema_sql, self._workflow_ref(), IdResult, None)
+        failed = (
+            ("schema_failed", MachineName.WORKFLOW)
+            if workflow.patched(SCHEMA_FAILURE_PATCH)
+            else None
+        )
+        await self._attempt(build_schema_sql, self._workflow_ref(), IdResult, failed)
 
     async def _stage_build_sub_skills(self) -> None:
         await self._enter(PipelineStage.BUILD_SUB_SKILLS)
@@ -594,13 +602,25 @@ class ProjectPipeline:
             event, machine = failure
             entity = self.workflow_id if machine is MachineName.WORKFLOW else self.inp.project_id
             await self._transition(machine, _need(entity), event)
-        await self._notify(
-            "pipeline.failed",
-            {"stage": self.stage.value, "error": error_type, "next_action": "retry"},
-        )
+        payload = {"stage": self.stage.value, "error": error_type, "next_action": "retry"}
+        if step == "build_schema_sql" and workflow.patched(SCHEMA_FAILURE_PATCH):
+            await self._abort_builds()
+            details = [str(d) for d in getattr(cause, "details", ())]  # [id, codes, skill ids]
+            payload.update(codes=details[1] if len(details) > 1 else "")
+            payload.update(sub_skills=details[2] if len(details) > 2 else "")
+        await self._notify("pipeline.failed", payload)
         self.stage = PipelineStage.FAILED
         await self._mirror(RunState.FAILED)
         raise _Stop
+
+    async def _abort_builds(self) -> None:
+        """Generate sent these Sub-Skills to BUILDING; no build started, so they return to VALID."""
+        wanted = set(_need(self.generate).sub_skill_ids)  # empty = every Sub-Skill
+        for sub_skill_id in [s for s in self.sub_skill_ids if not wanted or s in wanted]:
+            try:
+                await self._transition(MachineName.SUB_SKILL, sub_skill_id, "build_aborted")
+            except ActivityError:  # not BUILDING (e.g. changed meanwhile): leave it as it is
+                continue
 
     async def _cancelled(self) -> None:
         """Cancel: children are already cancelled (signal handler); record CANCELLED on the

@@ -8,6 +8,9 @@
   leaves the state alone). Out of KNOWLEDGE_FAILED it is a `retry` that resumes after ingestion
   (#674). The transition carries the key the workflow's own first activity uses,
   so that activity replays it as a no-op instead of applying it twice.
+* A pipeline that failed at build_schema_sql (#694) leaves the project in WORKFLOW_CREATED and the
+  Workflow back in ISATVON_REVIEW: a start then replaces the run by one waiting at the Generate
+  step (`restart_pipeline`), with no project transition. Anything else in WORKFLOW_CREATED is 409.
 * `pipeline_status`: the workflow's `status` query (None when the project never started one).
 * `signal_pipeline`: for the API endpoints that drive the waits (#90 SOW approval, generate,
   cancel). The caller authorizes the FDE and the project first: signals are never authorization.
@@ -31,7 +34,12 @@ from sbam_contracts.pipeline import (
 )
 from sbam_contracts.projects import ProjectStatus
 from sbam_contracts.runs import Run, SubjectType, TaskQueue, pipeline_workflow_id
-from sbam_contracts.state_machines import Actor, KnowledgeVersionState, MachineName
+from sbam_contracts.state_machines import (
+    Actor,
+    KnowledgeVersionState,
+    MachineName,
+    WorkflowState,
+)
 from sbam_contracts.state_machines import ProjectPipelineState as P
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import Client, WorkflowExecutionStatus
@@ -273,6 +281,8 @@ def _check_startable(
     state = P(project.state)
     if state in RUNNING:
         raise pipeline_running()
+    if state is P.WORKFLOW_CREATED:  # only a schema failure restarts from here (checked later)
+        return project, [], None
     if state not in START_EVENTS:
         raise PipelineNotStartable(state)
     documents = DocumentVersionRepository(session, ctx).active_ids()
@@ -299,6 +309,26 @@ def _resume(session: Session, user: CurrentUser, project_id: UUID, state: P) -> 
     return ResumeState(stage=PipelineStage.KNOWLEDGE)
 
 
+def _resume_generate(
+    session: Session, user: CurrentUser, project_id: UUID, state: P
+) -> ResumeState:
+    """The Generate wait of the newest Workflow, which must be back in ISATVON_REVIEW (#694)."""
+    # Imported here: these packages import this module (circular otherwise).
+    from sbam_api.isatvon.repository import SubSkillRepository
+    from sbam_api.workflows.repository import WorkflowRepository
+
+    ctx = user.context(project_id)
+    workflows = WorkflowRepository(session, ctx).of_project()
+    if not workflows or workflows[0].state != WorkflowState.ISATVON_REVIEW.value:
+        raise PipelineNotStartable(state)
+    subs = SubSkillRepository(session, ctx).of_workflow(workflows[0].id)
+    return ResumeState(
+        stage=PipelineStage.WAIT_GENERATE,
+        workflow_id=workflows[0].id,
+        sub_skill_ids=[s.id for s in subs],
+    )
+
+
 def _commit_start(
     session: Session,
     user: CurrentUser,
@@ -309,28 +339,29 @@ def _commit_start(
 ) -> None:
     ctx = user.context(project.id)
     before = project.state
-    event = START_EVENTS[P(before)]
-    apply_transition(
-        session,
-        ctx,
-        TransitionCommand(
-            model=Project,
-            entity_id=project.id,
-            event=event,
-            actor=Actor.FDE,
-            actor_id=str(user.user_id),
-            correlation_id=correlation_id,
-            # The key ProjectPipeline's first activity sends (`_stage_ingest` always sends
-            # start_processing), so that activity finds this transition applied and does nothing,
-            # also when this one is a `retry` out of INGESTION_FAILED. A run that resumes after
-            # ingestion (#674) never sends it, so its retry gets a key of its own.
-            idempotency_key=(
-                f"{run.temporal_run_id}:{MachineName.PROJECT_PIPELINE.value}:start_processing:0"
-                if P(before) is not P.KNOWLEDGE_FAILED
-                else f"{run.id}:retry"
+    event = START_EVENTS.get(P(before))  # None: a restart at the Generate wait moves nothing
+    if event is not None:
+        apply_transition(
+            session,
+            ctx,
+            TransitionCommand(
+                model=Project,
+                entity_id=project.id,
+                event=event,
+                actor=Actor.FDE,
+                actor_id=str(user.user_id),
+                correlation_id=correlation_id,
+                # The key ProjectPipeline's first activity sends (`_stage_ingest` always sends
+                # start_processing), so that activity finds this transition applied and does
+                # nothing, also when this one is a `retry` out of INGESTION_FAILED. A run that
+                # resumes after ingestion (#674) never sends it, so its retry gets a key of its own.
+                idempotency_key=(
+                    f"{run.temporal_run_id}:{MachineName.PROJECT_PIPELINE.value}:start_processing:0"
+                    if P(before) is not P.KNOWLEDGE_FAILED
+                    else f"{run.id}:retry"
+                ),
             ),
-        ),
-    )
+        )
     record(
         session,
         tenant_id=ctx.tenant_id,
@@ -386,9 +417,27 @@ async def start_project_pipeline(
                 resume=resume,
             )
             try:
-                run = await start_pipeline(
-                    client, sessions, pipeline_input, with_search_attributes=with_search_attributes
-                )
+                if P(project.state) is P.WORKFLOW_CREATED:
+                    status = await pipeline_status(client, project_id)
+                    if status is None or status.failed_stage is not PipelineStage.BUILD_SCHEMA_SQL:
+                        raise PipelineNotStartable(P(project.state))
+                    resume = await asyncio.to_thread(
+                        _resume_generate, session, user, project_id, P(project.state)
+                    )
+                    pipeline_input = pipeline_input.model_copy(update={"resume": resume})
+                    run = await restart_pipeline(
+                        client,
+                        sessions,
+                        pipeline_input,
+                        with_search_attributes=with_search_attributes,
+                    )
+                else:
+                    run = await start_pipeline(
+                        client,
+                        sessions,
+                        pipeline_input,
+                        with_search_attributes=with_search_attributes,
+                    )
             except OrchestratorUnavailable:
                 raise TemporalUnavailable() from None
             await asyncio.to_thread(
