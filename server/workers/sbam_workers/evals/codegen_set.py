@@ -37,7 +37,7 @@ from sbam_workers.evals.golden import (
 )
 from sbam_workers.evals.testgen_set import BOUNDS
 
-TEMPLATE: Final = ("fastmcp-loopy", "1.0.0")
+TEMPLATE: Final = ("fastmcp-loopy", "1.0.1")
 
 
 @dataclass(frozen=True)

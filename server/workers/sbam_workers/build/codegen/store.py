@@ -12,7 +12,7 @@ order, ``"<path>\\0<sha256 of the bytes>\\n"``. It is checked on every load agai
 registry entry). The loader reads each file once and renders from those bytes, so what was
 hashed is exactly what is rendered.
 
-    uv run python -m sbam_workers.build.codegen fastmcp-loopy 1.0.0   # print the tree hash
+    uv run python -m sbam_workers.build.codegen fastmcp-loopy 1.0.1   # print the tree hash
 """
 
 import hashlib

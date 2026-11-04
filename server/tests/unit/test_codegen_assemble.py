@@ -62,7 +62,7 @@ END = "# <<< LLM_BODY:action"
 
 @pytest.fixture(scope="module")
 def template() -> LoadedTemplate:
-    return load_template("fastmcp-loopy", "1.0.0")
+    return load_template("fastmcp-loopy", "1.0.1")
 
 
 def run_assembly(template: LoadedTemplate, bodies: dict[str, Any] | None = None) -> Assembled:

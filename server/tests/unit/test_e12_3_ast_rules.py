@@ -24,7 +24,7 @@ ACTION = "auth_mcp_session_otp_evaluator"
 
 @pytest.fixture(scope="module")
 def template() -> LoadedTemplate:
-    return load_template("fastmcp-loopy", "1.0.0")
+    return load_template("fastmcp-loopy", "1.0.1")
 
 
 @pytest.fixture(scope="module")
