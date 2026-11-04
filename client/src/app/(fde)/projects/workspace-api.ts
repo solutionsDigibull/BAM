@@ -24,8 +24,13 @@ export const problemCode = (error: unknown): string | undefined =>
 
 // --- Start processing -------------------------------------------------------------------------------
 
-/** The states the API starts processing from: a fresh project, or a retry after a failed ingestion. */
-export const START_STATES: readonly ProjectPipelineState[] = ["IDLE", "INGESTION_FAILED"];
+/** The states the API starts processing from: a fresh project, or a retry after a failed ingestion
+ * or knowledge build (#674: the knowledge retry resumes after ingestion, it never starts over). */
+export const START_STATES: readonly ProjectPipelineState[] = [
+  "IDLE",
+  "INGESTION_FAILED",
+  "KNOWLEDGE_FAILED",
+];
 /** States where a run is in progress, so the overview keeps refreshing. */
 export const RUNNING_STATES: readonly ProjectPipelineState[] = [
   "INGESTING",
@@ -41,6 +46,10 @@ export const canStart = (t: PipelineTimeline): boolean =>
   START_STATES.includes(t.state) && activeDocuments(t.counts) >= 1;
 
 export const isRunning = (state: ProjectPipelineState): boolean => RUNNING_STATES.includes(state);
+
+/** A failed knowledge build continues where it stopped, so the button says so (#674). */
+export const startLabel = (state: ProjectPipelineState): string =>
+  state === "KNOWLEDGE_FAILED" ? "Retry processing" : "Start processing";
 
 const START_MESSAGES: Record<string, string> = {
   PIPELINE_RUNNING: "Processing is already running.",

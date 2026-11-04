@@ -15,12 +15,14 @@ import httpx
 import pytest
 from runs_db import FakeClient, FakeHandle
 from sbam_api.audit.models import AuditLog
+from sbam_api.core.ids import uuid7
+from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.pipeline.timeline import build_counts, build_steps
 from sbam_api.temporal.models import TemporalRun
 from sbam_contracts.api import API_BASE
 from sbam_contracts.state_machines import DocumentVersionState as D
 from sqlalchemy import select
-from test_auth import FDE_A1, FDE_A2, FDE_B1, TENANT_B, problem
+from test_auth import FDE_A1, FDE_A2, FDE_B1, TENANT_A, TENANT_B, problem
 from test_uploads import Harness as UploadsHarness
 
 
@@ -261,12 +263,74 @@ def test_e4_1_restart_after_ingestion_failed(h: Harness) -> None:
     assert transition.idempotency_key.endswith(":project_pipeline:start_processing:0")
 
 
+def add_knowledge(h: Harness, number: int, state: str) -> uuid.UUID:
+    bind = h.sessions.kw["bind"]  # the upload harness creates only its own tables
+    KnowledgeVersion.__table__.create(bind, checkfirst=True)  # type: ignore[attr-defined]
+    with h.sessions() as s:
+        row = KnowledgeVersion(
+            id=uuid7(),
+            tenant_id=TENANT_A,
+            project_id=uuid.UUID(h.project),
+            version=number,
+            run_id=uuid7(),
+            cognee_dataset=f"sbam_{TENANT_A}_{h.project}",
+            coverage={},
+            state=state,
+        )
+        s.add(row)
+        s.commit()
+        return row.id
+
+
+def test_e4_1b_t01_knowledge_retry_resumes_at_okf_with_the_ready_version(h: Harness) -> None:
+    """#674: after a failed build and a successful Rebuild, Start continues to the SOW with the
+    READY version (OKF returns it as is), never re-ingesting or building knowledge again."""
+    h.seed_versions(1)
+    add_knowledge(h, 1, "FAILED")
+    ready = add_knowledge(h, 2, "READY")
+    h.set_state(h.project, "KNOWLEDGE_FAILED")
+    res = h.start()
+    assert res.status_code == 202, res.text
+    assert res.json()["run"]["current_stage"] == "okf"
+    assert h.state() == "KNOWLEDGE_BUILDING"
+    resume = h.temporal.calls[0]["arg"].resume
+    assert resume.stage.value == "okf" and resume.refs == {"knowledge": ready}
+    [transition] = h.trail("project_pipeline", "retry")
+    assert transition.before is not None and transition.before["state"] == "KNOWLEDGE_FAILED"
+    assert transition.idempotency_key == f"{res.json()['run']['id']}:retry"
+
+
+def test_e4_1b_t02_knowledge_retry_without_a_ready_version_builds_again(h: Harness) -> None:
+    h.seed_versions(1)
+    add_knowledge(h, 1, "FAILED")
+    h.set_state(h.project, "KNOWLEDGE_FAILED")
+    res = h.start()
+    assert res.status_code == 202, res.text
+    assert res.json()["run"]["current_stage"] == "knowledge"  # not ingest: no re-ingestion
+    resume = h.temporal.calls[0]["arg"].resume
+    assert resume.stage.value == "knowledge" and resume.refs == {}
+    assert h.state() == "KNOWLEDGE_BUILDING"
+
+
+def test_e4_1b_t03_a_fresh_start_and_an_ingestion_retry_do_not_resume(h: Harness) -> None:
+    h.seed_versions(1)
+    add_knowledge(h, 1, "READY")  # a READY version never short-cuts a first start
+    assert h.start().status_code == 202
+    assert h.temporal.calls[0]["arg"].resume is None
+
+
+def test_e4_1b_knowledge_retry_is_still_refused_to_another_fde(h: Harness) -> None:
+    h.seed_versions(1)
+    h.set_state(h.project, "KNOWLEDGE_FAILED")
+    problem(h.start(token=h.realm.token(FDE_A2)), 404, "NOT_FOUND")  # unassigned: no leak
+    assert h.temporal.calls == [] and h.state() == "KNOWLEDGE_FAILED"
+
+
 @pytest.mark.parametrize(
     ("state", "code"),
     [
         ("KNOWLEDGE_BUILDING", "PIPELINE_RUNNING"),
         ("SOW_REVIEW", "PIPELINE_RUNNING"),
-        ("KNOWLEDGE_FAILED", "INVALID_TRANSITION"),
         ("CANCELLED", "INVALID_TRANSITION"),
         ("WORKFLOW_CREATED", "INVALID_TRANSITION"),
     ],

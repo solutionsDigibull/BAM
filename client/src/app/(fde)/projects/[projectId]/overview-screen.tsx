@@ -28,6 +28,7 @@ import {
   isRunning,
   pipelinePath,
   startErrorMessage,
+  startLabel,
   startPath,
   timelineView,
   workflowsPath,
@@ -146,7 +147,7 @@ export function OverviewScreen({ projectId }: { projectId: string }) {
               loading={start.mutation.isPending}
               onClick={onStart}
             >
-              Start processing
+              {startLabel(t.state)}
             </Button>
             <Link href={`/projects/${projectId}/documents`}>
               <Button>Manage documents</Button>

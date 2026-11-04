@@ -149,6 +149,22 @@ describe("Project overview (E4.10)", () => {
     expect((button as HTMLButtonElement).disabled).toBe(false);
   });
 
+  test("e4_1b_t04 a failed knowledge build shows an enabled Retry processing (#674)", async () => {
+    const api = fakeApi({
+      ...base(timeline("KNOWLEDGE_FAILED", { parsed: 6 })),
+      [START]: { status: 202, body: { run: {} } },
+    });
+    renderWithRefine(<OverviewScreen projectId={ID} />);
+    const button = await screen.findByRole("button", { name: "Retry processing" });
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(
+        api.calls.some((c) => c.method === "POST" && c.path === `/projects/${ID}/pipeline/start`),
+      ).toBe(true),
+    );
+  });
+
   test("while processing runs the button is disabled", async () => {
     fakeApi(base(timeline("KNOWLEDGE_BUILDING", { parsed: 2 })));
     renderWithRefine(<OverviewScreen projectId={ID} />);
