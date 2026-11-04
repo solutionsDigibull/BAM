@@ -63,6 +63,28 @@ def test_e12_4_t01_ruff_error_unused_variable() -> None:
     assert (hit["file"], hit["line"]) == ("action.py", 2)
 
 
+def test_684_the_templates_own_current_is_not_an_unused_variable() -> None:
+    # The fastmcp-loopy template assigns `current` before the body; a body that ignores it
+    # must not fail on that line.
+    source = "def action() -> None:\n    current = 1\n"
+    result = run_ruff(files(source))
+    assert (result.status, result.findings) == (GateStatus.PASSED, []), result
+
+
+def test_684_any_other_unused_variable_in_a_body_still_fails() -> None:
+    source = "def action() -> None:\n    current = 1\n    order_details = 2\n"
+    result = run_ruff(files(source))
+    assert result.status is GateStatus.FAILED
+    (hit,) = [f for f in result.findings if f["code"] == "F841"]
+    assert (hit["file"], hit["line"]) == ("action.py", 3) and "order_details" in hit["message"]
+
+
+def test_684_ruffs_default_dummy_names_stay_exempt() -> None:
+    source = "def action() -> None:\n    _ = 1\n    _unused = 2\n"
+    result = run_ruff(files(source))
+    assert (result.status, result.findings) == (GateStatus.PASSED, []), result
+
+
 def test_e12_4_t02_black_diff_on_modified_spacing() -> None:
     result = run_black(files("x  =  1\n"))
     assert result.status is GateStatus.FAILED and codes(result) == {"BLACK_DIFF"}
