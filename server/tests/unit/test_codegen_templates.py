@@ -62,7 +62,7 @@ TEMPLATES = default_templates_dir()
 
 @pytest.fixture(scope="module")
 def template() -> LoadedTemplate:
-    return load_template("fastmcp-loopy", "1.0.0")
+    return load_template("fastmcp-loopy", "1.0.1")
 
 
 def manifest_dict() -> dict[str, Any]:
@@ -122,7 +122,7 @@ def copy_templates(tmp_path: Path) -> Path:
     return root
 
 
-def rehash(root: Path, name: str = "fastmcp-loopy", version: str = "1.0.0") -> None:
+def rehash(root: Path, name: str = "fastmcp-loopy", version: str = "1.0.1") -> None:
     """Write the registry entry for the (modified) copy, as a release would."""
     files = {
         p.relative_to(root / name / version).as_posix(): p.read_bytes()
@@ -148,7 +148,7 @@ def test_e11_1_t01_ms01_1_renders_twice_byte_identical_and_equals_golden(
 ) -> None:
     manifest = SkillManifest.model_validate(manifest_dict())
     first = render_manifest(template, manifest)
-    second = render_manifest(load_template("fastmcp-loopy", "1.0.0"), manifest)
+    second = render_manifest(load_template("fastmcp-loopy", "1.0.1"), manifest)
     assert list(first.files) == list(PY_FILES)
     assert {n: t.encode() for n, t in first.files.items()} == {
         n: t.encode() for n, t in second.files.items()
@@ -188,14 +188,14 @@ def test_e11_1_t01_ms01_1_mapping_uses_isatvon_structured_form() -> None:
 
 
 def test_e11_1_t01_registry_entry_is_the_sorted_tree_hash(template: LoadedTemplate) -> None:
-    root = TEMPLATES / "fastmcp-loopy" / "1.0.0"
+    root = TEMPLATES / "fastmcp-loopy" / "1.0.1"
     digest = hashlib.sha256()
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
         rel = path.relative_to(root).as_posix()
         digest.update(f"{rel}\0{hashlib.sha256(path.read_bytes()).hexdigest()}\n".encode())
     ref = render(template).template
-    assert (ref.name, ref.version, ref.sha256) == ("fastmcp-loopy", "1.0.0", digest.hexdigest())
-    assert ref.sha256 == released_hash(TEMPLATES, "fastmcp-loopy", "1.0.0")
+    assert (ref.name, ref.version, ref.sha256) == ("fastmcp-loopy", "1.0.1", digest.hexdigest())
+    assert ref.sha256 == released_hash(TEMPLATES, "fastmcp-loopy", "1.0.1")
 
 
 def test_e11_1_registry_covers_every_template_version_and_nothing_else() -> None:
@@ -223,7 +223,7 @@ def test_e11_1_template_yaml_context_lists_match_the_template_sources(
 
 
 def test_e11_1_template_yaml_declares_isatvon_1_4_and_semver(template: LoadedTemplate) -> None:
-    spec = yaml.safe_load((TEMPLATES / "fastmcp-loopy" / "1.0.0" / "template.yaml").read_text())
+    spec = yaml.safe_load((TEMPLATES / "fastmcp-loopy" / "1.0.1" / "template.yaml").read_text())
     assert spec["supports_isatvon"] == ["1.4"]
     assert re.fullmatch(r"\d+\.\d+\.\d+", spec["version"])
     assert set(spec["base_imports"]) == set(template.base_imports)
@@ -449,10 +449,10 @@ def test_e11_1_t04_strict_undefined_makes_a_template_typo_a_render_error(
     tmp_path: Path,
 ) -> None:
     root = copy_templates(tmp_path)
-    path = root / "fastmcp-loopy" / "1.0.0" / "server.py.j2"
+    path = root / "fastmcp-loopy" / "1.0.1" / "server.py.j2"
     path.write_text(path.read_text() + "\n# {{ not_a_context_variable }}\n", encoding="utf-8")
     rehash(root)
-    loaded = load_template("fastmcp-loopy", "1.0.0", root=root)
+    loaded = load_template("fastmcp-loopy", "1.0.1", root=root)
     out = tmp_path / "skeleton"
     err = error_of(lambda: write_skeleton(render_skeleton(loaded, edge_params()), out))
     assert err.code is TemplateErrorCode.TEMPLATE_RENDER_ERROR
@@ -594,8 +594,8 @@ def test_e11_1_t05_structural_rules(template: LoadedTemplate) -> None:
 
 def test_e11_1_t06_unmodified_copy_loads(tmp_path: Path) -> None:
     root = copy_templates(tmp_path)
-    assert load_template("fastmcp-loopy", "1.0.0", root=root).sha256 == released_hash(
-        root, "fastmcp-loopy", "1.0.0"
+    assert load_template("fastmcp-loopy", "1.0.1", root=root).sha256 == released_hash(
+        root, "fastmcp-loopy", "1.0.1"
     )
 
 
@@ -604,52 +604,52 @@ def test_e11_1_t06_one_changed_byte_without_a_version_bump_fails_the_hash_check(
     tmp_path: Path, victim: str
 ) -> None:
     root = copy_templates(tmp_path)
-    path = root / "fastmcp-loopy" / "1.0.0" / victim
+    path = root / "fastmcp-loopy" / "1.0.1" / victim
     data = bytearray(path.read_bytes())
     data[-1] ^= 0x01 if data[-1] != 0x0A else 0x20  # flip one bit of the last byte
     path.write_bytes(bytes(data))
-    err = error_of(lambda: load_template("fastmcp-loopy", "1.0.0", root=root))
+    err = error_of(lambda: load_template("fastmcp-loopy", "1.0.1", root=root))
     assert err.code is TemplateErrorCode.TEMPLATE_HASH_MISMATCH
     assert "bump the version" in err.message
 
 
 def test_e11_1_t06_an_added_or_removed_file_fails_the_hash_check(tmp_path: Path) -> None:
     root = copy_templates(tmp_path)
-    directory = root / "fastmcp-loopy" / "1.0.0"
+    directory = root / "fastmcp-loopy" / "1.0.1"
     (directory / "extra.py.j2").write_text("x", encoding="utf-8")
     assert (
-        error_of(lambda: load_template("fastmcp-loopy", "1.0.0", root=root)).code
+        error_of(lambda: load_template("fastmcp-loopy", "1.0.1", root=root)).code
         is TemplateErrorCode.TEMPLATE_HASH_MISMATCH
     )
     (directory / "extra.py.j2").unlink()
     (directory / "models.py.j2").unlink()
     assert (
-        error_of(lambda: load_template("fastmcp-loopy", "1.0.0", root=root)).code
+        error_of(lambda: load_template("fastmcp-loopy", "1.0.1", root=root)).code
         is TemplateErrorCode.TEMPLATE_HASH_MISMATCH
     )
 
 
 def test_e11_1_t06_a_version_bump_with_a_new_registry_entry_loads(tmp_path: Path) -> None:
     root = copy_templates(tmp_path)
-    shutil.copytree(root / "fastmcp-loopy" / "1.0.0", root / "fastmcp-loopy" / "1.0.1")
-    spec = root / "fastmcp-loopy" / "1.0.1" / "template.yaml"
-    spec.write_text(spec.read_text().replace("version: 1.0.0", "version: 1.0.1"), encoding="utf-8")
+    shutil.copytree(root / "fastmcp-loopy" / "1.0.1", root / "fastmcp-loopy" / "1.0.2")
+    spec = root / "fastmcp-loopy" / "1.0.2" / "template.yaml"
+    spec.write_text(spec.read_text().replace("version: 1.0.1", "version: 1.0.2"), encoding="utf-8")
     assert (
-        error_of(lambda: load_template("fastmcp-loopy", "1.0.1", root=root)).code
+        error_of(lambda: load_template("fastmcp-loopy", "1.0.2", root=root)).code
         is TemplateErrorCode.TEMPLATE_NOT_FOUND  # unreleased: no registry entry yet
     )
     registry = json.loads((root / "registry.json").read_text(encoding="utf-8"))
-    registry["templates"]["fastmcp-loopy"]["1.0.1"] = "0" * 64
+    registry["templates"]["fastmcp-loopy"]["1.0.2"] = "0" * 64
     (root / "registry.json").write_text(json.dumps(registry), encoding="utf-8")
-    rehash(root, version="1.0.1")
-    loaded = load_template("fastmcp-loopy", "1.0.1", root=root)
-    assert loaded.version == "1.0.1"
-    assert loaded.sha256 != load_template("fastmcp-loopy", "1.0.0", root=root).sha256
+    rehash(root, version="1.0.2")
+    loaded = load_template("fastmcp-loopy", "1.0.2", root=root)
+    assert loaded.version == "1.0.2"
+    assert loaded.sha256 != load_template("fastmcp-loopy", "1.0.1", root=root).sha256
 
 
 @pytest.mark.parametrize(
     ("name", "version"),
-    [("nope", "1.0.0"), ("fastmcp-loopy", "9.9.9"), ("fastmcp-loopy", "1.0"), ("../x", "1.0.0")],
+    [("nope", "1.0.1"), ("fastmcp-loopy", "9.9.9"), ("fastmcp-loopy", "1.0"), ("../x", "1.0.1")],
 )
 def test_e11_1_t06_unknown_or_malformed_template_refs_are_not_found(
     name: str, version: str
@@ -660,18 +660,18 @@ def test_e11_1_t06_unknown_or_malformed_template_refs_are_not_found(
 
 def test_e11_1_t06_symlinks_in_a_template_tree_are_refused(tmp_path: Path) -> None:
     root = copy_templates(tmp_path)
-    directory = root / "fastmcp-loopy" / "1.0.0"
+    directory = root / "fastmcp-loopy" / "1.0.1"
     (directory / "link.j2").symlink_to(directory / "server.py.j2")
-    err = error_of(lambda: load_template("fastmcp-loopy", "1.0.0", root=root))
+    err = error_of(lambda: load_template("fastmcp-loopy", "1.0.1", root=root))
     assert err.code is TemplateErrorCode.TEMPLATE_INVALID
 
 
 def test_e11_1_t06_registry_must_hold_a_sha256(tmp_path: Path) -> None:
     root = copy_templates(tmp_path)
     (root / "registry.json").write_text(
-        json.dumps({"templates": {"fastmcp-loopy": {"1.0.0": "not-a-hash"}}}), encoding="utf-8"
+        json.dumps({"templates": {"fastmcp-loopy": {"1.0.1": "not-a-hash"}}}), encoding="utf-8"
     )
-    err = error_of(lambda: load_template("fastmcp-loopy", "1.0.0", root=root))
+    err = error_of(lambda: load_template("fastmcp-loopy", "1.0.1", root=root))
     assert err.code is TemplateErrorCode.TEMPLATE_INVALID
 
 
@@ -681,7 +681,7 @@ def test_e11_1_templates_dir_can_be_overridden_by_environment(
     root = copy_templates(tmp_path)
     monkeypatch.setenv("SBAM_TEMPLATES_DIR", str(root))
     assert default_templates_dir() == root
-    assert load_template("fastmcp-loopy", "1.0.0").name == "fastmcp-loopy"
+    assert load_template("fastmcp-loopy", "1.0.1").name == "fastmcp-loopy"
 
 
 # --- ISATVON support -----------------------------------------------------------------------------
@@ -689,13 +689,13 @@ def test_e11_1_templates_dir_can_be_overridden_by_environment(
 
 def test_e11_1_template_version_without_isatvon_1_4_is_a_template_error(tmp_path: Path) -> None:
     root = copy_templates(tmp_path)
-    spec = root / "fastmcp-loopy" / "1.0.0" / "template.yaml"
+    spec = root / "fastmcp-loopy" / "1.0.1" / "template.yaml"
     spec.write_text(
         spec.read_text().replace('supports_isatvon: ["1.4"]', 'supports_isatvon: ["1.3"]'),
         encoding="utf-8",
     )
     rehash(root)
-    old = load_template("fastmcp-loopy", "1.0.0", root=root)
+    old = load_template("fastmcp-loopy", "1.0.1", root=root)
     out = tmp_path / "skeleton"
     err = error_of(lambda: write_skeleton(render_manifest(old, manifest_dict()), out))
     assert err.code is TemplateErrorCode.TEMPLATE_UNSUPPORTED
@@ -857,9 +857,9 @@ def test_e11_1_loaded_template_is_independent_of_the_working_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    a = render_manifest(load_template("fastmcp-loopy", "1.0.0"), manifest_dict())
+    a = render_manifest(load_template("fastmcp-loopy", "1.0.1"), manifest_dict())
     monkeypatch.chdir(Path(__file__).parent)
-    b = render_manifest(load_template("fastmcp-loopy", "1.0.0"), manifest_dict())
+    b = render_manifest(load_template("fastmcp-loopy", "1.0.1"), manifest_dict())
     assert a.files == b.files
 
 
@@ -924,3 +924,18 @@ def test_e11_1_t08_the_only_sql_is_a_parameterised_insert(template: LoadedTempla
     assert sql == ["INSERT INTO otp_audit (skill_id, payload) VALUES (%s, %s)"]
     assert not re.search(r"\b(UPDATE|DELETE)\b", source, flags=re.IGNORECASE)
     assert 'f"INSERT' not in source and "format(" not in source and "% (" not in source
+
+
+def test_696_t01_released_1_0_0_is_still_released_and_unchanged() -> None:
+    """A released version is never edited: 1.0.0 stays in the registry, still loads, and its tree
+    hash is the pinned one (#696). 1.0.1 is a separate entry with a different hash."""
+    old = load_template("fastmcp-loopy", "1.0.0")
+    new = load_template("fastmcp-loopy", "1.0.1")
+    assert old.sha256 == released_hash(TEMPLATES, "fastmcp-loopy", "1.0.0")
+    assert old.sha256 == "d682984986e20c58d4cfdf3d7dd47bcb8469996882a868613aa69c9d6fdda3a6"
+    assert new.sha256 != old.sha256
+    assert (
+        "noqa: F841"
+        not in (TEMPLATES / "fastmcp-loopy" / "1.0.0" / "action_tool.py.j2").read_text()
+    )
+    assert "noqa: F841" in (TEMPLATES / "fastmcp-loopy" / "1.0.1" / "action_tool.py.j2").read_text()

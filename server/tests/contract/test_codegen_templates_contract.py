@@ -41,7 +41,7 @@ def params() -> dict[str, Any]:
 def render(**changes: Any) -> RenderedSkeleton:
     merged = params()
     merged.update(changes)
-    return render_skeleton(load_template("fastmcp-loopy", "1.0.0"), merged)
+    return render_skeleton(load_template("fastmcp-loopy", "1.0.1"), merged)
 
 
 def mypy_strict(directory: Path, *files: str) -> tuple[str, int]:
@@ -125,7 +125,7 @@ def test_e11_1_t07_ms01_1_models_are_mypy_strict_clean(tmp_path: Path) -> None:
     manifest = SkillManifest.model_validate(
         json.loads((FIXTURES / "ms01_1_manifest.json").read_text(encoding="utf-8"))
     )
-    template = load_template("fastmcp-loopy", "1.0.0")
+    template = load_template("fastmcp-loopy", "1.0.1")
     skeleton = render_skeleton(template, params_from_manifest(manifest))
     write_skeleton(skeleton, tmp_path)
     out, status = mypy_strict(tmp_path, "models.py", "state_handoff.py")

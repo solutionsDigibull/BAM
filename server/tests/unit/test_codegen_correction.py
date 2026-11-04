@@ -195,7 +195,7 @@ def attempt_row(sessions: sessionmaker[Session], inp: CorrectionInput, attempt: 
 
 @pytest.fixture(scope="module")
 def template() -> LoadedTemplate:
-    return load_template("fastmcp-loopy", "1.0.0")
+    return load_template("fastmcp-loopy", "1.0.1")
 
 
 # --- E11.4-T01: defect fixed ----------------------------------------------------------------------

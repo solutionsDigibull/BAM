@@ -96,7 +96,7 @@ srv = load_mock_module()
 
 @pytest.fixture(scope="module")
 def template() -> LoadedTemplate:
-    return load_template("fastmcp-loopy", "1.0.0")
+    return load_template("fastmcp-loopy", "1.0.1")
 
 
 def ms01_params() -> dict[str, Any]:
@@ -231,7 +231,7 @@ def test_e11_2_t01_bodies_parse_and_match_golden(template: LoadedTemplate, name:
     assert row.status == LlmCallStatus.SUCCEEDED
     assert (row.prompt_id, row.model) == (PROMPT_ID, f"{ALIAS}-primary")
     assert bifrost.requests[0]["model"] == ALIAS  # an alias, never a model id
-    assert bifrost.requests[0]["metadata"]["template"] == "fastmcp-loopy/1.0.0"
+    assert bifrost.requests[0]["metadata"]["template"] == "fastmcp-loopy/1.0.1"
 
 
 class FakeConn:
@@ -661,7 +661,7 @@ def test_e11_2_t07_crash_after_llm_replays_without_new_call(template: LoadedTemp
     assert row.id == result.id
     assert row.status == CodeAttemptStatus.BODIES_GENERATED
     assert row.llm_call_ids == [str(call.id)]
-    assert (row.template_name, row.template_version) == ("fastmcp-loopy", "1.0.0")
+    assert (row.template_name, row.template_version) == ("fastmcp-loopy", "1.0.1")
     assert row.template_sha256 == template.sha256
     assert row.bodies["state_queries"]
     # A third run (e.g. the workflow replays the stage) finds the row and calls nothing.

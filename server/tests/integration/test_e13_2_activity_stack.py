@@ -218,7 +218,7 @@ def seed(
         stored_manifest = s.get(SubSkillManifest, manifest_id)
         assert stored_manifest is not None
         params = params_from_manifest(SkillManifest.model_validate(stored_manifest.manifest))
-    template = load_template("fastmcp-loopy", "1.0.0")
+    template = load_template("fastmcp-loopy", "1.0.1")
     assembled = assemble_bundle(
         template,
         render_skeleton(template, params),
@@ -242,7 +242,7 @@ def seed(
                 cycle=0,
                 attempt=0,
                 template_name="fastmcp-loopy",
-                template_version="1.0.0",
+                template_version="1.0.1",
                 template_sha256="0" * 64,
                 status="ASSEMBLED",
                 bodies={},

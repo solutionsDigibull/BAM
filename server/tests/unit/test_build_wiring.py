@@ -68,7 +68,7 @@ class World:
     """One Sub-Skill, its manifests and attempts, in a SQLite database with the real tables."""
 
     def __init__(self) -> None:
-        self.template: LoadedTemplate = load_template("fastmcp-loopy", "1.0.0")
+        self.template: LoadedTemplate = load_template("fastmcp-loopy", "1.0.1")
         self.sessions: sessionmaker[Session] = pipeline_sessions()
         bind = self.sessions.kw["bind"]
         tables = [

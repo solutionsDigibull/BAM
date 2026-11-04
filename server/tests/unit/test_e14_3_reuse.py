@@ -97,3 +97,17 @@ def test_e14_3_several_changes_are_all_named() -> None:
     decision = decide(parts(), parts(changed, suite="6" * 64), evidence_verified=True)
     assert set(decision.differing) == {"runtime_image_digest", "suite_sha256"}
     assert decision.prior_key != decision.current_key
+
+
+def test_696_a_fastmcp_loopy_1_0_0_build_is_not_reused_as_1_0_1() -> None:
+    old = manifest()
+    template = old["sbam_build_record"]["build"]["template"]
+    template.update(
+        version="1.0.0", sha256="d682984986e20c58d4cfdf3d7dd47bcb8469996882a868613aa69c9d6fdda3a6"
+    )
+    new = copy.deepcopy(old)
+    new["sbam_build_record"]["build"]["template"].update(
+        version="1.0.1", sha256="8be343759f19c941ab5043419e489e9d0dc854ac47fc65d8363b547ce85076af"
+    )
+    decision = decide(parts(old), parts(new), evidence_verified=True)
+    assert not decision.reuse and decision.differing == ("template",)

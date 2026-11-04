@@ -32,7 +32,7 @@ CHECK = "rbac_mcp_policy_limit_validator"
 
 @pytest.fixture(scope="module")
 def template() -> LoadedTemplate:
-    return load_template("fastmcp-loopy", "1.0.0")
+    return load_template("fastmcp-loopy", "1.0.1")
 
 
 @pytest.fixture(scope="module")

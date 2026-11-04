@@ -125,7 +125,7 @@ def test_e11_3_artifact_kind_is_checked(sessions: sessionmaker[Session]) -> None
 def test_e11_3_t07_disk_full_is_retryable_and_leaves_no_trace(
     sessions: sessionmaker[Session], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    template = load_template("fastmcp-loopy", "1.0.0")
+    template = load_template("fastmcp-loopy", "1.0.1")
     params = ms01_params()
     inp = BuildStageInput(
         tenant_id=TENANT,

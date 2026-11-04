@@ -159,7 +159,7 @@ def run_input(
     """A MS01.1 run. `files` replaces whole bundle files after assembly (a bundle that is simply
     wrong)."""
     params = ms01_params()
-    template = load_template("fastmcp-loopy", "1.0.0")
+    template = load_template("fastmcp-loopy", "1.0.1")
     assembled = assemble_bundle(
         template,
         render_skeleton(template, params),
@@ -237,7 +237,7 @@ def test_e13_2_t02_a_real_bundle_passes_all_three_scenarios_and_leaves_evidence(
 
 def test_e13_2_t05_a_module_missing_from_the_runtime_is_an_import_error(agent_url: str) -> None:
     params = ms01_params()
-    template = load_template("fastmcp-loopy", "1.0.0")
+    template = load_template("fastmcp-loopy", "1.0.1")
     action = assemble_bundle(
         template, render_skeleton(template, params), ms01_bodies(),
         params.get("fresh_state", []), ms01_loop_spec(),

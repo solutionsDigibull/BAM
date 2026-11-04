@@ -41,7 +41,7 @@ SOURCES: Final = {
     "manifest": TESTS / "fixtures" / "isa14" / "ms01_1_manifest.json",
 }
 BODIES_SOURCE: Final = TESTS / "llm-mock" / "sbam-codegen" / "e11_2_ms01_1.json"
-TEMPLATE: Final = ("fastmcp-loopy", "1.0.0")
+TEMPLATE: Final = ("fastmcp-loopy", "1.0.1")
 # What a corrected answer must still contain: the logic that makes this Sub-Skill do its job.
 MUST_KEEP: Final = (
     "otp_match",

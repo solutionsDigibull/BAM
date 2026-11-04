@@ -40,7 +40,7 @@ ALL_GATES = {g.value for g in GATES}
 
 @pytest.fixture(scope="module")
 def template() -> LoadedTemplate:
-    return load_template("fastmcp-loopy", "1.0.0")
+    return load_template("fastmcp-loopy", "1.0.1")
 
 
 def db() -> sessionmaker[Session]:

@@ -84,7 +84,7 @@ class Real:
         self.storage = LocalDiskBackend(root)
         self.bifrost = FakeBifrost(replies)
         client, _ = make_client(self.bifrost, sessions=self.sessions)
-        template = load_template("fastmcp-loopy", "1.0.0")
+        template = load_template("fastmcp-loopy", "1.0.1")
         params = ms01_params()
         skeleton = render_skeleton(template, params)
 
@@ -230,7 +230,7 @@ def test_e12_2_t11_a_failing_real_gate_runs_the_correction_loop_and_escalates(
     pass, the real corrector runs twice, and the Sub-Skill waits for the FDE. A verdict is recorded
     for each pass, under that pass's own stage key."""
     real = Real(root, [codegen_reply(), corrector_reply(), corrector_reply()])
-    skeleton = render_skeleton(load_template("fastmcp-loopy", "1.0.0"), ms01_params())
+    skeleton = render_skeleton(load_template("fastmcp-loopy", "1.0.1"), ms01_params())
     files = dict(skeleton.files)
     files["server.py"] = files["server.py"].replace("mcp.tool(", "mcp.resource(", 1)
     real.gate_skeleton = replace(skeleton, files=files)
