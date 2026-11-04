@@ -363,6 +363,16 @@ def _macro_prefix(macro_category: str) -> str | None:
 # --- Rules ----------------------------------------------------------------------------------------
 
 
+_NOT_A_TABLE_NAME = "is not a SQL table name (lowercase snake_case, up to 63 characters)"
+
+
+def _is_table_name(name: str) -> bool:
+    """The schema step's own rule; imported late because schema_sql reaches this module."""
+    from sbam_contracts.schema_sql import TABLE_NAME
+
+    return re.match(TABLE_NAME, name) is not None
+
+
 def _check_sub_skill(
     skill: SubSkill, macro_category: str | None, registry: Collection[str]
 ) -> list[Found]:
@@ -462,6 +472,9 @@ def _check_sub_skill(
             )
     if len(set(s.required_inputs)) != len(s.required_inputs):
         found.append((6, idef + "s_source.required_inputs", "duplicate input names"))
+    for k, table in enumerate(v.tables):  # the schema step only accepts TABLE_NAME (#690)
+        if not _is_table_name(table):
+            found.append((6, f"{idef}v_variables.tables.{k}", _NOT_A_TABLE_NAME))
     try:
         build_contracts(skill)
     except ValueError as exc:
@@ -471,6 +484,8 @@ def _check_sub_skill(
     handoff = idef + "o_outcome.state_handoff_file."
     if o.state_handoff_file.mode != "append_only":
         found.append((7, handoff + "mode", "must be 'append_only'"))
+    if not _is_table_name(o.state_handoff_file.table):
+        found.append((7, handoff + "table", _NOT_A_TABLE_NAME))
     if o.state_handoff_file.table not in v.tables:
         found.append((7, handoff + "table", "must be listed in v_variables.tables"))
     if not o.state_handoff_file.required_fields:

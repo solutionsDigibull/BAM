@@ -557,3 +557,29 @@ def test_e8_3_a_stored_finding_reads_back_with_its_code() -> None:
     finding = RuleViolation(rule=4, path="p", message="m", code="TOOLS_NOT_DECOUPLED")  # type: ignore[arg-type]
     again = RuleViolation.model_validate(json.loads(finding.model_dump_json()))
     assert again == finding
+
+
+def test_690_a_table_name_that_is_not_a_sql_identifier_is_flagged_up_front() -> None:
+    raw = variant(**{IDEF + "v_variables.tables": ["audit_log", "ERP invoicing"]})
+    found = validate_sub_skill(raw)
+    assert (6, IDEF + "v_variables.tables.1") in [(v.rule, v.path) for v in found]
+    assert all("ERP invoicing" not in v.message for v in found)
+
+
+def test_690_a_handoff_table_that_is_not_a_sql_identifier_is_flagged() -> None:
+    bad = "ERP invoicing"
+    raw = variant(
+        **{
+            IDEF + "v_variables.tables": [bad],
+            IDEF + "o_outcome.state_handoff_file.table": bad,
+        }
+    )
+    pairs = [(v.rule, v.path) for v in validate_sub_skill(raw)]
+    assert (7, IDEF + "o_outcome.state_handoff_file.table") in pairs
+    assert (6, IDEF + "v_variables.tables.0") in pairs
+
+
+def test_690_valid_snake_case_tables_and_the_ms01_1_sample_still_pass() -> None:
+    raw = variant(**{IDEF + "v_variables.tables": ["audit_x", "_t2"]})
+    assert [v for v in validate_sub_skill(raw) if "table" in v.path and "tables" in v.path] == []
+    assert validate_sub_skill(sample(), macro_category="MS01_Investor_Registration_Access") == []
