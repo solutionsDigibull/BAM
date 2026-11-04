@@ -753,6 +753,18 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # Generate (#678): the world's SOW is not approved, so the assigned FDE reaches the checks
+  # and is refused there; nothing is signalled.
+  generate_api_v1_projects__project_id__workflows__workflow_id__generate_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/generate
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      json: {}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 SOW_NOT_APPROVED"
+
   # Manifest viewer reads (E9.6). The world seeds no manifests or Sub-Skills: an assigned FDE
   # reaches the handler and gets 404 (or the Workflow's empty list); the others are refused first.
   sub_skill_manifests_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_skill_id__manifests_get:

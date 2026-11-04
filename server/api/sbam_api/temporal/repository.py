@@ -35,6 +35,16 @@ class TemporalRunRepository(TenantScopedRepository[TemporalRun]):
         )
         return self.session.scalars(query).one_or_none()
 
+    def latest_for_workflow_id(self, temporal_workflow_id: str) -> TemporalRun | None:
+        """The newest run of a Temporal workflow id (e.g. `pipeline-<project_id>`)."""
+        query = (
+            self._scoped()
+            .where(TemporalRun.temporal_workflow_id == temporal_workflow_id)
+            .order_by(TemporalRun.id.desc())
+            .limit(1)
+        )
+        return self.session.scalars(query).one_or_none()
+
     def apply(
         self,
         temporal_workflow_id: str,

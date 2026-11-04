@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:234516baae4dc8c42eedafa73e267a8f4d71d12374d05cc43029f9561d305895
+// source-sha256:940c4381de751f717e68ae8c9f4feb5133282ec85cf73ddcba9c0cc9c85a33e3
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -498,6 +498,7 @@ export interface SbamContracts {
   MacroSkillPatch?: MacroSkillPatch;
   SubSkillEditHistory?: SubSkillEditHistory;
   RegenerateRequest?: RegenerateRequest;
+  GenerateRequest?: GenerateRequest;
   RegenerateInput?: RegenerateInput;
   ValidationReport?: ValidationReport;
   MacroExtraction?: MacroExtraction;
@@ -1031,6 +1032,19 @@ export interface SubSkillEdit {
  */
 export interface RegenerateRequest {
   hint?: string | null;
+}
+/**
+ * `POST W/generate` (#678, TD §8): the Sub-Skills to build; empty = every Sub-Skill, all of
+ * which must then be VALID.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GenerateRequest".
+ */
+export interface GenerateRequest {
+  /**
+   * @maxItems 500
+   */
+  sub_skill_ids?: string[];
 }
 /**
  * `IsatvonRegenerate`'s input: ids only; no `sub_skill_id` re-extracts the Macro Skill.
