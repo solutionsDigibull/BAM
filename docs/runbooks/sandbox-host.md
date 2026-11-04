@@ -36,6 +36,8 @@ The mode comes from the worker's environment and from nowhere else: no API or UI
 
 A worker with `SANDBOX_MODE` set and something missing refuses to start and names the variable (never its value).
 
+On a laptop, `make up PROFILES=sandbox-local` sets `SANDBOX_RUNTIME_DIGEST` for `sandbox-runner` from `skill-runtime:local` (unless you already set it in your shell) and then runs `make runtime-registry-load`, which registers that image in the running API container (no host uv or DB access; safe to repeat). If the image is not built yet it prints a hint: run `make runtime-registry` once, then `make up PROFILES=sandbox-local` again. A failed load does not fail `make up`; re-run `make runtime-registry-load` after fixing what it names.
+
 ## What the CubeSandbox host must provide
 
 Written from the CubeSandbox source and the SDK. **None of it has been run against a real host**: the host acceptance suite
