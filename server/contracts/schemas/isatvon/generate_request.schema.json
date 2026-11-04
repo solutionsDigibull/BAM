@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:isatvon/generate_request:0.1.0",
+  "additionalProperties": false,
+  "description": "`POST W/generate` (#678, TD §8): the Sub-Skills to build; empty = every Sub-Skill, all of\nwhich must then be VALID.",
+  "properties": {
+    "sub_skill_ids": {
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "maxItems": 500,
+      "title": "Sub Skill Ids",
+      "type": "array"
+    }
+  },
+  "title": "GenerateRequest",
+  "type": "object"
+}

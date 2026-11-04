@@ -15,6 +15,8 @@
   per-field history). A Sub-Skill cannot be created here: POST is 405. See `isatvon/edits.py`.
 * `POST W/macro-skills/{macro_id}/regenerate` and `POST W/sub-skills/{sub_id}/regenerate`
   (`RegenerateRequest {hint?}` + `Idempotency-Key`): 202 `{"run": Run}`; see `regenerate.py`.
+* `POST W/generate` (`GenerateRequest {sub_skill_ids?}` + `Idempotency-Key`, #678): signals the
+  pipeline waiting at WAIT_GENERATE to build; 202 `{"run": Run}`; see `generate.py`.
 * `GET W/isatvon/export.xlsx?include_invalid=true` (E8.5): 302 to a signed URL (300 s) of the
   breakdown as a workbook, a sheet per Macro Skill; 409 CONFLICT before any Macro Skill exists.
   See `isatvon/export.py`.
@@ -28,6 +30,7 @@ from fastapi.responses import RedirectResponse
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.isatvon_macros import MacroSkillOut
 from sbam_contracts.isatvon_workbench import (
+    GenerateRequest,
     MacroSkillPatch,
     RegenerateRequest,
     SubSkillEditHistory,
@@ -44,6 +47,7 @@ from sbam_api.core.conventions import etag, not_found, validate_idempotency_key
 from sbam_api.core.settings import Settings
 from sbam_api.isatvon import edits
 from sbam_api.isatvon.export import export_workbook
+from sbam_api.isatvon.generate import start_generate
 from sbam_api.isatvon.grid import IsatvonSchemaResponse, render
 from sbam_api.isatvon.models import MacroSkill
 from sbam_api.isatvon.regenerate import start_regenerate
@@ -244,6 +248,31 @@ async def regenerate_sub_skill(
     return await _regenerate(
         project_id, workflow_id, sub_id, body, request, user, sessions, idempotency_key, True
     )
+
+
+@router.post(W + "/generate", status_code=202, response_model=RunAccepted)
+async def generate(
+    project_id: Project,
+    workflow_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    body: GenerateRequest | None = None,
+    idempotency_key: IdempotencyKey = None,
+) -> RunAccepted:
+    """Build the reviewed breakdown: signals the pipeline waiting at WAIT_GENERATE (#678)."""
+    if idempotency_key is not None:
+        validate_idempotency_key(idempotency_key)
+    run = await start_generate(
+        sessions,
+        lambda: temporal_client(request),
+        user,
+        project_id,
+        workflow_id,
+        body.sub_skill_ids if body else [],
+        idempotency_key=idempotency_key,
+    )
+    return RunAccepted(run=run)
 
 
 EXPORT_URL_TTL = 300  # seconds a signed export link works (as SOW exports)

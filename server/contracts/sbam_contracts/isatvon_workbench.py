@@ -144,6 +144,15 @@ class SubSkillEditHistory(BaseModel):
     edits: list[SubSkillEdit]
 
 
+class GenerateRequest(BaseModel):
+    """`POST W/generate` (#678, TD §8): the Sub-Skills to build; empty = every Sub-Skill, all of
+    which must then be VALID."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sub_skill_ids: Annotated[list[UUID], Field(max_length=500)] = Field(default_factory=list)
+
+
 class RegenerateRequest(BaseModel):
     """`POST W/macro-skills/{id}/regenerate` and `POST W/sub-skills/{id}/regenerate` (E8.4): an
     optional short instruction the FDE typed, never document content."""
@@ -188,6 +197,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "macro_skill_patch": MacroSkillPatch,
         "sub_skill_edit_history": SubSkillEditHistory,
         "regenerate_request": RegenerateRequest,
+        "generate_request": GenerateRequest,
         "regenerate_input": RegenerateInput,
         "validation_report": ValidationReport,
     }
