@@ -5,7 +5,8 @@
 * `start_project_pipeline` (E4.1): the endpoint's flow around it. Under the project row lock:
   replay a repeated Idempotency-Key, check the project is ACTIVE and startable and has documents,
   start Temporal, and only then move IDLE -> INGESTING through the state machine (Temporal down
-  leaves the state alone). The transition carries the key the workflow's own first activity uses,
+  leaves the state alone). Out of KNOWLEDGE_FAILED it is a `retry` that resumes after ingestion
+  (#674). The transition carries the key the workflow's own first activity uses,
   so that activity replays it as a no-op instead of applying it twice.
 * `pipeline_status`: the workflow's `status` query (None when the project never started one).
 * `signal_pipeline`: for the API endpoints that drive the waits (#90 SOW approval, generate,
@@ -21,10 +22,16 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from sbam_contracts.api import ErrorCode
-from sbam_contracts.pipeline import PROJECT_PIPELINE, PipelineInput, PipelineStage, PipelineStatus
+from sbam_contracts.pipeline import (
+    PROJECT_PIPELINE,
+    PipelineInput,
+    PipelineStage,
+    PipelineStatus,
+    ResumeState,
+)
 from sbam_contracts.projects import ProjectStatus
 from sbam_contracts.runs import Run, SubjectType, TaskQueue, pipeline_workflow_id
-from sbam_contracts.state_machines import Actor, MachineName
+from sbam_contracts.state_machines import Actor, KnowledgeVersionState, MachineName
 from sbam_contracts.state_machines import ProjectPipelineState as P
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import Client, WorkflowExecutionStatus
@@ -63,7 +70,11 @@ TEMPORAL_UNAVAILABLE_DETAIL = (
     "The orchestrator is unavailable; nothing was changed. Try again shortly."
 )
 # States a start may begin from, with the state-machine event that leaves them (TD §14.2).
-START_EVENTS = {P.IDLE: "start_processing", P.INGESTION_FAILED: "retry"}
+START_EVENTS = {
+    P.IDLE: "start_processing",
+    P.INGESTION_FAILED: "retry",
+    P.KNOWLEDGE_FAILED: "retry",  # resumes after ingestion, never re-ingests (#674)
+}
 # The pipeline is alive in these (SOW_REVIEW is its wait for the approval signal).
 RUNNING = frozenset(
     {P.INGESTING, P.KNOWLEDGE_BUILDING, P.SOW_GENERATING, P.SOW_REVIEW, P.SOW_APPROVED}
@@ -250,8 +261,9 @@ def _prior_start(session: Session, user: CurrentUser, project_id: UUID, key: str
 
 def _check_startable(
     session: Session, user: CurrentUser, project_id: UUID
-) -> tuple[Project, list[UUID]]:
-    """Lock the project row and check it can start. Returns it with its active document ids."""
+) -> tuple[Project, list[UUID], ResumeState | None]:
+    """Lock the project row and check it can start. Returns it with its active document ids and
+    where the run resumes (None: from the start)."""
     ctx = user.context(project_id)
     project = ProjectRepository(session, ctx).get_for_update(project_id)
     if project is None:
@@ -266,7 +278,25 @@ def _check_startable(
     documents = DocumentVersionRepository(session, ctx).active_ids()
     if not documents:
         raise NoDocuments()
-    return project, documents
+    return project, documents, _resume(session, user, project_id, state)
+
+
+def _resume(session: Session, user: CurrentUser, project_id: UUID, state: P) -> ResumeState | None:
+    """A knowledge retry (#674) continues where the pipeline stopped, the way a SOW regeneration
+    does: with a READY knowledge version (e.g. from a Rebuild) at OKF, whose `build_okf_bundle`
+    returns a READY version as it is and then moves the project on to the SOW; else at KNOWLEDGE,
+    a fresh build. Ingestion is never repeated."""
+    if state is not P.KNOWLEDGE_FAILED:
+        return None
+    # Imported here: sbam_api.knowledge imports this module (TemporalUnavailable).
+    from sbam_api.knowledge.repository import KnowledgeVersionRepository
+
+    ready = KnowledgeVersionRepository(session, user.context(project_id)).in_state(
+        KnowledgeVersionState.READY
+    )
+    if ready:
+        return ResumeState(stage=PipelineStage.OKF, refs={"knowledge": ready[-1].id})
+    return ResumeState(stage=PipelineStage.KNOWLEDGE)
 
 
 def _commit_start(
@@ -292,8 +322,13 @@ def _commit_start(
             correlation_id=correlation_id,
             # The key ProjectPipeline's first activity sends (`_stage_ingest` always sends
             # start_processing), so that activity finds this transition applied and does nothing,
-            # also when this one is a `retry` out of INGESTION_FAILED.
-            idempotency_key=f"{run.temporal_run_id}:{MachineName.PROJECT_PIPELINE.value}:start_processing:0",
+            # also when this one is a `retry` out of INGESTION_FAILED. A run that resumes after
+            # ingestion (#674) never sends it, so its retry gets a key of its own.
+            idempotency_key=(
+                f"{run.temporal_run_id}:{MachineName.PROJECT_PIPELINE.value}:start_processing:0"
+                if P(before) is not P.KNOWLEDGE_FAILED
+                else f"{run.id}:retry"
+            ),
         ),
     )
     record(
@@ -333,7 +368,7 @@ async def start_project_pipeline(
                 )
                 if replay is not None:
                     return replay
-            project, documents = await asyncio.to_thread(
+            project, documents, resume = await asyncio.to_thread(
                 _check_startable, session, user, project_id
             )
             try:
@@ -348,6 +383,7 @@ async def start_project_pipeline(
                 actor_id=str(user.user_id),
                 document_version_ids=documents,  # from the database, never from the request
                 search_attributes=with_search_attributes,
+                resume=resume,
             )
             try:
                 run = await start_pipeline(

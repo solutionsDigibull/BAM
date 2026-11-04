@@ -7,6 +7,7 @@ import {
   canStart,
   isRunning,
   startErrorMessage,
+  startLabel,
   timelineView,
   uploadsPath,
 } from "./workspace-api";
@@ -34,6 +35,14 @@ describe("Start processing rules (E4.10)", () => {
   test("a retry after a failed ingestion needs a document too", () => {
     expect(canStart(timeline("INGESTION_FAILED", { failed: 1 }))).toBe(true);
     expect(canStart(timeline("INGESTION_FAILED"))).toBe(false);
+  });
+
+  test("e4_1b_t04 a failed knowledge build can be retried and says so (#674)", () => {
+    expect(canStart(timeline("KNOWLEDGE_FAILED", { parsed: 6 }))).toBe(true);
+    expect(canStart(timeline("KNOWLEDGE_FAILED"))).toBe(false);
+    expect(startLabel("KNOWLEDGE_FAILED")).toBe("Retry processing");
+    expect(startLabel("IDLE")).toBe("Start processing");
+    expect(startLabel("INGESTION_FAILED")).toBe("Start processing");
   });
 
   test.each([
