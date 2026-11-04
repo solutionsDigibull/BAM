@@ -35,6 +35,8 @@ class FailedPipeline(PipelineClient):
 
 
 class Failed(GenerateHarness):
+    pipeline: FailedPipeline  # narrows the base harness attribute (it holds the fake below)
+
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
         self.pipeline = FailedPipeline()
@@ -46,7 +48,7 @@ class Failed(GenerateHarness):
             self.sub(macro, 2, sample("MS01.2_B", "B")).id,
         ]
 
-    def start(self, token: str | None = None) -> Any:
+    def begin(self, token: str | None = None) -> Any:
         return self.call("POST", f"/projects/{self.project}/pipeline/start", token or self.fde())
 
     def project_state(self) -> str:
@@ -59,7 +61,7 @@ def h(tmp_path: Path) -> Iterator[Failed]:
 
 
 def test_694_t04_start_after_a_schema_failure_resumes_at_wait_generate(h: Failed) -> None:
-    res = h.start()
+    res = h.begin()
     assert res.status_code == 202, res.text
     [arg] = h.pipeline.started
     assert arg.resume is not None
@@ -75,7 +77,7 @@ def test_694_t04_start_after_a_schema_failure_resumes_at_wait_generate(h: Failed
 @pytest.mark.parametrize("failed", [PipelineStage.BUILD_SUB_SKILLS, PipelineStage.KNOWLEDGE, None])
 def test_694_t05_a_failure_elsewhere_is_still_409(h: Failed, failed: PipelineStage | None) -> None:
     h.pipeline.failed_stage = failed
-    problem(h.start(), 409, "INVALID_TRANSITION")
+    problem(h.begin(), 409, "INVALID_TRANSITION")
     assert h.pipeline.started == []
 
 
@@ -83,12 +85,12 @@ def test_694_t06_a_workflow_that_is_not_in_review_is_409(h: Failed) -> None:
     with h.sessions() as s:
         s.execute(update(Workflow).where(Workflow.id == h.wf).values(state="BUILDING"))
         s.commit()
-    problem(h.start(), 409, "INVALID_TRANSITION")
+    problem(h.begin(), 409, "INVALID_TRANSITION")
     assert h.pipeline.started == []
 
 
 def test_694_t07_start_is_still_tenant_and_role_scoped(h: Failed) -> None:
-    problem(h.start(token=h.realm.token(FDE_A2)), 404, "NOT_FOUND")  # not assigned: no leak
-    problem(h.start(token=h.realm.token(FDE_B1)), 404, "NOT_FOUND")  # another tenant
-    assert h.start(token=h.realm.token(ADMIN_A)).status_code == 403
+    problem(h.begin(token=h.realm.token(FDE_A2)), 404, "NOT_FOUND")  # not assigned: no leak
+    problem(h.begin(token=h.realm.token(FDE_B1)), 404, "NOT_FOUND")  # another tenant
+    assert h.begin(token=h.realm.token(ADMIN_A)).status_code == 403
     assert h.pipeline.started == []

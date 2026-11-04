@@ -9,6 +9,7 @@ import asyncio
 import json
 import os
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -75,7 +76,7 @@ def test_694_t01_schema_failure_returns_workflow_and_sub_skills_and_names_them()
 
     async def scenario(sessions: Any) -> None:
         project = new_project(sessions, TENANT)
-        overrides = {
+        overrides: dict[str, Callable[..., Any]] = {
             "ingest_documents": ingest_stand_in,
             "build_schema_sql": invalid,
             "apply_pipeline_transition": recording,
