@@ -7,6 +7,7 @@ Cognee names a data item after its file stem; the key is what makes `add` idempo
 """
 
 import asyncio
+import importlib
 import json
 import os
 import tempfile
@@ -25,8 +26,26 @@ from sbam_workers.llm.store import SqlCallStore
 from sbam_workers.settings import WorkerSettings
 
 COGNEE_LLM_PROVIDER = "custom"
+CHUNK_TASK_MODULE = "cognee.tasks.documents.extract_chunks_from_documents"
 _ready: asyncio.Lock | None = None
 _setup_done = False
+
+
+def _no_temporal_hints(text: str, base: Any) -> tuple[list[str], Any]:
+    """Stands in for Cognee's `hint_lines` (#676). The real one runs `dateparser.search_dates` on
+    every chunk, synchronously, on the worker's event loop: for minutes at a time, so the
+    activity's heartbeats cannot be sent and Temporal times every attempt out. The hints only
+    resolve dates that state no year; the chunk text is never changed."""
+    return [], base
+
+
+def disable_temporal_hints() -> None:
+    """Replace `hint_lines` in Cognee's chunk task. Raises if Cognee no longer has it, so an
+    upgrade cannot silently undo this (a rename must be looked at, not skipped)."""
+    module = importlib.import_module(CHUNK_TASK_MODULE)
+    if not hasattr(module, "hint_lines"):
+        raise RuntimeError(f"{CHUNK_TASK_MODULE} has no hint_lines to replace (#676)")
+    setattr(module, "hint_lines", _no_temporal_hints)  # noqa: B010 - ModuleType has no attribute
 
 
 class CogneeLibrary:
@@ -45,6 +64,7 @@ class CogneeLibrary:
                 # LLM_PROVIDER is SBAM's mock/bifrost switch in every worker, so Cognee's own
                 # provider type is set here: an OpenAI-compatible endpoint, which is Bifrost.
                 cognee.config.set_llm_provider(COGNEE_LLM_PROVIDER)
+                disable_temporal_hints()
                 await setup()
                 _setup_done = True
 
