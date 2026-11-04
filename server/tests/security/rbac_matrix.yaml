@@ -765,6 +765,18 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "409 SOW_NOT_APPROVED"
 
+  # Rebuild (#695): project A's Workflow is not NEEDS_FDE_REVIEW, so the assigned FDE is refused
+  # at the checks; nothing is signalled.
+  rebuild_api_v1_projects__project_id__workflows__workflow_id__rebuild_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/rebuild
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      json: {}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 CONFLICT"
+
   # Manifest viewer reads (E9.6). The world seeds no manifests or Sub-Skills: an assigned FDE
   # reaches the handler and gets 404 (or the Workflow's empty list); the others are refused first.
   sub_skill_manifests_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_skill_id__manifests_get:

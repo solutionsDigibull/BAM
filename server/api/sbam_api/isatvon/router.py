@@ -17,6 +17,9 @@
   (`RegenerateRequest {hint?}` + `Idempotency-Key`): 202 `{"run": Run}`; see `regenerate.py`.
 * `POST W/generate` (`GenerateRequest {sub_skill_ids?}` + `Idempotency-Key`, #678): signals the
   pipeline waiting at WAIT_GENERATE to build; 202 `{"run": Run}`; see `generate.py`.
+* `POST W/rebuild` (`GenerateRequest {sub_skill_ids?}` + `Idempotency-Key`, #695): signals the
+  pipeline waiting at WAIT_REBUILD to rebuild Sub-Skills that need review; 202 `{"run": Run}`;
+  see `rebuild.py`.
 * `GET W/isatvon/export.xlsx?include_invalid=true` (E8.5): 302 to a signed URL (300 s) of the
   breakdown as a workbook, a sheet per Macro Skill; 409 CONFLICT before any Macro Skill exists.
   See `isatvon/export.py`.
@@ -50,6 +53,7 @@ from sbam_api.isatvon.export import export_workbook
 from sbam_api.isatvon.generate import start_generate
 from sbam_api.isatvon.grid import IsatvonSchemaResponse, render
 from sbam_api.isatvon.models import MacroSkill
+from sbam_api.isatvon.rebuild import start_rebuild
 from sbam_api.isatvon.regenerate import start_regenerate
 from sbam_api.isatvon.service import revalidate
 from sbam_api.isatvon.tree import workbench_row, workbench_tree
@@ -264,6 +268,31 @@ async def generate(
     if idempotency_key is not None:
         validate_idempotency_key(idempotency_key)
     run = await start_generate(
+        sessions,
+        lambda: temporal_client(request),
+        user,
+        project_id,
+        workflow_id,
+        body.sub_skill_ids if body else [],
+        idempotency_key=idempotency_key,
+    )
+    return RunAccepted(run=run)
+
+
+@router.post(W + "/rebuild", status_code=202, response_model=RunAccepted)
+async def rebuild(
+    project_id: Project,
+    workflow_id: UUID,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+    body: GenerateRequest | None = None,
+    idempotency_key: IdempotencyKey = None,
+) -> RunAccepted:
+    """Rebuild Sub-Skills that need review: signals the pipeline at WAIT_REBUILD (#695)."""
+    if idempotency_key is not None:
+        validate_idempotency_key(idempotency_key)
+    run = await start_rebuild(
         sessions,
         lambda: temporal_client(request),
         user,
