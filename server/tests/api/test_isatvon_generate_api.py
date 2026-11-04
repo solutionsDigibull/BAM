@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from sbam_api.audit.models import AuditLog
 from sbam_api.core.ids import uuid7
+from sbam_api.isatvon.models import SubSkill
 from sbam_api.sow.models import SowVersion
 from sbam_api.temporal.models import TemporalRun
 from sbam_api.workflows.models import Workflow
@@ -59,6 +60,15 @@ class GenerateHarness(Harness):
             json=body if body is not None else {},
             headers=headers,
         )
+
+    def states(self) -> dict[str, str]:
+        with self.sessions() as s:
+            return {r.skill_id: r.state for r in s.scalars(select(SubSkill))}
+
+    def entered_building(self) -> list[AuditLog]:
+        with self.sessions() as s:
+            rows = s.scalars(select(AuditLog).where(AuditLog.entity_type == "sub_skill"))
+            return [r for r in rows if (r.after or {}).get("state") == "BUILDING"]
 
     def requested(self) -> list[AuditLog]:
         with self.sessions() as s:
@@ -175,3 +185,44 @@ def test_e10_1b_t06_a_sub_skill_of_another_workflow_is_404(h: GenerateHarness) -
     problem(h.generate({"sub_skill_ids": [str(uuid.uuid4())]}), 404, "NOT_FOUND")
     problem(h.generate(workflow=uuid.uuid4()), 404, "NOT_FOUND")
     assert h.pipeline.signals == []
+
+
+# --- #682: the Sub-Skills sent to build enter BUILDING ------------------------------------------
+
+
+def test_682_t02_named_sub_skills_enter_building_and_only_those(h: GenerateHarness) -> None:
+    macro = h.macro(1, "MS01_A")
+    one = h.sub(macro, 1, sample("MS01.1_A", "A"))
+    h.sub(macro, 2, sample("MS01.2_B", "B"))
+    assert h.generate({"sub_skill_ids": [str(one.id)]}).status_code == 202
+    assert h.states() == {"MS01.1_A": "BUILDING", "MS01.2_B": "VALID"}
+    [moved] = h.entered_building()
+    assert moved.entity_id == str(one.id) and moved.actor_id == str(FDE_A1)
+
+
+def test_682_t03_no_ids_moves_every_sub_skill_to_building(h: GenerateHarness) -> None:
+    macro = h.macro(1, "MS01_A")
+    h.sub(macro, 1, sample("MS01.1_A", "A"))
+    h.sub(macro, 2, sample("MS01.2_B", "B"))
+    assert h.generate().status_code == 202
+    assert h.states() == {"MS01.1_A": "BUILDING", "MS01.2_B": "BUILDING"}
+
+
+@pytest.mark.parametrize("refusal", ["not_waiting", "temporal_down"])
+def test_682_t04_a_refused_signal_leaves_the_sub_skills_valid(
+    h: GenerateHarness, refusal: str
+) -> None:
+    h.sub(h.macro(1, "MS01_A"), 1, sample("MS01.1_A", "A"))
+    if refusal == "not_waiting":
+        h.pipeline.stage = PipelineStage.BUILD_SUB_SKILLS
+    else:
+        h.pipeline.down = True
+    assert h.generate().status_code in (409, 503)
+    assert h.states() == {"MS01.1_A": "VALID"} and h.entered_building() == []
+
+
+def test_682_t05_a_repeated_key_moves_the_sub_skills_once(h: GenerateHarness) -> None:
+    h.sub(h.macro(1, "MS01_A"), 1, sample("MS01.1_A", "A"))
+    assert h.generate(key="generate-twice").status_code == 202
+    assert h.generate(key="generate-twice").status_code == 202
+    assert h.states() == {"MS01.1_A": "BUILDING"} and len(h.entered_building()) == 1

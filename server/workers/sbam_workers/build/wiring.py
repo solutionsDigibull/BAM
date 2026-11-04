@@ -27,6 +27,7 @@ import asyncio
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -292,7 +293,13 @@ def _static_gate() -> StaticGate:
         if settings.toolchain_jobs_dir
         else LocalExecutor()
     )
-    return StaticGate(make_backend(settings), sessions, clamd, make_tools(executor))
+    return StaticGate(
+        make_backend(settings),
+        sessions,
+        clamd,
+        make_tools(executor),
+        max_signature_age=timedelta(hours=settings.clamav_max_signature_age_hours),
+    )
 
 
 @lru_cache(maxsize=1)

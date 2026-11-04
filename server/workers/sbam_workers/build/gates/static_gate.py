@@ -7,7 +7,8 @@ any Ruff, Black or MyPy finding, a Bandit HIGH (MEDIUM and LOW are reported on a
 and any ClamAV detection. A blocking failure raises `GateFailed`, details[0] = the attempt id, so
 `SubSkillBuild` corrects it from the stored findings.
 
-A tool that gives no verdict (timeout, crash, clamd unreachable, signatures older than 24 hours) is
+A tool that gives no verdict (timeout, crash, clamd unreachable, signatures older than the limit,
+`clamav_max_signature_age_hours`, 48 h by default, the same as the upload scan) is
 `STATIC_GATE_INFRA`: retryable, never a correction; after the retries the build stops as a platform
 defect for an operator. Nothing is recorded for a gate that gave no verdict. A ClamAV detection
 also copies the bundle to quarantine storage and writes an audit row, and is logged as an alert.
@@ -44,7 +45,8 @@ from sbam_workers.build.gates.toolchain import ToolFailure
 
 STAGE = "static_gate"
 GATES = (GateName.RUFF, GateName.BLACK, GateName.MYPY, GateName.BANDIT, GateName.CLAMAV)
-MAX_SIGNATURE_AGE: Final = timedelta(hours=24)
+# ClamAV publishes one database a day, so a 24 h limit refuses for hours on most days (#682).
+MAX_SIGNATURE_AGE: Final = timedelta(hours=48)
 QUARANTINE_MIME: Final = "application/x-tar"
 SYSTEM_ACTOR: Final = "SYSTEM"
 log = logging.getLogger("sbam_workers.build.static_gate")
@@ -65,18 +67,20 @@ class StaticGate:
         clamd: ClamdClient,
         tools: tuple[Callable[[Mapping[str, bytes]], ToolResult], ...] = TOOLS,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        max_signature_age: timedelta = MAX_SIGNATURE_AGE,
     ) -> None:
         self.storage = storage
         self.sessions = sessions
         self.clamd = clamd
         self.tools = tools
         self.clock = clock
+        self.max_signature_age = max_signature_age
 
     def _scan(self, bundle: StoredBundle) -> tuple[Verdict, list[str]]:
         """ClamAV over every file of the bundle; the second item names the signatures found."""
         try:
             version = self.clamd.version()
-            require_fresh(version, self.clock(), MAX_SIGNATURE_AGE)
+            require_fresh(version, self.clock(), self.max_signature_age)
             found: list[dict[str, object]] = []
             signatures: list[str] = []
             for name in sorted(bundle.files):

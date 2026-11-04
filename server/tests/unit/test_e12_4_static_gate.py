@@ -195,16 +195,31 @@ def test_e12_4_t07_clamd_down_is_retryable_infra_and_records_no_verdict(
     assert results(sessions, inp) == []
 
 
+@pytest.mark.parametrize(
+    ("age", "limit"),
+    [(timedelta(hours=50), {}), (timedelta(hours=30), {"max_signature_age": timedelta(hours=24)})],
+)
 def test_e12_4_stale_signatures_are_infra_not_a_pass(
-    template: Any, tmp_path: Path  # noqa: F811
+    template: Any, tmp_path: Path, age: timedelta, limit: dict[str, Any]  # noqa: F811
 ) -> None:
     sessions, storage, inp = db(), LocalDiskBackend(tmp_path), stage_input()
     assembled(template, sessions, storage, inp)
-    with FakeClamd(version=version_string(age=timedelta(hours=30))) as clamd:
+    with FakeClamd(version=version_string(age=age)) as clamd:
         with pytest.raises(ApplicationError) as caught:
-            run_stage(stage_with(storage, sessions, clamd), inp)
+            run_stage(stage_with(storage, sessions, clamd, **limit), inp)
     assert caught.value.type == STATIC_GATE_INFRA and not caught.value.non_retryable
     assert results(sessions, inp) == []
+
+
+def test_682_t01_a_day_old_database_still_scans(
+    template: Any, tmp_path: Path  # noqa: F811
+) -> None:
+    """ClamAV publishes once a day: 30 h old is normal and within the default 48 h limit."""
+    sessions, storage, inp = db(), LocalDiskBackend(tmp_path), stage_input()
+    attempt_id = assembled(template, sessions, storage, inp)
+    with FakeClamd(version=version_string(age=timedelta(hours=30))) as clamd:
+        assert run_stage(stage_with(storage, sessions, clamd), inp) == attempt_id
+    assert {r.gate for r in results(sessions, inp)} == {g.value for g in GATES}
 
 
 def test_e12_4_a_blocking_tool_finding_is_gate_failed_with_the_findings_stored(

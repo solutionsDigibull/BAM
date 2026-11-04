@@ -13,10 +13,13 @@ it. Checks first, then the signal, then the audit:
 * the signal goes out with `expect_stage=WAIT_GENERATE`: 409 PIPELINE_NOT_WAITING when the
   pipeline is anywhere else, 503 when Temporal is down. Nothing is recorded on a refusal.
 
-202 with the project's pipeline run; audit GENERATE_REQUESTED (actor, Sub-Skills, run). A repeated
-Idempotency-Key answers the same run without a second signal (and the workflow drops a repeated
-key on its own). The workflow code is unchanged: it already applies `generate` to the Workflow and
-builds.
+202 with the project's pipeline run; audit GENERATE_REQUESTED (actor, Sub-Skills, run). Every
+Sub-Skill sent to build takes the SUB_SKILL `generate` event (FDE, VALID -> BUILDING) in the same
+transaction: flushed before the signal, committed after it, rolled back on a refusal (#682).
+Without it every transition of the build (`gate_failed`, `tests_started`, ...) is refused.
+A repeated Idempotency-Key answers the same run without a second signal or transition (and the
+workflow drops a repeated key on its own). The workflow code is unchanged: it already applies
+`generate` to the Workflow and builds.
 """
 
 import asyncio
@@ -26,7 +29,7 @@ from collections.abc import Awaitable, Callable
 from sbam_contracts.api import ErrorCode, FieldError
 from sbam_contracts.pipeline import Generate, PipelineStage
 from sbam_contracts.runs import Run, pipeline_workflow_id
-from sbam_contracts.state_machines import SowVersionState, SubSkillState, WorkflowState
+from sbam_contracts.state_machines import Actor, SowVersionState, SubSkillState, WorkflowState
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio.client import Client
 
@@ -36,9 +39,11 @@ from sbam_api.core.conventions import ApiError, not_found
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.isatvon.edits import editable_workflow
+from sbam_api.isatvon.models import SubSkill
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.pipeline.service import TemporalUnavailable, signal_pipeline
 from sbam_api.sow.repository import SowVersionRepository
+from sbam_api.state_machine import TransitionCommand, apply_transition
 from sbam_api.temporal.client import OrchestratorUnavailable
 from sbam_api.temporal.repository import TemporalRunRepository, to_run
 
@@ -87,8 +92,9 @@ def _check(
     project_id: uuid.UUID,
     workflow_id: uuid.UUID,
     requested: list[uuid.UUID],
-) -> list[uuid.UUID]:
-    """The Sub-Skills to build (empty = all of them) once every check passed."""
+) -> tuple[list[uuid.UUID], list[SubSkill]]:
+    """The ids the signal carries (empty = all of them) and the Sub-Skills that will build, once
+    every check passed."""
     ctx = user.context(project_id)
     workflow = editable_workflow(session, ctx, workflow_id)  # 404 / 409 / 423 by state
     if WorkflowState(workflow.state) is not WorkflowState.ISATVON_REVIEW:
@@ -112,7 +118,31 @@ def _check(
     invalid = [s.skill_id for s in chosen if s.state != SubSkillState.VALID.value]
     if invalid:
         raise _not_valid(sorted(invalid))
-    return list(dict.fromkeys(requested))
+    return list(dict.fromkeys(requested)), chosen
+
+
+def _enter_building(
+    session: Session,
+    user: CurrentUser,
+    project_id: uuid.UUID,
+    chosen: list[SubSkill],
+    correlation_id: str,
+) -> None:
+    """VALID -> BUILDING for each Sub-Skill sent to build; flushed, committed by `_commit`."""
+    ctx = user.context(project_id)
+    for sub in chosen:
+        apply_transition(
+            session,
+            ctx,
+            TransitionCommand(
+                model=SubSkill,
+                entity_id=sub.id,
+                event="generate",
+                actor=Actor.FDE,
+                actor_id=str(user.user_id),
+                correlation_id=correlation_id,
+            ),
+        )
 
 
 def _commit(
@@ -159,10 +189,13 @@ async def start_generate(
                 )
                 if replay is not None:
                     return replay
-            wanted = await asyncio.to_thread(
+            wanted, chosen = await asyncio.to_thread(
                 _check, session, user, project_id, workflow_id, sub_skill_ids
             )
             run = await asyncio.to_thread(_pipeline_run, session, user, project_id)
+            await asyncio.to_thread(
+                _enter_building, session, user, project_id, chosen, correlation_id
+            )
             signal = Generate(
                 sub_skill_ids=wanted,
                 idempotency_key=idempotency_key or str(uuid7()),
