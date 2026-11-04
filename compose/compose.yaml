@@ -573,13 +573,17 @@ services:
       MOCK_API_URL: ${MOCK_API_URL:-}
       MOCK_API_IP: ${MOCK_API_IP:-}
       MOCK_CONTROL_TOKEN: ${MOCK_CONTROL_TOKEN:?is required - set it in compose/.env (copy compose/.env.example)}
-    volumes: [promptfoo-jobs:/jobs]
+      # Test generation and the sandbox run read the code bundle and store the suite, report and logs (#700).
+      STORAGE_ROOT: /data/storage
+    volumes: [storage:/data/storage, promptfoo-jobs:/jobs]
     depends_on:
       <<: *worker-depends
       promptfoo: { condition: service_healthy }
   worker-certify:
     <<: *worker
-    environment: { <<: *worker-env, SBAM_QUEUES: sbam-certify }
+    # Certification reuses a stored test suite (certify/reuse.py), so it reads the storage volume (#700).
+    environment: { <<: *worker-env, SBAM_QUEUES: sbam-certify, STORAGE_ROOT: /data/storage }
+    volumes: [storage:/data/storage]
 
   sbam-mock-api:
     # The mock APIs of sandbox tests (E13.5): stubs per run, a request journal, never forwards. Internal
