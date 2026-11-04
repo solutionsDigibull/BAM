@@ -40,6 +40,13 @@ and failure behaviour (see the spike report for numbers and method).
 7. **Failure handling.** The adapter classifies Cognee errors itself. A Bifrost outage surfaces from Cognee as an HTTP 422
    `EmbeddingException`, which must be raised as a retryable `CogneeUnavailable`. `cognify` can run for minutes before
    failing (157 s observed), so the Temporal activity heartbeats from a separate task. No bundle is written unless `cognify` succeeded.
+8. **No date hints (#676).** That heartbeat task shares the worker's event loop, and the Temporal SDK sends an async activity's
+   heartbeat through the same loop, so any synchronous call that holds the loop for more than the 2-minute heartbeat timeout
+   fails every attempt. Cognee's chunk task calls `temporal_hints.hint_lines` (`dateparser.search_dates`) on every chunk, on that
+   loop; a stack dump of the live worker caught it there. `cognee_backend.disable_temporal_hints()` replaces it with a no-op that
+   returns `([], base)`, and raises at start-up if Cognee no longer has the symbol. The cost: the graph prompt no longer gets
+   "inferred from context" absolute dates for expressions that state no year ("of 27 April"); chunk text is unchanged. Dates that
+   state a year are still read by the model from the text.
 
 ## Consequences
 
