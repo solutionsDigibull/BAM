@@ -230,6 +230,8 @@ WORKFLOW: Final = Machine(
         (W.ISATVON_REVIEW, "generate", W.BUILDING, F),
         (W.BUILDING, "all_sub_skills_certified", W.CERTIFYING, S),
         (W.BUILDING, "sub_skill_needs_review", W.NEEDS_FDE_REVIEW, S),
+        # schema.sql failed before any Sub-Skill started (#694): back to the workbench to fix it.
+        (W.BUILDING, "schema_failed", W.ISATVON_REVIEW, S),
         (W.NEEDS_FDE_REVIEW, "retry", W.BUILDING, F),
         (W.CERTIFYING, "workflow_certified", W.CERTIFIED, S),
         (W.CERTIFYING, "workflow_validation_failed", W.WORKFLOW_VALIDATION_FAILED, S),
@@ -338,6 +340,7 @@ SUB_SKILL: Final = Machine(
         (K.VALID, "edit", K.DRAFT, F),
         (K.INVALID, "edit", K.DRAFT, F),
         (K.VALID, "generate", K.BUILDING, F),
+        (K.BUILDING, "build_aborted", K.VALID, S),  # the Workflow's schema failed first (#694)
         (K.BUILDING, "tests_started", K.TESTING, S),
         (K.BUILDING, "gate_failed", K.CORRECTING, S),
         (K.BUILDING, "dependency_missing", K.DEPENDENCY_FAILED, S),

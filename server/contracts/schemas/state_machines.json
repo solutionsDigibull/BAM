@@ -235,6 +235,12 @@
         "actor": "SYSTEM"
       },
       {
+        "from": "BUILDING",
+        "event": "schema_failed",
+        "to": "ISATVON_REVIEW",
+        "actor": "SYSTEM"
+      },
+      {
         "from": "NEEDS_FDE_REVIEW",
         "event": "retry",
         "to": "BUILDING",
@@ -605,6 +611,12 @@
         "event": "generate",
         "to": "BUILDING",
         "actor": "FDE"
+      },
+      {
+        "from": "BUILDING",
+        "event": "build_aborted",
+        "to": "VALID",
+        "actor": "SYSTEM"
       },
       {
         "from": "BUILDING",

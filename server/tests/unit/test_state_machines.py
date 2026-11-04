@@ -368,3 +368,12 @@ def test_e0_6_t09_mapping_matches_td_14_4() -> None:
 @pytest.mark.parametrize("name", list(MachineName), ids=[m.value for m in MachineName])
 def test_e0_6_check_constraint_values_equal_the_enum(name: MachineName) -> None:
     assert check_constraint_values(name) == tuple(s.value for s in MACHINES[name].states)
+
+
+def test_694_schema_failure_returns_the_workflow_and_its_sub_skills() -> None:
+    assert can_transition("workflow", "BUILDING", "schema_failed", "SYSTEM") == "ISATVON_REVIEW"
+    assert can_transition("sub_skill", "BUILDING", "build_aborted", "SYSTEM") == "VALID"
+    # the FDE cannot trigger either; and Generate works again from the restored states
+    assert code_of("workflow", "BUILDING", "schema_failed", "FDE") is not None
+    assert can_transition("workflow", "ISATVON_REVIEW", "generate", "FDE") == "BUILDING"
+    assert can_transition("sub_skill", "VALID", "generate", "FDE") == "BUILDING"
