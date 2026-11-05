@@ -106,16 +106,45 @@ def fingerprint(isatvon: Mapping[str, Any]) -> str:
     return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
 
+INPUT_HINT: Final = (
+    "every case input must satisfy input_schema; a kind whose condition cannot be reached with a"
+    " valid input (e.g. a required input left null) is written as an EDGE case instead"
+)
+
+
+def _input_rule(schema: Mapping[str, Any], path: str) -> str:
+    """What an `/input/<field>` path must be, from our own input schema: never the reply's value
+    (#702). Without it the model is told only the path and repeats the same case."""
+    field = path.removeprefix("/input/").split("/", 1)[0]
+    props: Mapping[str, Any] = schema.get("properties") or {}
+    if field not in props:
+        return f"not an input of this Sub-Skill; inputs: {', '.join(sorted(props)) or 'none'}"
+    kind = props[field].get("type")
+    shown = "/".join(kind) if isinstance(kind, list) else str(kind or "value")
+    if field in (schema.get("required") or []):
+        return f"required {shown}; never null or missing"
+    return f"{shown} when given"
+
+
 def check_output(isatvon: Mapping[str, Any], out: TestgenOutput) -> tuple[str, ...]:
-    """Error lines for a re-ask: the case index and the field path or a stable code, never a
-    value. Empty when every case may be stored."""
+    """Error lines for a re-ask: the case index, the field path and, for an input, the rule from
+    our input schema or a stable code, never a value. Empty when every case may be stored."""
     kinds = set(allowed_kinds(isatvon))
+    schema = input_schema(isatvon)
     lines: list[str] = []
+    bad_input = False
     for index, case in enumerate(out.cases):
         if case.kind not in kinds:
             lines.append(f"case {index}: kind {case.kind.value} is not allowed for this Sub-Skill")
         body = CaseBody.model_validate(case.model_dump(exclude={"kind"}))
-        lines += [f"case {index}: {e.path}" for e in case_errors(isatvon, case.kind, body)]
+        for e in case_errors(isatvon, case.kind, body):
+            if e.path.startswith("/input/"):
+                bad_input = True
+                lines.append(f"case {index}: {e.path}: {_input_rule(schema, e.path)}")
+            else:
+                lines.append(f"case {index}: {e.path}")
+    if bad_input:
+        lines.append(INPUT_HINT)
     return tuple(lines)
 
 

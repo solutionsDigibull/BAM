@@ -17,13 +17,15 @@ from openpyxl.writer import excel as excel_writer
 from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_contracts.build import BuildStageInput
-from sbam_contracts.testgen import CaseBody, CaseKind, dataset_sha256
+from sbam_contracts.testgen import CaseBody, CaseKind, TestgenOutput, dataset_sha256
 from sbam_workers.llm.reask import SchemaInvalidAfterRetries
 from sbam_workers.test.testgen import (
+    INPUT_HINT,
     TEST_DATA_STALE,
     GenerateTests,
     SqlDatasetStore,
     allowed_kinds,
+    check_output,
     data_files,
     fingerprint,
     request_context,
@@ -348,3 +350,40 @@ def test_e13_6_an_assertion_type_the_suite_does_not_know_is_re_asked_and_never_s
         w.bifrost.requests[1]
     )
     assert "typo" not in {c.name for c in w.cases()}
+
+
+# --- #702: the re-ask names the input rule a case broke, never its value -----------------------
+
+
+def answer(*cases: dict[str, Any]) -> TestgenOutput:
+    return TestgenOutput.model_validate({"cases": [*GOOD["cases"], *cases]})
+
+
+def test_702_t01_a_null_required_input_names_the_rule_not_the_value() -> None:
+    nulled = {**INPUT, "otp_payload": None}
+    lines = check_output(sample(), answer(case("no otp", "NO_OP", "NO_OP", input=nulled)))
+    assert lines[0] == "case 3: /input/otp_payload: required string; never null or missing"
+    missing = {k: v for k, v in INPUT.items() if k != "otp_payload"}
+    lines = check_output(sample(), answer(case("gone", "EDGE", "SUCCESS", input=missing)))
+    assert lines[0] == "case 3: /input/otp_payload: required string; never null or missing"
+    assert not any("None" in line or "123456" in line for line in lines)
+
+
+def test_702_t02_an_undeclared_input_lists_the_declared_ones() -> None:
+    extra = {**INPUT, "secret_flag": "x"}
+    [line, _] = check_output(sample(), answer(case("extra", "EDGE", "SUCCESS", input=extra)))
+    assert line == (
+        "case 3: /input/secret_flag: not an input of this Sub-Skill;"
+        " inputs: device_fingerprint, mobile_number, otp_payload"
+    )
+
+
+def test_702_t03_the_edge_hint_comes_once_and_only_with_an_input_error() -> None:
+    nulled = {**INPUT, "otp_payload": None, "mobile_number": None}
+    lines = check_output(sample(), answer(case("a", "NO_OP", "NO_OP", input=nulled)))
+    assert lines.count(INPUT_HINT) == 1 and lines[-1] == INPUT_HINT and len(lines) == 3
+    assert check_output(sample(), answer()) == ()
+    drop = check_output(
+        sample(), answer(case("b", "EDGE", "SUCCESS", initial_state=["DROP TABLE x"]))
+    )
+    assert drop == ("case 3: /initial_state/0",)  # other lines are unchanged, no hint
