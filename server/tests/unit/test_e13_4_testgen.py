@@ -15,6 +15,7 @@ from fixtures import fixture_path
 from llm_db import FakeBifrost, completion, make_client
 from openpyxl.writer import excel as excel_writer
 from sbam_api.storage.local import LocalDiskBackend
+from sbam_api.testgen import seed_fit
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.testgen import CaseBody, CaseKind, TestgenOutput, dataset_sha256
@@ -73,7 +74,10 @@ def reply(body: dict[str, Any]) -> dict[str, Any]:
 
 class World:
     def __init__(
-        self, replies: list[dict[str, Any]], isatvon: dict[str, Any] | None = None
+        self,
+        replies: list[dict[str, Any]],
+        isatvon: dict[str, Any] | None = None,
+        schema: str | None = None,
     ) -> None:
         self.bifrost = FakeBifrost([reply(r) for r in replies])
         self.client, self.sessions = make_client(self.bifrost)
@@ -88,8 +92,12 @@ class World:
         async def isatvon_of(_: BuildStageInput) -> dict[str, Any]:
             return self.isatvon
 
+        self.schema = schema
         self.stage = GenerateTests(
-            isatvon_of, self.client, SqlDatasetStore(self.sessions, self.storage)
+            isatvon_of,
+            self.client,
+            SqlDatasetStore(self.sessions, self.storage),
+            lambda _: self.schema,
         )
 
     def run(self) -> uuid.UUID:
@@ -387,3 +395,56 @@ def test_702_t03_the_edge_hint_comes_once_and_only_with_an_input_error() -> None
         sample(), answer(case("b", "EDGE", "SUCCESS", initial_state=["DROP TABLE x"]))
     )
     assert drop == ("case 3: /initial_state/0",)  # other lines are unchanged, no hint
+
+
+# --- #704: seed SQL that the Workflow's schema.sql refuses ----------------------------------------
+
+SCHEMA = """
+CREATE TABLE investor_profiles (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    mobile_number text NOT NULL,
+    kyc_status text
+);
+"""
+NULL_SEED = "INSERT INTO investor_profiles (mobile_number) VALUES (NULL)"
+GOOD_SEED = "INSERT INTO investor_profiles (mobile_number) VALUES ('9999900000')"
+NOT_NULL = "column mobile_number is NOT NULL: give it a value, never NULL"
+
+
+def seeded(seed: str) -> dict[str, Any]:
+    return {
+        "cases": [
+            case("happy", "PASS_FIRST", "SUCCESS", initial_state=[GOOD_SEED]),
+            case("never passes", "ESCALATION", "ESCALATED", initial_state=[seed]),
+            case("retry", "PASS_AFTER_RETRY", "SUCCESS"),
+        ]
+    }
+
+
+def test_704_t04_seed_sql_that_breaks_schema_sql_is_re_asked_with_the_column_rule() -> None:
+    out = TestgenOutput.model_validate(seeded(NULL_SEED))
+    tables = seed_fit.tables_of(SCHEMA)
+    assert check_output(sample(), out, tables) == (f"case 1: /initial_state/0: {NOT_NULL}",)
+    assert check_output(sample(), out) == ()  # no schema.sql yet: nothing to check against
+    w = World([seeded(NULL_SEED), seeded(GOOD_SEED)], schema=SCHEMA)
+    w.run()
+    assert len(w.bifrost.requests) == 2 and NOT_NULL in json.dumps(w.bifrost.requests[1])
+    assert all(NULL_SEED not in c.initial_state for c in w.cases())
+
+
+def test_704_t05_a_stored_dataset_that_no_longer_fits_is_generated_again() -> None:
+    w = World([seeded(NULL_SEED), seeded(GOOD_SEED)])  # stored before the check existed
+    first = w.run()
+    w.schema = SCHEMA
+    second = w.run()  # same stage key: the replay cache must not hand back the refused cases
+    assert second != first and [d.version for d in w.datasets()] == [1, 2]
+    assert len(w.bifrost.requests) == 2
+    assert w.run() == second and len(w.bifrost.requests) == 2  # it fits now: reused
+
+
+def test_704_an_fde_dataset_that_does_not_fit_is_left_alone() -> None:
+    w = World([seeded(NULL_SEED)])
+    first = w.run()
+    mark_edited(w, first)
+    w.schema = SCHEMA
+    assert w.run() == first and len(w.bifrost.requests) == 1

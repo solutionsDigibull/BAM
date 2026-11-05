@@ -98,3 +98,60 @@ def test_e13_2_a_test_failure_spends_a_correction_and_hands_the_corrector_the_at
     assert result.certified and len(sandbox) == 2  # attempt 0 failed once, never retried as infra
     assert corrections[0].failed_gate == "run_sandbox_tests"
     assert corrections[0].finding_ids == [IDENTITY.attempt_id]
+
+
+# --- #704: retry from TESTING_BLOCKED generates the tests again ----------------------------------
+
+
+def test_704_t06_retry_generates_the_tests_and_the_suite_again_before_the_sandbox() -> None:
+    seq: list[str] = []
+    refused = {"on": True}
+
+    def step(name: str) -> Any:
+        def behave(inp: Any) -> None:
+            seq.append(name)
+            if name == "run_sandbox_tests" and refused["on"]:
+                raise unavailable(InfraReason.DATASET_INVALID)
+
+        return traced(name, [], behave)
+
+    async def scenario(build: Build) -> Any:
+        await build.until_waiting()
+        refused["on"] = False
+        await build.retry()
+        return await build.finish()
+
+    names = ("generate_tests", "build_promptfoo_suite", "run_sandbox_tests")
+    result = run(scenario, **{n: step(n) for n in names})
+    assert result.certified
+    assert seq == [*names, *names]  # the second sandbox run tests the regenerated dataset
+
+
+def test_704_a_model_that_cannot_rewrite_the_tests_blocks_testing_again() -> None:
+    gen: list[BuildStageInput] = []
+    sandbox: list[BuildStageInput] = []
+
+    def generate(inp: Any) -> None:
+        if len(gen) == 2:  # the regeneration after the first retry
+            raise ApplicationError(
+                "no valid cases", type="SchemaInvalidAfterRetries", non_retryable=True
+            )
+
+    def refuse_first(inp: Any) -> None:
+        if len(sandbox) == 1:
+            raise unavailable(InfraReason.DATASET_INVALID)
+
+    async def scenario(build: Build) -> tuple[Any, list[str]]:
+        await build.until_waiting()
+        await build.retry("retry-1")
+        await build.until(lambda s: s.waiting_for_retry and len(gen) == 2)
+        await build.retry("retry-2")
+        return await build.finish(), build.actions()
+
+    result, actions = run(
+        scenario,
+        generate_tests=traced("generate_tests", gen, generate),
+        run_sandbox_tests=traced("run_sandbox_tests", sandbox, refuse_first),
+    )
+    assert result.certified and len(gen) == 3 and len(sandbox) == 2
+    assert actions.count("sandbox_unavailable") == 2 and "generation_failed" not in actions
