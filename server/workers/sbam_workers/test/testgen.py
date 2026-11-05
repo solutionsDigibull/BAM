@@ -24,6 +24,11 @@
   alone; another fingerprint regenerates. An FDE-edited dataset is never overwritten: if its
   fingerprint no longer matches, the stage fails with `TestDataStale` and the Sub-Skill waits in
   review.
+* Seed SQL fits `schema.sql` (#704): a case whose seed SQL breaks a column rule of the Workflow's
+  latest PASSED `schema.sql` (NULL into NOT NULL, a NOT NULL column left out, an unknown column) is
+  re-asked with the column and its rule, because the sandbox refuses the whole dataset for it. A
+  generated dataset that the check refuses is not reused: it is asked again under a key that names
+  it, so the replay cache cannot hand the same answer back. An FDE's dataset is left alone.
 * Mocks follow the API references (#546): `fingerprint` does not cover `S.external_data`, so a
   reused dataset whose stored mocks differ from `mock_definitions(isatvon, its cases)` is written
   again as a new version with the same cases, files and FDE flag and the refreshed mocks. No model
@@ -44,12 +49,15 @@ from typing import Any, Final
 
 from openpyxl import Workbook
 from sbam_api.db.repository import TenantContext
+from sbam_api.schema_sql.repository import WorkflowSchemaRepository
 from sbam_api.storage.base import Kind, StorageBackend, StorageScope
+from sbam_api.testgen import seed_fit
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_api.testgen.repository import CaseRepository, DatasetRepository
 from sbam_api.testgen.service import body_of, files_hashes, mocks_hashes
 from sbam_api.testgen.validate import case_errors, declared_tables, input_schema
 from sbam_contracts.build import BuildStageInput
+from sbam_contracts.build_dashboard import GateStatus
 from sbam_contracts.isatvon14 import SubSkill as SubSkillModel
 from sbam_contracts.pipeline import IdResult
 from sbam_contracts.testgen import (
@@ -126,9 +134,12 @@ def _input_rule(schema: Mapping[str, Any], path: str) -> str:
     return f"{shown} when given"
 
 
-def check_output(isatvon: Mapping[str, Any], out: TestgenOutput) -> tuple[str, ...]:
+def check_output(
+    isatvon: Mapping[str, Any], out: TestgenOutput, tables: seed_fit.Tables | None = None
+) -> tuple[str, ...]:
     """Error lines for a re-ask: the case index, the field path and, for an input, the rule from
-    our input schema or a stable code, never a value. Empty when every case may be stored."""
+    our input schema, for seed SQL the column rule of `schema.sql` (`tables`, #704), or a stable
+    code, never a value. Empty when every case may be stored."""
     kinds = set(allowed_kinds(isatvon))
     schema = input_schema(isatvon)
     lines: list[str] = []
@@ -143,13 +154,18 @@ def check_output(isatvon: Mapping[str, Any], out: TestgenOutput) -> tuple[str, .
                 lines.append(f"case {index}: {e.path}: {_input_rule(schema, e.path)}")
             else:
                 lines.append(f"case {index}: {e.path}")
+        for path, reason in seed_fit.errors(case.initial_state, case.state_script, tables or {}):
+            lines.append(f"case {index}: {path}: {reason}")
     if bad_input:
         lines.append(INPUT_HINT)
     return tuple(lines)
 
 
 async def generate(
-    client: LlmClient, scope: LlmScope, isatvon: Mapping[str, Any]
+    client: LlmClient,
+    scope: LlmScope,
+    isatvon: Mapping[str, Any],
+    tables: seed_fit.Tables | None = None,
 ) -> LlmResult[TestgenOutput]:
     return await client.run(
         ALIAS,
@@ -157,7 +173,7 @@ async def generate(
         TestgenOutput,
         request_context(isatvon),
         scope,
-        validate=lambda out: check_output(isatvon, out),
+        validate=lambda out: check_output(isatvon, out, tables),
     )
 
 
@@ -269,6 +285,12 @@ class SqlDatasetStore:
             for data in stored
         ]
 
+    def fits(self, inp: BuildStageInput, dataset_id: uuid.UUID, tables: seed_fit.Tables) -> bool:
+        """Whether every case of the dataset seeds rows `schema.sql` accepts (#704)."""
+        with self.sessions() as session:
+            rows = CaseRepository(session, self._ctx(inp)).of_dataset(dataset_id)
+            return not any(seed_fit.errors(r.initial_state, r.state_script, tables) for r in rows)
+
     def refresh_mocks(self, inp: BuildStageInput, isatvon: Mapping[str, Any]) -> uuid.UUID:
         """The newest dataset, or a new version of it whose mocks answer the current API
         references (#546). Cases, files, `edited_by_fde` and `generated_for` are carried over."""
@@ -350,17 +372,38 @@ class SqlDatasetStore:
             return dataset.id
 
 
+class SqlSchemaSource:
+    """The Workflow's latest PASSED `schema.sql`, the one the sandbox builds its database from."""
+
+    def __init__(self, sessions: sessionmaker[Session], storage: StorageBackend) -> None:
+        self.sessions = sessions
+        self.storage = storage
+
+    def __call__(self, inp: BuildStageInput) -> str | None:
+        with self.sessions() as session:
+            row = WorkflowSchemaRepository(
+                session, TenantContext(inp.tenant_id, inp.project_id)
+            ).latest(inp.workflow_id, status=GateStatus.PASSED)
+            key = row.storage_key if row is not None else None
+        return self.storage.get(key).decode("utf-8") if key else None
+
+
 def stage_key(inp: BuildStageInput) -> str:
     return f"{STAGE}:{inp.sub_skill_id}:{inp.build_no}:{inp.cycle}:{inp.attempt}"
 
 
-def stage_scope(inp: BuildStageInput, temporal_workflow_id: str) -> LlmScope:
+def stage_scope(
+    inp: BuildStageInput, temporal_workflow_id: str, replaces: uuid.UUID | None = None
+) -> LlmScope:
+    """`replaces` names a refused dataset (#704): its own key, so the replay cache cannot answer
+    with the cases that dataset was made from."""
+    key = stage_key(inp) if replaces is None else f"{stage_key(inp)}:replaces:{replaces}"
     return LlmScope(
         tenant_id=inp.tenant_id,
         project_id=inp.project_id,
         correlation_id=inp.correlation_id,
         temporal_workflow_id=temporal_workflow_id,
-        activity_id=stage_key(inp),
+        activity_id=key,
     )
 
 
@@ -372,20 +415,27 @@ class GenerateTests:
         isatvon_of: Callable[[BuildStageInput], Awaitable[Mapping[str, Any]]],
         client: LlmClient,
         store: SqlDatasetStore,
+        schema_of: Callable[[BuildStageInput], str | None] = lambda _: None,
     ) -> None:
         self.isatvon_of = isatvon_of
         self.client = client
         self.store = store
+        self.schema_of = schema_of  # the Workflow's latest PASSED schema.sql, None without one
 
     @activity.defn(name=STAGE)
     async def run(self, inp: BuildStageInput) -> IdResult:
         isatvon = await self.isatvon_of(inp)
         wanted = fingerprint(isatvon)
+        schema = self.schema_of(inp)
+        tables = seed_fit.tables_of(schema) if schema else {}
         newest = self.store.newest(inp)
+        replaces: uuid.UUID | None = None
         if newest is not None and newest.generated_for == wanted:
-            # same bounds, same tables: the cases stay, the mocks follow the API references
-            return IdResult(id=self.store.refresh_mocks(inp, isatvon))
-        if newest is not None and newest.edited_by_fde:
+            if newest.edited_by_fde or self.store.fits(inp, newest.id, tables):
+                # same bounds, same tables: the cases stay, the mocks follow the API references
+                return IdResult(id=self.store.refresh_mocks(inp, isatvon))
+            replaces = newest.id  # generated cases the sandbox would refuse: ask again (#704)
+        elif newest is not None and newest.edited_by_fde:
             if newest.generated_for is None:  # written before the fingerprint: keep their cases
                 return IdResult(id=self.store.refresh_mocks(inp, isatvon))
             raise ApplicationError(
@@ -396,7 +446,8 @@ class GenerateTests:
         workflow_id = activity.info().workflow_id
         if workflow_id is None:
             raise RuntimeError(f"{STAGE} runs only inside a workflow")
-        result = await generate(self.client, stage_scope(inp, workflow_id), isatvon)
+        scope = stage_scope(inp, workflow_id, replaces)
+        result = await generate(self.client, scope, isatvon, tables)
         cases = [
             (c.kind, CaseBody.model_validate(c.model_dump(exclude={"kind"})))
             for c in result.output.cases

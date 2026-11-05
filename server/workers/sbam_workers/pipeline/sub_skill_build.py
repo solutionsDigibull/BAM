@@ -9,15 +9,16 @@ a first pass (attempt 0) plus at most MAX_CORRECTIONS correction passes:
                                                               correction supplies the bodies)
 
 A gate or test failure runs `correct` and starts the next pass from the manifest (every gate runs
-again; a corrector that changed the ISATVON is picked up by the re-manifest). After
-MAX_CORRECTIONS corrections the Sub-Skill goes to NEEDS_FDE_REVIEW and the workflow waits for the
-`retry` signal, which opens a new cycle (counter reset) from the manifest. Missing libraries go
-DEPENDENCY_FAILED and are corrected the same way. Sandbox infrastructure failures never touch
-the counter: TESTING_BLOCKED, then `retry` re-runs only the sandbox tests. A model that cannot
-answer in a model stage (the re-asks or the transport retries are spent) is neither: the Sub-Skill
-is fine, so `generation_failed` parks it in NEEDS_FDE_REVIEW and `retry` opens a new cycle (#483).
-A correction that changed what the Sub-Skill means (a BEHAVIOUR ISATVON patch) is held the same way
-instead of certifying on the corrector's say-so (#446).
+again; a corrector that changed the ISATVON is picked up by the re-manifest). After MAX_CORRECTIONS
+corrections the Sub-Skill goes to NEEDS_FDE_REVIEW and the workflow waits for the `retry` signal,
+which opens a new cycle (counter reset) from the manifest. Missing libraries go DEPENDENCY_FAILED
+and are corrected the same way. Sandbox infrastructure failures never touch the counter:
+TESTING_BLOCKED, then `retry` runs `generate_tests` and `build_promptfoo_suite` again (#704: a
+dataset the sandbox refused is regenerated, one that fits is reused unchanged), then the sandbox
+tests. A model that cannot answer in a model stage (the re-asks or the transport retries are spent)
+is neither: the Sub-Skill is fine, so `generation_failed` parks it in NEEDS_FDE_REVIEW and `retry`
+opens a new cycle (#483). A correction that changed what the Sub-Skill means (a BEHAVIOUR ISATVON
+patch) is held the same way instead of certifying on the corrector's say-so (#446).
 
 Rules (.claude/rules/temporal.md): deterministic (no clock, randomness, I/O); everything else is an
 activity. The counters live in workflow state and survive replay. State changes go through the
@@ -126,6 +127,7 @@ GENERATION_PATCH = "e11-2c-generation-failed"
 FINDINGS_PATCH = "e11-4-cycle-findings"
 REVIEW_PATCH = "a20-isatvon-patch-review"
 PLATFORM_PATCH = "e12-2-gate-platform-defect"
+RETRY_TESTS_PATCH = "704-retry-regenerates-tests"
 # #117: an integrity or wiring defect in a gate is a platform defect (BUILD_ERROR, an admin fixes
 # it), not a crashed workflow nobody hears about. The other stages' wiring errors still fail loudly.
 # #119: a static tool or clamd that still gives no verdict after the activity's retries is the
@@ -379,9 +381,27 @@ class SubSkillBuild:
             except ActivityError as error:
                 if not isinstance(error.cause, ApplicationError | ActivityTimeout):
                     raise  # a cancellation, not an infrastructure failure
-            await self._apply("sandbox_unavailable")
-            await self._notify("sub_skill.testing_blocked")
-            await self._wait_retry()  # `retry` takes it back to TESTING
+            while not await self._blocked_then_retried(ref):
+                pass
+
+    async def _blocked_then_retried(self, ref: BuildStageInput) -> bool:
+        """TESTING_BLOCKED until the FDE's `retry`, then (#704) the tests are generated again: a
+        dataset the sandbox refused is replaced, one that fits is reused and the suite follows.
+        False when the model could not write them: blocked again, the Sub-Skill is TESTING and
+        `generation_failed` only leaves BUILDING."""
+        await self._apply("sandbox_unavailable")
+        await self._notify("sub_skill.testing_blocked")
+        await self._wait_retry()  # `retry` takes it back to TESTING
+        if not workflow.patched(RETRY_TESTS_PATCH):
+            return True
+        try:
+            await self._call(BuildStage.GENERATE_TESTS, generate_tests, ref)
+            await self._call(BuildStage.BUILD_PROMPTFOO_SUITE, build_promptfoo_suite, ref)
+        except _Failure as failure:
+            if failure.kind != GENERATION_FAILED:
+                raise
+            return False
+        return True
 
     async def _enter_correction(self, failure: _Failure) -> None:
         """CORRECTING (gates, tests) or DEPENDENCY_FAILED (libraries)."""
