@@ -244,6 +244,7 @@ class SubSkillBuild:
         self.held_patch: list[str] | None = None  # paths of a BEHAVIOUR patch held for the FDE
         self.waiting = False
         self.pending_retry: SubSkillRetry | None = None
+        self.blocked_retries = 0  # retries from TESTING_BLOCKED, for the per-retry patch id
         self.retry_keys: list[str] = []
         self.cancel_request: Cancel | None = None
         self.sequence = 0  # makes every transition / notification key unique and replay-stable
@@ -392,7 +393,8 @@ class SubSkillBuild:
         await self._apply("sandbox_unavailable")
         await self._notify("sub_skill.testing_blocked")
         await self._wait_retry()  # `retry` takes it back to TESTING
-        if not workflow.patched(RETRY_TESTS_PATCH):
+        self.blocked_retries += 1
+        if not self._regenerates_tests():
             return True
         try:
             await self._call(BuildStage.GENERATE_TESTS, generate_tests, ref)
@@ -402,6 +404,14 @@ class SubSkillBuild:
                 raise
             return False
         return True
+
+    def _regenerates_tests(self) -> bool:
+        """Whether this retry runs the #704 regeneration. The SDK remembers a patch's first answer
+        for the whole run, so a build that was retried from TESTING_BLOCKED on the old code keeps
+        False forever (#706); each later retry asks its own id, which only new code writes."""
+        return workflow.patched(RETRY_TESTS_PATCH) or workflow.patched(
+            f"{RETRY_TESTS_PATCH}-{self.blocked_retries}"
+        )
 
     async def _enter_correction(self, failure: _Failure) -> None:
         """CORRECTING (gates, tests) or DEPENDENCY_FAILED (libraries)."""
