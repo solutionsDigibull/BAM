@@ -570,6 +570,9 @@ services:
       CUBE_PROXY_PORT_HTTP: ${CUBE_PROXY_PORT_HTTP:-80}
       CUBE_SANDBOX_DOMAIN: ${CUBE_SANDBOX_DOMAIN:-cube.app}
       SANDBOX_EGRESS_LOG_PATH: ${SANDBOX_EGRESS_LOG_PATH:-}
+      # ...or the collector's HTTP service on another machine: GET <url>/egress/<vm_id>, bearer token
+      SANDBOX_EGRESS_URL: ${SANDBOX_EGRESS_URL:-}
+      SANDBOX_EGRESS_TOKEN: ${SANDBOX_EGRESS_TOKEN:-}
       MOCK_API_URL: ${MOCK_API_URL:-}
       MOCK_API_IP: ${MOCK_API_IP:-}
       MOCK_CONTROL_TOKEN: ${MOCK_CONTROL_TOKEN:?is required - set it in compose/.env (copy compose/.env.example)}

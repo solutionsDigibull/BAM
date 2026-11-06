@@ -85,7 +85,8 @@ class WorkerSettings(BaseSettings):
     # Sandbox (E13.2, ADR 0023). The mode comes from here and from nowhere else: no API or UI field
     # can pick it. Unset means no sandbox is configured, and `run_sandbox_tests` then ends as an
     # infrastructure error (retried, then TESTING_BLOCKED), never as a pass. CUBESANDBOX needs the
-    # CUBE_* host settings and an egress evidence file; LOCAL_DOCKER_NONCERT needs the agent's.
+    # CUBE_* host settings and egress evidence (a file or a URL); LOCAL_DOCKER_NONCERT needs the
+    # agent's.
     # Compose passes "" when unset, which every field below reads as unset.
     sandbox_mode: SandboxMode | None = None
     cube_api_url: str | None = None  # CubeAPI :3000 (control plane)
@@ -95,6 +96,9 @@ class WorkerSettings(BaseSettings):
     cube_sandbox_domain: str = Field(default="cube.app", min_length=1)
     # JSONL of `EgressEvent`s written by the host collector (compose/sandbox-host), one per attempt
     sandbox_egress_log_path: str | None = None
+    # ...or served over HTTP when the collector runs on another machine (`GET <url>/egress/<vm>`)
+    sandbox_egress_url: str | None = None
+    sandbox_egress_token: SecretStr | None = None
     sandbox_agent_url: str | None = None  # the local-docker agent
     sandbox_agent_token: SecretStr | None = None
     # The mock API (E13.5): tools under test reach it by name; the worker controls it by token.
@@ -119,6 +123,8 @@ class WorkerSettings(BaseSettings):
         "cube_api_key",
         "cube_proxy_node_ip",
         "sandbox_egress_log_path",
+        "sandbox_egress_url",
+        "sandbox_egress_token",
         "sandbox_agent_url",
         "sandbox_agent_token",
         "mock_api_url",

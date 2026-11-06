@@ -29,7 +29,8 @@ The mode comes from the worker's environment and from nowhere else: no API or UI
 | `CUBE_PROXY_NODE_IP`, `CUBE_PROXY_PORT_HTTP` | CubeSandbox | CubeProxy, port 80 (data plane: exec and file upload; the SDK uses plain HTTP) |
 | `CUBE_SANDBOX_DOMAIN` | CubeSandbox | `cube.app` unless the host was installed with another domain |
 | `CUBE_API_KEY` | CubeSandbox | only when the host enables authentication (it does not by default) |
-| `SANDBOX_EGRESS_LOG_PATH` | CubeSandbox | the file of `EgressEvent` lines the host collector writes (required: no evidence, no certification) |
+| `SANDBOX_EGRESS_LOG_PATH` | CubeSandbox | the file of `EgressEvent` lines the host collector writes (this or the URL is required: no evidence, no certification) |
+| `SANDBOX_EGRESS_URL`, `SANDBOX_EGRESS_TOKEN` | CubeSandbox | the collector's read-only HTTP service when it runs on another machine than the worker: `GET <url>/egress/<vm_id>` with `Authorization: Bearer <token>`. Only a 200 is evidence (an empty 200: nothing attempted); any other status, a timeout or a transport error is `EGRESS_LOG_UNAVAILABLE`. Wins over the file when both are set |
 | `SANDBOX_AGENT_URL`, `SANDBOX_AGENT_TOKEN` | local | the `sandbox-runner` agent (`make up PROFILES=sandbox-local`) |
 | `SANDBOX_RUNTIME_DIGEST` | local agent | the digest the local runtime reports: `docker image inspect --format '{{.Id}}' skill-runtime:local`, the one `make runtime-registry` registers |
 | `MOCK_API_URL`, `MOCK_API_IP`, `MOCK_CONTROL_TOKEN` | both | the mock API for networked sources; the IP must be an address that carries nothing else (CubeSandbox opens every port of an allowed address) |
@@ -86,7 +87,7 @@ on the row lists each case's verdict, never what the code printed.
 | `DATASET_INVALID` | a seed statement failed, or a data file name is not a file name | fix or regenerate the dataset (E13.4); not a host problem |
 | `INPUT_MISMATCH` | a gate did not pass for this bundle, or the schema is not the manifest's | the gate rows; rebuild |
 | `HASH_MISMATCH` | an input changed after the gates: **a security event**, `alert=security` in the worker log | who touched storage; do not retry blindly |
-| `EGRESS_LOG_UNAVAILABLE` | the evidence file is missing or unreadable | the collector, `SANDBOX_EGRESS_LOG_PATH` |
+| `EGRESS_LOG_UNAVAILABLE` | the evidence file is missing or unreadable, or the HTTP service answered anything but 200 | the collector, `SANDBOX_EGRESS_LOG_PATH` / `SANDBOX_EGRESS_URL` and its token |
 | `SUPERSEDED` | a retry took over a stalled run | normal after a worker restart |
 | `CANCELLED` | the activity was cancelled (deploy drain, `cancel` signal) | normal |
 

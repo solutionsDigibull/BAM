@@ -1,10 +1,12 @@
 """E13.2 egress evidence reader and the sandbox factory: the mode comes from the worker's settings
 and nowhere else, and a certifying worker without evidence or host settings refuses to run."""
 
+import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 import pytest
 from sbam_contracts.sandbox import (
     EgressEvent,
@@ -16,7 +18,12 @@ from sbam_contracts.sandbox import (
 from sbam_workers.registry import PreflightError
 from sbam_workers.sandbox.backend import SandboxInfraError
 from sbam_workers.sandbox.cube_backend import CubeSandboxBackend
-from sbam_workers.sandbox.egress import MAX_EVENTS, JsonlEgressReader, read_events
+from sbam_workers.sandbox.egress import (
+    MAX_EVENTS,
+    HttpEgressReader,
+    JsonlEgressReader,
+    read_events,
+)
 from sbam_workers.sandbox.factory import make_sandbox, problem
 from sbam_workers.sandbox.local_backend import LocalDockerBackend
 from sbam_workers.sandbox.preflight import MISCONFIGURED, check_sandbox
@@ -79,6 +86,7 @@ def settings(monkeypatch: pytest.MonkeyPatch, **env: str) -> WorkerSettings:
     for key in (
         "SANDBOX_MODE", "CUBE_API_URL", "CUBE_API_KEY", "CUBE_PROXY_NODE_IP",
         "SANDBOX_EGRESS_LOG_PATH", "SANDBOX_AGENT_URL", "SANDBOX_AGENT_TOKEN", "SBAM_ENV",
+        "SANDBOX_EGRESS_URL", "SANDBOX_EGRESS_TOKEN",
     ):  # fmt: skip
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("TEMPORAL_HOST", "temporal:7233")
@@ -141,7 +149,8 @@ def test_e13_2_a_certifying_worker_missing_a_host_setting_refuses_and_names_only
     monkeypatch: pytest.MonkeyPatch, missing: str
 ) -> None:
     s = settings(monkeypatch, **{k: v for k, v in CUBE.items() if k != missing})
-    assert problem(s) == f"{missing} not set"
+    named = "SANDBOX_EGRESS_LOG_PATH or SANDBOX_EGRESS_URL" if "EGRESS" in missing else missing
+    assert problem(s) == f"{named} not set"
     with pytest.raises(SandboxInfraError) as caught:
         make_sandbox(s)
     assert caught.value.reason is InfraReason.NOT_CONFIGURED and "cube:3000" not in str(
@@ -217,3 +226,84 @@ def test_e13_2_the_check_is_registered_on_the_test_queue() -> None:
     served = {fn.__name__ for fn in registry._PREFLIGHT[TaskQueue.TEST]}
     assert "sandbox_preflight" in served
     assert "sandbox_preflight" not in {fn.__name__ for fn in registry._PREFLIGHT[TaskQueue.BUILD]}
+
+
+# --- the collector's HTTP service (SANDBOX_EGRESS_URL) -------------------------------------------
+
+TOKEN = "e" * 32
+
+
+def served(
+    status: int, body: str = "", seen: list[httpx.Request] | None = None
+) -> HttpEgressReader:
+    def answer(request: httpx.Request) -> httpx.Response:
+        if seen is not None:
+            seen.append(request)
+        return httpx.Response(status, text=body)
+
+    client = httpx.AsyncClient(
+        base_url="http://cube-host:29000",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        transport=httpx.MockTransport(answer),
+    )
+    return HttpEgressReader("http://cube-host:29000", TOKEN, settle_seconds=0, client=client)
+
+
+def test_egress_http_a_200_is_this_vms_events_and_asks_for_this_vm_with_the_token() -> None:
+    seen: list[httpx.Request] = []
+    body = "\n".join([event("vm-1"), "not json", event("vm-2"), event("vm-1", "api.example.com")])
+    found = asyncio.run(served(200, body, seen)("vm-1"))
+    assert [e.dst_host for e in found] == ["evil.example.com", "api.example.com"]
+    assert seen[0].url.path == "/egress/vm-1"
+    assert seen[0].headers["Authorization"] == f"Bearer {TOKEN}"
+
+
+def test_egress_http_an_empty_200_means_nothing_was_attempted() -> None:
+    assert asyncio.run(served(200, "")("vm-1")) == []
+
+
+@pytest.mark.parametrize("status", [401, 404, 409, 500, 503])
+def test_egress_http_any_other_status_is_unavailable_never_an_empty_list(status: int) -> None:
+    with pytest.raises(SandboxInfraError) as caught:
+        asyncio.run(served(status)("vm-1"))
+    assert caught.value.reason is InfraReason.EGRESS_LOG_UNAVAILABLE
+    assert TOKEN not in str(caught.value)
+
+
+def test_egress_http_a_transport_error_or_timeout_is_unavailable() -> None:
+    def fail(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("no answer", request=request)
+
+    client = httpx.AsyncClient(
+        base_url="http://cube-host:29000", transport=httpx.MockTransport(fail)
+    )
+    reader = HttpEgressReader("http://cube-host:29000", TOKEN, settle_seconds=0, client=client)
+    with pytest.raises(SandboxInfraError) as caught:
+        asyncio.run(reader("vm-1"))
+    assert caught.value.reason is InfraReason.EGRESS_LOG_UNAVAILABLE
+
+
+HTTP_CUBE = {
+    **{k: v for k, v in CUBE.items() if k != "SANDBOX_EGRESS_LOG_PATH"},
+    "SANDBOX_EGRESS_URL": "http://cube-host:29000",
+    "SANDBOX_EGRESS_TOKEN": TOKEN,
+}
+
+
+def test_egress_http_the_url_and_token_build_the_http_reader(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    s = settings(monkeypatch, **HTTP_CUBE)
+    assert problem(s) is None
+    assert isinstance(make_sandbox(s).egress_reader, HttpEgressReader)
+    both = settings(monkeypatch, **HTTP_CUBE, SANDBOX_EGRESS_LOG_PATH="/var/egress.jsonl")
+    assert isinstance(make_sandbox(both).egress_reader, HttpEgressReader)  # the URL wins
+
+
+def test_egress_http_a_url_without_its_token_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
+    env = {k: v for k, v in HTTP_CUBE.items() if k != "SANDBOX_EGRESS_TOKEN"}
+    s = settings(monkeypatch, **env)
+    assert problem(s) == "SANDBOX_EGRESS_TOKEN not set"
+    with pytest.raises(SandboxInfraError) as caught:
+        make_sandbox(s)
+    assert caught.value.reason is InfraReason.NOT_CONFIGURED
