@@ -11,7 +11,7 @@ from sbam_contracts.sandbox import InfraReason, SandboxMode
 
 from sbam_workers.sandbox.backend import SandboxBackend, SandboxInfraError
 from sbam_workers.sandbox.cube_backend import CubeSandboxBackend, CubeSettings
-from sbam_workers.sandbox.egress import JsonlEgressReader
+from sbam_workers.sandbox.egress import HttpEgressReader, JsonlEgressReader
 from sbam_workers.sandbox.executor import EgressReader
 from sbam_workers.sandbox.local_backend import LocalDockerBackend
 from sbam_workers.settings import WorkerSettings
@@ -34,10 +34,15 @@ def problem(settings: WorkerSettings) -> str | None:
             for name, value in (
                 ("CUBE_API_URL", settings.cube_api_url),
                 ("CUBE_PROXY_NODE_IP", settings.cube_proxy_node_ip),
-                ("SANDBOX_EGRESS_LOG_PATH", settings.sandbox_egress_log_path),
+                (
+                    "SANDBOX_EGRESS_LOG_PATH or SANDBOX_EGRESS_URL",
+                    settings.sandbox_egress_log_path or settings.sandbox_egress_url,
+                ),
             )
             if not value
         ]
+        if settings.sandbox_egress_url and not settings.sandbox_egress_token:
+            missing.append("SANDBOX_EGRESS_TOKEN")
         return f"{', '.join(missing)} not set" if missing else None
     missing = [
         name
@@ -50,12 +55,23 @@ def problem(settings: WorkerSettings) -> str | None:
     return f"{', '.join(missing)} not set" if missing else None
 
 
+def _egress_reader(settings: WorkerSettings) -> EgressReader:
+    """The collector's HTTP service when one is set, else its file (`problem` checked one is)."""
+    if settings.sandbox_egress_url and settings.sandbox_egress_token:
+        return HttpEgressReader(
+            settings.sandbox_egress_url, settings.sandbox_egress_token.get_secret_value()
+        )
+    if settings.sandbox_egress_log_path:
+        return JsonlEgressReader(settings.sandbox_egress_log_path)
+    raise SandboxInfraError(InfraReason.NOT_CONFIGURED, "no egress evidence source is set")
+
+
 def make_sandbox(settings: WorkerSettings) -> Sandbox:
     why = problem(settings)
     if why is not None or settings.sandbox_mode is None:
         raise SandboxInfraError(InfraReason.NOT_CONFIGURED, why or "SANDBOX_MODE is not set")
     if settings.sandbox_mode is SandboxMode.CUBESANDBOX:
-        if not settings.cube_api_url or not settings.sandbox_egress_log_path:  # `problem` checked
+        if not settings.cube_api_url:  # `problem` checked
             raise SandboxInfraError(InfraReason.NOT_CONFIGURED, "CUBE_API_URL is not set")
         key = settings.cube_api_key.get_secret_value() if settings.cube_api_key else None
         backend: SandboxBackend = CubeSandboxBackend(
@@ -67,9 +83,7 @@ def make_sandbox(settings: WorkerSettings) -> Sandbox:
                 api_key=key,
             )
         )
-        return Sandbox(
-            SandboxMode.CUBESANDBOX, backend, JsonlEgressReader(settings.sandbox_egress_log_path)
-        )
+        return Sandbox(SandboxMode.CUBESANDBOX, backend, _egress_reader(settings))
     if not settings.sandbox_agent_url or not settings.sandbox_agent_token:  # `problem` checked
         raise SandboxInfraError(InfraReason.NOT_CONFIGURED, "SANDBOX_AGENT_URL is not set")
     local = LocalDockerBackend(
