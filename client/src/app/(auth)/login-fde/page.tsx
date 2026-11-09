@@ -1,6 +1,6 @@
 import { devAuthEnabled, keycloakEnabled } from "@/lib/session";
 
-import { DevLogin } from "../dev-login";
+import { FdeLogin } from "../_login/fde-login";
 import { failureReference } from "../failure";
 
 export const metadata = { title: "FDE sign-in" };
@@ -12,8 +12,7 @@ export default async function FdeLoginPage({
 }) {
   const { error, callbackUrl } = await searchParams;
   return (
-    <DevLogin
-      portal="fde"
+    <FdeLogin
       enabled={devAuthEnabled()}
       keycloak={keycloakEnabled()}
       error={error}
