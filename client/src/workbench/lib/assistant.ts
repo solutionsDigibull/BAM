@@ -56,7 +56,7 @@ export function screenNote(f: AssistantFacts): string {
       return 'Index runs automatically: building the context graph.'
     }
     case '3.1': return !snap.sow ? 'No SOW yet. It is generated from the context once the graph is built.'
-      : snap.sow.status === 'approved' ? `SOW v${snap.sow.approval?.version} is approved. Any edit invalidates the approval.` : `Review and edit SOW v${snap.sow.version} in the right pane. The FDE approves it before the Grid.`
+      : snap.sow.status === 'approved' ? `SOW v${snap.sow.approval?.version} is approved. Any edit invalidates the approval.` : `Review and edit SOW v${snap.sow.version} on this screen. The FDE approves it before the Grid.`
     case '3.2': return 'Review the Agent > Skill rows inline. Mark the grid reviewed, then generate the ISATVON Contract.'
     case '4.2': return 'Template shows manifest.json, linked to the approved Scope and Grid.'
     case '4.3': return 'Translate turns the current manifest and approved inputs into checked code.'

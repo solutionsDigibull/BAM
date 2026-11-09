@@ -8,9 +8,10 @@ import type {
   KnowledgeVersionSummary,
   PipelineTimeline,
   ProjectPipelineState,
+  SowOverview,
 } from "@/contracts";
 
-import type { IngestionRun, RunStatus, Snapshot, Stage, StepId, StepInfo } from "../api/types";
+import type { IngestionRun, RunStatus, Snapshot, Sow, Stage, StepId, StepInfo } from "../api/types";
 import { setRagState, type KnowledgeGraph, type KnowledgeStatus } from "../rag/ragPipeline";
 import { isActive, scanEventsOf, toUploadRecord } from "./documents";
 import { getJson, listAll } from "./http";
@@ -24,6 +25,27 @@ const LOCKED = [
 ];
 
 const FAILED: ProjectPipelineState[] = ["INGESTION_FAILED", "KNOWLEDGE_FAILED", "SOW_GENERATION_FAILED"];
+
+/** From these pipeline states on, the project has (or is making) a SOW; before that there is nothing to ask for. */
+const HAS_SOW: ReadonlySet<ProjectPipelineState> = new Set(["SOW_GENERATING", "SOW_REVIEW", "SOW_APPROVED", "WORKFLOW_CREATED"]);
+
+/** The SOW as the shell reads it (tracker status, what blocks the next step, the assistant): its version, whether it is
+ *  approved or being regenerated, and the approval. The document itself is the Scope screen's, never copied here. */
+export function sowOf(o: SowOverview | undefined, state: ProjectPipelineState): Sow | undefined {
+  const cur = o?.current;
+  if (!o || !cur) return undefined;
+  const appr = o.approved;
+  return {
+    version: cur.version,
+    generatedVersion: cur.version,
+    html: "",
+    generatedHtml: "",
+    meta: { sowId: o.sow_id, client: "", lengthMode: "", sources: 0 },
+    updatedAt: cur.created_at,
+    status: appr && appr.version === cur.version ? "approved" : state === "SOW_GENERATING" ? "regenerating" : "draft",
+    approval: appr ? { version: appr.version, at: appr.created_at, by: appr.author ?? "" } : undefined,
+  };
+}
 
 const graphs = new Map<string, KnowledgeGraph>();
 const GRAPH_PAGE = 500;
@@ -89,6 +111,9 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
     getJson<PipelineTimeline>(`projects/${projectId}/pipeline`).then((r) => r.body),
     getJson<KnowledgeVersionList>(`projects/${projectId}/knowledge`).then((r) => r.body.versions),
   ]);
+  const sowOverview = HAS_SOW.has(pipeline.state)
+    ? await getJson<SowOverview>(`projects/${projectId}/sow`).then((r) => r.body, () => undefined)
+    : undefined;
   const active = documents.filter(isActive);
   const uploads = active.map(toUploadRecord);
   const kv = latest(knowledge);
@@ -153,6 +178,7 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
     scanEvents: scanEventsOf(documents),
     ingestion,
     sowGeneration: sowStages(state),
+    sow: sowOf(sowOverview, state),
     extraction: [],
     skillsRevision: 0,
     testHistory: [],

@@ -7,6 +7,8 @@ import { setBamApi } from "@/workbench/api/adapter";
 import { setHostSession } from "@/workbench/features/login/session";
 import { createSbamApi } from "@/workbench/http/sbamApi";
 
+import { ScopeHost } from "./scope-host";
+
 // The workbench uses browser-only APIs (Uppy, canvas, ResizeObserver), so it is not rendered on the server.
 const Workbench = dynamic(() => import("@/workbench/Workbench").then((m) => m.Workbench), {
   ssr: false,
@@ -35,6 +37,7 @@ export function WorkbenchClient({
   return (
     <div style={{ height: "100vh" }}>
       <Workbench />
+      <ScopeHost projectId={projectId} />
     </div>
   );
 }
