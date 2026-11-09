@@ -75,7 +75,13 @@ def test_719_t07_the_seed_sets_the_theme_and_turns_off_only_the_identity_first_s
 
 @pytest.mark.skipif(sys.platform == "win32", reason="no bash on a Windows host; Linux CI runs it")
 def test_719_t08_the_seed_script_is_valid_bash() -> None:
-    result = subprocess.run(["bash", "-n", str(SEED)], capture_output=True, text=True, check=False)
+    # fixed argv, our own script, no shell: `bash -n` only parses it
+    result = subprocess.run(  # noqa: S603
+        ["bash", "-n", str(SEED)],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert result.returncode == 0, result.stderr
 
 
