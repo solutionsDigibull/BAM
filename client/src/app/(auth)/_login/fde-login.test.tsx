@@ -58,11 +58,16 @@ describe("the FDE login in the BuLLM look (#719)", () => {
     expect(screen.getByText(/has no SBAM role/)).toBeTruthy();
   });
 
-  test("test_719_the_development_role_buttons_appear_only_when_dev_sign_in_is_on", () => {
+  test("test_719_the_development_role_buttons_appear_only_when_keycloak_is_off", () => {
     const { rerender } = render(<FdeLogin enabled keycloak={false} />);
     expect(screen.getByRole("button", { name: "Sign in as FDE" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sign in as Admin + FDE" })).toBeTruthy();
-    rerender(<FdeLogin enabled={false} keycloak />);
+    // dev sign-in on AND Keycloak on: the shortcut would end in a 401 from the API, so it is not offered
+    rerender(<FdeLogin enabled keycloak />);
+    expect(screen.queryByRole("button", { name: "Sign in as FDE" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Sign in with Keycloak" })).toBeTruthy();
+    // neither on: nothing to click, and the page says so
+    rerender(<FdeLogin enabled={false} keycloak={false} />);
     expect(screen.queryByRole("button", { name: "Sign in as FDE" })).toBeNull();
   });
 
