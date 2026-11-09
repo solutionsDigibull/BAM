@@ -12,7 +12,8 @@ import { getUi, setUi, useUi } from './lib/store'
 import { activeScreen, aliasOf, goScreen, navigate, usePath } from './lib/route'
 import { NavRail, TopBar } from './components/shell'
 import { AutoChip, Banner, Confirm, Empty, ErrorState, HitlChip, Icon, PanesContext, Skeleton } from './components/ui'
-import * as Step1 from './steps/Step1'
+import { Intake } from './steps/Intake'
+import { HostSlot } from './host/slots'
 import * as Step2 from './steps/Step2'
 import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
@@ -37,7 +38,8 @@ export interface StepProps { snap: Snapshot; info: StepInfo }
 // Gated screens (a backend step locks them) rendered as 3 panes inside the Results & edits workspace, by screen ID.
 // SOW, Skills grid and the three Validation views are centre-only (side panes removed per user, 14 Oct 2026).
 const PANES: Record<string, { Left?: (p: StepProps) => React.ReactNode; Center: (p: StepProps) => React.ReactNode; Right?: (p: StepProps) => React.ReactNode }> = {
-  '3.1': { Center: Step1.Center }, // SOW: centre-only too (Sources and SOW generation panes removed per user, 14 Oct 2026)
+  // Scope: the host's SOW screen, rendered into this slot (workbench-client.tsx / scope-host.tsx).
+  '3.1': { Center: () => <HostSlot id="scope" /> },
   '3.2': { Center: Step2.Center },
   '4.1': { Center: Step3.ActivitiesCenter },
   '4.3': { Center: Step3.CodeCenter },
@@ -48,8 +50,8 @@ const PANES: Record<string, { Left?: (p: StepProps) => React.ReactNode; Center: 
 }
 // Gated single-column screens (Upload and Scan share one intake component, state and run).
 const SINGLE: Record<string, (p: StepProps) => React.ReactNode> = {
-  '1.1': p => <Step1.Intake {...p} view="upload" />,
-  '1.5': p => <Step1.Intake {...p} view="scan" />,
+  '1.1': p => <Intake {...p} view="upload" />,
+  '1.5': p => <Intake {...p} view="scan" />,
 }
 // One primary action per step, pinned below the scrolling body (never scrolled to). Gated screens show it only unlocked.
 const FOOT: Record<string, (p: { snap: Snapshot; info?: StepInfo }) => React.ReactNode> = {

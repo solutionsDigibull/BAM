@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ragPipeline } from "../rag/ragPipeline";
-import { buildSnapshot, resetSnapshotCache } from "./snapshot";
+import { buildSnapshot, resetSnapshotCache, sowOf } from "./snapshot";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
 
@@ -9,7 +9,7 @@ const json = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 
 /** Answers the reads the snapshot makes; any other request fails the test. */
-function api(opts: { state: string; versions?: unknown[]; documents?: unknown[] }) {
+function api(opts: { state: string; versions?: unknown[]; documents?: unknown[]; sow?: unknown }) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
@@ -25,6 +25,7 @@ function api(opts: { state: string; versions?: unknown[]; documents?: unknown[] 
           counts: { uploaded: 0, parsed: 0, rejected: 0, failed: 0 },
         });
       if (path === `projects/${PROJECT}/knowledge`) return json({ versions: opts.versions ?? [] });
+      if (path === `projects/${PROJECT}/sow`) return json(opts.sow ?? { sow_id: "s1", current: null, approved: null, etag: "e" });
       if (path.includes("/graph"))
         return json({
           knowledge_version_id: "kv1",
@@ -112,5 +113,66 @@ describe("the workbench snapshot composed from the API (#711)", () => {
       vi.fn(async () => new Response(JSON.stringify({ title: "x", detail: "down" }), { status: 503 })),
     );
     await expect(buildSnapshot(PROJECT)).rejects.toThrow();
+  });
+});
+
+const summary = (version: number, extra: Record<string, unknown> = {}) => ({
+  id: `v${version}`,
+  version,
+  status: "IN_REVIEW",
+  source: "GENERATED",
+  sha256: "a".repeat(64),
+  parent_version: null,
+  knowledge_version_id: "kv1",
+  author: null,
+  created_at: "2026-11-09T10:00:00Z",
+  ...extra,
+});
+
+describe("the SOW in the workbench snapshot (#713)", () => {
+  test("test_713_a_draft_sow_in_review_is_a_draft_with_no_approval", () => {
+    const sow = sowOf({ sow_id: "s1", current: summary(2), approved: null, etag: "e" } as never, "SOW_REVIEW");
+    expect(sow).toMatchObject({ version: 2, status: "draft", approval: undefined });
+    expect(sow?.meta.sowId).toBe("s1");
+  });
+
+  test("test_713_the_approved_current_version_is_approved_with_who_and_which_version", () => {
+    const v = summary(3, { status: "APPROVED", author: "fde-a1" });
+    const sow = sowOf({ sow_id: "s1", current: v, approved: v, etag: "e" } as never, "SOW_APPROVED");
+    expect(sow?.status).toBe("approved");
+    expect(sow?.approval).toMatchObject({ version: 3, by: "fde-a1" });
+  });
+
+  test("test_713_a_newer_draft_after_an_approval_is_a_draft_and_the_approval_stays_visible", () => {
+    const sow = sowOf({ sow_id: "s1", current: summary(4), approved: summary(3, { status: "APPROVED" }), etag: "e" } as never, "SOW_REVIEW");
+    expect(sow?.status).toBe("draft");
+    expect(sow?.approval?.version).toBe(3);
+  });
+
+  test("test_713_a_sow_being_regenerated_says_so", () => {
+    expect(sowOf({ sow_id: "s1", current: summary(2), approved: null, etag: "e" } as never, "SOW_GENERATING")?.status).toBe("regenerating");
+  });
+
+  test("test_713_no_current_version_means_no_sow", () => {
+    expect(sowOf({ sow_id: "s1", current: null, approved: null, etag: "e" } as never, "SOW_GENERATING")).toBeUndefined();
+    expect(sowOf(undefined, "SOW_REVIEW")).toBeUndefined();
+  });
+
+  test("test_713_the_sow_is_asked_for_only_once_the_pipeline_has_reached_it", async () => {
+    const early = api({ state: "KNOWLEDGE_BUILDING" });
+    await buildSnapshot(PROJECT);
+    expect(early.some((c) => c.endsWith("/sow"))).toBe(false);
+    vi.unstubAllGlobals();
+    const late = api({ state: "SOW_REVIEW", sow: { sow_id: "s1", current: summary(1), approved: null, etag: "e" } });
+    const snap = await buildSnapshot(PROJECT);
+    expect(late.some((c) => c.endsWith("/sow"))).toBe(true);
+    expect(snap.sow?.version).toBe(1);
+  });
+
+  test("test_713_a_sow_request_that_fails_does_not_break_the_snapshot", async () => {
+    api({ state: "SOW_REVIEW", sow: undefined });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => (String(url).endsWith("/sow") ? new Response("{}", { status: 500 }) : json({ items: [], next_cursor: null, state: "SOW_REVIEW", steps: [], counts: {}, versions: [] }))));
+    const snap = await buildSnapshot(PROJECT);
+    expect(snap.sow).toBeUndefined();
   });
 });

@@ -1,0 +1,4 @@
+/* scoped to .bam-wb by scripts/scope-workbench-css.mjs */
+/* Screens the host app renders into the workbench (host/slots.tsx): they fill the pane and scroll inside it. */
+.bam-wb .host-slot { flex: 1; min-height: 0; min-width: 0; overflow: auto; background: var(--bg); }
+.bam-wb .scope-host-body { padding: 16px; max-width: 1280px; margin: 0 auto; color: var(--text); }
