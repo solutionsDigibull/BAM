@@ -82,7 +82,7 @@ export function fdeView(u: UploadRecord): { pill: 'pass' | 'running' | 'fail' | 
   if (u.scanError) return { pill: 'needs_review', label: 'Needs attention', text: 'The file check did not finish. Retry the check or remove the file.' }
   if (u.scan === 'blocked' || u.clamavVerdict === 'threat') return { pill: 'fail', label: 'Needs attention', text: 'This file cannot be used. Remove it and upload a different copy.' }
   if (u.scan === 'scanning' || !isReleased(u)) return { pill: 'running', label: 'Checking', text: 'Checking the upload' }
-  return { pill: 'pass', label: 'Ready', text: 'Ready for Standardize' }
+  return { pill: 'pass', label: 'Ready', text: 'Ready to process' }
 }
 
 // ---- screen title row with the details icon ----------------------------------------------------------------

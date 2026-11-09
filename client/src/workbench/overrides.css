@@ -1,0 +1,7 @@
+/* Workbench shell without the assistant pane (it needs an LLM backend this build does not have): the shell is the
+   navigation rail and the workspace. Kept out of the imported stylesheets so those stay diffable against their source. */
+@media (min-width: 861px) {
+  .bam-wb .shell {
+    grid-template-columns: var(--nav) minmax(0, 1fr);
+  }
+}

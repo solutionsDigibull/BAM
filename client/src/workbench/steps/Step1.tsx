@@ -182,9 +182,6 @@ export function Center({ snap, info }: StepProps) {
               <button className="btn btn-primary" disabled={!!busy} onClick={() => run('Generate SOW', () => api.startSowGeneration(ragPipeline.getState().runId), { step: 1 })}>
                 <Icon name="bolt" />Generate SOW with Certified Context
               </button>
-              <button className="btn btn-secondary" onClick={() => goScreen('2.3')}>
-                Verify in Context quality
-              </button>
             </div>
           }>
             {ragRunning ? 'The RAG pipeline is running. Click Generate SOW once verified.' : 'Context graph and pre-flight checks are certified. Synthesize the SOW draft from the discovery context.'}

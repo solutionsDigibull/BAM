@@ -10,7 +10,7 @@ import { useAction } from '../lib/data'
 import { api } from '../api/adapter'
 import { Copy, Empty, GateButton, Icon, Kpis, StatusPill, Time, Tip, fmtBytes } from '../components/ui'
 import { tips } from '../lib/actionTips'
-import { FileRows, ScreenTitle, SecurityDetails, fdeView, useAdvanceWhen } from './IngestionFlow'
+import { FileRows, ScreenTitle, SecurityDetails, fdeReason, fdeView, useAdvanceWhen, useIngestStart } from './IngestionFlow'
 import { Foot, needsReview, useReviewFiles, useStandardize } from './Standardize'
 import { STATE_TEXT } from '../api/standardize'
 import { UploadProgress, isAdded, uploadCount, useUploadRows } from './UploadPanes'
@@ -181,8 +181,8 @@ export function IngestionReview({ snap }: { snap: Snapshot }) {
 }
 
 // ---- pinned footers (one primary action each) ------------------------------------------------------------------
-/** Upload's one action (16 Oct 2026 wireframes): Start opens Standardize, which hands the batch on by itself.
- *  It waits for the click in the Ready state (no auto-advance from Upload). */
+/** Upload's one action: Start sends the batch to the backend (one pipeline start: ingestion, then the knowledge
+ *  build, then the SOW) and opens Parse. It waits for the click in the Ready state (no auto-advance from Upload). */
 export function UploadFooter({ snap }: { snap: Snapshot }) {
   const all = useUploadRows(snap), rows = all.filter(isAdded)
   const progress = uploadCount(all)
@@ -192,10 +192,12 @@ export function UploadFooter({ snap }: { snap: Snapshot }) {
   const locked = !useGoal(canAddFiles)
   const status = locked && !rows.length ? 'Send your goal to unlock Add files.' : !rows.length ? 'Add files to continue' : progress ? `${progress.done} of ${progress.total} uploaded` : busy ? 'Checking the uploaded files' : !ready ? 'No file is ready yet' : 'Ready to start'
   const t = tips('1.1', 'Start')
+  const { start, block, starting } = useIngestStart(snap)
+  const canStart = status === 'Ready to start' && !block && !starting
   return <div className="ws-foot-in" role="status" aria-live="polite">
     <div className="ws-foot-text">{progress ? <UploadProgress {...progress} /> : <span className="muted sm">{status}</span>}</div>
-    <Tip text={t.tip} note={status !== 'Ready to start' ? status : undefined}>
-      <button className="btn btn-primary" aria-disabled={status !== 'Ready to start' || undefined} onClick={() => { if (status === 'Ready to start') goScreen('1.8') }}>Start ingestion</button></Tip>
+    <Tip text={t.tip} note={status !== 'Ready to start' ? status : block ? fdeReason(block) : undefined}>
+      <button className="btn btn-primary" aria-disabled={!canStart || undefined} onClick={() => { if (canStart) void start() }}>{starting ? 'Starting…' : 'Start ingestion'}</button></Tip>
   </div>
 }
 /** Parse is automated: status only; it opens Review when the extraction is done. A failure shows Retry. */
@@ -204,7 +206,7 @@ export function ParseFooter({ snap }: { snap: Snapshot }) {
   const ex = rag.steps.find(x => x.key === 'extract')
   const failed = rag.steps.slice(0, 2).find(x => x.status === 'failed')
   const reason = !snap.ingestion ? 'Starts from Upload once every file is ready' : failed ? `${failed.label} failed` : ex?.status !== 'done' ? 'Parsing the standardized files' : undefined
-  useAdvanceWhen(!reason, () => goScreen('1.4'))
+  useAdvanceWhen(!reason, () => goScreen('2.5')) // Review has no backend and is hidden: on to Context
   return <Foot title={reason ?? 'Extraction complete'} line="Extracted text and tables are linked to the source files">
     {failed && <GateButton icon="refresh" {...tips('1.9', 'Retry')} onClick={() => ragPipeline.retry(failed.key)}>Retry</GateButton>}</Foot>
 }
