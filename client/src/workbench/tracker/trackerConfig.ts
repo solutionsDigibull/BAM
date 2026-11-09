@@ -53,9 +53,9 @@ const screen = (id: string, parentId: string, label: string, icon: string, path:
 export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('1', 'Ingestion', 'tb-inbox', 'Add the source documents, standardize and parse them, then confirm what goes to Context.'),
   screen('1.1', '1', 'Upload', 'tb-upload', '/ingestion/upload', 'Choose source files and track upload readiness.', { step: 1, mode: 'hitl' }),
-  screen('1.8', '1', 'Standardize', 'tb-transform', '/ingestion/standardize', 'Classify each file, keep the original, flag problems and decide: ready, local AI fix or manual review.', { hidden: true, mode: 'automated' }),
+  screen('1.8', '1', 'Standardize', 'tb-transform', '/ingestion/standardize', 'What the backend found in each accepted file, then start ingestion.', { mode: 'hitl' }),
   screen('1.9', '1', 'Parse', 'tb-file-code', '/ingestion/parse', 'Extract text, tables and structure from the ready files.', { mode: 'automated' }),
-  screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'Confirm the accepted, parsed files that go to Context. Not SOW approval.', { hidden: true, mode: 'hitl' }),
+  screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'A last look at the accepted, read files that go to Context. Not SOW approval.', { mode: 'hitl' }),
   screen('1.6', '1', 'Connectors', 'plug', '/ingestion/connectors', 'Optional. Pull documents from a connected source.', { hidden: true, navAs: '1.4', optional: true }),
   screen('1.5', '1', 'Scan', 'scan', '/ingestion/scan', 'Internal diagnostics: per-file virus scan.', { step: 1, hidden: true, internal: true, navAs: '1.1' }),
   screen('1.7', '1', 'Quarantine', 'shield', '/ingestion/quarantine', 'Internal diagnostics: files held by the scan.', { hidden: true, internal: true, navAs: '1.1' }),

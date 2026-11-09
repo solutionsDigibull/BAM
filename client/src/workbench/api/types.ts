@@ -30,6 +30,21 @@ export interface StepInfo {
 /** The three scan verdict states shown in 1.1. A scanner/transport failure is `scanError`, never a verdict. */
 export type ScanState = 'scanning' | 'verified' | 'blocked'
 
+/** What the loader found when it read a file (the backend's verdict, never worked out in the browser). */
+export interface ParseInfo {
+  /** PARSING while the file is still being read, then PARSED or PARSE_FAILED. */
+  state: 'PARSING' | 'PARSED' | 'PARSE_FAILED'
+  /** Why a PARSE_FAILED file could not be read, in words. */
+  reason?: string
+  pages: number
+  sheets: number
+  tables: number
+  warnings: string[]
+  /** Pages read by text recognition, and the pages even that could not read. */
+  ocrPages: number
+  unreadablePages: number
+}
+
 export interface UploadRecord {
   id: string
   /** The active intake batch this file belongs to. */
@@ -52,6 +67,8 @@ export interface UploadRecord {
   scanError?: string
   /** True only after a clean verdict released the object to the clean RAG input location. */
   released: boolean
+  /** The loader's verdict once the file was read; absent until then. */
+  parse?: ParseInfo
   /** Tier-1 ClamAV static signature scan verdict. */
   clamavVerdict?: 'clean' | 'threat' | 'pending'
   /** Tier-2 Repel heuristic & adversarial prompt injection verdict. */

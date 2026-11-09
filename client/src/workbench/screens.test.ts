@@ -34,6 +34,6 @@ describe("every screen the rail offers has a renderer (#711)", () => {
 
   test("test_711_the_screens_without_a_backend_stay_hidden", () => {
     const hidden = SUBTASKS.filter((s) => s.hidden).map((s) => s.id);
-    for (const id of ["1.8", "1.4", "2.2", "2.3", "4.5", "4.6"]) expect(hidden).toContain(id);
+    for (const id of ["2.2", "2.3", "4.5", "4.6"]) expect(hidden).toContain(id);
   });
 });

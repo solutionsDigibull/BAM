@@ -94,7 +94,7 @@ export function PipelineCard({ title = 'Build pipeline', lead, controls }: { tit
           {/* The first build starts from the upload step once every virus scan passes; this button is only for rebuilds. */}
           {s.runId
             ? ragPipeline.canStart() && <button className="btn btn-secondary sm" onClick={() => ragPipeline.start()}><Icon name="refresh" />Rebuild</button>
-            : <span className="muted xs"><Icon name="clock" size={11} /> Starts from Upload once every virus scan passes.</span>}
+            : <span className="muted xs"><Icon name="clock" size={11} /> Starts from Standardize once every file has been read.</span>}
         </div>
       ))}
     </section>

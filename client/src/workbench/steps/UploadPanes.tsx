@@ -191,7 +191,7 @@ export function uploadSummary(all: UpRow[], review: number, uploadActive = true)
   const text = `${plural(n, 'file')} added (see files panel)`
     + (failed.length ? `; ${failed.length} couldn't be added: ${list(failed)}` : '') + '.'
   const live = [review ? `${plural(review, 'file')} ${review === 1 ? 'needs' : 'need'} review before parse.` : '',
-    uploadActive ? 'Start when you are ready. Have more source files? Drop them here.' : ''].filter(Boolean).join(' ')
+    uploadActive ? 'Continue when you are ready. Have more source files? Drop them here.' : ''].filter(Boolean).join(' ')
   return { key: `${n}:${failed.length}`, text, live }
 }
 

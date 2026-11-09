@@ -28,7 +28,7 @@ export function SyncView() {
       )}
       <section className="std-card" aria-labelledby="sync-docs">
         <h3 id="sync-docs">Documents</h3>
-        {!s.runId ? <p className="muted sm">No knowledge version yet. It starts from Start in Upload.</p> : !s.docs.length ? <p className="muted sm">No documents are listed for this version.</p> : (
+        {!s.runId ? <p className="muted sm">No knowledge version yet. It starts from Start ingestion in Standardize.</p> : !s.docs.length ? <p className="muted sm">No documents are listed for this version.</p> : (
           <ul className="dc-list">
             {s.docs.map(d => (
               <li key={d.id}>

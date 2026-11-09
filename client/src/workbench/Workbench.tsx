@@ -16,7 +16,8 @@ import * as Step1 from './steps/Step1'
 import * as Step2 from './steps/Step2'
 import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
-import { FileDetail, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
+import { FileDetail, IngestReviewFooter, IngestionReview, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
+import { StandardizeFooter, StandardizeView } from './steps/Standardize'
 import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
 import { AssistantPane } from './components/AssistantPane'
 import { goalStage, skipGoal, useGoal } from './lib/goal'
@@ -52,7 +53,7 @@ const SINGLE: Record<string, (p: StepProps) => React.ReactNode> = {
 }
 // One primary action per step, pinned below the scrolling body (never scrolled to). Gated screens show it only unlocked.
 const FOOT: Record<string, (p: { snap: Snapshot; info?: StepInfo }) => React.ReactNode> = {
-  '1.1': p => <UploadFoot snap={p.snap} />, '1.9': p => <ParseFooter snap={p.snap} />,
+  '1.1': p => <UploadFoot snap={p.snap} />, '1.8': p => <StandardizeFooter snap={p.snap} />, '1.9': p => <ParseFooter snap={p.snap} />, '1.4': p => <IngestReviewFooter snap={p.snap} />,
   '2.5': () => <SyncFooter />, '2.1': () => <AutoContextFooter />,
   '4.2': p => <Step3.TemplateFooter snap={p.snap} info={p.info!} />, '4.3': p => <Step3.TranslateFooter snap={p.snap} info={p.info!} />,
   '4.8': p => <Step4.SandboxFooter snap={p.snap} info={p.info!} />, '4.4': p => <Step4.CheckFooter snap={p.snap} info={p.info!} />,
@@ -62,7 +63,7 @@ const NAV_ORDER = TASKS.flatMap(t => subtasksOf(t.id))
 
 // Ungated screens: always viewable, with honest empty/unavailable states.
 const VIEWS: Record<string, (p: { snap: Snapshot; path: string }) => React.ReactNode> = {
-  '1.3': FileDetail, '1.7': Quarantine, '1.9': ParseView,
+  '1.3': FileDetail, '1.7': Quarantine, '1.8': StandardizeView, '1.9': ParseView, '1.4': IngestionReview,
   '2.5': SyncView, '2.1': RagScreen,
   '3.3': SkillReview, '3.4': ReleasePrep,
 }
