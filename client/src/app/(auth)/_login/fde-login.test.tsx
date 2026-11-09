@@ -8,10 +8,10 @@ import { FdeLogin } from "./fde-login";
 afterEach(cleanup);
 
 describe("the FDE login in the BuLLM look (#719)", () => {
-  test("test_719_keycloak_sign_in_asks_for_an_email_but_never_a_password", () => {
+  test("test_719_keycloak_sign_in_asks_for_a_username_or_email_but_never_a_password", () => {
     const { container } = render(<FdeLogin enabled={false} keycloak />);
     expect(screen.getByRole("button", { name: "Sign in with Keycloak" })).toBeTruthy();
-    expect(screen.getByLabelText("Work email")).toBeTruthy();
+    expect(screen.getByLabelText("Username or email")).toBeTruthy();
     // the password is typed on Keycloak's own page: no field here can collect or accept one
     expect(container.querySelector('input[type="password"]')).toBeNull();
     expect(screen.queryByLabelText(/password/i)).toBeNull();
@@ -26,21 +26,29 @@ describe("the FDE login in the BuLLM look (#719)", () => {
     );
   });
 
-  test("test_719_a_typed_email_that_is_not_an_email_is_refused_before_it_is_sent", () => {
-    render(<FdeLogin enabled={false} keycloak />);
-    fireEvent.change(screen.getByLabelText("Work email"), { target: { value: "not-an-email" } });
+  test("test_719_a_username_without_an_at_sign_is_accepted_not_refused_as_a_bad_email", () => {
+    const { container } = render(<FdeLogin enabled={false} keycloak />);
+    const input = screen.getByLabelText("Username or email") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "fde-a1" } });
     fireEvent.submit(
       screen.getByRole("button", { name: "Sign in with Keycloak" }).closest("form")!,
     );
-    expect(screen.getByText("Enter a valid work email")).toBeTruthy();
+    expect(input.value).toBe("fde-a1");
+    expect(input.name).toBe("username"); // the name the sign-in action reads
+    expect(container.querySelector('[aria-invalid="true"]')).toBeNull();
+    expect(screen.queryByText(/enter a valid/i)).toBeNull();
   });
 
-  test("test_719_an_empty_email_is_allowed_because_keycloak_asks_for_it", () => {
+  test("test_719_an_email_and_an_empty_field_are_accepted_too_because_keycloak_asks_for_it", () => {
     render(<FdeLogin enabled={false} keycloak />);
+    const input = screen.getByLabelText("Username or email") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "fde-a1@sbam.test" } });
+    expect(input.value).toBe("fde-a1@sbam.test");
+    fireEvent.change(input, { target: { value: "" } });
     fireEvent.submit(
       screen.getByRole("button", { name: "Sign in with Keycloak" }).closest("form")!,
     );
-    expect(screen.queryByText("Enter a valid work email")).toBeNull();
+    expect(screen.queryByText(/enter a valid/i)).toBeNull();
   });
 
   test("test_719_an_error_shows_its_text_and_the_reference_as_separate_lines", () => {
