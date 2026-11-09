@@ -1,0 +1,123 @@
+/* scoped to .bam-wb by scripts/scope-workbench-css.mjs */
+/* Enterprise Assistant chat (22 Oct 2026, assistant pane design). Tokens only, so light/dark and FDE/Staging follow.
+   Prefixed with .assist to win over the older v3 / declutter assistant rules. */
+.bam-wb .assist .as-dropzone { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.bam-wb .assist .as-dropzone[data-dragging] { outline: 2px dashed var(--accent); outline-offset: -8px; border-radius: 12px; }
+
+/* Empty: greeting, sublines, composer and chips centred. */
+.bam-wb .assist .as-empty { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: var(--pad); text-align: center; }
+.bam-wb .assist .as-hello { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.bam-wb .assist .as-sub { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.bam-wb .assist .as-empty .as-msg { align-self: center; background: none; padding: 0; font-size: 12px; color: var(--muted); }
+.bam-wb .assist .as-empty .as-compose { width: 100%; margin-top: 8px; padding: 0; }
+
+/* Composer: rounded field with + on the left, dictate and send / stop on the right, inside it. */
+.bam-wb .assist .as-compose { display: flex; flex-direction: column; gap: 8px; padding: 8px var(--pad) var(--pad); }
+.bam-wb .assist .as-composer { align-items: center; gap: 6px; padding: 6px; border: 1px solid var(--border-strong); border-radius: 18px; background: var(--surface-2); }
+.bam-wb .assist .as-composer:focus-within { border-color: var(--accent); }
+.bam-wb .assist .as-composer .as-input { border: 0; background: transparent; min-height: 36px; padding: 8px 6px; }
+.bam-wb .assist .as-composer .as-input:focus-visible { box-shadow: none; }
+.bam-wb .assist .as-attach, .bam-wb .assist .as-composer .as-dictate { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--accent-txt); background: var(--surface); color: var(--accent-txt); display: grid; place-items: center; padding: 0; cursor: pointer; }
+.bam-wb .assist .as-attach:hover { background: var(--accent-soft); }
+.bam-wb .assist .as-composer .tip { right: auto; left: 0; } /* the + sits at the left edge: open the tip rightwards */
+.bam-wb .assist .as-attach:focus-visible, .bam-wb .assist .as-send:focus-visible, .bam-wb .assist .as-ibtn:focus-visible, .bam-wb .assist .as-sug:focus-visible, .bam-wb .assist .as-pill:focus-visible { outline: none; box-shadow: var(--focus); }
+.bam-wb .assist .as-composer .as-dictate.rec { background: var(--accent); color: var(--accent-ink); }
+.bam-wb .assist .as-send { width: 36px; height: 36px; border-radius: 50%; }
+.bam-wb .assist .as-stop { display: grid; place-items: center; cursor: pointer; }
+
+/* Chat attachment cards above the composer (questions only, never ingested). */
+.bam-wb .assist .as-files { display: flex; flex-wrap: wrap; gap: 8px; }
+.bam-wb .assist .as-file { display: inline-flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-align: left; }
+.bam-wb .assist .as-file > .icon { flex: none; color: var(--accent-txt); }
+.bam-wb .assist .as-file-meta { display: flex; flex-direction: column; min-width: 0; font-size: 12px; }
+.bam-wb .assist .as-file-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.bam-wb .assist .as-file-meta span { color: var(--muted); font-size: 12px; }
+.bam-wb .assist .as-file-x { flex: none; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.bam-wb .assist .as-file-x:hover { background: var(--surface-3); color: var(--text); }
+
+/* Suggestion chips under the composer. */
+.bam-wb .assist .as-sugs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.bam-wb .assist .as-sug { min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--muted); font-size: 12px; cursor: pointer; }
+.bam-wb .assist .as-sug:hover { color: var(--text); border-color: var(--accent); }
+
+/* Thread: user bubbles right in the accent colour; assistant replies left beside the B avatar, no bubble. */
+.bam-wb .assist .as-viewport { gap: 16px; }
+.bam-wb .assist .as-urow { align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 88%; }
+.bam-wb .assist .as-uline { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.bam-wb .assist .as-msg.as-user { max-width: 100%; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 18px; padding: 9px 16px; }
+.bam-wb .assist .as-msg.as-user p { margin: 0; }
+.bam-wb .assist .as-uedit { opacity: 0; transition: opacity .12s; }
+.bam-wb .assist .as-urow:hover .as-uedit, .bam-wb .assist .as-uedit:focus-within { opacity: 1; }
+.bam-wb .assist .as-sent-file { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12px; color: var(--text); }
+.bam-wb .assist .as-sent-file .icon { color: var(--accent-txt); }
+.bam-wb .assist .as-arow { align-self: stretch; display: flex; align-items: flex-start; gap: 10px; }
+.bam-wb .assist .as-avatar { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; margin-top: 1px; overflow: hidden; }
+.bam-wb .assist .as-avatar img { width: 86%; height: 86%; object-fit: contain; }
+.bam-wb .assist .as-abody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.bam-wb .assist .as-arow .as-msg.as-bot { max-width: 100%; background: none; border: 0; border-radius: 0; padding: 0; font-size: 14px; }
+.bam-wb .assist .as-arow .as-msg.as-bot.as-fail { border-left: 3px solid var(--err); padding-left: 10px; }
+.bam-wb .assist .as-msg.as-bot p { margin: 0; }
+.bam-wb .assist .as-caret { content: ''; display: inline-block; width: 8px; height: 1.05em; margin-left: 2px; vertical-align: text-bottom; background: var(--accent); animation: as-caret 1s steps(1) infinite; }
+@keyframes as-caret { 50% { opacity: 0; } }
+
+/* Action bar: always visible. */
+.bam-wb .assist .as-ibtn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.bam-wb .assist .as-ibtn:hover { background: var(--surface-3); color: var(--text); }
+.bam-wb .assist .as-ibtn[data-submitted] { color: var(--accent-txt); }
+.bam-wb .assist .as-ibtn:disabled { opacity: .4; cursor: not-allowed; }
+.bam-wb .assist .as-helper { margin: 0; font-size: 12px; color: var(--faint); }
+
+/* Generating indicator. */
+.bam-wb .assist .as-gen { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.bam-wb .assist .as-dots { display: inline-flex; gap: 3px; }
+.bam-wb .assist .as-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: as-dot 1.2s ease-in-out infinite; }
+.bam-wb .assist .as-dots i:nth-child(2) { animation-delay: .15s; } .bam-wb .assist .as-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes as-dot { 0%, 80%, 100% { opacity: .3; } 40% { opacity: 1; } }
+
+/* Edit and resend. */
+.bam-wb .assist .as-edit { align-self: flex-end; width: min(100%, 88%); display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .assist .as-edit-input { width: 100%; min-height: 72px; resize: vertical; padding: 10px 14px; border: 1.5px solid var(--accent); border-radius: 14px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; line-height: 1.5; }
+.bam-wb .assist .as-edit-input:focus-visible { outline: none; box-shadow: var(--focus); }
+.bam-wb .assist .as-edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.bam-wb .assist .as-pill { min-height: 30px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; }
+.bam-wb .assist .as-pill.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bam-wb .assist .as-caret, .bam-wb .assist .as-dots i { animation: none; }
+  .bam-wb .assist .as-uedit { transition: none; }
+}
+
+/* Idle Orb above the greeting (empty state only). The Orb's Tailwind classes (relative z-0 h-full w-full
+   overflow-hidden; canvas absolute inset-0 block) are mirrored here. Dimmed so the greeting stays the focus. */
+.bam-wb .assist .as-orb { flex: none; width: 124px; height: 124px; margin: -6px 0 -2px; opacity: .8; }
+.bam-wb .assist .as-orb > div { position: relative; z-index: 0; width: 100%; height: 100%; overflow: hidden; }
+.bam-wb .assist .as-orb canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+/* First message: the empty state fades out over the conversation, which fades in. */
+.bam-wb .assist .as-dropzone { position: relative; }
+.bam-wb .assist .as-empty-ghost { position: absolute; inset: 0; z-index: 2; pointer-events: none; justify-content: flex-start; padding-top: 18%; animation: as-ghost-out .3s ease forwards; }
+.bam-wb .assist .as-fade-in { animation: as-fade-in .3s ease; }
+@keyframes as-ghost-out { to { opacity: 0; transform: translateY(-12px); } }
+@keyframes as-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .bam-wb .assist .as-empty-ghost, .bam-wb .assist .as-fade-in { animation-duration: 1ms; } }
+/* Thread layout (23 Oct 2026, overlap fix): the viewport is a scrolling flex column, so every child keeps its content
+   height (flex-shrink 0). Without it, an item with an explicit min-height (the stage note, .as-note: 2.7em) shrank
+   once the thread overflowed and its text spilled over the next message. */
+.bam-wb .assist .as-viewport > * { flex-shrink: 0; }
+.bam-wb .assist .as-viewport .as-msg, .bam-wb .assist .as-viewport .as-msg * { overflow-wrap: anywhere; }
+
+/* Suggestions directly above the chatbox, captioned (29 Oct 2026, output-specific chips). */
+.bam-wb .assist .as-sugwrap { display: flex; flex-direction: column; gap: 6px; }
+.bam-wb .assist .as-sugcap { font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; }
+.bam-wb .assist .as-sugwrap .as-sugs { justify-content: flex-start; }
+.bam-wb .assist .as-empty .as-sugwrap .as-sugs { justify-content: center; }
+.bam-wb .assist .as-empty .as-sugcap { text-align: center; }
+/* Upload: the goal's state beside the title ("Goal · Ready", "<agent> · Draft"). */
+.bam-wb .assist .as-state { margin-left: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 400; color: var(--muted); }
+.bam-wb .assist #assist-title:has(.as-state) { min-width: 0; white-space: nowrap; }
+/* Persistent thread (keep-conversation fix, 29 Oct 2026): scrolled up to read history, a small cue returns to the
+   newest message; assistant-ui disables it while the view is at the bottom, so it only shows when needed. */
+.bam-wb .assist .as-jump { position: sticky; bottom: 8px; align-self: center; z-index: 2; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px;
+  border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--accent-txt); font-size: 12px; font-weight: 600; box-shadow: var(--shadow); cursor: pointer; }
+.bam-wb .assist .as-jump:disabled { display: none; }
+.bam-wb .assist .as-jump:hover { border-color: var(--accent); }
+.bam-wb .assist .as-jump:focus-visible { outline: none; box-shadow: var(--focus); }
