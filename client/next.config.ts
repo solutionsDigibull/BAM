@@ -11,6 +11,10 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // Turbopack's dev file cache makes `next dev` recompile after every request on a Docker Desktop (Windows) bind
+  // mount, and every rebuild reloads the open page, so a form could not be filled in (#719). Dev only: `next build`
+  // keeps its own cache setting. Webpack does not loop; this keeps Turbopack and its speed.
+  experimental: { turbopackFileSystemCacheForDev: false },
   headers: async () => [{ source: "/:path*", headers: SECURITY_HEADERS }],
 };
 
