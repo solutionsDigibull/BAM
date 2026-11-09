@@ -1,0 +1,28 @@
+/* Review waiting state (ReviewWaiting.tsx). Tokens only; the glow and sheen stay soft in dark mode. */
+.rw-main { position: relative; display: flex; min-height: 100%; }
+.rw { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: var(--pad); text-align: center; }
+.rw-mark { position: relative; display: grid; place-items: center; width: 124px; height: 124px; margin-bottom: 6px; }
+.rw-mark::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%); animation: rw-pulse 3.2s ease-in-out infinite; }
+.rw-mark > .rb-sm, .rw-mark > .icon { position: absolute; }
+.rw-mark > .icon { color: var(--muted); }
+.rw-title { margin: 0; font-size: 16px; font-weight: 700; }
+.rw-sub { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+@keyframes rw-pulse { 0%, 100% { transform: scale(.92); opacity: .7; } 50% { transform: scale(1.04); opacity: 1; } }
+
+/* Hand-off: the large ring shrinks up toward the cards while the text fades; the review fades in and each card's
+   small Status Mark grows in from a larger ring, so it reads as one element. */
+.ing.dc { position: relative; }
+.rw.rw-leaving { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: transparent; }
+.rw-leaving .rw-mark { animation: rw-shrink .45s cubic-bezier(.77, 0, .175, 1) forwards; }
+.rw-leaving .rw-mark::before { animation: none; }
+.rw-leaving .rw-title, .rw-leaving .rw-sub { animation: rw-out .25s ease forwards; }
+.rw-enter > * { animation: rw-in .45s ease both; }
+.rw-enter .rb-sm { animation: rw-mark-in .45s cubic-bezier(.77, 0, .175, 1) both; }
+@keyframes rw-shrink { to { transform: translateY(-38vh) scale(.18); opacity: 0; } }
+@keyframes rw-out { to { opacity: 0; } }
+@keyframes rw-in { from { opacity: 0; } }
+@keyframes rw-mark-in { from { transform: scale(2.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .rw-mark::before { animation: none; }
+  .rw-leaving .rw-mark, .rw-leaving .rw-title, .rw-leaving .rw-sub, .rw-enter > *, .rw-enter .rb-sm { animation-duration: 1ms; }
+}

@@ -1,0 +1,3 @@
+/* BrandLockup: the logo image, sized by height. `--bl` is its height basis. */
+.brand-lockup { --bl: 38px; display: block; height: calc(var(--bl) * 1.2); width: auto; }
+@media (max-width: 860px) { .topbar .brand-lockup { --bl: 24px; } }

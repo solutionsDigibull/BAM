@@ -1,0 +1,25 @@
+/* Plain-CSS mirror of the Tailwind classes used by the copied React Bits components (Tailwind is not installed).
+   Status Mark: pass className="rb-sm". Shiny Text: pass className="rb-shiny". */
+
+/* ---- Status Mark ---- */
+.rb-sm { position: relative; display: inline-flex; align-items: center; vertical-align: middle; line-height: 1; gap: calc(var(--sm-size) * .5); }
+.rb-sm > svg { flex-shrink: 0; overflow: visible; color: var(--sm-color); transition: color 200ms ease; }
+.rb-sm[data-status="done"] > svg { color: var(--sm-done); }
+.rb-sm[data-status="failed"] > svg { color: var(--sm-error); }
+.rb-sm circle:nth-of-type(1) { fill: currentColor; stroke: currentColor; stroke-width: var(--sm-stroke); fill-opacity: 0; stroke-opacity: 0; transition: fill-opacity 180ms ease, stroke-opacity 200ms ease; }
+.rb-sm[data-status="running"] circle:nth-of-type(1) { stroke-opacity: .2; }
+.rb-sm[data-status="done"] circle:nth-of-type(1), .rb-sm[data-status="failed"] circle:nth-of-type(1) { fill-opacity: var(--sm-fill); }
+.rb-sm circle:nth-of-type(2) { fill: none; stroke: currentColor; stroke-width: var(--sm-stroke); stroke-linecap: round; opacity: .55; transition: opacity 200ms ease; }
+.rb-sm[data-status="running"] circle:nth-of-type(2), .rb-sm[data-status="done"] circle:nth-of-type(2), .rb-sm[data-status="failed"] circle:nth-of-type(2) { opacity: 1; }
+.rb-sm path { fill: none; stroke: currentColor; stroke-width: var(--sm-stroke); stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 2; stroke-dashoffset: 1.05; opacity: 0;
+  transition: stroke-dashoffset 160ms cubic-bezier(.23, 1, .32, 1), opacity 0ms linear 160ms; }
+.rb-sm[data-status="done"] path:nth-of-type(1), .rb-sm[data-status="failed"] path:nth-of-type(2), .rb-sm[data-status="cancelled"] path:nth-of-type(2) { stroke-dashoffset: 0; opacity: 1;
+  transition: stroke-dashoffset var(--sm-draw) cubic-bezier(.23, 1, .32, 1) var(--sm-check-delay), opacity 0ms linear var(--sm-check-delay); }
+@media (prefers-reduced-motion: reduce) {
+  .rb-sm path { stroke-dashoffset: 0; transition: opacity 200ms ease; }
+  .rb-sm[data-indeterminate] circle:nth-of-type(2) { animation: sm-breathe 1400ms cubic-bezier(.77, 0, .175, 1) infinite; }
+}
+
+/* ---- Shiny Text ---- */
+.rb-shiny { position: relative; display: inline-block; background-repeat: no-repeat; background-size: 100% 100%; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.rb-shiny > span { position: absolute; inset: 0; background-repeat: no-repeat; background-size: 100% 100%; background-clip: text; -webkit-background-clip: text; filter: blur(.14em); pointer-events: none; user-select: none; }

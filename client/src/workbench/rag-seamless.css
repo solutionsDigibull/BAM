@@ -1,0 +1,109 @@
+/* ===== RAG stage, seamless (14 Oct 2026): each body fits the Results & edits pane; one action in the pinned footer.
+   Tokens only (light + dark). */
+.ws-body > .rag:has(> .rag-fit), .ws-body > .rag.rag-graph-page { padding: 14px var(--pad); }
+.rag-fit { gap: 12px; }
+
+/* Graph explorer: the graph fills the body; chips top-left, icons top-right, zoom + count bottom-left */
+.ws-body > .rag.rag-graph-page { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.rg { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.rg-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rg-icons { display: inline-flex; gap: 6px; flex: none; }
+.rg-canvas { position: relative; flex: 1; min-height: 0; display: flex; }
+.rg-canvas > .graph-box { flex: 1; height: auto; }
+.rg-canvas > .empty, .rg-canvas > .error-state { flex: 1; }
+.rg-zoom { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px; z-index: 5; }
+.rg-zoom .icon-btn { background: var(--surface); }
+.rg-count { padding: 4px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-weight: 600; }
+.rg-insp { position: absolute; right: 10px; bottom: 10px; z-index: 6; width: 250px; max-height: calc(100% - 20px); overflow: auto; display: flex; flex-direction: column; gap: 6px;
+  padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.rg-insp header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rg-search { min-height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12px; }
+.rg-rels { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.rg-rels li { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; overflow-wrap: anywhere; }
+
+/* Schemas */
+.rs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rs-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text); }
+.rs-chip[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-txt); }
+.rs-chip .icon { color: var(--ok); }
+.rs-title { display: flex; align-items: center; gap: 8px; }
+.rs-title strong { font-size: 14px; }
+.rs-actions { margin-left: auto; display: inline-flex; gap: 6px; }
+.rs-code { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font: 12.5px/1.6 'JetBrains Mono', ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.rs-edit { width: 100%; min-height: 220px; resize: vertical; }
+
+/* Context quality */
+.rq-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; }
+.rq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rq-bar { position: relative; height: 6px; border-radius: 99px; background: var(--surface-3); }
+.rq-bar > span { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--warn); transition: width .3s ease; }
+.rq-bar.is-ok > span { background: var(--ok); }
+.rq-bar > i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text); }
+
+/* RAG review */
+.rr-h { font-size: 14px; font-weight: 700; }
+.rr-warn { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--warn); background: var(--warn-soft); }
+.rr-warn > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rr-warn > .icon { color: var(--warn); flex: none; }
+.rr-show { margin-left: auto; color: var(--muted); font-size: 12px; }
+.dc-rows details[open] .rr-show { visibility: hidden; }
+.rr-body { padding: 0 14px 12px; }
+.rr-body .rag-card { border: 0; padding: 0; }
+.dc-rows summary > .icon:first-child { margin-left: 0; transform: none !important; color: var(--muted); }
+
+/* Context quality, Questions only (15 Oct 2026): the list scrolls, never the pane or the pinned footer. */
+.ws-body > .rag:has(> .cq) { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+.cq { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cq-h { margin: 2px 0 0; font-size: 12px; font-weight: 700; display: flex; gap: 8px; }
+.cq-h .muted { font-weight: 400; }
+.cq-list { flex: 1; min-height: 0; overflow: auto; list-style: none; margin: 0; padding: 0 2px 2px; display: flex; flex-direction: column; gap: 6px; }
+.cq-row { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.cq-row.is-running { border-color: var(--accent); }
+.cq-row.is-flagged { border-color: var(--err); }
+.cq-kind { flex: none; min-width: 58px; padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 99px; font-size: 12px; color: var(--muted); text-align: center; }
+.cq-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cq-q { font-size: 14px; overflow-wrap: anywhere; }
+.cq-row .dc-pill { gap: 4px; }
+.cq-row .dc-pill:not([class*="tone-"]) { color: var(--muted); }
+/* Assistant thread on Context quality (same store as the list). */
+.as-q { display: flex; align-items: flex-start; gap: 8px; }
+.as-q > .icon { margin-top: 3px; flex: none; color: var(--accent-txt); }
+.as-src { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-txt); font-size: 12px; white-space: normal; }
+.as-msg.as-fail { border: 1px solid var(--err); }
+.as-wait { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.assist[data-screen="2.3"] .as-msg > p, .assist[data-screen="1.1"] .as-msg > p { margin: 0; }
+.assist[data-screen="2.3"] .as-who, .assist[data-screen="1.1"] .as-who { display: none; }
+
+/* Verify: failed-answer detail (replaces the list), opened from a failed row or the footer's Review issue. */
+.cq-row.is-flagged[role="button"] { cursor: pointer; }
+.cq-row.is-flagged[role="button"]:hover { background: var(--err-soft); }
+.cq-row.is-flagged[role="button"]:focus-visible { outline: none; box-shadow: var(--focus); }
+.cq-dh { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.cq-ef { display: grid; gap: 8px; margin: 0; }
+.cq-ef > div { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.cq-ef dt { font-size: 12px; font-weight: 700; color: var(--muted); }
+.cq-ef dd { margin: 2px 0 0; font-size: 14px; }
+.cq-detail-actions { justify-content: flex-end; gap: 10px; margin-top: auto; }
+
+/* Template: progress while the check activities run, and the read-only manifest. */
+.tpl-progress { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+.tpl-progress > span { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+.tpl-manifest .v3-card-title { display: flex; align-items: center; gap: 8px; }
+.tpl-json { max-height: 360px; overflow: auto; }
+.tpl-manifest .monaco-box { flex: 1 0 auto; height: 360px; } /* flex-basis auto: the explicit height stays definite so the editor wrapper's 100% resolves (was collapsing to 0) */
+@media (prefers-reduced-motion: reduce) { .tpl-progress > span { transition: none; } }
+/* Verify: Needs attention, pinned under the stat cards (23 Oct 2026). Scrolls inside past ~45% so the list stays visible. */
+.cq-na { flex: none; max-height: min(45%, 360px); overflow: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); border-radius: 12px; background: var(--err-soft); }
+.cq-na-h { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 700; color: var(--err); }
+.cq-na-card { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--err) 35%, var(--border)); border-radius: 10px; background: var(--surface); scroll-margin: 10px; }
+.cq-na-card p { margin: 0; overflow-wrap: anywhere; }
+.cq-na-card .cq-ef { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.cq-na-card .cq-ef dd { overflow-wrap: anywhere; }
+.cq-na-top { display: flex; align-items: flex-start; gap: 10px; }
+.cq-na-top .cq-q { flex: 1; min-width: 0; font-weight: 700; }
+.cq-na-top .dc-pill { flex: none; gap: 4px; }
+.cq-na-card .cq-detail-actions { margin-top: 0; }
+.cq-na-card.is-flash { animation: cq-flash 1.6s ease-out; }
+@keyframes cq-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--err); } 100% { box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .cq-na-card.is-flash { animation: none; box-shadow: 0 0 0 3px var(--err); } }
+.cq-na-more { align-self: flex-start; }
