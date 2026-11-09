@@ -37,12 +37,20 @@ export function screenNote(f: AssistantFacts): string {
   switch (id) {
     case '1.1': return !filesLine(f)
       ? 'Add your first files with + Add files on the left.'
-      : `${filesLine(f)}${checking ? '; checking uploads' : attention ? `; ${attention} need${attention === 1 ? 's' : ''} attention` : '. Ready files can continue to Parse'}.`
-    case '1.9': return !snap.ingestion ? 'Nothing to parse yet. It starts from Start in Upload.' : 'Parse extracts the text, tables and document structure needed by Context.'
+      : `${filesLine(f)}${checking ? '; checking uploads' : attention ? `; ${attention} need${attention === 1 ? 's' : ''} attention` : '. Ready files can continue to Standardize'}.`
+    case '1.8': {
+      const files = snap.uploads.filter(x => x.scan === 'verified' && x.released)
+      const failed = files.filter(x => x.parse?.state === 'PARSE_FAILED').length
+      if (!files.length) return 'Nothing to standardize yet. Add documents in Upload.'
+      if (snap.ingestion) return 'Ingestion has started. Parse shows the extraction that follows.'
+      return `Each file shows what the backend found when it read it.${failed ? ` ${failed} cannot be read and will stay out of Context.` : ''} Start ingestion when you are ready.`
+    }
+    case '1.4': return snap.ingestion ? 'Review is a last look at the accepted, read files that go to Context. This is not SOW approval.' : 'No files handed on yet. Start ingestion in Standardize.'
+    case '1.9': return !snap.ingestion ? 'Nothing to parse yet. It starts from Start ingestion in Standardize.' : 'Parse extracts the text, tables and document structure needed by Context.'
     case '2.5': return 'Context syncs the Admin Masters so the knowledge can be built. The masters stay unchanged.'
     case '2.1': {
       const st = f.rag?.steps ?? []
-      if (!f.rag?.runId) return 'No context run yet. It starts from Start in Upload.'
+      if (!f.rag?.runId) return 'No context run yet. It starts from Start ingestion in Standardize.'
       if (st.some(x => x.status === 'failed')) return `${st.find(x => x.status === 'failed')!.label} failed. The automated flow is paused here: retry the failed step on this screen.`
       if (st.length && st.every(x => x.status === 'done')) return `The context graph has ${f.rag.relations?.length ?? 0} relations across ${f.rag.nodes ?? 0} nodes. Select a node to inspect its source and relations.`
       return 'Index runs automatically: building the context graph.'
@@ -97,7 +105,8 @@ export function reply(question: string, f: AssistantFacts): string {
     if (!u.length) return 'No files uploaded yet.'
     const bad = u.filter(x => x.scan === 'blocked' || x.scanError)
     const why = bad.map(x => `${x.name}: ${x.threat ?? x.scanError}`).join('; ')
-    return `${u.length} files: ${u.filter(x => x.scan === 'verified' && x.released).length} ready, ${u.filter(x => x.scan === 'scanning' && !x.scanError).length} being checked, ${bad.length} need${bad.length === 1 ? 's' : ''} attention${bad.length ? ` (${why})` : ''}.`
+    const unread = u.filter(x => x.parse?.state === 'PARSE_FAILED').map(x => `${x.name}: ${x.parse!.reason}`)
+    return `${u.length} files: ${u.filter(x => x.scan === 'verified' && x.released).length} ready, ${u.filter(x => x.scan === 'scanning' && !x.scanError).length} being checked, ${bad.length} need${bad.length === 1 ? 's' : ''} attention${bad.length ? ` (${why})` : ''}.${unread.length ? ` Cannot be read: ${unread.join('; ')}.` : ''}`
   }
   if (has(q, 'why', 'lock', 'blocked', "can't", 'cannot', 'disabled'))
     return f.screen?.locked ? `${f.screen.label} is locked: ${f.screen.locked}` : f.blocker ? `${f.screen?.label ?? 'This screen'} is open. The next workflow gate: ${f.blocker.reason}` : `Nothing blocks ${f.screen?.label ?? 'this screen'} right now.`

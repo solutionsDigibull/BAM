@@ -94,7 +94,7 @@ export function PipelineCard({ title = 'Build pipeline', lead, controls }: { tit
           {/* The first build starts from the upload step once every virus scan passes; this button is only for rebuilds. */}
           {s.runId
             ? ragPipeline.canStart() && <button className="btn btn-secondary sm" onClick={() => ragPipeline.start()}><Icon name="refresh" />Rebuild</button>
-            : <span className="muted xs"><Icon name="clock" size={11} /> Starts from Upload once every virus scan passes.</span>}
+            : <span className="muted xs"><Icon name="clock" size={11} /> Starts from Standardize once every file has been read.</span>}
         </div>
       ))}
     </section>
@@ -316,7 +316,7 @@ const GraphExplorer = memo(function GraphExplorer() {
   const focus = liveNode?.label
 
   let canvas
-  if (!s.runId) canvas = <Empty icon="bolt" title="No knowledge graph yet" action={<button className="btn btn-primary" onClick={() => goScreen('1.1')}><Icon name="upload" />Upload documents</button>}>The knowledge build starts when verified documents are sent with Start in Upload; the graph appears here when it finishes.</Empty>
+  if (!s.runId) canvas = <Empty icon="bolt" title="No knowledge graph yet" action={<button className="btn btn-primary" onClick={() => goScreen('1.1')}><Icon name="upload" />Upload documents</button>}>The knowledge build starts when verified documents are sent with Start ingestion in Standardize; the graph appears here when it finishes.</Empty>
   else if (chunk === 'running' || chunk === 'queued') canvas = <Empty icon="clock" title="Chunking and embedding documents…"><Icon name="spinner" spin size={12} /> {s.counts.documents} documents are being chunked.</Empty>
   else if (chunk === 'failed') canvas = <ErrorState title="The knowledge build failed" action={ragPipeline.canStart() ? <button className="btn btn-primary" onClick={() => ragPipeline.retry('chunk')}><Icon name="refresh" />Retry</button> : undefined}>{s.error ?? 'No documents reached the graph.'}</ErrorState>
   else if (!laid.all.length) canvas = <Empty icon="info" title="The graph is empty">The build finished but found no entities in the documents.</Empty>

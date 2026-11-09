@@ -25,6 +25,22 @@ describe("the Enterprise Assistant answers from the project state only (#711)", 
     expect(r).toContain("bad.exe: Executable files are not accepted");
   });
 
+  test("test_711_a_file_the_loader_could_not_read_is_named_with_its_reason", () => {
+    const parse = { state: "PARSE_FAILED", reason: "The file is password protected", pages: 0, sheets: 0, tables: 0, warnings: [], ocrPages: 0, unreadablePages: 0 } as UploadRecord["parse"];
+    const r = reply("Upload status", facts(snapOf([upload({ id: "1" }), upload({ id: "2", name: "locked.pdf", parse })])));
+    expect(r).toContain("Cannot be read: locked.pdf: The file is password protected.");
+  });
+
+  test("test_711_the_standardize_and_review_screens_have_their_own_notes", () => {
+    const ready = upload({});
+    const std = { id: "1.8", label: "Standardize", stage: "Ingestion" };
+    const rev = { id: "1.4", label: "Review", stage: "Ingestion" };
+    expect(screenNote(facts(snapOf([ready]), { screen: std }))).toContain("Start ingestion when you are ready");
+    expect(screenNote(facts(snapOf([]), { screen: std }))).toContain("Nothing to standardize yet");
+    expect(screenNote(facts(snapOf([ready]), { screen: rev }))).toContain("Start ingestion in Standardize");
+    expect(screenNote(facts(snapOf([ready], { ingestion: { runId: "r", fileIds: ["u"] } as Snapshot["ingestion"] }), { screen: rev }))).toContain("not SOW approval");
+  });
+
   test("test_711_no_files_says_so", () => {
     expect(reply("Upload status", facts(snapOf([])))).toBe("No files uploaded yet.");
   });
@@ -65,7 +81,7 @@ describe("the Enterprise Assistant answers from the project state only (#711)", 
   test("test_711_the_screen_note_follows_upload_state", () => {
     const upload11 = { id: "1.1", label: "Upload", stage: "Ingestion" };
     expect(screenNote(facts(snapOf([]), { screen: upload11 }))).toContain("Add your first files");
-    expect(screenNote(facts(snapOf([upload({})]), { files: { total: 1, uploaded: 1 }, screen: upload11 }))).toBe("1 file added. Ready files can continue to Parse.");
+    expect(screenNote(facts(snapOf([upload({})]), { files: { total: 1, uploaded: 1 }, screen: upload11 }))).toBe("1 file added. Ready files can continue to Standardize.");
     expect(screenNote(facts(snapOf([upload({})]), { files: { total: 3, uploaded: 1 }, screen: upload11 }))).toContain("1 of 3 uploaded");
   });
 });

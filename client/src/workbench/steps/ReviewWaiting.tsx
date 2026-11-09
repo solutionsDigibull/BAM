@@ -21,7 +21,7 @@ export function ReviewWaiting({ leaving }: { leaving?: boolean }) {
         <Icon name="tb-file-text" size={30} stroke={1.6} />
       </div>
       <h3 className="rw-title" role="status"><ShinyText className="rb-shiny" text="Waiting for files" color={s.color} shineColor={s.shine} speed={3.2} delay={1.2} shineWidth={30} /></h3>
-      <p className="rw-sub">Upload pack files on the left.<br />Review opens once Standardize hands them on.</p>
+      <p className="rw-sub">Upload pack files on the left.<br />Review opens once ingestion has started.</p>
     </div>
   )
 }

@@ -35,7 +35,7 @@ export function intakeChecks(snap: Snapshot, inFlight: number): Check[] {
   return [
     { label: 'Uploads finished', state: !u.length ? 'pending' : inFlight ? 'pending' : 'ready', detail: !u.length ? 'No documents yet' : inFlight ? `${inFlight} still uploading` : 'All uploads finished' },
     { label: 'Scan passed', state: !u.length || scanning ? 'pending' : held || errors ? 'fail' : 'ready', detail: `${accepted} accepted · ${scanning} pending scan${held ? ` · ${held} held` : ''}${errors ? ` · ${errors} scan errors` : ''}` },
-    { label: 'Handed to the knowledge build', state: snap.ingestion ? 'ready' : 'next', detail: snap.ingestion ? `Run ${snap.ingestion.runId}` : 'Starts with Start in Upload' },
+    { label: 'Handed to the knowledge build', state: snap.ingestion ? 'ready' : 'next', detail: snap.ingestion ? `Run ${snap.ingestion.runId}` : 'Starts with Start ingestion in Standardize' },
   ]
 }
 

@@ -15,7 +15,7 @@ const sources = (dir: string) =>
 
 // Screens with no backend are hidden in the tracker, so no screen may send the FDE into one. Step 4's footers
 // still point at Certify and Commit until Step 4 is wired (#715): the one known exception.
-const HIDDEN = ["1.8", "1.4", "2.2", "2.3", "4.5", "4.6"];
+const HIDDEN = ["2.2", "2.3", "4.5", "4.6"];
 const KNOWN = new Set(["steps/Step4.tsx"]);
 
 describe("the workbench flow never leads into a hidden screen (#711)", () => {
@@ -36,11 +36,25 @@ describe("the workbench flow never leads into a hidden screen (#711)", () => {
     expect(offenders).toEqual([]);
   });
 
-  test("test_711_uploaded_documents_not_yet_started_point_back_to_upload", () => {
+  test("test_711_uploaded_documents_not_yet_started_point_to_standardize", () => {
     const snap = { uploads: [{ id: "u" }], ingestion: undefined, sow: undefined } as unknown as Snapshot;
     const blocker = prerequisite(snap, { runId: undefined, steps: [] }, 1);
-    expect(blocker?.target).toBe("1.1");
-    expect(blocker?.reason).toMatch(/Start it in Upload/);
-    expect(blocker?.reason).not.toMatch(/standardiz/i);
+    expect(blocker?.target).toBe("1.8");
+    expect(blocker?.reason).toMatch(/Start it in Standardize/);
+  });
+
+  test("test_711_ingestion_runs_upload_standardize_parse_review_in_that_order", () => {
+    const visible = SUBTASKS.filter((s) => s.parentId === "1" && !s.hidden).map((s) => s.id);
+    expect(visible).toEqual(["1.1", "1.8", "1.9", "1.4"]);
+  });
+
+  test("test_711_each_ingestion_footer_moves_on_to_the_next_screen_and_only_standardize_starts_the_run", () => {
+    const ingestion = readFileSync(join(root, "steps", "Ingestion.tsx"), "utf8");
+    const standardize = readFileSync(join(root, "steps", "Standardize.tsx"), "utf8");
+    expect(ingestion).toContain("goScreen('1.8')"); // Upload: Continue
+    expect(ingestion).toContain("goScreen('1.4')"); // Parse, when the extraction is done
+    expect(ingestion).toContain("goScreen('2.5')"); // Review: Continue to Context
+    expect(standardize).toContain("start(ok.map"); // Standardize: Start ingestion
+    expect(ingestion).not.toMatch(/useIngestStart\(snap\)/); // Upload no longer starts the run
   });
 });

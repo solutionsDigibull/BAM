@@ -106,7 +106,7 @@ export const DONE_RULE: Record<string, string> = {
   '1.1': 'Done when a file is stored. The scan starts by itself; upload never marks a file safe.',
   '1.5': 'Done when every file has a final ClamAV and Repel verdict with no scan failure and nothing held.',
   '1.3': 'Done when every file has a final BuLL*Sav verdict and is released from quarantine.',
-  '1.8': 'Done when every file is ready and Standardize hands the batch on.',
+  '1.8': 'Done once ingestion has been started from here.',
   '1.9': 'Done when extraction of the current run finishes.',
   '1.4': 'Done when the accepted files are parsed and handed to Context.',
   '2.5': 'Done when Start on Sync has run the current context build (graph build).',

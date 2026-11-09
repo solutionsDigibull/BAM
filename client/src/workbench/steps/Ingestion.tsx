@@ -11,8 +11,7 @@ import { api } from '../api/adapter'
 import { Copy, Empty, GateButton, Icon, Kpis, StatusPill, Time, Tip, fmtBytes } from '../components/ui'
 import { tips } from '../lib/actionTips'
 import { FileRows, ScreenTitle, SecurityDetails, fdeReason, fdeView, useAdvanceWhen, useIngestStart } from './IngestionFlow'
-import { Foot, needsReview, useReviewFiles, useStandardize } from './Standardize'
-import { STATE_TEXT } from '../api/standardize'
+import { Foot, VerdictPill, useStandardize } from './Standardize'
 import { UploadProgress, isAdded, uploadCount, useUploadRows } from './UploadPanes'
 import { ragPipeline, useRag } from '../rag/ragPipeline'
 import StatusMark from '../components/reactbits/StatusMark'
@@ -88,7 +87,7 @@ export function ParseView({ snap }: { snap: Snapshot }) {
         { value: state === 'parsed' ? files.length : 0, label: 'Parsed', tone: state === 'parsed' ? 'ok' : undefined },
         { value: state === 'parsing' ? files.length : state === 'failed' ? `${files.length} failed` : 0, label: state === 'failed' ? 'Errors' : 'Parsing', tone: state === 'failed' ? 'err' : undefined },
       ]} />
-      {!snap.ingestion ? <p className="dc-none"><Icon name="tb-transform" size={16} />Nothing to parse yet. Standardize hands the files on once every file is ready.</p> : (
+      {!snap.ingestion ? <p className="dc-none"><Icon name="tb-transform" size={16} />Nothing to parse yet. Start ingestion in Standardize.</p> : (
         <ul className="dc-list" aria-label="Files">
           {files.map(u => <li key={u.id}><Icon name="tb-file-code" size={15} /><div><strong className="dc-name">{u.name}</strong>
             <span className="muted xs">{state === 'parsed' ? 'Text, tables and structure extracted' : state === 'failed' ? failed?.error ?? 'Extraction failed' : 'Extracting text, tables and structure'}</span></div>
@@ -114,14 +113,15 @@ export function IngestionReview({ snap }: { snap: Snapshot }) {
   const rejected = useUi(s => s.rejected)
   const rag = useRag(s => s)
   const std = useStandardize(snap)
-  const ingested = snap.uploads.filter(u => snap.ingestion?.fileIds.includes(u.id))
+  const handed = snap.ingestion?.fileIds ?? []
+  const ingested = std.filter(f => handed.includes(f.u.id))
   const ex = rag.steps.find(x => x.key === 'extract')
   const parsed = !!snap.ingestion && ex?.status === 'done', parseFailed = ex?.status === 'failed'
+  const unreadable = ingested.filter(f => f.v.state === 'failed')
+  const noted = ingested.filter(f => f.v.state === 'attention')
   const excluded = snap.uploads.length - ingested.length
-  // Held for review = the shared rule (useReviewFiles), the same files Upload flags and the chat counts. Any other file
-  // not handed on (e.g. its content was unavailable) is listed separately with its reason, so nothing is left out silently.
-  const { files: held } = useReviewFiles(snap)
-  const notHandedOn = snap.ingestion ? std.filter(f => !snap.ingestion!.fileIds.includes(f.u.id) && !needsReview(f)) : []
+  // Accepted files the run did not take (added after it started, or not readable) are listed with the reason, so nothing is left out silently.
+  const notHandedOn = snap.ingestion ? std.filter(f => !handed.includes(f.u.id)) : []
   const parseText = parsed ? 'Complete' : parseFailed ? 'Failed' : snap.ingestion ? 'Parsing' : 'Waiting'
   // Nothing handed on yet: the whole pane is the waiting state. The hand-off plays it out over the review (~450ms).
   const waiting = !handedOn(snap)
@@ -138,38 +138,37 @@ export function IngestionReview({ snap }: { snap: Snapshot }) {
   return (
     <main className={`ing dc${morph ? ' rw-enter' : ''}`} aria-labelledby="center-title">
       {morph && <ReviewWaiting leaving />}
-      <ScreenTitle title="Review accepted files" help="Close Ingestion before opening Context. This is not SOW approval." />
+      <ScreenTitle title="Review accepted files" help="A last look at what goes to Context. The knowledge build runs by itself. This is not SOW approval." />
       <Kpis label="Review summary" items={[
-        { value: parsed ? ingested.length : 0, label: 'Accepted & parsed', tone: parsed ? 'ok' : undefined },
+        { value: parsed ? ingested.length - unreadable.length : 0, label: 'Accepted & read', tone: parsed ? 'ok' : undefined },
         { value: excluded + rejected.length, label: 'Excluded' },
-        { value: parseFailed ? ingested.length : 0, label: 'Parse errors', tone: parseFailed ? 'err' : undefined },
+        { value: unreadable.length + (parseFailed ? 1 : 0), label: 'Cannot be read', tone: unreadable.length || parseFailed ? 'err' : undefined },
       ]} />
-      {!ingested.length ? <p className="dc-none"><Icon name="tb-clipboard-check" size={16} />No files handed on yet. Standardize hands the uploads on once they are ready.</p> : (
+      {!ingested.length ? <p className="dc-none"><Icon name="tb-clipboard-check" size={16} />No files handed on yet. Start ingestion in Standardize.</p> : (
         <ul className="dc-list" aria-label="Accepted files">
-          {ingested.map(u => {
-            const f = std.find(x => x.u.id === u.id)
-            return <li key={u.id}><StatusMark className="rb-sm" size={16} color="var(--accent)" doneColor="var(--ok)" errorColor="var(--err)"
-                status={parsed ? 'done' : parseFailed ? 'failed' : snap.ingestion ? 'running' : 'pending'} /><div><strong className="dc-name">{u.name}</strong>
-              <span className="muted xs">Standardize: {f?.review ? 'Reviewed' : 'Passed'} · Parse: {parseText}</span></div>
-              <span className={`dc-pill ${parsed ? 'tone-ok' : parseFailed ? 'tone-err' : ''}`}>{parsed ? 'Accepted' : parseFailed ? 'Parse error' : 'Waiting'}</span></li>
-          })}
+          {ingested.map(({ u, v }) => (
+            <li key={u.id}><StatusMark className="rb-sm" size={16} color="var(--accent)" doneColor="var(--ok)" errorColor="var(--err)"
+                status={v.state === 'failed' || parseFailed ? 'failed' : parsed ? 'done' : 'running'} /><div><strong className="dc-name">{u.name}</strong>
+              <span className="muted xs">{[v.reason, ...v.facts].join(' · ')} · Extraction: {parseText}</span></div>
+              <VerdictPill v={v} /></li>
+          ))}
         </ul>
       )}
       <section className="std-card">
         <h3>Handoff to Context</h3>
         <ul className="dc-list">
-          <li><Icon name="check" size={15} /><div><strong>Accepted and parsed files</strong><span className="muted xs">Source links and analysis copies retained</span></div><span className={`dc-pill ${parsed ? 'tone-ok' : ''}`}>{parsed ? 'Ready' : 'Waiting'}</span></li>
-          <li><Icon name="minus" size={15} /><div><strong>Excluded files</strong><span className="muted xs">Not sent to Context: removed, not ready, or refused at selection</span></div><span className="dc-pill">{excluded + rejected.length} excluded</span></li>
+          <li><Icon name="check" size={15} /><div><strong>Accepted and read files</strong><span className="muted xs">Source links retained</span></div><span className={`dc-pill ${parsed ? 'tone-ok' : ''}`}>{parsed ? 'Ready' : 'Waiting'}</span></li>
+          <li><Icon name="minus" size={15} /><div><strong>Excluded files</strong><span className="muted xs">Not sent to Context: removed, not readable, or refused at selection</span></div><span className="dc-pill">{excluded + rejected.length} excluded</span></li>
         </ul>
       </section>
       <div className="dc-rows">
-        {held.length > 0 && <details open>
-          <summary><strong>Held for review</strong><span className="dc-count">{held.length}</span><Icon name="down" size={13} /></summary>
-          <ul className="dc-files">{held.map(f => <li key={f.u.id}><Icon name="alert" size={15} /><span className="dc-name">{f.u.name}</span></li>)}</ul>
+        {noted.length > 0 && <details open>
+          <summary><strong>Read with notes</strong><span className="dc-count">{noted.length}</span><Icon name="down" size={13} /></summary>
+          <ul className="dc-files">{noted.map(f => <li key={f.u.id}><Icon name="alert" size={15} /><span className="dc-name">{f.u.name}</span><span className="muted xs">{f.v.reason}</span></li>)}</ul>
         </details>}
         {notHandedOn.length > 0 && <details open>
           <summary><strong>Not handed on</strong><span className="dc-count">{notHandedOn.length}</span><Icon name="down" size={13} /></summary>
-          <ul className="dc-files">{notHandedOn.map(f => <li key={f.u.id}><Icon name="file" size={15} /><span className="dc-name">{f.u.name}</span><span className="muted xs">{STATE_TEXT[f.a.state]}{f.a.reason ? `: ${f.a.reason}` : ''} · not sent to Context</span></li>)}</ul>
+          <ul className="dc-files">{notHandedOn.map(f => <li key={f.u.id}><Icon name="file" size={15} /><span className="dc-name">{f.u.name}</span><span className="muted xs">{f.v.label}: {f.v.reason} · not sent to Context</span></li>)}</ul>
         </details>}
         {rejected.length > 0 && <details>
           <summary><strong>Refused at selection</strong><span className="dc-count">{rejected.length}</span><Icon name="down" size={13} /></summary>
@@ -181,23 +180,21 @@ export function IngestionReview({ snap }: { snap: Snapshot }) {
 }
 
 // ---- pinned footers (one primary action each) ------------------------------------------------------------------
-/** Upload's one action: Start sends the batch to the backend (one pipeline start: ingestion, then the knowledge
- *  build, then the SOW) and opens Parse. It waits for the click in the Ready state (no auto-advance from Upload). */
+/** Upload's one action: Continue opens Standardize, where the backend's verdict on each file is shown and ingestion is
+ *  started. It waits for the click once every added file is uploaded and checked (no auto-advance from Upload). */
 export function UploadFooter({ snap }: { snap: Snapshot }) {
   const all = useUploadRows(snap), rows = all.filter(isAdded)
   const progress = uploadCount(all)
   const busy = rows.some(r => r.state === 'uploading' || r.state === 'checking')
   const ready = rows.filter(r => r.state === 'ready').length
-  // Locked until the goal is approved (approval gate): the footer says how to unlock Add files.
+  // Locked until a goal is saved: the footer says how to unlock Add files.
   const locked = !useGoal(canAddFiles)
-  const status = locked && !rows.length ? 'Send your goal to unlock Add files.' : !rows.length ? 'Add files to continue' : progress ? `${progress.done} of ${progress.total} uploaded` : busy ? 'Checking the uploaded files' : !ready ? 'No file is ready yet' : 'Ready to start'
-  const t = tips('1.1', 'Start')
-  const { start, block, starting } = useIngestStart(snap)
-  const canStart = status === 'Ready to start' && !block && !starting
+  const status = locked && !rows.length ? 'Send your goal to unlock Add files.' : !rows.length ? 'Add files to continue' : progress ? `${progress.done} of ${progress.total} uploaded` : busy ? 'Checking the uploaded files' : !ready ? 'No file is ready yet' : 'Ready to continue'
+  const canGo = status === 'Ready to continue'
   return <div className="ws-foot-in" role="status" aria-live="polite">
     <div className="ws-foot-text">{progress ? <UploadProgress {...progress} /> : <span className="muted sm">{status}</span>}</div>
-    <Tip text={t.tip} note={status !== 'Ready to start' ? status : block ? fdeReason(block) : undefined}>
-      <button className="btn btn-primary" aria-disabled={!canStart || undefined} onClick={() => { if (canStart) void start() }}>{starting ? 'Starting…' : 'Start ingestion'}</button></Tip>
+    <Tip text="Open Standardize to see what the backend found in each file, then start ingestion." note={!canGo ? status : undefined}>
+      <button className="btn btn-primary" aria-disabled={!canGo || undefined} onClick={() => { if (canGo) goScreen('1.8') }}>Continue</button></Tip>
   </div>
 }
 /** Parse is automated: status only; it opens Review when the extraction is done. A failure shows Retry. */
@@ -205,8 +202,8 @@ export function ParseFooter({ snap }: { snap: Snapshot }) {
   const rag = useRag(s => s)
   const ex = rag.steps.find(x => x.key === 'extract')
   const failed = rag.steps.slice(0, 2).find(x => x.status === 'failed')
-  const reason = !snap.ingestion ? 'Starts from Upload once every file is ready' : failed ? `${failed.label} failed` : ex?.status !== 'done' ? 'Parsing the standardized files' : undefined
-  useAdvanceWhen(!reason, () => goScreen('2.5')) // Review has no backend and is hidden: on to Context
+  const reason = !snap.ingestion ? 'Starts from Standardize once every file is read' : failed ? `${failed.label} failed` : ex?.status !== 'done' ? 'Parsing the standardized files' : undefined
+  useAdvanceWhen(!reason, () => goScreen('1.4')) // the extraction is done: Review is the last look before Context
   return <Foot title={reason ?? 'Extraction complete'} line="Extracted text and tables are linked to the source files">
     {failed && <GateButton icon="refresh" {...tips('1.9', 'Retry')} onClick={() => ragPipeline.retry(failed.key)}>Retry</GateButton>}</Foot>
 }
@@ -216,11 +213,11 @@ export function IngestReviewFooter({ snap }: { snap: Snapshot }) {
   const rag = useRag(s => s)
   const parsed = !!snap.ingestion && rag.steps.find(x => x.key === 'extract')?.status === 'done'
   const closed = !snap.steps[0]!.editable
-  return <Foot title={parsed ? 'Accepted, parsed files only' : 'Waiting for parsed files'} line="Context receives the accepted, parsed files">
-    {/* Missed a file while reviewing? (5 Nov 2026) Upload opens its picker; current files and review results are kept. */}
-    <button className="btn btn-secondary" disabled={closed} title={closed ? 'Uploads are closed.' : 'Add files you missed - current files and review results stay'}
+  return <Foot title={parsed ? 'Accepted, read files only' : 'Waiting for the extraction'} line="Context receives the accepted, read files">
+    {/* Missed a file while reviewing? Upload opens its picker; current files are kept. */}
+    <button className="btn btn-secondary" disabled={closed} title={closed ? 'Uploads are closed.' : 'Add files you missed - current files stay'}
       onClick={() => { setUi({ armPicker: 'files' }); goScreen('1.1') }}><Icon name="tb-plus" />Add files</button>
-    <GateButton icon="tb-clipboard-check" {...tips('1.4', 'Approve')} reason={parsed ? undefined : 'Parsing must finish first'} onClick={() => goScreen('2.5')}>Approve</GateButton></Foot>
+    <GateButton icon="tb-arrow-right" reason={parsed ? undefined : 'The extraction must finish first'} onClick={() => goScreen('2.5')}>Continue to Context</GateButton></Foot>
 }
 
 // ---- Quarantine -------------------------------------------------------------------------------------------

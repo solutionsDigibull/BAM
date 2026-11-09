@@ -8,7 +8,7 @@ export interface Blocker { reason: string; label: string; target: string }
 /** The first unmet prerequisite for working on backend step `step`, or undefined when nothing blocks it. */
 export function prerequisite(snap: Snapshot, rag: Pick<RagState, 'runId' | 'steps'>, step: StepId): Blocker | undefined {
   if (!snap.uploads.length) return { reason: 'Source documents are needed first. The SOW is generated from the RAG context of the uploaded documents.', label: 'Upload documents', target: '1.1' }
-  if (!snap.ingestion) return { reason: 'Documents are uploaded but processing has not started. Start it in Upload once every file check has passed.', label: 'Open Upload', target: '1.1' }
+  if (!snap.ingestion) return { reason: 'Documents are uploaded but processing has not started. Start it in Standardize once every file has been read.', label: 'Open Standardize', target: '1.8' }
 
   const sow = snap.sow
   const genFailed = snap.sowGeneration.find(s => s.status === 'failed')
