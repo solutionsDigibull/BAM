@@ -153,7 +153,8 @@ export function FdeLogin({
             </form>
           )}
 
-          {enabled && (
+          {/* The role buttons skip Keycloak, so the API rejects them (401): they exist only while Keycloak is off. */}
+          {enabled && !keycloak && (
             <div className="login-dev">
               <p className="login-hint">Development sign-in (SBAM_DEV_AUTH=1)</p>
               {DEV_CHOICES.map((c) => (
