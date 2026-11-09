@@ -3,9 +3,13 @@ import { useCustom, type BaseRecord } from '@refinedev/core'
 import { useQueryClient } from '@tanstack/react-query'
 import type { CodeFile, SkillRow, Snapshot, StepId } from '../api/types'
 
-// One shared poll of the backend snapshot; every status in the UI derives from it.
+// A snapshot is three API calls through the Next proxy, so a 1 s poll kept the dev server and the API queued behind it and
+// made every click slow. Commands refresh it at once (useAction invalidates), so the poll only has to catch background work.
+export const SNAPSHOT_POLL_MS = 4000
+
+// One shared poll of the backend snapshot; every status in the UI derives from it. React Query pauses it in a hidden tab.
 export function useSnapshot() {
-  const { query } = useCustom<Snapshot & BaseRecord>({ url: 'snapshot', method: 'get', queryOptions: { refetchInterval: 1000, retry: false } })
+  const { query } = useCustom<Snapshot & BaseRecord>({ url: 'snapshot', method: 'get', queryOptions: { refetchInterval: SNAPSHOT_POLL_MS, retry: false } })
   return { snap: query.data?.data as Snapshot | undefined, error: query.error, isLoading: query.isLoading, syncedAt: query.dataUpdatedAt, refetch: query.refetch }
 }
 
