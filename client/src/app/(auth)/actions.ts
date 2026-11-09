@@ -29,10 +29,16 @@ export async function keycloakSignIn(formData: FormData) {
   // the admin portal goes through "/" (src/proxy.ts picks tenants vs projects by role) and the FDE
   // portal straight to its projects.
   const callback = safeCallback(String(formData.get("callbackUrl") ?? ""), portal);
+  // An email typed on the login card only travels to Keycloak as a hint, so its form arrives filled in. It is
+  // checked here too (the client check is a courtesy) and is never logged or stored.
+  const email = String(formData.get("email") ?? "").trim();
+  const hint = email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : undefined;
   // Keycloak down: Auth.js redirects to pages.error (the login card) with error=Configuration.
-  await signIn(providerId(portal), {
-    redirectTo: callback ?? (portal === "admin" ? "/" : landing("fde", [])),
-  });
+  await signIn(
+    providerId(portal),
+    { redirectTo: callback ?? (portal === "admin" ? "/" : landing("fde", [])) },
+    hint ? { login_hint: hint } : undefined,
+  );
 }
 
 export async function signOut() {
