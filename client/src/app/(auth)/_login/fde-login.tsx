@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { devSignIn, keycloakSignIn } from "../actions";
 import panel from "./assets/bull-panel.png";
@@ -19,8 +19,6 @@ const DEV_CHOICES = [
   { roles: "sbam-fde", label: "Sign in as FDE" },
   { roles: "sbam-admin,sbam-fde", label: "Sign in as Admin + FDE" },
 ];
-
-export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const Alert = () => (
   <svg
@@ -57,7 +55,8 @@ const Arrow = ({ dir }: { dir: "left" | "right" }) => (
 
 /**
  * The FDE sign-in, in the BuLLM look. The password is never typed here: "Sign in" goes to Keycloak, which asks for
- * it on its own page. An email typed here only travels to Keycloak as a hint, so its form arrives filled in.
+ * it on its own page. A username or email typed here only travels to Keycloak as a hint, so its form arrives
+ * filled in; Keycloak accepts either, so nothing is validated here.
  */
 export function FdeLogin({
   enabled,
@@ -73,18 +72,7 @@ export function FdeLogin({
   reference?: string;
   callbackUrl?: string;
 }) {
-  const [email, setEmail] = useState("");
-  const [invalid, setInvalid] = useState(false);
-  const emailRef = useRef<HTMLInputElement>(null);
-
-  function onSubmit(e: FormEvent) {
-    // An empty email is fine (Keycloak asks for it); a typed one must look like an email.
-    if (email.trim() && !EMAIL_RE.test(email.trim())) {
-      e.preventDefault();
-      setInvalid(true);
-      emailRef.current?.focus();
-    }
-  }
+  const [username, setUsername] = useState("");
 
   return (
     <main className="login-page">
@@ -116,33 +104,22 @@ export function FdeLogin({
           )}
 
           {keycloak && (
-            <form className="login-form" action={keycloakSignIn} noValidate onSubmit={onSubmit}>
+            <form className="login-form" action={keycloakSignIn} noValidate>
               <input type="hidden" name="portal" value="fde" />
               {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
               <div className="login-field">
-                <label htmlFor="login-email">Work email</label>
+                <label htmlFor="login-username">Username or email</label>
                 <input
-                  id="login-email"
-                  ref={emailRef}
-                  name="email"
-                  type="email"
+                  id="login-username"
+                  name="username"
+                  type="text"
                   autoComplete="username"
-                  placeholder="you@company.com"
+                  placeholder="you@company.com or username"
                   autoFocus
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setInvalid(false);
-                  }}
-                  aria-invalid={invalid}
-                  aria-describedby={invalid ? "login-email-err" : "login-pw-note"}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  aria-describedby="login-pw-note"
                 />
-                {invalid && (
-                  <p id="login-email-err" className="login-err">
-                    <Alert />
-                    Enter a valid work email
-                  </p>
-                )}
                 <p id="login-pw-note" className="login-hint">
                   You enter your password on the next secure step.
                 </p>
