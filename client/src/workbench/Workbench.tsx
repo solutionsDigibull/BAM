@@ -4,7 +4,6 @@ import './v3.css'
 import './ingestion.css'
 import './declutter.css'
 import './rag-seamless.css'
-import './overrides.css'
 import { Refine } from '@refinedev/core'
 import { api, dataProvider } from './api/adapter'
 import type { Snapshot, StepId, StepInfo } from './api/types'
@@ -19,7 +18,8 @@ import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
 import { FileDetail, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
 import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
-import { goalStage, useGoal } from './lib/goal'
+import { AssistantPane } from './components/AssistantPane'
+import { goalStage, skipGoal, useGoal } from './lib/goal'
 import { ReleasePrep, SkillReview } from './steps/Review'
 import { SCREEN_ROUTES, STEP_SCREEN, TASKS, screenByPath, screenLabel, stageOf, subtasksOf } from './tracker/trackerConfig'
 import { AutoContextFooter, SyncFooter, SyncView } from './rag/KnowledgeSync'
@@ -192,8 +192,10 @@ function WorkbenchBody() {
       <a className="skip" href="#ws-title">Skip to screen content</a>
       <TopBar snap={snap} syncedAt={syncedAt} offline={!!error} />
       <UploadStage snap={snap} on={screen?.id === '1.1'} />
-      <div className="shell" data-screen={screen?.id} data-nav={shell.nav ? 'collapsed' : undefined} data-assist="collapsed" data-drawer={drawer ?? undefined}>
+      <div className="shell" data-screen={screen?.id} data-nav={shell.nav ? 'collapsed' : undefined} data-assist={shell.assistant ? 'collapsed' : undefined} data-drawer={drawer ?? undefined}>
         <div className="shell-slot slot-nav"><NavRail snap={snap} /></div>
+        {/* Mounted once for the session (never keyed by screen), so the conversation survives navigation. */}
+        <div className="shell-slot slot-assist"><AssistantPane snap={snap} screenId={screen?.id} locked={locked} /></div>
         {drawer && <button className="drawer-scrim" aria-label="Close panel" onClick={() => setUi({ drawer: null })} />}
         <section className="shell-pane workspace" aria-labelledby="ws-title">
           <header className="shell-head ws-head">
@@ -219,6 +221,8 @@ const UploadFoot = ({ snap }: { snap: Snapshot }) => <UploadFooter snap={snap} /
 /** Pane progression on Upload: 1 = middle only, 2 = goal expanded (files pane opens), 3 = files added (outputs pane opens). */
 function UploadStage({ snap, on }: { snap: Snapshot; on: boolean }) {
   const n = useUploadRows(snap).length, stage = useGoal(s => goalStage(s, n))
+  // A project that already has files or a pipeline run resumes where the work is: it is not asked for a goal first.
+  useEffect(() => { if (snap.uploads.length || snap.ingestion) skipGoal() }, [snap.uploads.length, snap.ingestion])
   useEffect(() => {
     const root = document.querySelector<HTMLElement>('.bam-wb')
     if (!root) return
