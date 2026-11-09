@@ -1,0 +1,314 @@
+/* BuLLM login theme: the FDE sign-in card (client/src/app/(auth)/_login/login.css) around Keycloak's own forms.
+   Dark by default, light when the system asks for it, the same tokens as the card in the web app. */
+.bullm-page {
+  --bl-bg: #080d18;
+  --bl-card: #141b2b;
+  --bl-border: #2d3750;
+  --bl-text: #f1f4fa;
+  --bl-muted: #9aa4b8;
+  --bl-input: #1b2336;
+  --bl-link: #5aa9e6;
+  --bl-err: #f97066;
+  --bl-shadow: 0 40px 90px rgba(0, 0, 0, 0.55);
+  --bl-glow:
+    radial-gradient(38% 34% at 0% 0%, rgba(236, 132, 38, 0.55), transparent 72%),
+    radial-gradient(40% 42% at 100% 100%, rgba(26, 108, 196, 0.5), transparent 72%),
+    radial-gradient(30% 22% at 50% 100%, rgba(190, 96, 40, 0.22), transparent 72%);
+  --bl-ring: 0 0 0 3px rgba(90, 169, 230, 0.45);
+  --bl-pad: clamp(8px, 4vh, 40px);
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--bl-pad) 20px;
+  background:
+    var(--bl-glow),
+    var(--bl-bg);
+  color: var(--bl-text);
+}
+@media (prefers-color-scheme: light) {
+  .bullm-page {
+    --bl-bg: #eef2f8;
+    --bl-card: #ffffff;
+    --bl-border: #d5dbe7;
+    --bl-text: #101828;
+    --bl-muted: #667085;
+    --bl-input: #f5f7fb;
+    --bl-link: #1b6fc2;
+    --bl-err: #d92d20;
+    --bl-shadow: 0 30px 70px rgba(16, 24, 40, 0.12);
+    --bl-glow:
+      radial-gradient(36% 34% at 0% 0%, rgba(255, 196, 140, 0.7), transparent 72%),
+      radial-gradient(38% 40% at 100% 100%, rgba(150, 200, 245, 0.65), transparent 72%);
+    --bl-ring: 0 0 0 3px rgba(27, 111, 194, 0.25);
+  }
+}
+html,
+body#keycloak-bg {
+  background: transparent !important;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.bullm-card {
+  /* PatternFly reads its colours from these variables, so labels, links and alerts follow the card. */
+  --pf-v5-global--BackgroundColor--100: var(--bl-card);
+  --pf-v5-global--BackgroundColor--200: var(--bl-input);
+  --pf-v5-global--Color--100: var(--bl-text);
+  --pf-v5-global--Color--200: var(--bl-muted);
+  --pf-v5-global--BorderColor--100: var(--bl-border);
+  --pf-v5-global--link--Color: var(--bl-link);
+  --pf-v5-global--link--Color--hover: var(--bl-link);
+  width: min(1320px, 90vw);
+  min-height: min(800px, calc(100vh - 2 * var(--bl-pad)));
+  display: grid;
+  grid-template-columns: minmax(0, 580px) minmax(0, 580px);
+  justify-content: space-between;
+  align-items: center;
+  gap: 40px;
+  padding: clamp(12px, 4.4vh, 40px) 60px clamp(12px, 4.4vh, 40px) clamp(12px, 4.4vh, 40px);
+  border-radius: clamp(22px, 4vh, 34px);
+  background: var(--bl-card);
+  border: 1px solid var(--bl-border);
+  box-shadow: var(--bl-shadow);
+  color: var(--bl-text);
+}
+.bullm-card :focus-visible {
+  outline: 2px solid var(--bl-link);
+  outline-offset: 2px;
+}
+
+/* Left: the showcase panel (the same artwork and wording as the web app's card, without the carousel). */
+.bullm-panel {
+  position: relative;
+  align-self: stretch;
+  min-height: 0;
+  border-radius: clamp(20px, 3.6vh, 30px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  background:
+    radial-gradient(55% 36% at 50% 82%, rgba(236, 104, 52, 0.5), transparent 72%),
+    radial-gradient(48% 40% at 0% 100%, rgba(8, 58, 130, 0.7), transparent 72%),
+    linear-gradient(180deg, #3d86c0 0%, #14568f 58%, #0a5a96 100%);
+}
+.bullm-panel-art {
+  display: block;
+  flex: 1 1 0;
+  min-height: 0;
+  width: auto;
+  max-width: 100%;
+  align-self: center;
+  object-fit: cover;
+  object-position: top;
+  --fade:
+    linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent),
+    linear-gradient(180deg, #000 72%, transparent 100%);
+  -webkit-mask-image: var(--fade);
+  mask-image: var(--fade);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.bullm-panel-body {
+  flex: none;
+  padding: 0 14px clamp(10px, 2vh, 18px);
+}
+.bullm-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 clamp(6px, 1.4vh, 12px) 14px;
+  padding: 0;
+}
+.bullm-chips li {
+  font-size: 14px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(8px);
+}
+.bullm-quote {
+  padding: 14px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(14px);
+}
+.bullm-quote-head {
+  margin: 0;
+  font-size: clamp(18px, min(1.9vw, 3vh), 26px);
+  line-height: 1.3;
+}
+.bullm-quote-flow {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Right: Keycloak's own form, with the PatternFly login chrome flattened into the card. */
+.bullm-form-side {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.bullm-form-side .pf-v5-c-login {
+  min-height: 0;
+  background: none;
+  display: block;
+}
+.bullm-form-side .pf-v5-c-login__container {
+  display: block;
+  max-width: none;
+  padding: 0;
+  background: none;
+}
+.bullm-form-side .pf-v5-c-login__header {
+  padding: 0;
+  margin: 0 0 clamp(8px, 1.6vh, 16px);
+}
+.bullm-lockup {
+  display: block;
+  width: 215px;
+  max-width: 100%;
+  height: auto;
+}
+.bullm-form-side .pf-v5-c-login__main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+}
+.bullm-form-side .pf-v5-c-login__main-header,
+.bullm-form-side .pf-v5-c-login__main-body,
+.bullm-form-side .pf-v5-c-login__main-footer {
+  padding-left: 0;
+  padding-right: 0;
+}
+#kc-page-title {
+  margin: clamp(8px, 4vh, 40px) 0 6px;
+  font-size: clamp(26px, 5.2vh, 46px);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--bl-text);
+}
+.bullm-form-side label,
+.bullm-form-side .pf-v5-c-form__label-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bl-text);
+}
+.bullm-form-side .pf-v5-c-form-control {
+  min-height: clamp(40px, 6.2vh, 56px);
+  border-radius: 12px;
+  background: var(--bl-input);
+  border: 1px solid var(--bl-border);
+  color: var(--bl-text);
+  font-size: 16px;
+}
+.bullm-form-side .pf-v5-c-form-control::before,
+.bullm-form-side .pf-v5-c-form-control::after {
+  display: none;
+}
+.bullm-form-side .pf-v5-c-form-control input {
+  color: var(--bl-text);
+  background: transparent;
+  padding: 0 18px;
+}
+.bullm-form-side .pf-v5-c-form-control:focus-within {
+  border-color: var(--bl-link);
+  box-shadow: var(--bl-ring);
+}
+.bullm-form-side .pf-v5-c-form-control[aria-invalid="true"],
+.bullm-form-side .pf-v5-c-form-control.pf-m-error {
+  border-color: var(--bl-err);
+}
+.bullm-form-side a {
+  color: var(--bl-link);
+  font-weight: 700;
+}
+.bullm-form-side .pf-v5-c-button.pf-m-primary {
+  width: 100%;
+  height: clamp(42px, 6.4vh, 58px);
+  border: 0;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #161008;
+  background: linear-gradient(180deg, #ffa63a 0%, #ec6f26 100%);
+  box-shadow:
+    0 12px 30px rgba(236, 111, 38, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.bullm-form-side .pf-v5-c-button.pf-m-primary:hover {
+  filter: brightness(1.05);
+}
+.bullm-form-side .pf-v5-c-button.pf-m-secondary,
+.bullm-form-side .pf-v5-c-button.pf-m-control {
+  border-radius: 12px;
+  color: var(--bl-text);
+}
+.bullm-form-side .pf-v5-c-alert {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bl-err) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bl-err) 40%, transparent);
+}
+.bullm-form-side .pf-v5-c-alert.pf-m-success,
+.bullm-form-side .pf-v5-c-alert.pf-m-info {
+  background: color-mix(in srgb, var(--bl-link) 10%, transparent);
+  border-color: color-mix(in srgb, var(--bl-link) 40%, transparent);
+}
+.bullm-form-side .pf-v5-c-login__main-footer-band {
+  background: transparent;
+  border-top: 1px solid var(--bl-border);
+}
+
+/* PatternFly's blue accent bar above the form, and the doubled border inside the field wrapper. */
+.bullm-form-side .pf-v5-c-login__main,
+.bullm-form-side .pf-v5-c-login__main-header {
+  border-top: 0 !important;
+}
+.bullm-form-side .pf-v5-c-login__main::before,
+.bullm-form-side .pf-v5-c-login__main::after {
+  display: none !important;
+}
+.bullm-form-side .pf-v5-c-form-control input {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  height: 100%;
+  min-height: inherit;
+}
+.bullm-form-side .pf-v5-c-input-group {
+  gap: 8px;
+}
+.bullm-form-side .pf-v5-c-input-group__item .pf-v5-c-button.pf-m-control {
+  min-height: clamp(40px, 6.2vh, 56px);
+  background: var(--bl-input);
+  border: 1px solid var(--bl-border);
+  border-radius: 12px;
+  color: var(--bl-muted);
+}
+
+@media (max-width: 1024px) {
+  .bullm-card {
+    padding: clamp(12px, 4vh, 32px);
+    gap: 32px;
+  }
+}
+@media (max-width: 900px) {
+  .bullm-card {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(620px, 100%);
+    min-height: 0;
+  }
+  .bullm-panel {
+    display: none;
+  }
+}

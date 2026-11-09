@@ -217,6 +217,9 @@ services:
       # Hardened realm (#47): clients, roles, mappers, token policy; no users. --import-realm skips a
       # realm that already exists. Local seed users come from keycloak-seed (compose.override.yaml).
       - ./keycloak/realm-bullm.json:/opt/keycloak/data/import/realm-bullm.json:ro
+      # BuLLM login theme (#719): Keycloak's own pages in the look of the FDE sign-in card. A realm uses it once
+      # `loginTheme` is `bullm` (keycloak-seed sets it locally; staging and production set it in the realm).
+      - ./keycloak/themes/bullm:/opt/keycloak/themes/bullm:ro
     ports: ["127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"]
     networks: [sbam_edge, sbam_internal]
     depends_on:

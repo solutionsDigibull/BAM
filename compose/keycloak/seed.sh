@@ -116,6 +116,24 @@ ensure_smtp() { # invite emails (#50) go to Mailpit locally; staging/prod config
     -s smtpServer.from=no-reply@sbam.test -s smtpServer.fromDisplayName=SBAM
 }
 
+# Local sign-in (#719): the BuLLM login theme, and email and password on one page. Keycloak's default browser flow
+# asks for the email first through "Organization Identity-First Login"; the deployed flow (browser-mfa, see
+# render_realm.py) is a single form, so local development matches it. Tenants stay Organizations: only the
+# identity-first screen is switched off. Re-runnable: both steps set a value.
+use_login_theme() {
+  "$kc" update "realms/$realm" -s loginTheme=bullm >/dev/null
+  echo "login theme: bullm"
+}
+single_form_login() {
+  local step
+  step=$(csv authentication/flows/browser/executions --fields id,displayName,level | grep ',Organization,0$' | cut -d, -f1 || true)
+  if [ -n "$step" ]; then
+    "$kc" update authentication/flows/browser/executions -r "$realm" -b "{\"id\":\"$step\",\"requirement\":\"DISABLED\"}" >/dev/null
+    echo "browser flow: identity-first step off"
+  fi
+}
+use_login_theme
+single_form_login
 ensure_api_admin_client
 ensure_swagger_client
 ensure_smtp
