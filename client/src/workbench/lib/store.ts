@@ -128,7 +128,7 @@ uppy.addUploader(async fileIDs => {
 async function send(f: ReturnType<typeof uppy.getFile>) {
     try {
       const batchId = (f.meta as { batchId?: string } | undefined)?.batchId
-      const rec = await api.uploadFile({ name: f.name ?? 'file', size: f.size ?? 0, batchId }, (loaded, total) =>
+      const rec = await api.uploadFile({ name: f.name ?? 'file', size: f.size ?? 0, type: f.type, data: f.data as Blob, batchId }, (loaded, total) =>
         uppy.emit('upload-progress', uppy.getFile(f.id), { uploadStarted: Date.now(), bytesUploaded: loaded, bytesTotal: total }))
       uppy.emit('upload-success', uppy.getFile(f.id), { status: 200, body: rec as never, uploadURL: rec.objectKey })
     } catch (e) {

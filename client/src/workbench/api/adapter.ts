@@ -11,7 +11,7 @@ export interface BamApi {
   getSkills(): Promise<SkillRow[]>
   getCode(): Promise<CodeFile[]>
   /** stageUpload: stores the file in private quarantine staging and starts an async virus scan (ClamAV in production). */
-  uploadFile(file: { name: string; size: number; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
+  uploadFile(file: { name: string; size: number; type?: string; data: Blob; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
   /** Removes a file from the active intake batch once the service confirms. A blocked object stays in quarantine (audit). Refused while scanning. */
   removeUpload(id: string): Promise<void>
   /** Rescans a file whose scan failed (outage, timeout, malformed verdict). */

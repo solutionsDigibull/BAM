@@ -94,9 +94,9 @@ export function triage<T extends { name: string; size: number }>(files: ArrayLik
   return r
 }
 
-export const MAX_MULTI_BATCH_WAVES = 9
-export const MAX_MULTI_BATCH_FILES = MAX_BATCH_FILES * MAX_MULTI_BATCH_WAVES // 225 files
-export const MAX_MULTI_BATCH_BYTES = MAX_BATCH_BYTES * MAX_MULTI_BATCH_WAVES // 2.25 GB
+export const MAX_MULTI_BATCH_WAVES = 1 // a project holds at most 20 active files, so there is one wave
+export const MAX_MULTI_BATCH_FILES = MAX_BATCH_FILES * MAX_MULTI_BATCH_WAVES // 20 files
+export const MAX_MULTI_BATCH_BYTES = MAX_BATCH_BYTES * MAX_MULTI_BATCH_WAVES // 300 MB
 
 export interface MultiBatchFit {
   ok: boolean

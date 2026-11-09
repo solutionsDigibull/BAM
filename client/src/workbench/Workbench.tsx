@@ -16,7 +16,7 @@ import * as Step1 from './steps/Step1'
 import * as Step2 from './steps/Step2'
 import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
-import { FileDetail, ParseFooter, Quarantine, UploadFooter } from './steps/Ingestion'
+import { FileDetail, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
 import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
 import { goalStage, useGoal } from './lib/goal'
 import { ReleasePrep, SkillReview } from './steps/Review'
@@ -61,7 +61,7 @@ const NAV_ORDER = TASKS.flatMap(t => subtasksOf(t.id))
 
 // Ungated screens: always viewable, with honest empty/unavailable states.
 const VIEWS: Record<string, (p: { snap: Snapshot; path: string }) => React.ReactNode> = {
-  '1.3': FileDetail, '1.7': Quarantine,
+  '1.3': FileDetail, '1.7': Quarantine, '1.9': ParseView,
   '2.5': SyncView, '2.1': RagScreen,
   '3.3': SkillReview, '3.4': ReleasePrep,
 }
@@ -155,8 +155,11 @@ function WorkbenchBody() {
   const locked = info?.state === 'locked' && !templateReady ? (prerequisite(snap, rag, info.id)?.reason ?? `${info.reason}.`) : undefined
   let body
   if (!info) {
-    const View = VIEWS[screen!.id]!
-    body = <><ContextBar snap={snap} screenId={screen!.id} /><PanesContext.Provider value><View snap={snap} path={path} /></PanesContext.Provider></>
+    const View = VIEWS[screen!.id]
+    // A screen without a view (hidden for lack of a backend) says so; it never crashes the page.
+    body = View
+      ? <><ContextBar snap={snap} screenId={screen!.id} /><PanesContext.Provider value><View snap={snap} path={path} /></PanesContext.Provider></>
+      : <main className="locked-screen"><Empty icon="info" title={`${screenLabel(screen!.id)} is not available`} action={<button className="btn btn-primary" onClick={() => goScreen(activeScreen(snap))}>Go to {screenLabel(activeScreen(snap))}</button>}>This screen has no backend yet.</Empty></main>
   }
   // Template before any run (the Grid is approved but the checks have not started): its Ready state, not a lock.
   else if (templateReady) body = <><ContextBar snap={snap} screenId={screen!.id} /><PanesContext.Provider value><main className="panes" data-single=""><Step3.TemplateReady /></main></PanesContext.Provider></>

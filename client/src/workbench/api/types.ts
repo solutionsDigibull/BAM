@@ -299,14 +299,14 @@ export const AUTOMATIONS = [
   'DYNAMIC_CONTEXT_VERIFIER',
 ] as const
 
-export const ACCEPTED_TYPES = ['.pdf', '.docx', '.xlsx', '.pptx', '.txt', '.png', '.zip']
-/** One intake batch: at most 25 files and 250 MB in total. A ZIP counts as one file. */
-export const MAX_BATCH_FILES = 25
-export const MAX_BATCH_BYTES = 250 * 1024 * 1024
-/** Files above this are sent in parts of this size (multipart upload). */
+// These mirror the backend's rules (sbam_api/ingest/rules.py): the server decides, the UI only avoids a refused pick.
+export const ACCEPTED_TYPES = ['.md', '.txt', '.eml', '.msg', '.json', '.xml', '.yaml', '.yml', '.py', '.sql', '.js', '.go', '.cpp', '.csv', '.xlsx', '.docx', '.pdf', '.zip', '.gz', '.png', '.jpg', '.jpeg', '.tiff']
+/** One intake batch is the project's active files: at most 20, 15 MB each. */
+export const MAX_BATCH_FILES = 20
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+export const MAX_BATCH_BYTES = MAX_BATCH_FILES * MAX_UPLOAD_BYTES
+/** Files above this are sent in parts of this size by the resumable upload. */
 export const CHUNK_BYTES = 10 * 1024 * 1024
-/** A single file may use the whole batch budget; anything over 10 MB is chunked. */
-export const MAX_UPLOAD_BYTES = MAX_BATCH_BYTES
 export const chunkCount = (size: number) => Math.max(1, Math.ceil(size / CHUNK_BYTES))
 
 /** BuLL*Sav = Digibull Security AntiVirus Engine, the 1.1 scan gate. The scan engine behind it is ClamAV (clamd) in production. */
