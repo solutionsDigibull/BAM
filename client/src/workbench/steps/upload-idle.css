@@ -1,0 +1,20 @@
+/* scoped to .bam-wb by scripts/scope-workbench-css.mjs */
+/* Upload right pane, zero files (UploadIdle.tsx). Tokens only; bars sit one step above the raised card, no animation. */
+.bam-wb .up-idle { display: flex; flex-direction: column; gap: 16px; }
+.bam-wb .up-idle-explain { margin: 4px 0 0; text-align: center; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.bam-wb .up-idle-skel { display: flex; flex-direction: column; gap: 6px; }
+.bam-wb .up-idle-label { font-size: 12px; font-weight: 700; color: var(--faint); opacity: .7; }
+.bam-wb .up-idle-card { display: flex; flex-direction: column; gap: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+/* Same columns as the real Results table: # · File · Type · Conf. */
+.bam-wb .up-idle-row { display: grid; grid-template-columns: 3em 1fr 17% 7.5rem; gap: 12px; align-items: center; }
+.bam-wb .up-idle-row i, .bam-wb .up-idle-note i { display: block; height: 8px; border-radius: 4px; background: var(--border); }
+.bam-wb .up-idle-row i:first-child { width: 1.2em; }
+.bam-wb .up-idle-row i:nth-child(2) { width: 75%; }
+.bam-wb .up-idle-row i:last-child { width: 3rem; }
+.bam-wb .up-idle-note i { width: 70%; }
+
+/* First file: the skeleton fades out over the real content beneath it (crossfade ~300ms, no layout jump). */
+.bam-wb .up-right { position: relative; }
+.bam-wb .up-idle.up-idle-leaving { position: absolute; inset: 0; padding: var(--pad); background: var(--surface); z-index: 2; pointer-events: none; animation: up-idle-out .3s ease forwards; }
+@keyframes up-idle-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .bam-wb .up-idle.up-idle-leaving { animation-duration: 1ms; } }

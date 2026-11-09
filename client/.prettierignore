@@ -5,3 +5,5 @@ playwright-report
 test-results
 src/contracts
 next-env.d.ts
+# Imported from the BAM UI repo; kept byte-for-byte reviewable against its source (scripts/scope-workbench-css.mjs)
+src/workbench

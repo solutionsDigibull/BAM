@@ -1,0 +1,236 @@
+/* scoped to .bam-wb by scripts/scope-workbench-css.mjs */
+/* Upload goal capture, the ISATVON output and the Upload list changes (29 Oct 2026, "Upload step & assistant changes"
+   wireframes). Brand blue #0084C2 and orange #FF9800 as local tokens (lighter blue / ink orange where contrast needs it). */
+.bam-wb, .bam-wb[data-theme="dark"] { --bl-blue: #4AB0E8; --bl-blue-soft: rgba(74, 176, 232, .14); --bl-orange: #FFA726; --bl-orange-soft: rgba(255, 152, 0, .14); }
+.bam-wb[data-theme="light"] { --bl-blue: #0084C2; --bl-blue-soft: rgba(0, 132, 194, .09); --bl-orange: #B86A00; --bl-orange-soft: rgba(255, 152, 0, .12); }
+
+/* ---- middle pane: goal capture ---- */
+.bam-wb .goal { display: flex; flex-direction: column; gap: 14px; padding: 12px 0 4px; }
+.bam-wb .goal-head { margin: 8px 0 0; font-size: 24px; line-height: 1.25; text-align: center; white-space: nowrap; font-weight: 800; letter-spacing: -.015em; color: var(--text); }
+.bam-wb .goal-bull { height: 1.05em; width: auto; vertical-align: -.16em; }
+.bam-wb .goal-lede { margin: -6px 0 0; font-size: 14px; color: var(--muted); text-align: center; }
+.bam-wb .goal-card { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); }
+.bam-wb .goal-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.bam-wb .goal-sentence { margin: 0; font-size: 16px; line-height: 1.75; font-weight: 600; color: var(--text); }
+/* Goal fields (field-width fix, 29 Oct 2026): no box. Blue italic text with a dashed blue underline that hugs the
+   value (+ chevron), so the sentence keeps normal word spacing; states only tint or thicken the underline. */
+.bam-wb .goal-blank { padding: 0 0 1px; border: 0; border-bottom: 1.5px dashed var(--bl-blue); border-radius: 0; background: none; color: var(--bl-blue);
+  font-style: italic; font-weight: 500; outline: none; box-shadow: none; }
+.bam-wb .goal-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bam-wb .goal-chip { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); text-align: left; cursor: pointer; min-width: 0; }
+.bam-wb .goal-chip strong { font-size: 12px; }
+.bam-wb .goal-chip span { font-size: 12px; color: var(--muted); }
+.bam-wb .goal-chip:hover { border-color: var(--bl-blue); background: color-mix(in srgb, var(--bl-blue-soft) 60%, var(--surface)); box-shadow: 0 2px 6px rgb(0 0 0 / .08); transform: translateY(-1px); }
+.bam-wb .goal-chip { transition: transform .12s ease, box-shadow .12s ease, background .12s ease; }
+.bam-wb .goal-chip[aria-pressed="true"] { border-color: var(--bl-blue); }
+@media (prefers-reduced-motion: reduce) { .bam-wb .goal-chip { transition: none; } .bam-wb .goal-chip:hover { transform: none; } }
+.bam-wb .goal-chip:focus-visible { outline: none; box-shadow: var(--focus); }
+.bam-wb .goal-flow { margin: 0; font-size: 12px; color: var(--muted); }
+.bam-wb .goal-go { display: flex; justify-content: flex-end; }
+.bam-wb .goal-go .btn { gap: 6px; }
+.bam-wb .goal-req { gap: 6px; background: var(--surface); }
+.bam-wb .goal-req h4 { margin: 0 0 4px; font-size: 14px; }
+.bam-wb .goal-req h4 span { margin-left: 6px; font-weight: 400; font-size: 12px; color: var(--muted); }
+.bam-wb .goal-req ul { list-style: none; margin: 0; padding: 0; }
+.bam-wb .goal-req li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); }
+.bam-wb .goal-req li:first-child { border-top: 0; }
+.bam-wb .goal-req li > .icon { flex: none; color: var(--muted); }
+.bam-wb .goal-req li > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bam-wb .goal-req strong { font-size: 14px; font-weight: 600; }
+.bam-wb .goal-req small { font-size: 12px; color: var(--muted); }
+.bam-wb .goal-req em { flex: none; padding: 1px 8px; border-radius: 99px; font-style: normal; font-size: 12px; font-weight: 600; background: var(--surface-3); color: var(--muted); }
+.bam-wb .goal-req em.req { background: var(--bl-orange-soft); color: var(--bl-orange); }
+.bam-wb .goal-req em.added { background: var(--ok-soft); color: var(--ok); }
+@container (max-width: 420px) { .bam-wb .goal-chips { grid-template-columns: 1fr; } .bam-wb .goal-head { font-size: 24px; } }
+
+/* ---- right pane: ISATVON output ---- */
+.bam-wb .goal-out { gap: 10px; }
+.bam-wb .goal-pill { width: fit-content; padding: 2px 10px; border-radius: 99px; background: var(--bl-blue-soft); color: var(--bl-blue); font-size: 12px; font-weight: 600; }
+.bam-wb .goal-out .toolbar { position: static; }
+.bam-wb .goal-doc .ProseMirror { outline: none; font-size: 14px; line-height: 1.55; }
+.bam-wb .goal-doc .ProseMirror:focus-visible { box-shadow: var(--focus); border-radius: 6px; }
+.bam-wb .goal-doc h2 { margin: 6px 0 2px; font-size: 16px; }
+.bam-wb .goal-doc h2 + p { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+.bam-wb .goal-doc h3 { display: flex; align-items: center; gap: 8px; margin: 12px 0 3px; font-size: 14px; }
+.bam-wb .goal-doc h3 code { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; padding: 0; background: var(--bl-blue-soft); color: var(--bl-blue); font: 700 11px/1 inherit; }
+.bam-wb .goal-doc h3:nth-of-type(2) code { background: var(--bl-orange-soft); color: var(--bl-orange); }
+/* "N files required" beside Source data (the count comes from the pane as --req). */
+.bam-wb .goal-doc h3:nth-of-type(2)::after { content: var(--req); margin-left: auto; padding: 1px 8px; border-radius: 99px; background: var(--bl-orange-soft); color: var(--bl-orange); font-size: 12px; font-weight: 600; }
+.bam-wb .goal-doc p { margin: 0; }
+
+/* ---- Upload list: Needs attention, skipped lines, Type chip and Confidence bar ---- */
+.bam-wb .ws-head h2:has(.up-count) { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.bam-wb .up-count { font-size: 12px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.bam-wb .up-attn-n { color: var(--bl-orange); font-weight: 600; }
+.bam-wb .up-sec { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.bam-wb .up-attn .up-sec { color: var(--bl-orange); }
+.bam-wb .up-sec-in { padding: 10px 12px 4px; }
+.bam-wb .up-attn { display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .up-attn-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--bl-orange) 30%, transparent);
+  border-radius: 10px; background: var(--bl-orange-soft); }
+.bam-wb .up-attn-card > .icon { color: var(--bl-orange); margin-top: 2px; }
+.bam-wb .up-attn-card.up-sel { box-shadow: inset 3px 0 0 var(--accent); }
+.bam-wb .up-attn-body { min-width: 0; }
+.bam-wb .up-attn-body strong { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bam-wb .up-attn-body p { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+.bam-wb .up-attn-body b { color: var(--bl-orange); font-weight: 600; }
+.bam-wb .up-attn-act { display: flex; gap: 6px; }
+.bam-wb .up-attn-act .btn { min-height: 30px; gap: 4px; }
+@container ws (max-width: 400px) { .bam-wb .up-attn-act { grid-column: 2 / -1; } }
+.bam-wb .up-col-type { width: 6.5rem; }
+.bam-wb .up-col-conf { width: 6.75rem; }
+.bam-wb .up-table .up-conf { text-align: right; }
+.bam-wb .up-fname { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bam-wb .up-fname > .icon { flex: none; color: var(--muted); }
+.bam-wb .up-fname > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bam-wb .up-type { display: inline-block; max-width: 100%; padding: 1px 8px; border-radius: 99px; background: var(--bl-blue-soft); color: var(--bl-blue); font-size: 12px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.bam-wb .up-type.plain { background: var(--surface-3); color: var(--muted); }
+.bam-wb .up-cbar { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--bl-orange); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bam-wb .up-cbar.hi { color: var(--bl-blue); }
+.bam-wb .up-cbar > i { display: block; width: 32px; height: 4px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+.bam-wb .up-cbar > i > i { display: block; height: 100%; border-radius: 99px; background: currentColor; }
+.bam-wb .up-cbar > span { min-width: 3ch; text-align: right; }
+@container ws (max-width: 400px) { .bam-wb .up-cbar > i, .bam-wb .up-fname > .icon { display: none; } .bam-wb .up-col-type { width: 5.5rem; } .bam-wb .up-col-conf { width: 5.9rem; }
+  .bam-wb .up-table thead th { letter-spacing: .02em; } .bam-wb .up-review { max-width: 100%; overflow: hidden; } }
+
+/* "+ Add files" in the goal flow: muted while locked (Expand the goal first); a primary cue with a soft pulse once the
+   draft is approved, until the first file arrives. */
+.bam-wb .up-add:disabled { opacity: .5; cursor: not-allowed; }
+.bam-wb .up-add.up-add-cue { animation: up-add-pulse 1.8s ease-out infinite; }
+@keyframes up-add-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
+@media (prefers-reduced-motion: reduce) { .bam-wb .up-add.up-add-cue { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); } }
+
+/* Goal dropdowns (29 Oct 2026): the three blanks are dropdowns with a chevron; the menu anchors under its field,
+   left-aligned, over the content below. "Others" is last, divided and muted, and turns the field into a text input. */
+.bam-wb .goal-field { position: relative; display: inline-block; vertical-align: baseline; }
+.bam-wb .goal-select { display: inline-flex; align-items: baseline; gap: 2px; min-width: 0; margin: 0; font: inherit; font-style: italic; font-weight: 500; line-height: 1.3; cursor: pointer; text-align: left; }
+.bam-wb .goal-select > .icon, .bam-wb .goal-chev > .icon { flex: none; align-self: center; font-style: normal; opacity: .8; }
+.bam-wb .goal-select:hover, .bam-wb .goal-custom:hover { border-bottom-color: color-mix(in srgb, var(--bl-blue) 70%, var(--text)); }
+.bam-wb .goal-select[aria-expanded="true"], .bam-wb .goal-custom:has([aria-expanded="true"]) { border-bottom-style: solid; }
+.bam-wb .goal-select:focus-visible, .bam-wb .goal-custom:focus-within { outline: none; box-shadow: none; border-bottom: 2.5px solid var(--bl-blue); padding-bottom: 0; }
+.bam-wb .goal-custom { display: inline-flex; align-items: baseline; gap: 2px; line-height: 1.3; }
+/* The custom input sizes to its text: a hidden copy of the value (or placeholder) sets the width, the input sits on it. */
+.bam-wb .goal-sizer { display: inline-grid; min-width: 1ch; }
+.bam-wb .goal-sizer > * { grid-area: 1 / 1; font: inherit; line-height: inherit; height: auto; font-style: italic; font-weight: 500; white-space: pre; }
+.bam-wb .goal-mirror { visibility: hidden; }
+.bam-wb .goal-input { width: 100%; min-width: 0; padding: 0; border: 0; background: none; color: inherit; outline: none; }
+.bam-wb .goal-input:focus, .bam-wb .goal-input:focus-visible { box-shadow: none; border: 0; outline: none; background: none; }
+.bam-wb .goal-input::placeholder { color: var(--bl-blue); opacity: .55; }
+.bam-wb .goal-chev { display: inline-grid; place-items: center; align-self: center; width: 14px; height: 14px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--bl-blue); cursor: pointer; }
+.bam-wb .goal-chev:focus-visible { outline: none; box-shadow: none; color: var(--text); }
+.bam-wb .goal-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; min-width: 220px; max-width: min(340px, 80vw); margin: 0; padding: 4px; list-style: none;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); font-size: 14px; font-style: normal; font-weight: 400; line-height: 1.3; }
+.bam-wb .goal-menu li { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; padding: 6px 10px; border-radius: 7px; color: var(--text); cursor: pointer; white-space: normal; }
+.bam-wb .goal-menu li:hover, .bam-wb .goal-menu li:focus { background: var(--bl-blue-soft); outline: none; }
+.bam-wb .goal-menu li[aria-selected="true"] { color: var(--bl-blue); font-weight: 600; }
+.bam-wb .goal-menu li > .icon { flex: none; color: var(--bl-blue); }
+.bam-wb .goal-menu li.goal-other { margin-top: 4px; border-top: 1px solid var(--border); border-radius: 0 0 7px 7px; color: var(--muted); }
+
+/* Upload: the middle pane gets clearly more width than the workflow rail and the right pane (collapsed panes keep their rail). */
+@media (min-width: 861px) {
+  .bam-wb .shell[data-screen="1.1"]:not([data-nav="collapsed"]) { --nav: minmax(0, .8fr); }
+  .bam-wb .shell[data-screen="1.1"]:not([data-assist="collapsed"]) { --assist: minmax(0, 1.6fr); }
+  .bam-wb .shell[data-screen="1.1"] { grid-template-columns: var(--nav) var(--assist) minmax(0, 1fr); }
+}
+
+/* Helper card → its field (goal-cards fix, 29 Oct 2026): stronger blue text and a thicker underline only; no box,
+   tint, glow or pulse. */
+.bam-wb .goal-blank.goal-hl { color: color-mix(in srgb, var(--bl-blue) 78%, var(--text)); font-weight: 650; border-bottom-width: 3px; border-bottom-color: currentColor; padding-bottom: 0; }
+.bam-wb .goal-hl .goal-input, .bam-wb .goal-hl .goal-mirror { font-weight: 650; }
+.bam-wb .goal-hl .goal-chev { color: inherit; }
+
+/* ---- goal screen, 4 Nov 2026: one large input with a ghost example ---- */
+.bam-wb .goal { align-items: stretch; }
+.bam-wb .goal-box { position: relative; display: flex; align-items: flex-start; gap: 8px; padding: 14px 14px 14px 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-2); }
+.bam-wb .goal-box:focus-within { border-color: var(--bl-blue); box-shadow: var(--focus); }
+.bam-wb .goal-input, .bam-wb .goal-ghost { flex: 1; min-width: 0; margin: 0; padding: 4px 0; font: inherit; font-size: 16px; line-height: 1.5; color: var(--text); }
+.bam-wb .goal-input { position: relative; z-index: 1; resize: none; border: 0; outline: none; background: transparent; max-height: 160px; overflow-y: auto; }
+.bam-wb .goal-ghost { position: absolute; left: 18px; right: 64px; top: 14px; pointer-events: none; overflow: hidden; white-space: normal; }
+.bam-wb .goal-ghost-pre { visibility: hidden; }
+.bam-wb .goal-ghost-tail { color: var(--muted); }
+.bam-wb .goal-send { position: relative; z-index: 1; flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 10px; background: var(--bl-blue); color: #fff; cursor: pointer; }
+.bam-wb .goal-send:disabled { opacity: .45; cursor: default; }
+.bam-wb .goal-hint { text-align: center; font-size: 12px; }
+.bam-wb .goal-flow { text-align: center; margin-top: 8px; }
+@media (max-width: 520px) { .bam-wb .goal-head { white-space: normal; } }
+.bam-wb .goal-draft { display: flex; flex-direction: column; gap: 10px; }
+.bam-wb .goal-draft-title { display: flex; flex-direction: column; gap: 2px; }
+.bam-wb .goal-draft-title span { font-size: 12px; color: var(--muted); }
+.bam-wb .goal-rows { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .goal-row dt { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.bam-wb .goal-row dt code { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; background: var(--bl-blue-soft); color: var(--bl-blue); font-size: 12px; }
+.bam-wb .goal-row dd { margin: 2px 0 0 28px; padding: 2px 4px; border-radius: 6px; font-size: 14px; line-height: 1.5; outline: none; }
+.bam-wb .goal-row dd:hover { background: var(--surface-2); }
+.bam-wb .goal-row dd:focus-visible { box-shadow: var(--focus); }
+
+/* ---- start screen (approved wireframe B, 5 Nov 2026): full-bleed brand gradient, centred hero, floating card.
+   Stage 1 (fresh goal entry) only; every other upload stage and screen keeps the pane chrome. Colours sampled
+   from the approved light/dark wireframes. Send stays brand blue (her pick over the wireframe's orange). ---- */
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] {
+  background:
+    radial-gradient(130% 95% at 50% 118%, rgba(228, 193, 128, .95), rgba(228, 193, 128, 0) 68%),
+    linear-gradient(180deg, #FBFDFE 0%, #E9F4FB 30%, #CDE6F4 62%, #C7DFEA 100%);
+}
+.bam-wb[data-theme="dark"][data-upload-stage="1"] .shell[data-screen="1.1"] {
+  background:
+    radial-gradient(120% 85% at 50% 118%, rgba(80, 76, 44, .8), rgba(80, 76, 44, 0) 62%),
+    linear-gradient(180deg, #070E1C 0%, #081C30 30%, #0B2942 62%, #0E2E47 100%);
+}
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist .assist { background: transparent; border-color: transparent; box-shadow: none; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist .assist .shell-head { border-bottom-color: transparent; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .as-viewport { justify-content: center; padding-bottom: 11vh; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal { width: 100%; gap: 18px; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-head { font-size: 40px; letter-spacing: -.02em; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-lede { font-size: 15px; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box {
+  max-width: 660px; width: 100%; margin-inline: auto; padding: 20px 20px 16px 22px; border-radius: 24px;
+  border: 1px solid rgb(15 23 42 / .07); background: #FFFFFF;
+  box-shadow: 0 24px 60px -18px rgb(13 58 92 / .35), 0 2px 8px rgb(13 58 92 / .08);
+}
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box:focus-within { border-color: var(--bl-blue); }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-ghost { left: 22px; top: 20px; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-send { width: 40px; height: 40px; border-radius: 12px; }
+.bam-wb[data-theme="dark"][data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box {
+  border-color: rgb(255 255 255 / .09); background: #101D2F;
+  box-shadow: 0 24px 60px -18px rgb(0 0 0 / .6), 0 2px 8px rgb(0 0 0 / .35);
+}
+@media (max-width: 900px) {
+  .bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-head { font-size: 30px; white-space: normal; }
+}
+
+/* ---- Transition: Fade & Settle (5 Nov 2026, option A chosen by the user) -------------------------------------------
+   Start screen to workspace, ~1.3s in all. The hero fades out while a copy of the goal card flies to the chat composer
+   slot (flyCard in GoalPanes.tsx); 100ms in, the workspace fades in around it, the start gradient fades out behind it
+   (so no blank frame), and the chat content rises in staggered. The top bar never animates. State and behaviour are
+   untouched. Both themes share the motion. */
+@keyframes fs-hero-out { to { opacity: 0; transform: translateY(-16px); } }
+@keyframes fs-from-left { from { opacity: 0; transform: translateX(-12px); } }
+@keyframes fs-fade { from { opacity: 0; } }
+@keyframes fs-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fs-bg-out { to { opacity: 0; } }
+.bam-wb .goal-exit .goal-head, .bam-wb .goal-exit .goal-lede { animation: fs-hero-out 350ms cubic-bezier(.65,0,.35,1) forwards; }
+.bam-wb .fs-fly { position: fixed; z-index: 90; box-sizing: border-box; overflow: hidden; pointer-events: none; }
+.bam-wb .fs-fly-text, .bam-wb .fs-fly-ph { position: absolute; left: 22px; right: 70px; top: 50%; transform: translateY(-50%); font: 400 15px/1.4 inherit; font-family: inherit;
+  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bam-wb .fs-fly-ph { left: 56px; color: var(--text-3, #7B8794); opacity: 0; }
+/* The start gradient fades out behind the arriving panes instead of switching off. */
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] { position: relative; }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"]::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; animation: fs-bg-out 700ms cubic-bezier(.33,1,.68,1) 100ms forwards;
+  background: radial-gradient(130% 95% at 50% 118%, rgba(228, 193, 128, .95), rgba(228, 193, 128, 0) 68%), linear-gradient(180deg, #FBFDFE 0%, #E9F4FB 30%, #CDE6F4 62%, #C7DFEA 100%); }
+.bam-wb[data-theme="dark"][data-upload-stage="2"] .shell[data-screen="1.1"]::before {
+  background: radial-gradient(120% 85% at 50% 118%, rgba(80, 76, 44, .8), rgba(80, 76, 44, 0) 62%), linear-gradient(180deg, #070E1C 0%, #081C30 30%, #0B2942 62%, #0E2E47 100%); }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] > .shell-slot { position: relative; z-index: 1; }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-nav { animation: fs-from-left 500ms cubic-bezier(.33,1,.68,1) 100ms both; }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist { animation: fs-fade 500ms cubic-bezier(.33,1,.68,1) 100ms both; }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > * { animation: fs-rise 420ms cubic-bezier(.33,1,.68,1) both; }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(1) { animation-delay: 550ms; }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(2) { animation-delay: 670ms; }
+.bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > :nth-child(n+3) { animation-delay: 790ms; }
+/* The live composer is in its slot from the start (so the card can measure it) but only shows once the card lands. */
+.bam-wb[data-fs-landing] .assist .as-compose { animation: fs-fade 140ms linear 700ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .bam-wb .goal-exit .goal-head, .bam-wb .goal-exit .goal-lede, .bam-wb .fs-fly, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-nav, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > * { animation: none; }
+  .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"]::before { display: none; }
+}
