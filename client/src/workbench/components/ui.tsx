@@ -2,7 +2,7 @@ import { cloneElement, createContext, useContext, useEffect, useId, useRef, useS
 import { IconPlayerPlay, IconRobot, IconDots, IconAlertCircle, IconFolder, IconFiles, IconFileZip, IconMicrophone, IconMicrophoneOff, IconPlayerStop, IconLoader, IconInbox, IconGitBranch, IconBriefcase, IconShieldCheck, IconUpload, IconTransform, IconFileCode, IconClipboardCheck, IconRefresh, IconSearch, IconSchema, IconTarget, IconTable, IconTemplate, IconCode, IconBox, IconListCheck, IconCertificate, IconDatabaseImport, IconPhoto, IconPencil, IconTrash, IconX, IconDeviceFloppy, IconCopy, IconCheck, IconThumbUp, IconThumbDown, IconPlus, IconPlayerStopFilled, IconFileText, IconSend, IconArrowRight, IconAlertTriangle, IconFile, IconChevronDown, IconArrowDown, type TablerIcon } from '@tabler/icons-react'
 import { setUi, useUi } from '../lib/store'
 import type { RunStatus, Stage, StepState } from '../api/types'
-import { BAM_ACTIONS, SUCCESS_MS, actionView, isNewSuccess, type BamAction } from '../lib/bamUi.ts'
+import { BAM_ACTIONS, SUCCESS_MS, actionView, isNewSuccess, type BamAction } from '../lib/bamUi'
 import bullLogo from '../assets/login/bull-head-transparent.png'
 
 // ---- icons (inline, 16px, currentColor) --------------------------------------
@@ -171,8 +171,8 @@ export function StatusPill({ status, text }: { status: AnyStatus; text?: string 
 }
 
 // ---- formatting ---------------------------------------------------------------
-/** The app's configured timezone (VITE_APP_TIMEZONE), else the viewer's. Stored values are ISO/UTC; never offset by hand. */
-export const APP_TIMEZONE: string = import.meta.env.VITE_APP_TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone
+/** The viewer's timezone. Stored values are ISO/UTC; never offset by hand. */
+export const APP_TIMEZONE: string = Intl.DateTimeFormat().resolvedOptions().timeZone
 const sameDay = (a: Date, b: Date) => a.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }) === b.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE })
 /** Short local time ("11:24 AM"; earlier days add the date). Full value: `fmtFull` / `<Time>`. */
 export const fmtTime = (iso?: string) => {
@@ -361,7 +361,7 @@ export function Tip({ text, note, children }: { text: string; note?: string; chi
 /** A step that runs on its own (`mode: 'automated'` in trackerConfig): robot chip, "Automated" on hover/focus. */
 // The BuLLM bull glyph for automated steps; the label comes from the parent chip.
 export function AutomatedIcon() {
-  return <img className="auto-icon" src={bullLogo} alt="" aria-hidden="true" draggable={false} />
+  return <img className="auto-icon" src={bullLogo.src} alt="" aria-hidden="true" draggable={false} />
 }
 
 export function AutoChip({ className = '' }: { className?: string }) {

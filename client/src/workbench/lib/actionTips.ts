@@ -1,7 +1,7 @@
 // Every pinned action button uses one of four words (BuLLM action-button rule, 17 Oct 2026). Its hover/focus tooltip
 // copy lives here only, keyed by screen ID and word. `disabled` replaces the gate reason on the tooltip's second line;
 // `running` is the second line while the button is busy.
-import { screenLabel } from '../tracker/trackerConfig.ts'
+import { screenLabel } from '../tracker/trackerConfig'
 
 export type ActionWord = 'Start' | 'Approve' | 'Edit' | 'Retry'
 

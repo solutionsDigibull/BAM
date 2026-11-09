@@ -129,7 +129,7 @@ export const changedSections = (d: Draft) => KEYS.filter(k => plain(d.sections[k
 export function amountOf(text: string): number | undefined {
   const m = /(?:₹|rs\.?|inr|\$)?\s*(\d[\d,]*(?:\.\d+)?)\s*(lakh|lac|crore|cr|k|thousand|m|million)?\b/i.exec(text)
   if (!m) return
-  const n = parseFloat(m[1].replace(/,/g, '')), unit = (m[2] ?? '').toLowerCase()
+  const n = parseFloat(m[1]!.replace(/,/g, '')), unit = (m[2] ?? '').toLowerCase()
   const mult = /^(lakh|lac)$/.test(unit) ? 1e5 : /^(crore|cr)$/.test(unit) ? 1e7 : /^(k|thousand)$/.test(unit) ? 1e3 : /^(m|million)$/.test(unit) ? 1e6 : 1
   return Math.round(n * mult)
 }
@@ -170,7 +170,7 @@ export function draftReply(d: Draft, text: string, uploaded: string[]): string |
       + `${miss.some(u => !u.required) ? ` Optional: ${miss.filter(u => !u.required).map(u => u.name).join(', ')}.` : ''} Matching is by file name only.`
   }
   const into = /^what goes into (.+?)\??$/i.exec(text.trim())
-  const u = into && d.uploads.find(x => x.name.toLowerCase() === into[1].trim().toLowerCase())
+  const u = into && d.uploads.find(x => x.name.toLowerCase() === into[1]!.trim().toLowerCase())
   if (u) return `${u.name}: ${u.hint.charAt(0).toLowerCase()}${u.hint.slice(1)}. ${u.required ? 'It is required' : 'It is optional'}; any file whose name says what it holds (for example ${u.name.toLowerCase().replace(/\s+/g, '-')}.pdf) is matched.`
   if (/what does isatvon mean/i.test(text))
     return 'ISATVON is the seven-part contract for each skill: Instructions, Source data, Automation, Tech Stack, Variables, Outcome and Next. The draft above fills each part for your goal.'
@@ -229,7 +229,7 @@ export const draftHtml = (d: Draft) => `<h2>${esc(d.title)}</h2><p>${esc(d.subti
 /** Edits typed in the output editor back into the sections (a section whose heading was removed keeps its text). */
 export function readHtml(d: Draft, html: string): Draft {
   const s = { ...d.sections }
-  for (const m of html.matchAll(/<h3><code>([ISATVON])<\/code>[^<]*<\/h3><p>(.*?)<\/p>/g)) s[m[1] as Key] = m[2]
+  for (const m of html.matchAll(/<h3><code>([ISATVON])<\/code>[^<]*<\/h3><p>(.*?)<\/p>/g)) s[m[1] as Key] = m[2]!
   return { ...d, sections: s }
 }
 
@@ -274,6 +274,6 @@ export const goalStage = (s: GoalState, files: number): 1 | 2 | 3 => !s.draft ||
 export function parseGoal(text: string): Goal {
   const t = text.trim().replace(/^build an ai agent that automates\s+/i, '').replace(/[.\s]+$/, '')
   const m = /^(.*?)\s+for\s+(.*?)(?:\s+in\s+(.+))?$/i.exec(t)
-  if (m && m[1].trim() && m[2].trim()) return { what: m[1].trim(), who: m[2].trim(), where: (m[3] ?? 'your market').trim() }
+  if (m && m[1]!.trim() && m[2]!.trim()) return { what: m[1]!.trim(), who: m[2]!.trim(), where: (m[3] ?? 'your market').trim() }
   return { what: t, who: 'your team', where: 'your market' }
 }

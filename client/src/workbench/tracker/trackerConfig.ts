@@ -53,9 +53,9 @@ const screen = (id: string, parentId: string, label: string, icon: string, path:
 export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('1', 'Ingestion', 'tb-inbox', 'Add the source documents, standardize and parse them, then confirm what goes to Context.'),
   screen('1.1', '1', 'Upload', 'tb-upload', '/ingestion/upload', 'Choose source files and track upload readiness.', { step: 1, mode: 'hitl' }),
-  screen('1.8', '1', 'Standardize', 'tb-transform', '/ingestion/standardize', 'Classify each file, keep the original, flag problems and decide: ready, local AI fix or manual review.', { mode: 'automated' }),
+  screen('1.8', '1', 'Standardize', 'tb-transform', '/ingestion/standardize', 'Classify each file, keep the original, flag problems and decide: ready, local AI fix or manual review.', { hidden: true, mode: 'automated' }),
   screen('1.9', '1', 'Parse', 'tb-file-code', '/ingestion/parse', 'Extract text, tables and structure from the ready files.', { mode: 'automated' }),
-  screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'Confirm the accepted, parsed files that go to Context. Not SOW approval.', { mode: 'hitl' }),
+  screen('1.4', '1', 'Review', 'tb-clipboard-check', '/ingestion/review', 'Confirm the accepted, parsed files that go to Context. Not SOW approval.', { hidden: true, mode: 'hitl' }),
   screen('1.6', '1', 'Connectors', 'plug', '/ingestion/connectors', 'Optional. Pull documents from a connected source.', { hidden: true, navAs: '1.4', optional: true }),
   screen('1.5', '1', 'Scan', 'scan', '/ingestion/scan', 'Internal diagnostics: per-file virus scan.', { step: 1, hidden: true, internal: true, navAs: '1.1' }),
   screen('1.7', '1', 'Quarantine', 'shield', '/ingestion/quarantine', 'Internal diagnostics: files held by the scan.', { hidden: true, internal: true, navAs: '1.1' }),
@@ -64,8 +64,8 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('2', 'Context', 'tb-git-branch', 'Sync Admin Masters, index the context graph, review the schema and verify answers.'),
   screen('2.5', '2', 'Sync', 'tb-refresh', '/context/sync', 'Sync Admin Masters for context extraction.', { mode: 'hitl' }),
   screen('2.1', '2', 'Index', 'tb-search', '/rag/graph', 'Graph nodes · current graph explorer.', { mode: 'automated' }),
-  screen('2.2', '2', 'Schema', 'tb-schema', '/rag/schemas', 'Schema drafts from the context graph.', { mode: 'automated' }),
-  screen('2.3', '2', 'Verify', 'tb-shield-check', '/rag/quality', 'Context testing · Questions only.', { mode: 'hitl' }),
+  screen('2.2', '2', 'Schema', 'tb-schema', '/rag/schemas', 'Schema drafts from the context graph.', { hidden: true, mode: 'automated' }),
+  screen('2.3', '2', 'Verify', 'tb-shield-check', '/rag/quality', 'Context testing · Questions only.', { hidden: true, mode: 'hitl' }),
   screen('2.4', '2', 'Context readiness', 'doccheck', '/rag/review', 'Graph, schema and retrieval readiness, the knowledge bundle and provenance.', { hidden: true, navAs: '2.3' }),
 
   stage('3', 'Workbench', 'tb-briefcase', 'Approve the scope, review the skills grid, then the manifest and the translated code.'),
@@ -79,8 +79,8 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('4', 'Validation', 'tb-shield-check', 'Run the isolated sandbox, check the results, certify the checked artifact and commit it to BAM_db.'),
   screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4, mode: 'hitl' }),
   screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4, mode: 'hitl' }),
-  screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { step: 4, mode: 'hitl' }),
-  screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { step: 4, mode: 'hitl' }),
+  screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { hidden: true, step: 4, mode: 'hitl' }),
+  screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { hidden: true, step: 4, mode: 'hitl' }),
   screen('4.1', '4', 'Validation activities', 'circle-check', '/workbench/validation', 'Check activities A–D with attempt history and findings.', { step: 3, hidden: true, navAs: '4.4' }),
   screen('4.7', '4', 'Staging complete', 'rocket', '/sandbox/staging', 'What is live on Staging. Staging complete never means production.', { step: 4, hidden: true, navAs: '4.6' }),
 ]
@@ -143,7 +143,7 @@ export function rollup(children: readonly TrackerStatus[]): TrackerStatus {
  * while its evidence was exactly what it is now. Any evidence change (a new run, a reset backend) ends the override.
  */
 export function effectiveStatuses(evidence: Statuses, manual: Statuses, basis: Partial<Statuses>): Statuses {
-  return Object.fromEntries(SUBTASKS.map(s => [s.id, basis[s.id] !== undefined && basis[s.id] === evidence[s.id] ? manual[s.id] : evidence[s.id] ?? 'not_started']))
+  return Object.fromEntries(SUBTASKS.map(s => [s.id, basis[s.id] !== undefined && basis[s.id] === evidence[s.id] ? manual[s.id]! : evidence[s.id] ?? 'not_started']))
 }
 
 export const taskStatus = (stageId: string, statuses: Statuses) => rollup(countedOf(stageId).map(s => statuses[s.id] ?? 'not_started'))

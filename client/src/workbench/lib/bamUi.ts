@@ -1,5 +1,5 @@
 // Pure presentation rules for the shared BAM action button and the 4-stage tracker (tested in bamUi.test.ts).
-import type { TrackerStatus } from '../tracker/trackerConfig.ts'
+import type { TrackerStatus } from '../tracker/trackerConfig'
 
 export type BamAction = 'ingest' | 'generate' | 'validate' | 'deploy' | 'approve' | 'save' | 'review' | 'commit'
 export const BAM_ACTIONS: Record<BamAction, { icon: string; loading: string; success: string }> = {

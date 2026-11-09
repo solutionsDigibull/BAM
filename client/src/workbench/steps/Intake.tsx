@@ -12,18 +12,17 @@ import '@uppy/core/css/style.min.css'
 import '@uppy/dashboard/css/style.min.css'
 import { api } from '../api/adapter'
 import type { ScanOutcome } from '../api/adapter'
-import { ACCEPTED_TYPES, AV_NAME, REPEL_NAME, CHUNK_BYTES, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES, type ScanEvent, type Snapshot, type UploadRecord } from '../api/types'
-import { autoPick, chunkNames, extOf, fit, triage, MAX_MULTI_BATCH_FILES, MAX_MULTI_BATCH_BYTES, SYSTEM_FILE_LABEL, type Triage } from '../api/scanGate.ts'
-import type { StepProps } from '../App'
+import { ACCEPTED_TYPES, AV_NAME, CHUNK_BYTES, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES, type ScanEvent, type Snapshot, type UploadRecord } from '../api/types'
+import { autoPick, chunkNames, extOf, fit, triage, MAX_MULTI_BATCH_FILES, MAX_MULTI_BATCH_BYTES, SYSTEM_FILE_LABEL, type Triage } from '../api/scanGate'
+import type { StepProps } from '../Workbench'
 import { useAction } from '../lib/data'
 import { setUi, uploadFiles, uppy, useUi } from '../lib/store'
-import { demoControls } from '../lib/demo'
 import { PipelineCard } from '../rag/RagScreens'
 import { Dialog, Icon, Time, fmtBytes } from '../components/ui'
-import { plural } from '../lib/bamUi.ts'
+import { plural } from '../lib/bamUi'
 import { ScanTable, ScreenTitle, SecurityDetails } from './IngestionFlow'
 import { UploadResults, openPicker, setPickHandler } from './UploadPanes'
-import { addFilesLocked } from '../lib/goal.ts'
+import { addFilesLocked } from '../lib/goal'
 
 const TYPES_LABEL = ACCEPTED_TYPES.map(t => t.slice(1).toUpperCase()).join(', ')
 const MB = (n: number) => `${Math.round(n / 1048576)} MB`
@@ -57,7 +56,7 @@ function FitGrid({ files }: { files: Record<string, { id: string; name?: string;
   const [w, setW] = useState(900)
   useEffect(() => {
     const el = ref.current; if (!el) return
-    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width)); ro.observe(el)
+    const ro = new ResizeObserver(([e]) => setW(e!.contentRect.width)); ro.observe(el)
     return () => ro.disconnect()
   }, [])
   // Filename filter (display only: the selection itself never changes).
@@ -253,14 +252,6 @@ function ReviewDialog({ review, existing, onClose, onUpload }: { review?: Review
   )
 }
 
-const FLOW_STAGES = [
-  { step: 1, label: 'Upload', icon: 'upload', desc: 'Flow 1/6: Streaming discovery files to air-gapped quarantine perimeter' },
-  { step: 2, label: 'Quarantine', icon: 'lock', desc: 'Flow 2/6: Air-gapped quarantine staging & SHA-256 fingerprinting' },
-  { step: 3, label: `${AV_NAME} (ClamAV)`, icon: 'shield', desc: 'Flow 3/6: ClamAV static MD5/SHA256 signature scan & macro AST inspection' },
-  { step: 4, label: `${REPEL_NAME}`, icon: 'shield', desc: 'Flow 4/6: Repel behavioral payload repulsion & prompt injection defense' },
-  { step: 5, label: 'Twin Verdict', icon: 'check', desc: 'Flow 5/6: Unanimous fail-closed consensus evaluation' },
-  { step: 6, label: 'Released', icon: 'bolt', desc: 'Flow 6/6: Twin-engine certified files admitted to BAM RAG pipeline' },
-]
 
 /** Live security pipeline for the batch: upload, quarantine, BuLL*Sav scan, verdict, release. Every count comes from real state. */
 function AvStatus({ uploads }: { uploads: UploadRecord[] }) {
@@ -282,103 +273,43 @@ function AvStatus({ uploads }: { uploads: UploadRecord[] }) {
   const state = sending.length || pending.length ? 'scanning' : !total ? 'idle' : blocked ? 'threat' : errors ? 'error' : 'clear'
   const s = (n: number) => (n === 1 ? '' : 's')
 
-  const [animatingStep, setAnimatingStep] = useState<number | null>(null)
-  const animationTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevUploadsCount = useRef(uploads.length)
 
-  const runSequentialFlow = (targetStep = 1) => {
-    if (animationTimer.current) clearTimeout(animationTimer.current)
-    if (targetStep <= 6) {
-      setAnimatingStep(targetStep)
-      animationTimer.current = setTimeout(() => {
-        runSequentialFlow(targetStep + 1)
-      }, targetStep === 1 ? 650 : targetStep === 2 ? 750 : targetStep === 3 ? 850 : targetStep === 4 ? 800 : targetStep === 5 ? 700 : 800)
-    } else {
-      setAnimatingStep(null)
-    }
-  }
-
-  // Auto-trigger sequential animation when batch is loaded or uploads start
-  useEffect(() => {
-    if (uploads.length > 0 && prevUploadsCount.current === 0) {
-      runSequentialFlow(1)
-    }
-    prevUploadsCount.current = uploads.length
-    return () => {
-      if (animationTimer.current) clearTimeout(animationTimer.current)
-    }
-  }, [uploads.length])
-
-  // Expose runSequentialFlow globally for external triggers
-  useEffect(() => {
-    ;(window as any).__triggerAvFlow = () => runSequentialFlow(1)
-    return () => { delete (window as any).__triggerAvFlow }
-  }, [])
-
-  const isSimulating = animatingStep !== null
-  const currentStepInfo = isSimulating ? FLOW_STAGES[animatingStep - 1] : null
-
-  const [title, sub] = isSimulating
-    ? [
-        `Flow ${animatingStep}/6 Running: ${currentStepInfo?.label}`,
-        currentStepInfo?.desc ?? '',
-      ]
-    : {
-        idle: [`Dual Engines Ready: ${AV_NAME} & ${REPEL_NAME}`, 'Every upload is quarantined and evaluated by ClamAV and Repel before entering the BAM pipeline.'],
+  const [title, sub] = {
+        idle: [`${AV_NAME} ready`, 'Every upload is quarantined and scanned by ClamAV before it enters the pipeline.'],
         scanning: sending.length && !pending.length
           ? [`Uploading ${sending.length} file${s(sending.length)} to quarantine · ${sendPct}%`, chunked.length ? `${chunked.length} large file${s(chunked.length)} sent in ${MB(CHUNK_BYTES)} chunks, 3 files at a time. Each file is scanned as soon as it lands.` : 'Up to 3 files at a time. Evaluated by ClamAV and Repel as soon as it lands in quarantine.']
-          : [`Twin-Engine Defense Running · ${total - pending.length} of ${total} inspected`, 'ClamAV signature inspection + Repel behavioral evasion check active. Files stay quarantined until both pass.'],
+          : [`Scanning · ${total - pending.length} of ${total} inspected`, 'ClamAV is scanning. Files stay quarantined until the scan passes.'],
         threat: [`${blocked} threat${s(blocked)} quarantined by security perimeter`, 'Blocked files cannot be opened or ingested. Remove them to continue.'],
         error: [`${errors} scan${s(errors)} did not finish`, 'No verdict means not clean. Retry the scan or remove the file.'],
-        clear: [`All ${total} file${s(total)} clean (ClamAV & Repel Verified)`, 'Twin-engine security verified. Released to the BAM pipeline for ingestion.'],
+        clear: [`All ${total} file${s(total)} clean (ClamAV)`, 'The scan passed. Released to the pipeline for ingestion.'],
       }[state]
 
   type St = 'idle' | 'active' | 'done' | 'alert'
   const resolved = total > 0 && !pending.length
 
-  const nodes: { label: string; st: St; count: string; icon: string }[] = isSimulating
-    ? FLOW_STAGES.map((fs, idx) => {
-        const stepNum = idx + 1
-        const st: St = stepNum < animatingStep ? 'done' : stepNum === animatingStep ? 'active' : 'idle'
-        const count = stepNum < animatingStep ? 'Passed' : stepNum === animatingStep ? 'Running…' : 'Queued'
-        return { label: fs.label, icon: fs.icon, st, count }
-      })
-    : [
+  const nodes: { label: string; st: St; count: string; icon: string }[] = [
         { label: 'Upload', icon: 'upload', st: sending.length ? 'active' : failed.length ? 'alert' : total ? 'done' : 'idle',
           count: sending.length ? `${sendPct}%` : failed.length ? `${failed.length} failed` : total ? `${total} sent` : '—' },
         { label: 'Quarantine', icon: 'lock', st: queued ? 'active' : total ? 'done' : 'idle', count: queued ? `${queued} waiting` : total ? `${total} held` : '—' },
         { label: `${AV_NAME} (ClamAV)`, icon: 'shield', st: inScan.length ? 'active' : errors ? 'alert' : resolved ? 'done' : 'idle', count: total ? `${total - pending.length}/${total}` : '—' },
-        { label: `${REPEL_NAME}`, icon: 'shield', st: inScan.length ? 'active' : errors ? 'alert' : resolved ? 'done' : 'idle', count: total ? `${total - pending.length}/${total}` : '—' },
-        { label: 'Twin Verdict', icon: blocked ? 'alert' : 'check', st: blocked || errors ? 'alert' : resolved ? 'done' : clean ? 'active' : 'idle',
+        { label: 'Verdict', icon: blocked ? 'alert' : 'check', st: blocked || errors ? 'alert' : resolved ? 'done' : clean ? 'active' : 'idle',
           count: total ? `${clean} clean${blocked ? ` · ${blocked} blocked` : ''}` : '—' },
         { label: 'Released', icon: 'bolt', st: released && released === total ? 'done' : released ? 'active' : 'idle', count: total ? `${released} of ${total}` : '—' },
       ]
 
-  const pct = isSimulating
-    ? Math.round((animatingStep / 6) * 100)
-    : sending.length && !pending.length
+  const pct = sending.length && !pending.length
     ? sendPct
     : total
     ? Math.round(((total - pending.length) / total) * 100)
     : 0
 
   return (
-    <section id="av-status" className={`av av-${isSimulating ? 'scanning' : state}`} aria-label="Virus scan status">
+    <section id="av-status" className={`av av-${state}`} aria-label="Virus scan status">
       <div className="av-head" role="status" aria-live="polite">
-        <span className="av-radar" aria-hidden="true"><Icon name={isSimulating ? 'spinner' : state === 'threat' ? 'alert' : 'shield'} size={16} spin={isSimulating} /></span>
+        <span className="av-radar" aria-hidden="true"><Icon name={state === 'threat' ? 'alert' : 'shield'} size={16} /></span>
         <span className="av-text">
           <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
             <strong>{title}</strong>
-            <button
-              type="button"
-              className="btn btn-secondary sm"
-              style={{ fontSize: '11px', padding: '2px 8px', height: '24px' }}
-              onClick={() => runSequentialFlow(1)}
-              title="Re-run animated 6-flow defense progression"
-            >
-              <Icon name="refresh" size={10} spin={isSimulating} />
-              <span>{isSimulating ? `Flow ${animatingStep}/6…` : 'Animate Defense Flow'}</span>
-            </button>
           </div>
           <span>{sub}</span>
         </span>
@@ -392,12 +323,12 @@ function AvStatus({ uploads }: { uploads: UploadRecord[] }) {
           </li>
         ))}
       </ol>
-      {(total > 0 || sending.length > 0 || isSimulating) && (
+      {(total > 0 || sending.length > 0) && (
         <span className="av-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
       )}
       {chunked.length > 0 && <p className="av-now xs"><Icon name="upload" size={11} /> Chunked upload:
         {chunked.slice(0, 3).map(f => { const n = chunkCount(f.size ?? 0); const done = Math.min(n, Math.floor((f.progress.bytesUploaded || 0) / CHUNK_BYTES)); return <span key={f.id} className="mono">part {Math.min(n, done + 1)}/{n} · {f.name}</span> })}</p>}
-      {inScan.length > 0 && !isSimulating && <p className="av-now xs"><Icon name="eye" size={11} /> Now scanning:
+      {inScan.length > 0 && <p className="av-now xs"><Icon name="eye" size={11} /> Now scanning:
         {inScan.slice(0, 3).map(u => <span key={u.id} className="mono">{u.name}</span>)}{queued > 0 && <span className="muted">+{queued} waiting in quarantine</span>}</p>}
       {failed.length > 0 && <div className="av-failed">
         <span className="stage-error"><Icon name="alert" size={12} /> {failed.length} upload{s(failed.length)} failed and never reached quarantine: {failed.slice(0, 3).map(f => f.name).join(', ')}{failed.length > 3 ? ` and ${failed.length - 3} more` : ''}.</span>
@@ -452,7 +383,7 @@ function scanRow(snap: Snapshot) {
   return (
     <li className={`pipe-step ps-${st.cls}`}>
       <span className="pipe-icon"><Icon name={st.icon} size={13} spin={st.cls === 'r'} /><span className="sr-only">{st.text}</span></span>
-      <span className="pipe-label">Dual Scan ({AV_NAME} + {REPEL_NAME})</span>
+      <span className="pipe-label">Virus scan ({AV_NAME})</span>
       <span className="pipe-detail">{st.detail}</span>
     </li>
   )
@@ -502,7 +433,6 @@ export function Intake({ snap, info, view }: StepProps & { view: 'upload' | 'sca
     // Every source (files, folder, ZIP, bulk, drop) opens the review dialog: nothing uploads without it (per user, 15 Oct 2026).
     setReview({ source, t: tr, dupes })
   }
-  const demo = demoControls() && api.demo
   // + Add files (left), the left-pane drop and the middle drop zone all arrive here (UploadPanes.tsx).
   const takeRef = useRef(take)
   takeRef.current = take
@@ -521,25 +451,15 @@ export function Intake({ snap, info, view }: StepProps & { view: 'upload' | 'sca
         <AvStatus uploads={snap.uploads} />
         <PipelineCard title="Hand-off to RAG" lead={scanRow(snap)} />
         <ScanActivity events={snap.scanEvents} />
-        {demo && <div className="row">
-          <label className="pipe-sim">Simulate scan outcome
-            <select value={outcome} onChange={e => { const o = e.target.value as ScanOutcome; setOutcome(o); demo.setScanOutcome(o); (window as any).__triggerAvFlow?.() }}>
-              <option value="clean">None (clean)</option><option value="threat">Threat detected</option><option value="error">Scanner outage</option>
-            </select>
-          </label>
-          <button className="btn btn-ghost sm" disabled={!!snap.ingestion} onClick={() => { demo.loadScanFixture(); (window as any).__triggerAvFlow?.(); void run('Load fixture', async () => {}) }}>Load mockup batch</button>
-        </div>}
       </section>
     </SecurityDetails>
   )
 
   if (view === 'upload') {
     // FDE view: results only (files on the left, conversation in the middle; UploadPanes.tsx). The scan and quarantine
-    // run inside Upload and still gate everything downstream; their diagnostics appear only with ?demo=1.
+    // run inside Upload and still gate everything downstream.
     return <>
       <UploadResults snap={snap} />
-      {demo && <p className="up-demo"><button className="link xs" onClick={() => setDetails(true)}>Upload diagnostics (demo)</button></p>}
-      {demo && <Dialog open={details} title="Upload diagnostics" onClose={() => setDetails(false)} className="dialog wide dc-details" footer={<button className="btn btn-secondary" onClick={() => setDetails(false)}>Close</button>}>{scanDetails}</Dialog>}
       {dialogs}
     </>
   }

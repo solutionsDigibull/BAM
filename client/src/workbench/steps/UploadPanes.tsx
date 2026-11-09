@@ -7,15 +7,15 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUppyState } from '@uppy/react'
 import { api } from '../api/adapter'
 import { ACCEPTED_TYPES, MAX_BATCH_BYTES, type Snapshot } from '../api/types'
-import { SYSTEM_FILE_LABEL, isReleased } from '../api/scanGate.ts'
-import { LANES, detectKind, type Kind } from '../api/fileKind.ts'
+import { SYSTEM_FILE_LABEL, isReleased } from '../api/scanGate'
+import { LANES, detectKind, type Kind } from '../api/fileKind'
 import { archive, setUi, uppy, useUi } from '../lib/store'
-import { plural } from '../lib/bamUi.ts'
+import { plural } from '../lib/bamUi'
 import { useAction } from '../lib/data'
 import { Confirm, Icon, Tip } from '../components/ui'
 import { fdeView } from './IngestionFlow'
 import { UploadIdle } from './UploadIdle'
-import { addFilesLocked, canAddFiles, resetGoal, useGoal } from '../lib/goal.ts'
+import { addFilesLocked, canAddFiles, resetGoal, useGoal } from '../lib/goal'
 import { useReviewFiles } from './Standardize'
 
 // ---- entry points --------------------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ export function useUploadRows(snap: Snapshot): UpRow[] {
     const state: UpRow['state'] = isReleased(u) ? 'ready' : fdeView(u).pill === 'running' ? 'checking' : 'failed'
     return { id: u.id, name: u.name, size: u.size, kind: detectKind(u.name), state,
       reason: state !== 'failed' ? undefined : u.scanError ? 'Failed - check did not finish' : u.status === 'failed' ? 'Failed - upload error' : 'Failed - cannot be used',
-      retry: u.scanError && snap.steps[0].editable ? () => { api.retryScan(u.id).catch((e: Error) => console.error('Retry failed:', e.message)) } : undefined }
+      retry: u.scanError && snap.steps[0]!.editable ? () => { api.retryScan(u.id).catch((e: Error) => console.error('Retry failed:', e.message)) } : undefined }
   })
   for (const u of snap.uploads) seen.add(u.id)
   const transit = Object.values(files).flatMap<UpRow>(f => {
@@ -116,7 +116,7 @@ export function phaseOf(rows: UpRow[], drag: boolean): Phase {
 
 // ---- left pane: Uploaded files + Add files ---------------------------------------------------------------------
 export function UploadFilesBlock({ snap }: { snap: Snapshot }) {
-  const uploadsClosed = !snap.steps[0].editable
+  const uploadsClosed = !snap.steps[0]!.editable
   // Goal flow (29 Oct 2026, approval gate): locked until the goal draft is approved; then highlighted until files arrive.
   const open = useGoal(canAddFiles), approved = open
   const added = fileCounts(useUploadRows(snap)).totalFiles > 0
@@ -165,7 +165,7 @@ function AddFilesMenu({ closed, cue, hint }: { closed: boolean; cue?: boolean; h
 // ---- middle pane: drop zone + the assistant's state messages ---------------------------------------------------
 export function UploadDropZone({ snap }: { snap: Snapshot }) {
   const drag = useDragging()
-  const closed = !snap.steps[0].editable
+  const closed = !snap.steps[0]!.editable
   return <>
     <div className={`up-drop ${drag && !closed ? 'on' : ''}`} role="button" tabIndex={closed ? -1 : 0} aria-disabled={closed || undefined}
       aria-label="Drop more files here or browse" {...dropTarget(closed)}
@@ -246,7 +246,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
   const review = useReviewFiles(snap).ids
   const archived = useUi(s => s.archived)
   const { busy: acting, run } = useAction()
-  const closed = !snap.steps[0].editable
+  const closed = !snap.steps[0]!.editable
   const busy = rows.some(r => r.state === 'uploading' || r.state === 'checking')
   const progress = uploadCount(all)
   const bytes = rows.reduce((t, r) => t + r.size, 0)
@@ -330,7 +330,7 @@ function RowMenu({ snap, row, x, y, onClose }: { snap: Snapshot; row: UpRow; x: 
   const ref = useRef<HTMLDivElement>(null)
   const { busy, run } = useAction()
   const stored = snap.uploads.find(u => u.id === row.id)
-  const why = !snap.steps[0].editable ? 'Uploads are closed.' : snap.ingestion && stored ? 'This file is already handed on.'
+  const why = !snap.steps[0]!.editable ? 'Uploads are closed.' : snap.ingestion && stored ? 'This file is already handed on.'
     : row.state === 'checking' && !stored?.scanError ? 'Wait for the file check to finish.' : null
   const trigger = useRef(document.activeElement as HTMLElement | null)
   const close = () => { onClose(); trigger.current?.focus?.() }
@@ -356,7 +356,7 @@ function RowMenu({ snap, row, x, y, onClose }: { snap: Snapshot; row: UpRow; x: 
 export function UploadMenu({ snap }: { snap: Snapshot }) {
   const [open, setOpen] = useState(false), [ask, setAsk] = useState(false)
   const { busy, run } = useAction()
-  const locked = !snap.steps[0].editable || !!snap.ingestion
+  const locked = !snap.steps[0]!.editable || !!snap.ingestion
   useEffect(() => { if (!open) return; const close = () => setOpen(false); document.addEventListener('click', close); return () => document.removeEventListener('click', close) }, [open])
   const reset = () => run('Reset', async () => {
     uppy.cancelAll()

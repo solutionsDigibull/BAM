@@ -95,7 +95,7 @@ export function ReleasePrep({ snap }: { snap: Snapshot }) {
   const wf = snap.workflow
   const m = wf?.manifest
   const p = snap.persist
-  const locked = (n: 3 | 4) => snap.steps[n - 1].state === 'locked' ? snap.steps[n - 1].reason : undefined
+  const locked = (n: 3 | 4) => (snap.steps[n - 1])!.state === 'locked' ? (snap.steps[n - 1])!.reason : undefined
   return (
     <main className="panes">
       <Pane id="left-title" kicker="Context and scope" title="Release inputs">

@@ -6,6 +6,17 @@ const config = [
   ...nextTs,
   // Server-provided text is always rendered as text (E1.13 safety check).
   { rules: { "react/no-danger": "error" } },
+  // The workbench (src/workbench) is imported from the BAM UI repo. Its refs-in-render and set-state-in-effect
+  // patterns work but trip the React Compiler rules; they warn here and are cleaned up screen by screen.
+  {
+    files: ["src/workbench/**"],
+    rules: {
+      "react-hooks/refs": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/use-memo": "warn",
+    },
+  },
   {
     ignores: [
       ".next/**",

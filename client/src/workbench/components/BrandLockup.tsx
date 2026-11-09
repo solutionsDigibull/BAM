@@ -7,5 +7,5 @@ import dark from '../assets/brand-logo-dark.png'
 
 export function BrandLockup({ className = '' }: { className?: string }) {
   const theme = useUi(s => s.theme)
-  return <img className={`brand-lockup ${className}`} src={theme === 'dark' ? dark : light} alt="BuLLM. Enterprise Workflows. Intelligently Done." />
+  return <img className={`brand-lockup ${className}`} src={theme === 'dark' ? dark.src : light.src} alt="BuLLM. Enterprise Workflows. Intelligently Done." />
 }

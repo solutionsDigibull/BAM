@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { SUBTASKS, effectiveStatuses, type TrackerStatus } from './trackerConfig.ts'
+import { SUBTASKS, effectiveStatuses, type TrackerStatus } from './trackerConfig'
 import { getUi, setUi, trackerStorage, useUi, type TrackerState } from '../lib/store'
 
 export const useTrackerStore = <T,>(select: (t: TrackerState) => T) => useUi(s => select(s.tracker))

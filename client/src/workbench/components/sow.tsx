@@ -84,7 +84,7 @@ function normalize(raw: string) {
   let text = ''
   const idx: number[] = []
   for (let i = 0; i < raw.length; i++) {
-    if (/\s/.test(raw[i])) { if (text && !text.endsWith(' ')) { text += ' '; idx.push(i) } }
+    if (/\s/.test(raw[i]!)) { if (text && !text.endsWith(' ')) { text += ' '; idx.push(i) } }
     else { text += raw[i]; idx.push(i) }
   }
   if (text.endsWith(' ')) { text = text.slice(0, -1); idx.pop() }
@@ -117,19 +117,19 @@ const strikeEl = (text: string, block: boolean) => () => {
 function buildDecorations(doc: PMNode, base: Block[]): Decoration[] {
   const tbs = textblocks(doc)
   const cur = tbs.map(t => normalize(t.node.textContent))
-  const { blocks } = diffBlocks(base, tbs.map((t, i) => ({ tag: t.tag, text: cur[i].text })))
-  const at = (i: number, off: number) => tbs[i].pos + 1 + (off >= cur[i].text.length ? tbs[i].node.textContent.length : cur[i].idx[off])
+  const { blocks } = diffBlocks(base, tbs.map((t, i) => ({ tag: t.tag, text: cur[i]!.text })))
+  const at = (i: number, off: number) => tbs[i]!.pos + 1 + (off >= cur[i]!.text.length ? tbs[i]!.node.textContent!.length : cur[i]!.idx[off]!)
   const decos: Decoration[] = []
   let k = 0
   for (const b of blocks) {
     if (b.kind === 'removed') {
-      decos.push(Decoration.widget(k < tbs.length ? tbs[k].pos : doc.content.size, strikeEl(b.segs[0].text, true), { side: -1, ignoreSelection: true }))
+      decos.push(Decoration.widget(k < tbs.length ? tbs[k]!.pos : doc.content.size, strikeEl(b.segs[0]!.text, true), { side: -1, ignoreSelection: true }))
       continue
     }
     if (b.kind === 'added') {
       const t = tbs[k]
-      decos.push(Decoration.node(t.pos, t.pos + t.node.nodeSize, { class: 'db-added', title: 'Added' }))
-      if (t.tag.startsWith('h')) decos.push(Decoration.widget(t.pos + t.node.nodeSize - 1, () => {
+      decos.push(Decoration.node(t!.pos, t!.pos + t!.node.nodeSize, { class: 'db-added', title: 'Added' }))
+      if (t!.tag.startsWith('h')) decos.push(Decoration.widget(t!.pos + t!.node.nodeSize - 1, () => {
         const el = document.createElement('span'); el.className = 'new-section'; el.textContent = 'New section'; el.contentEditable = 'false'; return el
       }, { side: 1, ignoreSelection: true }))
     } else if (b.kind === 'changed') {

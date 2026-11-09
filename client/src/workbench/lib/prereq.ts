@@ -1,7 +1,7 @@
 // What actually blocks a locked screen, derived from backend + RAG state. The reason text and the
 // button target come from the same check, so a lock never says "approve the SOW" while sending you to Upload.
 import type { Snapshot, StepId } from '../api/types'
-import type { RagState } from '../rag/ragPipeline.ts'
+import type { RagState } from '../rag/ragPipeline'
 
 export interface Blocker { reason: string; label: string; target: string }
 

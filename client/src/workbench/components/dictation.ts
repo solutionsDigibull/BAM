@@ -46,7 +46,7 @@ async function startMeter(onBlocked: () => void) {
       meter.raf = requestAnimationFrame(tick)
       if (t - last < 66) return // ~15 frames a second is enough for the bars
       last = t; an.getByteFrequencyData(data)
-      set({ levels: Array.from({ length: BARS }, (_, i) => data[Math.min(data.length - 1, i + 1)] / 255) })
+      set({ levels: Array.from({ length: BARS }, (_, i) => (data[Math.min(data.length - 1, i + 1)])! / 255) })
     }
     meter = { stream, ctx, raf: requestAnimationFrame(tick) }
   } catch {

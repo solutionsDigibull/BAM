@@ -3,7 +3,7 @@ import { AgGridReact, type CustomCellEditorProps, type CustomCellRendererProps }
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type CellKeyDownEvent, type ColDef, type FullWidthCellKeyDownEvent, type GridApi } from 'ag-grid-community'
 import { api } from '../api/adapter'
 import { AUTOMATIONS, ISATVON, type IsatvonField, type SkillRow } from '../api/types'
-import type { StepProps } from '../App'
+import type { StepProps } from '../Workbench'
 import { useAction, useSkills } from '../lib/data'
 import { setUi, useUi } from '../lib/store'
 import { addCounts, countSegs, diffWords, editCount, type Seg } from '../lib/sowDiff'
@@ -398,7 +398,7 @@ export function Center({ snap, info }: StepProps) {
     </div>
     {!info.editable && info.state !== 'locked' && (
       <Banner tone="warn" icon="lock" action={snap.activeStep > 2 && <button id="reopen-32" className="btn btn-secondary sm" disabled={!!busy} onClick={() => setReopen(true)}><Icon name="edit" />Reopen Skills grid to edit</button>}>
-        <strong>Read-only.</strong> Cells can't be edited because the workflow has moved past the Skills grid{snap.activeStep > 2 ? ` (now at ${['', 'SOW', 'Skills grid', 'Validation', 'Test results'][snap.activeStep]})` : ''}.
+        <strong>Read-only.</strong> Cells can&apos;t be edited because the workflow has moved past the Skills grid{snap.activeStep > 2 ? ` (now at ${['', 'SOW', 'Skills grid', 'Validation', 'Test results'][snap.activeStep]})` : ''}.
       </Banner>)}
     <SkillGrid rows={rows} setRows={setRows} editable={info.editable} showChanges={showChanges} onLockedEdit={lockedEdit} />
   </>

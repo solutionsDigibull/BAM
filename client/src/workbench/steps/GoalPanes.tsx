@@ -7,7 +7,7 @@
 import './goal.css'
 import { useEffect, useRef, useState } from 'react'
 import { setUi } from '../lib/store'
-import { KEYS, SECTION, atGoalEntry, continueGoal, expandGoal, getGoal, parseGoal, plain, setGoal, useGoal } from '../lib/goal.ts'
+import { KEYS, SECTION, atGoalEntry, continueGoal, expandGoal, getGoal, parseGoal, plain, setGoal, useGoal } from '../lib/goal'
 import { Icon } from '../components/ui'
 import bull from '../assets/login/bull-head-transparent.png'
 
@@ -17,7 +17,7 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 /** The cycling example: types out, holds, deletes, moves to the next. Ghost text only: it is never the input's value. */
 function useMarquee(active: boolean): string {
-  const [text, setText] = useState(EXAMPLES[0])
+  const [text, setText] = useState<string>(EXAMPLES[0]!)
   const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
   useEffect(() => {
     if (!active || reduce) return
@@ -25,8 +25,8 @@ function useMarquee(active: boolean): string {
     const tick = () => {
       const full = EXAMPLES[i]
       n += dir
-      setText(full.slice(0, n))
-      if (dir === 1 && n >= full.length) { dir = -1; t = setTimeout(tick, 1800); return }
+      setText(full!.slice(0, n))
+      if (dir === 1 && n >= full!.length) { dir = -1; t = setTimeout(tick, 1800); return }
       if (dir === -1 && n <= 0) { dir = 1; i = (i + 1) % EXAMPLES.length; t = setTimeout(tick, 350); return }
       t = setTimeout(tick, dir === 1 ? 38 : 18)
     }
@@ -117,7 +117,7 @@ export function GoalCapture() {
     flyCard(boxRef.current, value, go)
   }
   return <div className={`goal${exit ? ' goal-exit' : ''}`}>
-    <h3 className="goal-head">Name the agent and let the <img src={bull} alt="BuLLM" className="goal-bull" /> build it</h3>
+    <h3 className="goal-head">Name the agent and let the <img src={bull.src} alt="BuLLM" className="goal-bull" /> build it</h3>
     <p className="goal-lede">Type the goal. BuLL does the rest.</p>
     <div className="goal-box" ref={boxRef}>
       {value === GOAL_PREFIX && <div className="goal-ghost" aria-hidden><span className="goal-ghost-pre">{GOAL_PREFIX}</span><span className="goal-ghost-tail">{example}</span></div>}
@@ -146,12 +146,12 @@ export function GoalExpansion() {
   const save = (k: typeof KEYS[number], v: string) => setGoal(s => s.draft && plain(s.draft.sections[k]) !== v.trim() ? { draft: { ...s.draft, sections: { ...s.draft.sections, [k]: esc(v.trim()) } } } : {})
   return <>
     <div className="as-urow"><div className="as-uline"><div className="as-msg as-user"><p>{text || draft.goal.what}</p></div></div></div>
-    <div className="as-arow"><span className="as-avatar" aria-hidden><img src={bull} alt="" /></span><div className="as-abody"><div className="as-msg as-bot goal-draft" key={draft.rev}>
+    <div className="as-arow"><span className="as-avatar" aria-hidden><img src={bull.src} alt="" /></span><div className="as-abody"><div className="as-msg as-bot goal-draft" key={draft.rev}>
       <p className="goal-draft-title"><strong>{draft.title}</strong><span>{draft.subtitle}</span></p>
       <dl className="goal-rows">{KEYS.map(k => <div key={k} className="goal-row"><dt><code>{k}</code>{SECTION[k]}</dt>
         <dd contentEditable suppressContentEditableWarning spellCheck role="textbox" aria-label={`${SECTION[k]} (editable)`}
           onBlur={e => save(k, e.currentTarget.innerText)}>{plain(draft.sections[k])}</dd></div>)}</dl>
-      <p>Add your files on the left and I'll take it from there.</p>
+      <p>Add your files on the left and I&apos;ll take it from there.</p>
     </div></div></div>
   </>
 }

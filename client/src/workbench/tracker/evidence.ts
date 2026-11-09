@@ -2,21 +2,21 @@
 // Completion follows saved reviews, checks and gates, never a route visit. Stage 1 completes from the intake
 // gates alone (upload, BuLL*Sav verdicts, quarantine, hand-off to RAG), so its screens finish automatically.
 import type { Snapshot, StepState } from '../api/types'
-import { templateApproved, type StepApprovals } from '../lib/approvals.ts'
-import type { RagState } from '../rag/ragPipeline.ts'
-import type { TrackerStatus } from './trackerConfig.ts'
-import { currentTests } from '../lib/certification.ts'
+import { templateApproved, type StepApprovals } from '../lib/approvals'
+import type { RagState } from '../rag/ragPipeline'
+import type { TrackerStatus } from './trackerConfig'
+import { currentTests } from '../lib/certification'
 
 const running = (x?: { status: string }) => x?.status === 'running' || x?.status === 'queued'
 const FROM_STEP: Record<StepState, TrackerStatus> = {
   locked: 'not_started', active: 'in_progress', needs_review: 'needs_review', done: 'done', failed: 'blocked',
 }
 
-function ragStep(rag: RagState, key: 'chunk' | 'extract' | 'graph' | 'schemas'): TrackerStatus {
+function ragStep(rag: RagState, key: 'chunk' | 'extract' | 'graph'): TrackerStatus {
   if (!rag.runId) return 'not_started'
   const steps = rag.steps
   const i = steps.findIndex(s => s.key === key)
-  if (steps[i].status === 'done') return 'done'
+  if (steps[i]!.status === 'done') return 'done'
   if (steps.slice(0, i + 1).some(s => s.status === 'failed')) return 'blocked'
   return 'in_progress'
 }
@@ -25,16 +25,12 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
   const sow = snap.sow
   const gen = snap.sowGeneration
   const graph = ragStep(rag, 'graph')
-  const schemas = ragStep(rag, 'schemas')
-  const ctx = !!rag.runId && rag.contextStartedRun === rag.runId
   const uploads = snap.uploads.length
   const scanning = snap.uploads.some(u => u.scan === 'scanning' && !u.scanError)
   const wf = snap.workflow
   const approved = !!wf?.manifest && wf.approval?.hash === wf.manifest.hash
   // Code and manifest review (3.3, 4.2, 4.3) completes only with the human approval for the current hash.
   const review: TrackerStatus = !wf ? 'not_started' : wf.status === 'running' ? 'in_progress' : wf.status === 'failed' ? 'blocked' : approved ? 'done' : 'needs_review'
-  // Only a hand-off from the current RAG run counts; one from an earlier run does not complete 2.2/2.4.
-  const handedOff = schemas === 'done' ? (rag.handoffs.some(h => h.contextVersion === rag.runId) ? 'done' : 'needs_review') : schemas
   const held = snap.uploads.some(u => u.scan === 'blocked')
   const scanFailed = snap.uploads.some(u => u.status === 'failed' || u.scanError)
   const t = currentTests(snap)
@@ -64,18 +60,17 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
     '1.6': 'not_started',
     // Quarantine: clear once no file in the batch is held (held files are removed from the batch, never released).
     '1.7': !uploads ? 'not_started' : scanning ? 'in_progress' : held ? 'needs_review' : 'done',
-    // Context counts only once the FDE started it on Sync for this run (the pipeline itself builds in the background
-    // after Parse), and Verify only once it is approved. Before that every Context step is not started.
-    '2.5': ctx ? graph : 'not_started',
-    '2.1': ctx ? graph : 'not_started',
-    '2.2': ctx ? handedOff : 'not_started',
-    '2.3': !ctx ? 'not_started' : rag.verifiedRun === rag.runId ? 'done' : graph === 'done' ? 'needs_review' : graph,
-    '2.4': ctx ? handedOff : 'not_started',
+    // Context follows the knowledge build; schema drafts, context testing and readiness review have no backend.
+    '2.5': graph,
+    '2.1': graph,
+    '2.2': 'not_started',
+    '2.3': 'not_started',
+    '2.4': 'not_started',
     '3.1': sow?.status === 'approved' ? 'done'
       : gen.some(s => s.status === 'failed') ? 'blocked'
       : sow?.status === 'regenerating' || gen.some(s => s.status === 'running' || s.status === 'queued') ? 'in_progress'
       : sow ? 'needs_review' : 'not_started',
-    '3.2': FROM_STEP[snap.steps[1].state],
+    '3.2': FROM_STEP[snap.steps[1]!.state],
     '3.3': review,
     '3.4': !wf?.manifest ? 'not_started' : approved ? 'done' : 'needs_review',
     '4.1': !wf ? 'not_started' : wf.status === 'running' ? 'in_progress' : wf.status === 'failed' ? 'blocked' : 'done',
@@ -92,7 +87,7 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
     // Commit: the certified version is saved (frozen) in BAM_db for the current hash.
     '4.6': committed ? 'done' : t?.reviewedAt ? 'needs_review' : 'not_started',
     // Staging complete: the backend reports step 4 done and the current manifest is live on Staging.
-    '4.7': snap.steps[3].state === 'done' && deployed ? 'done' : deploying ? 'in_progress' : 'not_started',
+    '4.7': snap.steps[3]!.state === 'done' && deployed ? 'done' : deploying ? 'in_progress' : 'not_started',
     // Deploy to Staging lives in Commit's details; it is shown, never counted (4.7 is hidden).
   }
   // Work built on an earlier RAG run is kept but shows as not started (marked "from previous run" by previousRun()).

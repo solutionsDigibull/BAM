@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import Editor, { DiffEditor, type BeforeMount, type OnMount } from '@monaco-editor/react'
 import { api } from '../api/adapter'
 import type { Activity, CodeFile, Finding, Snapshot, StepInfo } from '../api/types'
-import type { StepProps } from '../App'
+import type { StepProps } from '../Workbench'
 import { useAction, useCode } from '../lib/data'
 import { setUi, useUi } from '../lib/store'
 import { goScreen, goStep } from '../lib/route'
@@ -244,7 +244,7 @@ export function ActivitiesCenter({ snap, info }: StepProps) {
   const wf = r.wf
   if (!wf) return <NoRun kicker="Check · Validation activities" title="Validation activities" />
   const c = wf.activities[2], d = wf.activities[3]
-  const cFirstFail = c.history.find(h => h.status === 'failed')
+  const cFirstFail = c!.history.find(h => h.status === 'failed')
   const open = wf.activities.flatMap(a => a.findings.filter(f => !f.resolved))
   return (
     <Pane id="center-title" kicker="Check · Validation activities" title="Validation activities" className="center"
@@ -256,10 +256,10 @@ export function ActivitiesCenter({ snap, info }: StepProps) {
         <div><dt>Duration</dt><dd>{fmtDuration(wf.startedAt, wf.endedAt) ?? 'in progress'}</dd></div>
       </dl>
       {/* One narrative: a recovered failure is history, not a current failure. */}
-      {d.status === 'succeeded' && c.status === 'succeeded' && cFirstFail && (
-        <Banner tone="ok" icon="refresh">Recovered: C attempt {cFirstFail.attempt} failed ({cFirstFail.reason}); fallback D re-routed the payload; C passed on attempt {c.attempts}. The failed attempt stays in C's history. No open failure.</Banner>)}
-      {d.status === 'succeeded' && c.status === 'failed' && <Banner tone="err" icon="alert">Fallback D ran, but C still fails on attempt {c.attempts}. Fix the open findings in Translate, then retry.</Banner>}
-      {wf.status === 'failed' && !(d.status === 'succeeded' && c.status === 'failed') && <Banner tone="err" icon="alert">The workflow stopped. Failed activities stay listed below with their reason; fix the cause and retry.</Banner>}
+      {d!.status === 'succeeded' && c!.status === 'succeeded' && cFirstFail && (
+        <Banner tone="ok" icon="refresh">Recovered: C attempt {cFirstFail.attempt} failed ({cFirstFail.reason}); fallback D re-routed the payload; C passed on attempt {c!.attempts}. The failed attempt stays in C&apos;s history. No open failure.</Banner>)}
+      {d!.status === 'succeeded' && c!.status === 'failed' && <Banner tone="err" icon="alert">Fallback D ran, but C still fails on attempt {c!.attempts}. Fix the open findings in Translate, then retry.</Banner>}
+      {wf.status === 'failed' && !(d!.status === 'succeeded' && c!.status === 'failed') && <Banner tone="err" icon="alert">The workflow stopped. Failed activities stay listed below with their reason; fix the cause and retry.</Banner>}
       {open.length > 0 && (
         <Section title="Open findings" aside={<span className="muted sm">{open.length}</span>}>
           <ul className="findings compact">{open.map(f => <FindingItem key={f.id} f={f} files={r.files} />)}</ul>
@@ -286,7 +286,7 @@ export function CodeCenter({ snap, info }: StepProps) {
       {r.error ? <ErrorState title="Could not load generated code" action={<button className="btn btn-primary" onClick={() => r.refetch()}>Retry</button>}>{r.error.message}</ErrorState>
         : r.isLoading && !r.files ? <Skeleton rows={8} label="Loading generated code" />
         : !r.files?.length ? <Empty icon="file" title="No generated code yet">Activity C translates each skill and checks the result.</Empty>
-        : <CodeView files={r.files} findings={findings} editable={r.editable} lockedReason={r.lockedReason} showChanges={showChanges} cStatus={r.wf.activities[2].status} />}
+        : <CodeView files={r.files} findings={findings} editable={r.editable} lockedReason={r.lockedReason} showChanges={showChanges} cStatus={r.wf.activities[2]!.status} />}
       <ReviewActions snap={snap} info={info} screen="4.3" />
     </Pane>
   )
@@ -299,7 +299,7 @@ const PLAN: [Activity['key'], string][] = [['A', 'Validates every ISATVON field 
 export function TemplateReady() {
   return (
     <Pane id="center-title" kicker="Check activities" title="Template" className="center" actions={<StatusPill status="pending" text="Ready" />}>
-      <p className="muted sm">Runs on the reviewed grid when you start it here, or from Grid's Approve.</p>
+      <p className="muted sm">Runs on the reviewed grid when you start it here, or from Grid&apos;s Approve.</p>
       <ol className="timeline">{PLAN.map(([k, d]) => (
         <li key={k} className="activity st-queued"><div className="activity-rail"><span className="activity-key" aria-hidden>{k}</span></div>
           <article className="activity-card"><header><h3>{CHECK_NAMES[k]}</h3><StatusPill status="pending" text={k === 'D' ? 'Not needed' : 'Waiting'} /></header>
@@ -322,7 +322,7 @@ export function TemplateCenter({ snap, info }: StepProps) {
   const checks = wf.activities.filter(x => x.key !== 'D')
   const passed = checks.filter(x => x.status === 'succeeded').length
   const c = wf.activities[2], d = wf.activities[3]
-  const cFirstFail = c.history.find(h => h.status === 'failed')
+  const cFirstFail = c!.history.find(h => h.status === 'failed')
   const failed = wf.status === 'failed'
   const last = [...wf.activities].filter(x => x.endedAt && !dIdle(x)).sort((x, y) => (x.endedAt! < y.endedAt! ? -1 : 1)).pop()
   const live = r.running ? (last ? `${ANNOUNCE[last.key]} ${last.status === 'succeeded' ? 'passed' : last.status}` : 'Running checks') : failed ? 'A check failed' : 'Checks finished, ready for review'
@@ -344,8 +344,8 @@ export function TemplateCenter({ snap, info }: StepProps) {
         <div><dt>Started</dt><dd><Time iso={wf.startedAt} /></dd></div>
         <div><dt>Duration</dt><dd>{fmtDuration(wf.startedAt, wf.endedAt) ?? 'in progress'}</dd></div>
       </dl>
-      {d.status === 'succeeded' && c.status === 'succeeded' && cFirstFail && (
-        <Banner tone="ok" icon="refresh">Recovered: C failed on attempt {cFirstFail.attempt} ({cFirstFail.reason}), fallback D re-routed it, C passed on attempt {c.attempts}.</Banner>)}
+      {d!.status === 'succeeded' && c!.status === 'succeeded' && cFirstFail && (
+        <Banner tone="ok" icon="refresh">Recovered: C failed on attempt {cFirstFail.attempt} ({cFirstFail.reason}), fallback D re-routed it, C passed on attempt {c!.attempts}.</Banner>)}
       {failed && <Banner tone="err" icon="alert">A check failed after retry and fallback. The failing check is open below with what went wrong; fix it (Edit, or the code in Translate) and Retry.</Banner>}
       <ol className="timeline">
         {wf.activities.map(x => <ActivityCard key={x.key} a={x} files={r.files} editable={info.editable} busy={!!busy}
@@ -499,9 +499,9 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
       </div>
       {!editable && <Banner tone="ok" icon="lock">{lockedReason}</Banner>}
       {saveError && <Banner tone="err" icon="alert"><strong>Save failed:</strong> {saveError}. Your edits are kept in the editor; fix the cause and save again.</Banner>}
-      {dirty && editable && <Banner tone="warn" icon="refresh"><strong>Validation is stale for your edits.</strong> Activity C's translation check last ran on the saved version of this file. Save and re-validate to check the edited code.</Banner>}
-      {!dirty && openHere.length > 0 && <Banner tone="err" icon="alert">Activity C's translation check fails on this file ({openHere.map(f => `line ${f.line}`).join(', ')}). Approval is blocked until it passes.</Banner>}
-      {!dirty && cStatus === 'succeeded' && current?.edited && openHere.length === 0 && <Banner tone="ok" icon="check">Your edits to this file passed activity C's translation check.</Banner>}
+      {dirty && editable && <Banner tone="warn" icon="refresh"><strong>Validation is stale for your edits.</strong> Activity C&apos;s translation check last ran on the saved version of this file. Save and re-validate to check the edited code.</Banner>}
+      {!dirty && openHere.length > 0 && <Banner tone="err" icon="alert">Activity C&apos;s translation check fails on this file ({openHere.map(f => `line ${f.line}`).join(', ')}). Approval is blocked until it passes.</Banner>}
+      {!dirty && cStatus === 'succeeded' && current?.edited && openHere.length === 0 && <Banner tone="ok" icon="check">Your edits to this file passed activity C&apos;s translation check.</Banner>}
       {fileFindings.length > 0 && <ul className="findings compact">{fileFindings.map(f => <FindingItem key={f.id} f={f} />)}</ul>}
       <div className="monaco-box">
         {current && <ReviewEditor path={current.path} language="python" original={current.generated} value={draft ?? current.content}
@@ -511,7 +511,7 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
       </div>
       {editable && (
         <div className="code-actions">
-          <span className="muted xs">{dirtyCount > 1 ? `${dirtyCount} files have unsaved changes · ` : ''}Saving re-runs activity C's translation check · Ctrl/Cmd+S</span>
+          <span className="muted xs">{dirtyCount > 1 ? `${dirtyCount} files have unsaved changes · ` : ''}Saving re-runs activity C&apos;s translation check · Ctrl/Cmd+S</span>
           <button className="btn btn-ghost sm" disabled={!dirty || !!busy} onClick={() => current && setCodeDraft(current.path, undefined)}>Discard</button>
           <GateButton action="save" reason={dirty ? undefined : 'No changes to save'} busy={busy === 'Save code'} successKey={savedAt} onClick={save}>Save and re-validate</GateButton>
         </div>

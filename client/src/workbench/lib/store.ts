@@ -2,9 +2,9 @@ import { useSyncExternalStore } from 'react'
 import Uppy from '@uppy/core'
 import { api } from '../api/adapter'
 import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES } from '../api/types'
-import { initialStatuses, type Statuses } from '../tracker/trackerConfig.ts'
-import { localTrackerStorage } from '../tracker/trackerStorage.ts'
-import { addFilesLocked } from './goal.ts'
+import { initialStatuses, type Statuses } from '../tracker/trackerConfig'
+import { localTrackerStorage } from '../tracker/trackerStorage'
+import { addFilesLocked } from './goal'
 
 // UI-only state: what the viewer is looking at. Process state lives in the backend snapshot.
 export interface Ui {
@@ -127,7 +127,7 @@ uppy.addUploader(async fileIDs => {
 
 async function send(f: ReturnType<typeof uppy.getFile>) {
     try {
-      const batchId = (f.meta as any)?.batchId as string | undefined
+      const batchId = (f.meta as { batchId?: string } | undefined)?.batchId
       const rec = await api.uploadFile({ name: f.name ?? 'file', size: f.size ?? 0, batchId }, (loaded, total) =>
         uppy.emit('upload-progress', uppy.getFile(f.id), { uploadStarted: Date.now(), bytesUploaded: loaded, bytesTotal: total }))
       uppy.emit('upload-success', uppy.getFile(f.id), { status: 200, body: rec as never, uploadURL: rec.objectKey })
@@ -150,7 +150,7 @@ export function uploadFiles(list: FileList | File[], batchId?: string) {
         type: f.type,
         data: f,
         source: 'intake',
-        meta: { batchId: (f as any).batchId || batchId },
+        meta: { batchId: (f as { batchId?: string }).batchId || batchId },
       })
       added++
     } catch { /* restriction-failed already reported */ }

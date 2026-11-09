@@ -4,7 +4,7 @@
 // Only checks this build can really run are run (file signatures read from the uploaded bytes). Header/template checks
 // need the parse service and conversion and the Local AI fix need their services: none is connected, so those are
 // reported as not available, never as passed.
-import { ACCEPTED_TYPES } from './types.ts'
+import { ACCEPTED_TYPES } from './types'
 
 export type Route = 'direct' | 'pdf-copy' | 'unsupported'
 /** The routing reference from the diagram. Accepted types still come from ACCEPTED_TYPES, never from this list. */
@@ -39,7 +39,7 @@ export const POST_PDF = ['Rasterization (Flattening)', 'Non-Searchable Text (Gly
 
 // ---- signature checks on the real bytes ---------------------------------------------------------------------------
 const starts = (b: Uint8Array, sig: number[]) => sig.every((x, i) => b[i] === x)
-const ascii = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return s }
+const ascii = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]!); return s }
 const MAGIC: { kind: string; sig: number[] }[] = [
   { kind: 'pdf', sig: [0x25, 0x50, 0x44, 0x46, 0x2d] }, { kind: 'zip', sig: [0x50, 0x4b, 0x03, 0x04] }, { kind: 'zip', sig: [0x50, 0x4b, 0x05, 0x06] },
   { kind: 'cfb', sig: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] }, { kind: 'png', sig: [0x89, 0x50, 0x4e, 0x47] },
@@ -47,7 +47,7 @@ const MAGIC: { kind: string; sig: number[] }[] = [
 ]
 const kindOf = (b: Uint8Array) => MAGIC.find(m => starts(b, m.sig))?.kind
 /** ZIP local header: general-purpose bit 0 set means the entry is encrypted. */
-const zipEncrypted = (b: Uint8Array) => b.length > 7 && (b[6] & 1) === 1
+const zipEncrypted = (b: Uint8Array) => b.length > 7 && (b[6]! & 1) === 1
 
 /** Problems found in a file's first and last bytes (`head`, `tail`: up to 64 KB each). */
 export function sniff(name: string, size: number, head: Uint8Array, tail: Uint8Array = head): IssueId[] {

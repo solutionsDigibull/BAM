@@ -1,6 +1,6 @@
 // 1.1 virus-scan gate. Pure, shared by the mock backend (the server-side guard) and the UI (the
 // disabled-button reason), so both always agree. A real backend must enforce the same rules itself.
-import { ACCEPTED_TYPES, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES, type IngestionRun, type UploadRecord } from './types.ts'
+import { ACCEPTED_TYPES, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES, type IngestionRun, type UploadRecord } from './types'
 
 export const acceptedType = (name: string) => ACCEPTED_TYPES.includes(name.slice(name.lastIndexOf('.')).toLowerCase())
 
@@ -10,8 +10,7 @@ export const isReleased = (u: UploadRecord) =>
   u.scan === 'verified' &&
   u.released &&
   !u.scanError &&
-  u.clamavVerdict !== 'threat' &&
-  u.repelVerdict !== 'threat'
+  u.clamavVerdict !== 'threat'
 
 export interface GateContext {
   /** Files still uploading in the browser (not yet staged). */
@@ -32,7 +31,7 @@ export function ingestionBlock(uploads: UploadRecord[], ctx: GateContext = {}): 
   if (uploads.some(u => u.status === 'failed')) return 'Remove failed uploads to continue'
   if (uploads.some(u => u.scanError)) return 'Retry or remove files whose scan failed'
   if (uploads.some(u => u.scan === 'scanning')) return 'Wait for virus scans to finish'
-  if (uploads.some(u => u.scan === 'blocked' || u.clamavVerdict === 'threat' || u.repelVerdict === 'threat')) return 'Remove blocked files to continue'
+  if (uploads.some(u => u.scan === 'blocked' || u.clamavVerdict === 'threat')) return 'Remove blocked files to continue'
   const clean = uploads.filter(isReleased).map(u => u.id)
   if (!clean.length) return 'Upload documents first'
   if (ctx.ingestion && clean.length === ctx.ingestion.fileIds.length && clean.every(id => ctx.ingestion!.fileIds.includes(id)))
@@ -46,19 +45,15 @@ export interface ScanView { pill: 'pass' | 'running' | 'fail' | 'needs_review'; 
 /** What a row shows and allows. Scanning has no actions; Blocked only Remove; Verified opens only once released. */
 export function scanView(u: UploadRecord): ScanView {
   if (u.scanError) return { pill: 'needs_review', label: 'Scan error', text: `${u.scanError} Not eligible until rescanned.`, actions: ['retry', 'remove'] }
-  if (u.scan === 'blocked' || u.clamavVerdict === 'threat' || u.repelVerdict === 'threat') {
-    const detail = u.repelVerdict === 'threat' && u.repelDetails?.heuristicFlags?.length
-      ? `Repel threat: ${u.repelDetails.heuristicFlags.join(', ')}`
-      : u.threat || 'Threat detected: quarantined'
+  if (u.scan === 'blocked' || u.clamavVerdict === 'threat') {
+    const detail = u.threat || 'Threat detected: quarantined'
     return { pill: 'fail', label: 'Blocked', text: detail, actions: ['remove'] }
   }
   if (u.scan === 'scanning') {
-    const text = (u.clamavVerdict || u.repelVerdict) ? 'Checking dual engines (ClamAV + Repel)...' : 'Checking file for threats...'
+    const text = 'Checking the file for threats...'
     return { pill: 'running', label: 'Scanning', text, actions: [] }
   }
-  const subtext = (u.clamavVerdict === 'clean' && u.repelVerdict === 'clean')
-    ? 'Clean (ClamAV ✓ · Repel ✓) - Ready for ingestion'
-    : 'Clean - Ready for ingestion'
+  const subtext = 'Clean - Ready for ingestion'
   return { pill: 'pass', label: 'Verified', text: subtext, actions: isReleased(u) ? ['view', 'remove'] : ['remove'] }
 }
 

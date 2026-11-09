@@ -1,4 +1,4 @@
-import { SUBTASKS, TRACKER_STATUSES, initialStatuses, type Statuses, type TrackerStatus } from './trackerConfig.ts'
+import { SUBTASKS, TRACKER_STATUSES, initialStatuses, type Statuses, type TrackerStatus } from './trackerConfig'
 
 /** Namespace for the 16-screen structure. */
 export const TRACKER_KEY = 'bullm-bam.tracker16.v1'

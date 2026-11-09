@@ -6,9 +6,9 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useUppyState } from '@uppy/react'
 import type { Snapshot, UploadRecord } from '../api/types'
-import { isReleased } from '../api/scanGate.ts'
+import { isReleased } from '../api/scanGate'
 import { CONVERT_UNAVAILABLE, DIRECT_REF, FIX_UNAVAILABLE, ISSUES, NEEDS_PARSER, PDF_FIRST_REF, POST_PDF, PRE_PDF, STATE_TEXT, classify, decide, issueLabel, sniff,
-  type Assessment, type IssueId } from '../api/standardize.ts'
+  type Assessment, type IssueId } from '../api/standardize'
 import { ACCEPTED_TYPES } from '../api/types'
 import { uppy } from '../lib/store'
 import { goScreen } from '../lib/route'

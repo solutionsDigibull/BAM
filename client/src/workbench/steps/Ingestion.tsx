@@ -6,26 +6,25 @@ import { useEffect, useRef, useState } from 'react'
 import type { Snapshot } from '../api/types'
 import { setUi, useUi } from '../lib/store'
 import { goScreen } from '../lib/route'
-import { JOBS } from '../rag/mockData.ts'
 import { useAction } from '../lib/data'
 import { api } from '../api/adapter'
 import { Copy, Empty, GateButton, Icon, Kpis, StatusPill, Time, Tip, fmtBytes } from '../components/ui'
 import { tips } from '../lib/actionTips'
 import { FileRows, ScreenTitle, SecurityDetails, fdeView, useAdvanceWhen } from './IngestionFlow'
 import { Foot, needsReview, useReviewFiles, useStandardize } from './Standardize'
-import { STATE_TEXT } from '../api/standardize.ts'
+import { STATE_TEXT } from '../api/standardize'
 import { UploadProgress, isAdded, uploadCount, useUploadRows } from './UploadPanes'
-import { ragPipeline, useRag } from '../rag/ragPipeline.ts'
+import { ragPipeline, useRag } from '../rag/ragPipeline'
 import StatusMark from '../components/reactbits/StatusMark'
 import { ReviewWaiting } from './ReviewWaiting'
-import { isReleased, scanView } from '../api/scanGate.ts'
-import { canAddFiles, useGoal } from '../lib/goal.ts'
+import { isReleased, scanView } from '../api/scanGate'
+import { canAddFiles, useGoal } from '../lib/goal'
 
 // ---- File detail/preview (opened from Scan) ------------------------------------------------------------------------
 export function FileDetail({ snap }: { snap: Snapshot }) {
   const picked = useUi(s => s.fileDetail)
   const file = snap.uploads.find(u => u.id === picked) ?? snap.uploads[0]
-  const fixture = file && JOBS.find(j => j.object === file.name)
+  const doc = useRag(s => s.docs).find(d => file && d.title === file.name)
   const ext = file?.name.slice(file.name.lastIndexOf('.') + 1).toUpperCase()
   return (
     <div className="rag">
@@ -52,19 +51,16 @@ export function FileDetail({ snap }: { snap: Snapshot }) {
             </section>
             <section className="rag-card" aria-labelledby="pp-title">
               <header className="rag-card-head"><h3 id="pp-title">Parsed preview and flags</h3><StatusPill status="unavailable" text="Not available" /></header>
-              <p className="muted sm">This file's rows, text and flags can't be shown yet. Nothing here is inferred or made up.</p>
-              {fixture ? (
+              <p className="muted sm">This file&apos;s rows, text and flags can&apos;t be shown yet. Nothing here is inferred or made up.</p>
+              {doc ? (
                 <div className="lineage">
-                  <p className="sm"><strong>Fixture lineage</strong> <span className="tag example-tag">EXAMPLE fixture</span></p>
-                  <p className="muted sm">The file name matches an object in the example RAG dataset; its fixture extraction record is:</p>
+                  <p className="sm"><strong>Knowledge coverage</strong></p>
                   <dl className="kv two-col">
-                    <div><dt>OKF class</dt><dd>{fixture.okfClass}</dd></div><div><dt>Extractor</dt><dd>{fixture.extractor}</dd></div>
-                    <div><dt>Entities</dt><dd>{fixture.entities}</dd></div><div><dt>Confidence</dt><dd>{fixture.confidence?.toFixed(2) ?? '—'}</dd></div>
-                    <div><dt>Fixture object</dt><dd><Copy value={fixture.s3} label="fixture URI" /></dd></div>
+                    <div><dt>Status</dt><dd>{doc.status.toLowerCase()}</dd></div><div><dt>Chunks</dt><dd>{doc.chunks}</dd></div>
+                    <div><dt>Entities</dt><dd>{doc.entities}</dd></div>
                   </dl>
-                  <button className="link sm" onClick={() => goScreen('2.3')}><Icon name="link" size={12} />See it in Context quality extraction jobs</button>
                 </div>
-              ) : <p className="muted xs">No fixture object matches this file name, so it has no lineage into the example graph.</p>}
+              ) : <p className="muted xs">This file is not part of a knowledge version yet.</p>}
             </section>
           </>}
         </div>
@@ -75,7 +71,7 @@ export function FileDetail({ snap }: { snap: Snapshot }) {
 
 // ---- Parse ---------------------------------------------------------------------------------------------------
 /** Extraction of the current run (the existing pipeline steps: chunk + embed, entity extraction). Per-file parsing has
- *  no backend contract, so every input file shows the run's extraction state; the fixture jobs are in the details. */
+ *  no backend contract, so every input file shows the run's extraction state; the documents of the version are in the details. */
 export function ParseView({ snap }: { snap: Snapshot }) {
   const rag = useRag(s => s)
   const files = snap.uploads.filter(u => snap.ingestion?.fileIds.includes(u.id))
@@ -102,9 +98,9 @@ export function ParseView({ snap }: { snap: Snapshot }) {
       {failed && <div className="rr-warn tone-err" role="alert"><Icon name="alert" size={15} /><div><strong className="sm">{failed.label} failed</strong><span className="xs">{failed.error ?? 'No reason reported'}</span></div>
         <button className="btn btn-secondary sm" onClick={() => ragPipeline.retry(failed.key)}><Icon name="refresh" />Retry</button></div>}
       <div className="dc-rows">
-        <details><summary><strong>Extraction details</strong><span className="dc-count">{JOBS.length}</span><Icon name="down" size={13} /></summary>
-          <p className="muted sm">Extracted text and tables stay linked to their source files. The extraction jobs below run on the labelled EXAMPLE dataset; your uploads are not parsed into it yet.</p>
-          <ul className="dc-files">{JOBS.map((j, i) => <li key={j.object}><Icon name="file" size={15} /><span className="dc-name">{j.object}</span><span className="muted xs">{j.okfClass} · {j.extractor}</span><span className="muted xs">{rag.jobs[i] ?? 'queued'}</span></li>)}</ul>
+        <details><summary><strong>Extraction details</strong><span className="dc-count">{rag.docs.length}</span><Icon name="down" size={13} /></summary>
+          <p className="muted sm">Extracted text and tables stay linked to their source documents.</p>
+          <ul className="dc-files">{rag.docs.map(d => <li key={d.id}><Icon name="file" size={15} /><span className="dc-name">{d.title}</span><span className="muted xs">{d.chunks} chunks · {d.entities} entities</span><span className="muted xs">{d.reason ?? d.status.toLowerCase()}</span></li>)}</ul>
         </details>
       </div>
     </main>
@@ -217,7 +213,7 @@ export const handedOn = (snap: Snapshot) => snap.uploads.some(u => snap.ingestio
 export function IngestReviewFooter({ snap }: { snap: Snapshot }) {
   const rag = useRag(s => s)
   const parsed = !!snap.ingestion && rag.steps.find(x => x.key === 'extract')?.status === 'done'
-  const closed = !snap.steps[0].editable
+  const closed = !snap.steps[0]!.editable
   return <Foot title={parsed ? 'Accepted, parsed files only' : 'Waiting for parsed files'} line="Context receives the accepted, parsed files">
     {/* Missed a file while reviewing? (5 Nov 2026) Upload opens its picker; current files and review results are kept. */}
     <button className="btn btn-secondary" disabled={closed} title={closed ? 'Uploads are closed.' : 'Add files you missed - current files and review results stay'}
@@ -230,7 +226,7 @@ export function IngestReviewFooter({ snap }: { snap: Snapshot }) {
  *  Rescan exists for failed scans only (the backend rule); Remove keeps the object in quarantine for audit. */
 export function Quarantine({ snap }: { snap: Snapshot }) {
   const { busy, run } = useAction()
-  const editable = snap.steps[0].editable
+  const editable = snap.steps[0]!.editable
   const held = snap.uploads.filter(u => u.scan === 'blocked' || u.scanError)
   const released = snap.uploads.filter(u => u.released)
   return (

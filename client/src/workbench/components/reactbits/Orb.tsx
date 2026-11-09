@@ -341,7 +341,7 @@ const Orb = ({
         probe.fillStyle = value;
         probe.fillRect(0, 0, 1, 1);
         const [r, g, b, a] = probe.getImageData(0, 0, 1, 1).data;
-        rgb = a ? [r / 255, g / 255, b / 255] : [0, 0, 0];
+        rgb = a ? [r! / 255, g! / 255, b! / 255] : [0, 0, 0];
       }
       cache.set(value, rgb);
       return rgb;
@@ -352,9 +352,9 @@ const Orb = ({
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
       const [r, g, b] = rgb;
-      const y = 0.299 * r + 0.587 * g + 0.114 * b;
-      const i = 0.596 * r - 0.274 * g - 0.322 * b;
-      const q = 0.211 * r - 0.523 * g + 0.312 * b;
+      const y = 0.299 * r! + 0.587 * g! + 0.114 * b!;
+      const i = 0.596 * r! - 0.274 * g! - 0.322 * b!;
+      const q = 0.211 * r! - 0.523 * g! + 0.312 * b!;
       const ni = i * cos - q * sin;
       const nq = i * sin + q * cos;
       return [y + 0.956 * ni + 0.621 * nq, y - 0.272 * ni - 0.647 * nq, y - 1.106 * ni + 1.703 * nq];
@@ -395,12 +395,12 @@ const Orb = ({
         const [cx, sx, cy, sy] = [Math.cos(ax), Math.sin(ax), Math.cos(ay), Math.sin(ay)];
         const normal = [sy * cx, -sx, cy * cx];
         const ray = [ux, uy, -FOCAL];
-        const denom = normal[0] * ray[0] + normal[1] * ray[1] + normal[2] * ray[2];
-        const t = -(normal[2] * FOCAL) / (Math.abs(denom) > 0.00001 ? denom : -0.00001);
+        const denom = normal[0]! * ray[0]! + normal[1]! * ray[1]! + normal[2]! * ray[2]!;
+        const t = -(normal[2]! * FOCAL) / (Math.abs(denom) > 0.00001 ? denom : -0.00001);
         if (t <= 0) return [99, 99];
-        const q = [ray[0] * t, ray[1] * t, FOCAL + ray[2] * t];
-        ux = q[0] * cy - q[2] * sy;
-        uy = q[0] * sy * sx + q[1] * cx + q[2] * cy * sx;
+        const q = [ray[0]! * t, ray[1]! * t, FOCAL + ray[2]! * t];
+        ux = q[0]! * cy - q[2]! * sy;
+        uy = q[0]! * sy * sx + q[1]! * cx + q[2]! * cy * sx;
       }
       const sin = Math.sin(state.rotation);
       const cos = Math.cos(state.rotation);
@@ -416,31 +416,31 @@ const Orb = ({
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(program.program);
       gl.bindVertexArray(vao);
-      gl.uniform2f(u.uResolution, canvas.width, canvas.height);
-      gl.uniform1f(u.uTime, state.time);
-      gl.uniform2f(u.uReach, state.reachX, state.reachY);
-      gl.uniform1f(u.uNear, state.near);
-      gl.uniform1f(u.uAwake, state.hover * s.hoverIntensity * 0.18);
-      gl.uniform1f(u.uRotation, state.rotation);
-      gl.uniform3fv(u.uBackground, parse(s.backgroundColor));
-      gl.uniform3fv(u.uColor1, c1);
-      gl.uniform3fv(u.uColor2, c2);
-      gl.uniform3fv(u.uColor3, c3);
-      gl.uniform1f(u.uScale, 1 / (s.size * (1 + state.pulse) * (0.62 + 0.38 * grow)));
-      gl.uniform1f(u.uWobble, s.wobble);
-      gl.uniform1f(u.uGlow, s.glow);
-      gl.uniform1f(u.uBleed, s.bleed);
-      gl.uniform1f(u.uHighlight, s.highlight);
-      gl.uniform2f(u.uEcho, state.echo * 0.55, state.echo < 1 ? (1 - state.echo) * (1 - state.echo) : 0);
-      gl.uniform1f(u.uSwirl, state.swirl);
-      gl.uniform1f(u.uOrbit, state.orbit);
+      gl.uniform2f(u.uResolution!, canvas.width, canvas.height);
+      gl.uniform1f(u.uTime!, state.time);
+      gl.uniform2f(u.uReach!, state.reachX, state.reachY);
+      gl.uniform1f(u.uNear!, state.near);
+      gl.uniform1f(u.uAwake!, state.hover * s.hoverIntensity * 0.18);
+      gl.uniform1f(u.uRotation!, state.rotation);
+      gl.uniform3fv(u.uBackground!, parse(s.backgroundColor));
+      gl.uniform3fv(u.uColor1!, c1!);
+      gl.uniform3fv(u.uColor2!, c2!);
+      gl.uniform3fv(u.uColor3!, c3!);
+      gl.uniform1f(u.uScale!, 1 / (s.size * (1 + state.pulse) * (0.62 + 0.38 * grow)));
+      gl.uniform1f(u.uWobble!, s.wobble);
+      gl.uniform1f(u.uGlow!, s.glow);
+      gl.uniform1f(u.uBleed!, s.bleed);
+      gl.uniform1f(u.uHighlight!, s.highlight);
+      gl.uniform2f(u.uEcho!, state.echo * 0.55, state.echo < 1 ? (1 - state.echo) * (1 - state.echo) : 0);
+      gl.uniform1f(u.uSwirl!, state.swirl);
+      gl.uniform1f(u.uOrbit!, state.orbit);
       gl.uniform1f(
-        u.uReveal,
+        u.uReveal!,
         Math.min(1, reveal / 0.55) * Math.min(1, reveal / 0.55) * (3 - 2 * Math.min(1, reveal / 0.55))
       );
-      gl.uniform1f(u.uOpacity, s.opacity);
-      gl.uniform1f(u.uTrail, s.trail);
-      gl.uniform2f(u.uTilt, (-s.tiltX * Math.PI) / 180, (s.tiltY * Math.PI) / 180);
+      gl.uniform1f(u.uOpacity!, s.opacity);
+      gl.uniform1f(u.uTrail!, s.trail);
+      gl.uniform2f(u.uTilt!, (-s.tiltX * Math.PI) / 180, (s.tiltY * Math.PI) / 180);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
 

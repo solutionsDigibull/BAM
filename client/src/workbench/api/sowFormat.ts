@@ -1,7 +1,7 @@
 // The ISATVON SOW format (see the approved SOW sample): flat "Requirement N" blocks, each tagged with all
 // seven ISATVON fields. The SOW has NO agent/skill grouping; that is applied after approval by a separate
 // step (`clusterRequirement`). Status and approval lines are system metadata, not document text.
-import { ISATVON, type IsatvonField } from './types.ts'
+import { ISATVON, type IsatvonField } from './types'
 
 export type RequirementFields = Record<IsatvonField, string>
 
@@ -80,7 +80,7 @@ export function parseRequirements(html: string): ParsedRequirement[] {
     const fields = Object.fromEntries(ISATVON.map(c => [c.key, ''])) as RequirementFields
     for (const m of chunk.matchAll(/<strong>\s*([ISATVON])\s*[—–-][^<:]*:?\s*<\/strong>([\s\S]*?)<\/p>/g)) {
       const key = ISATVON.find(c => c.letter === m[1])!.key
-      let v = text(m[2]).replace(/^:\s*/, '')
+      let v = text(m[2]!).replace(/^:\s*/, '')
       if (key === 'automation') v = v.match(/[A-Z][A-Z0-9_]{2,}/)?.[0] ?? v
       if (key === 'notifications') v = v.replace(/^PARSED\s*[·—–-]\s*/, '')
       fields[key] = v

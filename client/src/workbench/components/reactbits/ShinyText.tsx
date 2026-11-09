@@ -81,12 +81,12 @@ const parseColor = (value: string): number[] | null => {
 const blend = (from: number[], to: number[], amount: number) => {
   const channel = (a: number, b: number) =>
     Math.round(Math.pow(Math.pow(a / 255, 2.2) * (1 - amount) + Math.pow(b / 255, 2.2) * amount, 1 / 2.2) * 255);
-  const alpha = from[3] * (1 - amount) + to[3] * amount;
+  const alpha = from[3]! * (1 - amount) + to[3]! * amount;
   if (alpha <= 0) return 'rgba(0, 0, 0, 0)';
-  const weigh = (a: number, b: number) => (a * from[3] * (1 - amount) + b * to[3] * amount) / alpha;
-  const r = from[3] === to[3] ? channel(from[0], to[0]) : Math.round(weigh(from[0], to[0]));
-  const g = from[3] === to[3] ? channel(from[1], to[1]) : Math.round(weigh(from[1], to[1]));
-  const b = from[3] === to[3] ? channel(from[2], to[2]) : Math.round(weigh(from[2], to[2]));
+  const weigh = (a: number, b: number) => (a * from[3]! * (1 - amount) + b * to[3]! * amount) / alpha;
+  const r = from[3] === to[3] ? channel(from[0]!, to[0]!) : Math.round(weigh(from[0]!, to[0]!));
+  const g = from[3] === to[3] ? channel(from[1]!, to[1]!) : Math.round(weigh(from[1]!, to[1]!));
+  const b = from[3] === to[3] ? channel(from[2]!, to[2]!) : Math.round(weigh(from[2]!, to[2]!));
   return `rgba(${r}, ${g}, ${b}, ${Math.round(alpha * 1000) / 1000})`;
 };
 
@@ -207,7 +207,7 @@ const ShinyText = ({
         state.colors = key;
         base = parseColor(s.color);
         shine = parseColor(s.shineColor);
-        clear = shine ? [shine[0], shine[1], shine[2], 0] : null;
+        clear = shine ? [shine[0]!, shine[1]!, shine[2]!, 0] : null;
       }
       if (!base || !shine) {
         root.style.backgroundImage = `linear-gradient(${s.color}, ${s.color})`;

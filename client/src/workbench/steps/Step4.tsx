@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { api } from '../api/adapter'
 import type { Assertion, Snapshot, Tests } from '../api/types'
-import type { StepProps } from '../App'
+import type { StepProps } from '../Workbench'
 import { useAction, useSkills } from '../lib/data'
 import { setUi } from '../lib/store'
 import { goScreen } from '../lib/route'

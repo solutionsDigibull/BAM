@@ -14,16 +14,16 @@ function lcsOps<T>(a: T[], b: T[], eq: (x: T, y: T) => boolean): Op<T>[] {
   const n = a.length, m = b.length
   const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1))
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
-    dp[i][j] = eq(a[i], b[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
+    dp[i]![j] = eq(a[i]!, b[j]!) ? dp[i + 1]![j + 1]! + 1 : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!)
   const ops: Op<T>[] = []
   let i = 0, j = 0
   while (i < n && j < m) {
-    if (eq(a[i], b[j])) { ops.push({ op: 'eq', a: a[i], b: b[j] }); i++; j++ }
-    else if (dp[i + 1][j] >= dp[i][j + 1]) ops.push({ op: 'del', a: a[i++] })
-    else ops.push({ op: 'ins', b: b[j++] })
+    if (eq(a[i]!, b[j]!)) { ops.push({ op: 'eq', a: a[i]!, b: b[j]! }); i++; j++ }
+    else if (dp[i + 1]![j]! >= dp[i]![j + 1]!) ops.push({ op: 'del', a: a[i++]! })
+    else ops.push({ op: 'ins', b: b[j++]! })
   }
-  while (i < n) ops.push({ op: 'del', a: a[i++] })
-  while (j < m) ops.push({ op: 'ins', b: b[j++] })
+  while (i < n) ops.push({ op: 'del', a: a[i++]! })
+  while (j < m) ops.push({ op: 'ins', b: b[j++]! })
   return ops
 }
 
@@ -41,16 +41,17 @@ export function diffWords(oldText: string, newText: string): Seg[] {
   }
   const segs: Seg[] = []
   for (let i = 0; i < raw.length; i++) {
-    const s = raw[i]
-    if (s.kind === 'removed' && raw[i + 1]?.kind === 'added') { segs.push(s, { kind: 'modified', text: raw[i + 1].text }); i++ }
+    const s = raw[i]!
+    if (s.kind === 'removed' && raw[i + 1]?.kind === 'added') { segs.push(s, { kind: 'modified', text: raw[i + 1]!.text }); i++ }
     else segs.push(s)
   }
   // Whitespace at the edges of a change belongs to the unchanged text around it. A removed run's
   // whitespace exists only in the old text, so it is dropped: joining the non-removed segments
   // must reproduce the new text exactly (the editor maps highlights by these offsets).
-  return segs.flatMap(s => {
+  return segs.flatMap((s): Seg[] => {
     if (s.kind === 'same') return [s]
-    const [, lead, core, trail] = s.text.match(/^(\s*)(.*?)(\s*)$/s)!
+    const m = s.text.match(/^(\s*)(.*?)(\s*)$/s)!
+    const lead = m[1]!, core = m[2]!, trail = m[3]!
     if (s.kind === 'removed') return [{ kind: s.kind, text: core }]
     return [{ kind: 'same' as const, text: lead }, { kind: s.kind, text: core }, { kind: 'same' as const, text: trail }]
   }).filter(s => s.text)
@@ -68,7 +69,7 @@ export function diffBlocks(oldBlocks: Block[], newBlocks: Block[]): { blocks: Di
   const counts: DiffCounts = { added: 0, removed: 0, modified: 0 }
   const blocks: DiffBlock[] = []
   const ops = lcsOps(oldBlocks, newBlocks, (x, y) => x.tag === y.tag && x.text === y.text)
-  let dels: Block[] = [], ins: Block[] = []
+  const dels: Block[] = [], ins: Block[] = []
   const flush = () => {
     // Pair a removed and an inserted block only when they are clearly the same block edited
     // (same kind, shared wording); otherwise show a removal and an addition.

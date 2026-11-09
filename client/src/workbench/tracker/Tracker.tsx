@@ -4,10 +4,10 @@ import { Icon } from '../components/ui'
 import {
   STATUS_LABEL, countedOf, screenByPath, screenLabel, stageOf, TASKS, TRACKER_ITEMS, TRACKER_STATUSES, doneCount, subtasksOf, taskStatus,
   type TrackerItem, type TrackerStatus,
-} from './trackerConfig.ts'
+} from './trackerConfig'
 import { setTracker, updateSubtask, useStatuses, useTrackerStore } from './useTrackerStore'
-import { DONE_RULE } from './evidence.ts'
-import { stageMarkers, type StageMarker } from '../lib/bamUi.ts'
+import { DONE_RULE } from './evidence'
+import { stageMarkers, type StageMarker } from '../lib/bamUi'
 
 // Shape differs per status, so status never relies on colour alone.
 const GLYPH: Record<TrackerStatus, string> = {
@@ -138,7 +138,7 @@ export function TrackerMenu() {
   const previous = useTrackerStore(t => t.previous)
   const { markers, current } = stageMarkers(TASKS.map(t => taskStatus(t.id, statuses)))
   // Announce real workflow changes (current stage / its status) politely, not every poll.
-  const announce = current < 0 ? (markers.every(m => m.status === 'done') ? 'All four stages done' : '') : `Current stage: ${TASKS[current].label}, ${STATUS_LABEL[markers[current].status]}`
+  const announce = current < 0 ? (markers.every(m => m.status === 'done') ? 'All four stages done' : '') : `Current stage: ${TASKS[current]!.label}, ${STATUS_LABEL[markers[current]!.status]}`
 
   const show = () => { clearTimeout(timer.current); setOpen(true) }
   const close = (refocus: boolean) => {
@@ -193,7 +193,7 @@ export function TrackerMenu() {
         {storageError && <p className="tracker-error"><Icon name="alert" size={12} />{storageError} Progress is kept on this device only, not shared or synced.</p>}
         <ol className="wf-stages">
           {TASKS.map((t, i) => (
-            <StageStep key={t.id} item={t} marker={markers[i]} earned={false} last open={openTask === t.id}
+            <StageStep key={t.id} item={t} marker={markers[i]!} earned={false} last open={openTask === t.id}
               currentScreen={currentStage === t.id ? currentScreen : undefined}
               done={doneCount(countedOf(t.id), statuses)} total={countedOf(t.id).length} prev={countedOf(t.id).filter(s => previous.includes(s.id)).length}
               onToggle={() => toggle(t.id)}>
