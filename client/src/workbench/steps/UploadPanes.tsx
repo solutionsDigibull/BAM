@@ -69,16 +69,20 @@ const seen = new Set<string>()
 export function useUploadRows(snap: Snapshot): UpRow[] {
   const files = useUppyState(uppy, s => s.files)
   const refused = useUi(s => s.rejected)
+  const { busy, run } = useAction()
   const stored = snap.uploads.map<UpRow>(u => {
     const state: UpRow['state'] = isReleased(u) ? 'ready' : fdeView(u).pill === 'running' ? 'checking' : 'failed'
     return { id: u.id, name: u.name, size: u.size, kind: detectKind(u.name), state,
       reason: state !== 'failed' ? undefined : u.scanError ? 'Failed - check did not finish' : u.status === 'failed' ? 'Failed - upload error' : 'Failed - cannot be used',
-      retry: u.scanError && snap.steps[0]!.editable ? () => { api.retryScan(u.id).catch((e: Error) => console.error('Retry failed:', e.message)) } : undefined }
+      retry: u.scanError && snap.steps[0]!.editable && !busy ? () => { void run('Retry check', () => api.retryScan(u.id), { step: 1 }) } : undefined }
   })
   for (const u of snap.uploads) seen.add(u.id)
   const transit = Object.values(files).flatMap<UpRow>(f => {
     const id = (f.response?.body as { id?: string } | undefined)?.id
-    return f.progress.uploadComplete && !f.error && id && !seen.has(id) ? [{ id, name: f.name ?? 'file', size: f.size ?? 0, kind: detectKind(f.name ?? ''), state: 'checking' }] : []
+    // The uploader only knows a placeholder id (`pending:<name>`), never the document's, so a stored record with the same
+    // name and size is this file: show it once.
+    const stored = snap.uploads.some(u => u.name === f.name && u.size === f.size)
+    return f.progress.uploadComplete && !f.error && id && !seen.has(id) && !stored ? [{ id, name: f.name ?? 'file', size: f.size ?? 0, kind: detectKind(f.name ?? ''), state: 'checking' }] : []
   })
   const sending = Object.values(files).filter(f => !f.progress.uploadComplete && !snap.uploads.some(u => u.name === f.name && u.size === f.size))
     .map<UpRow>(f => ({ id: f.id, name: f.name ?? 'file', size: f.size ?? 0, kind: detectKind(f.name ?? ''), state: f.error ? 'failed' : 'uploading',
