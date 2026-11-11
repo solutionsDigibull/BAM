@@ -284,4 +284,5 @@ def schemas() -> dict[str, dict[str, Any]]:
         "version_list": contract_schema(KnowledgeVersionList, "knowledge/version_list"),
         "graph_page": contract_schema(KnowledgeGraphPage, "knowledge/graph_page"),
         "node_detail": contract_schema(KnowledgeNodeDetail, "knowledge/node_detail"),
+        "diff": contract_schema(KnowledgeDiff, "knowledge/diff"),
     }

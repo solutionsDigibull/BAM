@@ -258,9 +258,8 @@ def test_a_short_id_cannot_be_used_for_another_documents_chunk(g: Gen) -> None:
     cite["document_version_id"] = str(other.document_version_id)  # ...with another document's id
     bifrost = FakeBifrost([completion(json.dumps(bad)), completion(g.answer())])
     g.run(bifrost)
-    assert (
-        "scope.citations: CITATION_DOCUMENT_MISMATCH"
-        in (bifrost.requests[1]["messages"][-1]["content"])
+    assert "scope.citations: CITATION_DOCUMENT_MISMATCH" in (
+        bifrost.requests[1]["messages"][-1]["content"]
     )
 
 
@@ -269,9 +268,8 @@ def test_e6_2_a_citation_with_the_wrong_document_is_refused(g: Gen) -> None:
     bad["scope"]["citations"][0]["document_version_id"] = str(uuid.uuid4())
     bifrost = FakeBifrost([completion(json.dumps(bad)), completion(g.answer())])
     g.run(bifrost)
-    assert (
-        "scope.citations: CITATION_DOCUMENT_MISMATCH"
-        in (bifrost.requests[1]["messages"][-1]["content"])
+    assert "scope.citations: CITATION_DOCUMENT_MISMATCH" in (
+        bifrost.requests[1]["messages"][-1]["content"]
     )
 
 

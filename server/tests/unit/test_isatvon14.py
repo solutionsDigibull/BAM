@@ -461,9 +461,9 @@ def test_e0_2_models_are_strict_and_frozen() -> None:
 @pytest.mark.parametrize("stem", sorted(schemas()))
 def test_e0_2_committed_schema_matches_model(stem: str) -> None:
     committed = json.loads((SCHEMAS / f"{stem}.schema.json").read_text(encoding="utf-8"))
-    assert committed == schemas()[stem], (
-        "regenerate: cd server && uv run python -m sbam_contracts.isatvon14"
-    )
+    assert (
+        committed == schemas()[stem]
+    ), "regenerate: cd server && uv run python -m sbam_contracts.isatvon14"
 
 
 # --- E8.3: the same rules with stable codes, as pass 2 stores them ------------------------------

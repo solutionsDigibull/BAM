@@ -93,11 +93,15 @@ class World:
             return self.isatvon
 
         self.schema = schema
+
+        async def schema_of(_: BuildStageInput) -> str:
+            return self.schema or ""
+
         self.stage = GenerateTests(
             isatvon_of,
             self.client,
             SqlDatasetStore(self.sessions, self.storage),
-            lambda _: self.schema,
+            schema_of,
         )
 
     def run(self) -> uuid.UUID:

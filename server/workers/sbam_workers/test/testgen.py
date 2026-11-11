@@ -483,7 +483,7 @@ class GenerateTests:
     async def run(self, inp: BuildStageInput) -> IdResult:
         isatvon = await self.isatvon_of(inp)
         wanted = fingerprint(isatvon)
-        schema = self.schema_of(inp)
+        schema = await self.schema_of(inp) if self.schema_of is not None else None
         tables = seed_fit.tables_of(schema) if schema else {}
         newest = self.store.newest(inp)
         replaces: uuid.UUID | None = None
