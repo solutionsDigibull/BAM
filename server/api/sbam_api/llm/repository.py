@@ -56,6 +56,30 @@ class LlmCallRepository(TenantScopedRepository[LlmCall]):
         )
         return list(self.session.scalars(query))
 
+    def usage_by_alias(self) -> list[tuple[str, int, int, int, int, Decimal]]:
+        """(alias, calls, failed, tokens_in, tokens_out, cost) per model alias in scope, dearest
+        first. Same scope and the same billed-attempts rule as `spent`."""
+        cost = func.coalesce(func.sum(LlmCall.cost_usd), 0)
+        query = (
+            select(
+                LlmCall.alias,
+                func.count(),
+                func.count().filter(LlmCall.status != "SUCCEEDED"),
+                func.coalesce(func.sum(LlmCall.tokens_in), 0),
+                func.coalesce(func.sum(LlmCall.tokens_out), 0),
+                cost,
+            )
+            .where(LlmCall.tenant_id == self.ctx.tenant_id, LlmCall.deleted_at.is_(None))
+            .group_by(LlmCall.alias)
+            .order_by(cost.desc(), LlmCall.alias)
+        )
+        if self.ctx.project_id is not None:
+            query = query.where(LlmCall.project_id == self.ctx.project_id)
+        return [
+            (str(a), int(n), int(bad), int(tin), int(tout), Decimal(str(c)))
+            for a, n, bad, tin, tout, c in self.session.execute(query)
+        ]
+
     def spent(self) -> Decimal:
         """Total `cost_usd` of every attempt in scope: the project's when the context names one,
         else the whole tenant's. Failed attempts count: they were billed."""

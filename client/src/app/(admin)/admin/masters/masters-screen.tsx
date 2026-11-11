@@ -70,12 +70,15 @@ export function MastersScreen() {
 
   let body;
   if (query.isLoading) body = <LoadingState />;
-  else if (query.isError || !layout)
+  else if (query.isError || !layout?.types)
     body = (
       <ApiErrorState error={query.error ?? { statusCode: 500 }} onRetry={() => query.refetch()} />
     );
   else {
-    const types = SCREEN_TYPES.map((t) => layout.types.find((i) => i.master_type === t)!);
+    const types = SCREEN_TYPES.flatMap((t) => {
+      const info = layout.types.find((i) => i.master_type === t);
+      return info ? [info] : [];
+    });
     body = (
       <Tabs
         destroyOnHidden

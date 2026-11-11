@@ -65,7 +65,7 @@ from sbam_workers.llm.store import LlmScope, SqlCallStore
 from sbam_workers.llm.trace import LangfuseTracer
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
-from sbam_workers.sow.context import RESERVED_TOKENS, Bundle, Embed, SowContext, build_context
+from sbam_workers.sow.context import Bundle, Embed, SowContext, build_context, prompt_budget
 
 log = logging.getLogger("sbam_workers.sow.generate")
 
@@ -122,7 +122,7 @@ def check_citations(context: SowContext) -> Callable[[SowDocument], tuple[str, .
                 errors.append(f"{path}: FDE_CITATION_NOT_ALLOWED")
                 continue
             ref = c.okf_ref_id if _SAFE_ID.match(c.okf_ref_id) else "<id>"
-            docs = context.citable.get(c.okf_ref_id)
+            docs = context.citable.get(context.resolve(c.okf_ref_id))
             if docs is None:
                 errors.append(f"{path}: UNKNOWN_CITATION {ref}")
             elif c.document_version_id not in docs:
@@ -147,6 +147,7 @@ def finalize(doc: SowDocument, context: SowContext) -> dict[str, Any]:
             for c in node.get("citations", []):
                 if "okf_ref_id" not in c:
                     continue
+                c["okf_ref_id"] = context.resolve(c["okf_ref_id"])  # the stored id is the OKF one
                 where = context.locations.get(
                     (c["okf_ref_id"], uuid.UUID(c["document_version_id"]))
                 )
@@ -211,7 +212,12 @@ def _failed(deps: SowDeps, inp: StageRef, kind: str, message: str) -> Applicatio
     version_id = _record(deps, inp, gen)
     log.warning(
         "SOW generation failed",
-        extra={"project_id": str(inp.project_id), "sow_version_id": str(version_id), "type": kind},
+        extra={
+            "project_id": str(inp.project_id),
+            "sow_version_id": str(version_id),
+            "type": kind,
+            "cause": message[:200],  # status and upstream error type, never document text
+        },
     )
     return ApplicationError(message, type=kind, non_retryable=True)
 
@@ -294,7 +300,7 @@ def _deps() -> SowDeps:
         storage=make_backend(settings),
         llm=LlmClient(settings, PromptRegistry(), SqlCallStore(sessions), LangfuseTracer(settings)),
         embed=embed_texts,
-        budget_tokens=settings.llm_max_context_tokens - RESERVED_TOKENS,
+        budget_tokens=prompt_budget(settings),
     )
 
 

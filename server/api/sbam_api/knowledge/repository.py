@@ -30,6 +30,13 @@ class KnowledgeVersionRepository(StatefulRepository):
         )
         return int(self.session.scalar(query) or 0) + 1
 
+    def latest_before(self, number: int) -> KnowledgeVersion | None:
+        query = self._scoped().where(KnowledgeVersion.version < number)
+        found: KnowledgeVersion | None = self.session.scalars(
+            query.order_by(KnowledgeVersion.version.desc()).limit(1)
+        ).first()
+        return found
+
     def latest(self) -> KnowledgeVersion | None:
         query = self._scoped().order_by(KnowledgeVersion.version.desc()).limit(1)
         found: KnowledgeVersion | None = self.session.scalars(query).first()

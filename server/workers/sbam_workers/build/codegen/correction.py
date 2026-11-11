@@ -37,6 +37,7 @@ from sbam_workers.build.codegen.bodies import (
     import_allowlist,
     precheck,
 )
+from sbam_workers.build.codegen.params import GATES_PARAM, SCHEMA_PARAM
 from sbam_workers.build.codegen.render import RenderedSkeleton
 from sbam_workers.build.codegen.store import LoadedTemplate
 from sbam_workers.isatvon.loop_spec import compile_definition
@@ -209,6 +210,8 @@ def request_context(
     findings: Sequence[Mapping[str, Any]],
     trace: str = "",
     previous: Mapping[str, Any] | None = None,
+    schema_sql: str = "",
+    gates: str = "",
 ) -> dict[str, str]:
     """The `<data>` blocks of the request. `previous` (attempt 2): attempt 1's diff and findings."""
     context = {
@@ -218,6 +221,10 @@ def request_context(
     }
     for name, text in skeleton.files.items():
         context[f"skeleton.{name}"] = text
+    if gates:
+        context["loop_gates"] = gates
+    if schema_sql:
+        context["workflow_schema_sql"] = schema_sql
     context["findings"] = json.dumps(intake(findings), indent=1, ensure_ascii=False)
     if trace:
         context["harness_trace"] = _cap(trace, MAX_TRACE_BYTES)
@@ -360,7 +367,17 @@ async def correct_code(
         ALIAS,
         PROMPT_ID,
         CorrectorOutput,
-        request_context(sub_skill, current, skeleton, allowlist, findings, trace, previous),
+        request_context(
+            sub_skill,
+            current,
+            skeleton,
+            allowlist,
+            findings,
+            trace,
+            previous,
+            str(params.get(SCHEMA_PARAM) or ""),
+            str(params.get(GATES_PARAM) or ""),
+        ),
         scope,
         prompt_version=prompt_version,
         fresh=True,

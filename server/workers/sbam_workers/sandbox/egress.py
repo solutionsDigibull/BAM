@@ -11,13 +11,11 @@ reads that file:
   * only lines that name this VM are parsed, so a file of millions of lines costs one substring
     scan.
 
-When the collector runs on another machine than the worker, it serves the same lines over HTTP
-instead (`HttpEgressReader`, `SANDBOX_EGRESS_URL`): `GET <url>/egress/<vm_id>` with a bearer token
-answers the VM's lines. Only a 200 is evidence (an empty 200: the VM was watched from creation and
-attempted nothing). 404 (never seen), 409 (seen only in part), 503 (collector down), 401, any other
-status, a timeout or a transport error are `EGRESS_LOG_UNAVAILABLE`: a failure never becomes an
-empty list. The reader waits `settle_seconds` first, because an unanswered SYN becomes an event only
-after the collector's timeout.
+When the collector runs on another host, `HttpEgressReader` asks its read-only endpoint instead
+(`GET /egress/<vm_id>`, bearer token, a JSONL body of the same events). The rule is the same: only a
+200 is evidence. A 404 (never saw the VM), 409 (saw it part-way), 503, 401, a timeout, a refused
+connection or a body that is not events is `EGRESS_LOG_UNAVAILABLE`. A failure is never turned into
+"nothing was attempted": an empty 200 is the only way to say that.
 """
 
 import asyncio
@@ -26,7 +24,6 @@ import logging
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Final
-from urllib.parse import quote
 
 import httpx
 from pydantic import ValidationError
@@ -81,39 +78,60 @@ class JsonlEgressReader:
         return await asyncio.to_thread(read_events, self.path, vm_id)
 
 
-HTTP_TIMEOUT_S: Final = 10.0
-HTTP_SETTLE_S: Final = 0.5  # the collector turns an unanswered SYN into an event after 300 ms
+def _unavailable(why: str) -> SandboxInfraError:
+    return SandboxInfraError(InfraReason.EGRESS_LOG_UNAVAILABLE, why)
 
 
 class HttpEgressReader:
-    """The collector's lines over HTTP (see the module docstring)."""
+    """The collector's read-only HTTP endpoint (see the module docstring)."""
 
     def __init__(
         self,
         base_url: str,
         token: str,
-        settle_seconds: float = HTTP_SETTLE_S,
+        *,
+        timeout: float = 10.0,
+        settle_seconds: float = 0.0,
         client: httpx.AsyncClient | None = None,
     ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self._token = token
+        self.timeout = timeout
         self.settle_seconds = settle_seconds
-        self._client = client or httpx.AsyncClient(
-            base_url=base_url.rstrip("/"),
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=HTTP_TIMEOUT_S,
-        )
+        self._client = client
 
     async def __call__(self, vm_id: str) -> list[EgressEvent]:
+        if not vm_id.isalnum():  # an id goes into a URL path: never anything but letters and digits
+            raise _unavailable("the sandbox id is not an id")
         if self.settle_seconds:
             await asyncio.sleep(self.settle_seconds)
+        url = f"{self.base_url}/egress/{vm_id}"
+        headers = {"Authorization": f"Bearer {self._token}"}
         try:
-            response = await self._client.get(f"/egress/{quote(vm_id, safe='')}")
-        except httpx.HTTPError:  # timeouts and transport errors included
-            raise SandboxInfraError(
-                InfraReason.EGRESS_LOG_UNAVAILABLE, "the egress evidence service is unreachable"
-            ) from None
+            if self._client is not None:
+                response = await self._client.get(url, headers=headers, timeout=self.timeout)
+            else:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url, headers=headers, timeout=self.timeout)
+        except httpx.HTTPError:
+            raise _unavailable("the egress collector cannot be reached") from None
         if response.status_code != 200:
-            raise SandboxInfraError(
-                InfraReason.EGRESS_LOG_UNAVAILABLE,
-                f"the egress evidence service answered {response.status_code}",
-            )
-        return parse_events(response.text.splitlines(), vm_id)
+            raise _unavailable(f"the egress collector answered {response.status_code}")
+        events: list[EgressEvent] = []
+        for line in response.text.splitlines():
+            if not line.strip():
+                continue
+            try:
+                event = EgressEvent.model_validate_json(line)
+            except (ValidationError, ValueError):
+                # The collector promises valid events. A line that is not one means we cannot tell
+                # what happened: no evidence (unlike the file, nothing is skipped here).
+                raise _unavailable(
+                    "the egress collector sent a line that is not an event"
+                ) from None
+            if event.vm_id != vm_id:
+                raise _unavailable("the egress collector sent an event of another sandbox")
+            events.append(event)
+            if len(events) >= MAX_EVENTS:
+                break
+        return events

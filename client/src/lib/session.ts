@@ -10,14 +10,20 @@ export type Session = { roles: Role[] };
 
 export const DEV_ROLES_COOKIE = "sbam_dev_roles";
 
-/** Dev sign-in is off unless SBAM_DEV_AUTH=1, and never available in a production build. */
-export function devAuthEnabled(): boolean {
-  return process.env.SBAM_DEV_AUTH === "1" && process.env.NODE_ENV !== "production";
-}
-
 /** Keycloak sign-in (Auth.js) is on when KEYCLOAK_ISSUER and AUTH_SECRET are set. */
 export function keycloakEnabled(): boolean {
   return Boolean(process.env.KEYCLOAK_ISSUER && process.env.AUTH_SECRET);
+}
+
+/**
+ * The dev role picker needs SBAM_DEV_AUTH=1, is never available in a production build, and is off
+ * whenever Keycloak is on: its cookie holds roles but no access token, so the API answers 401 to
+ * every call and the UI bounced the user back to login. With Keycloak there is one way in.
+ */
+export function devAuthEnabled(): boolean {
+  return (
+    process.env.SBAM_DEV_AUTH === "1" && process.env.NODE_ENV !== "production" && !keycloakEnabled()
+  );
 }
 
 /**
@@ -34,8 +40,8 @@ export async function sessionToken(): Promise<JWT | null> {
   });
 }
 
-// Keep this signature: the (admin)/(fde) layout guards call it. Keycloak session first; the dev
-// cookie is the fallback for local work without Keycloak.
+// Keep this signature: the (admin)/(fde) layout guards call it. The Keycloak session when Keycloak is
+// configured; the dev cookie only for local work without Keycloak.
 export async function getSession(): Promise<Session | null> {
   // Read the request first so guarded routes are always rendered per request, never prerendered.
   const jar = await cookies();

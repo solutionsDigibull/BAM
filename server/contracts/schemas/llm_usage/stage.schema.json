@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:llm_usage/stage:0.1.0",
+  "additionalProperties": false,
+  "description": "One model alias (`sbam-sow`, `sbam-knowledge`, ...): what it was used for is in its name.",
+  "properties": {
+    "alias": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Alias",
+      "type": "string"
+    },
+    "calls": {
+      "minimum": 0,
+      "title": "Calls",
+      "type": "integer"
+    },
+    "failed": {
+      "minimum": 0,
+      "title": "Failed",
+      "type": "integer"
+    },
+    "tokens_in": {
+      "minimum": 0,
+      "title": "Tokens In",
+      "type": "integer"
+    },
+    "tokens_out": {
+      "minimum": 0,
+      "title": "Tokens Out",
+      "type": "integer"
+    },
+    "cost_usd": {
+      "pattern": "^\\d+\\.\\d{4}$",
+      "title": "Cost Usd",
+      "type": "string"
+    }
+  },
+  "required": [
+    "alias",
+    "calls",
+    "failed",
+    "tokens_in",
+    "tokens_out",
+    "cost_usd"
+  ],
+  "title": "LlmUsageStage",
+  "type": "object"
+}

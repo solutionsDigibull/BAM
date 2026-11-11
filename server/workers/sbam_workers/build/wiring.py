@@ -24,6 +24,7 @@ The loaders rebuild what the earlier stages produced from the database; no stage
 """
 
 import asyncio
+import json
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -39,8 +40,11 @@ from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.manifests.repository import SubSkillManifestRepository
 from sbam_api.registry.repository import registry_for_digest
 from sbam_api.scan.clamd import ClamdClient
+from sbam_api.schema_sql.repository import WorkflowSchemaRepository
+from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.factory import make_backend
 from sbam_contracts.build import BuildStageInput, CorrectionInput, CorrectionResult
+from sbam_contracts.build_dashboard import GateStatus
 from sbam_contracts.isatvon14 import SubSkill
 from sbam_contracts.manifest import SkillManifest
 from sbam_contracts.pipeline import IdResult
@@ -55,7 +59,12 @@ from sbam_workers.build import bodies as bodies_stage
 from sbam_workers.build import correct as correct_stage
 from sbam_workers.build.assemble import Assemble, AssembleInputs, SqlBundleStore
 from sbam_workers.build.bodies import BodiesInputs, GenerateBodies, SqlAttemptStore
-from sbam_workers.build.codegen.params import params_from_manifest
+from sbam_workers.build.codegen.params import (
+    GATES_PARAM,
+    MAX_SCHEMA_BYTES,
+    SCHEMA_PARAM,
+    params_from_manifest,
+)
 from sbam_workers.build.codegen.render import render_manifest
 from sbam_workers.build.codegen.store import LoadedTemplate, load_template
 from sbam_workers.build.correct import (
@@ -80,7 +89,7 @@ from sbam_workers.settings import WorkerSettings
 from sbam_workers.test import promptfoo_suite as suite_stage
 from sbam_workers.test import testgen as testgen_stage
 from sbam_workers.test.promptfoo_suite import BuildPromptfooSuite
-from sbam_workers.test.testgen import GenerateTests, SqlDatasetStore, SqlSchemaSource
+from sbam_workers.test.testgen import GenerateTests, SqlDatasetStore
 
 INPUT_MISMATCH = assemble_stage.INPUT_MISMATCH
 LOOP_SPEC_INVALID = "LoopSpecInvalid"
@@ -111,15 +120,70 @@ def loop_spec_of(sub_skill: Mapping[str, Any]) -> bytes:
         raise _mismatch(f"the loop spec does not compile: {exc}", LOOP_SPEC_INVALID) from exc
 
 
+def gates_text(sub_skill: Mapping[str, Any]) -> str:
+    """What the loop compares the tools' outputs against. The model wrote `status` as a sentence
+    while the success gate was `status == 'Valid'`: it was never shown the gate, so every pass
+    failed and every case escalated, whatever the code did."""
+    d = sub_skill.get("isatvon_definition", {})
+    v, o = d.get("v_variables", {}), d.get("o_outcome", {})
+    return json.dumps(
+        {
+            "success_gate": v.get("success_gate"),
+            "no_op_condition": v.get("no_op_condition"),
+            "escalation_condition": v.get("escalation_condition"),
+            "max_iterations": v.get("max_iterations"),
+            "output_schema": o.get("json_schema"),
+        },
+        sort_keys=True,
+    )
+
+
 class SqlBuildInputs:
     """The `inputs` loaders of the three stages (see the module docstring)."""
 
-    def __init__(self, sessions: sessionmaker[Session]) -> None:
+    def __init__(
+        self, sessions: sessionmaker[Session], storage: StorageBackend | None = None
+    ) -> None:
         self.sessions = sessions
+        self.storage = storage
 
     @staticmethod
     def _ctx(inp: BuildStageInput) -> TenantContext:
         return TenantContext(inp.tenant_id, inp.project_id)
+
+    def _schema_text(self, session: Session, inp: BuildStageInput) -> str:
+        """The Workflow's latest passed schema.sql, or "" when there is none or no storage."""
+        if self.storage is None:
+            return ""
+        row = WorkflowSchemaRepository(session, self._ctx(inp)).latest(
+            inp.workflow_id, status=GateStatus.PASSED
+        )
+        if row is None or not row.storage_key:
+            return ""
+        try:
+            with self.storage.open(row.storage_key) as stream:
+                return stream.read(MAX_SCHEMA_BYTES).decode("utf-8", "replace")
+        except (OSError, KeyError):
+            return ""  # no schema text: the request goes without it, as before
+
+    async def schema_text(self, inp: BuildStageInput) -> str:
+        def load() -> str:
+            with self.sessions() as session:
+                return self._schema_text(session, inp)
+
+        return await asyncio.to_thread(load)
+
+    def _params(self, session: Session, inp: BuildStageInput, loaded: Loaded) -> dict[str, Any]:
+        """The manifest's params, plus (when storage is wired) the Workflow's schema.sql under
+        `workflow_schema`. The model writes SQL against that schema and was never shown it: it made
+        up a table (`fresh_state`) and no correction could fix what it could not see. The key is
+        not a template parameter; the request builders move it into its own block."""
+        params: dict[str, Any] = dict(params_from_manifest(loaded.manifest))
+        schema = self._schema_text(session, inp)
+        if schema:
+            params[SCHEMA_PARAM] = schema
+        params[GATES_PARAM] = gates_text(loaded.sub_skill)
+        return params
 
     def _load(
         self, session: Session, inp: BuildStageInput, manifest_id: uuid.UUID | None
@@ -177,7 +241,7 @@ class SqlBuildInputs:
             loaded = self._load(session, inp, None)
             return BodiesInputs(
                 template=loaded.template,
-                params=params_from_manifest(loaded.manifest),
+                params=self._params(session, inp, loaded),
                 skeleton=render_manifest(loaded.template, loaded.manifest),
                 modules=loaded.modules,
                 manifest_id=loaded.manifest_id,
@@ -207,7 +271,7 @@ class SqlBuildInputs:
             loaded = self._load(session, inp, None)
             return CorrectionInputs(
                 template=loaded.template,
-                params=params_from_manifest(loaded.manifest),
+                params=self._params(session, inp, loaded),
                 skeleton=render_manifest(loaded.template, loaded.manifest),
                 modules=loaded.modules,
                 sub_skill=loaded.sub_skill,
@@ -244,7 +308,9 @@ def _llm(settings: WorkerSettings, sessions: sessionmaker[Session]) -> LlmClient
 def _generate() -> GenerateBodies:
     settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
     return GenerateBodies(
-        SqlBuildInputs(sessions).bodies, _llm(settings, sessions), SqlAttemptStore(sessions)
+        SqlBuildInputs(sessions, make_backend(settings)).bodies,
+        _llm(settings, sessions),
+        SqlAttemptStore(sessions),
     )
 
 
@@ -260,7 +326,9 @@ def _assemble() -> Assemble:
 def _correct() -> Correct:
     settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
     return Correct(
-        SqlBuildInputs(sessions).correction, _llm(settings, sessions), SqlCorrectionStore(sessions)
+        SqlBuildInputs(sessions, make_backend(settings)).correction,
+        _llm(settings, sessions),
+        SqlCorrectionStore(sessions),
     )
 
 
@@ -305,12 +373,11 @@ def _static_gate() -> StaticGate:
 @lru_cache(maxsize=1)
 def _generate_tests() -> GenerateTests:
     settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
-    storage = make_backend(settings)
     return GenerateTests(
         SqlBuildInputs(sessions).tests_sub_skill,
         _llm(settings, sessions),
-        SqlDatasetStore(sessions, storage),
-        SqlSchemaSource(sessions, storage),
+        SqlDatasetStore(sessions, make_backend(settings)),
+        SqlBuildInputs(sessions, make_backend(settings)).schema_text,
     )
 
 

@@ -53,6 +53,7 @@ import {
   EMPTY_SOW,
   EXPORT_FORMATS,
   FAILED_NO_VERSION,
+  failureHelp,
   GENERATING,
   MAX_TIPTAP_BYTES,
   NO_CHANGES,
@@ -641,7 +642,7 @@ export function SowScreen({ projectId }: { projectId: string }) {
                 showIcon
                 data-testid="sow-failed"
                 message="SOW generation failed"
-                description={`Reason: ${version?.error_reason ?? "unknown"}. Regenerate to try again.`}
+                description={`Reason: ${version?.error_reason ?? "unknown"}. ${failureHelp(version?.error_reason)}`}
                 action={regenerateButton}
               />
             ) : version && isSowDoc(version.content_tiptap) ? (

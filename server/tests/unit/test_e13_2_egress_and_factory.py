@@ -231,6 +231,8 @@ def test_e13_2_the_check_is_registered_on_the_test_queue() -> None:
 # --- the collector's HTTP service (SANDBOX_EGRESS_URL) -------------------------------------------
 
 TOKEN = "e" * 32
+VM = "a" * 32  # a CubeSandbox id is 32 hex characters; the reader refuses anything else
+OTHER = "b" * 32
 
 
 def served(
@@ -251,21 +253,28 @@ def served(
 
 def test_egress_http_a_200_is_this_vms_events_and_asks_for_this_vm_with_the_token() -> None:
     seen: list[httpx.Request] = []
-    body = "\n".join([event("vm-1"), "not json", event("vm-2"), event("vm-1", "api.example.com")])
-    found = asyncio.run(served(200, body, seen)("vm-1"))
+    body = "\n".join([event(VM), event(VM, "api.example.com")])
+    found = asyncio.run(served(200, body, seen)(VM))
     assert [e.dst_host for e in found] == ["evil.example.com", "api.example.com"]
-    assert seen[0].url.path == "/egress/vm-1"
+    assert seen[0].url.path == f"/egress/{VM}"
     assert seen[0].headers["Authorization"] == f"Bearer {TOKEN}"
 
 
+def test_egress_http_a_line_that_is_not_an_event_is_unavailable_not_skipped() -> None:
+    body = "\n".join([event(VM), "not json"])
+    with pytest.raises(SandboxInfraError) as caught:
+        asyncio.run(served(200, body)(VM))
+    assert caught.value.reason is InfraReason.EGRESS_LOG_UNAVAILABLE
+
+
 def test_egress_http_an_empty_200_means_nothing_was_attempted() -> None:
-    assert asyncio.run(served(200, "")("vm-1")) == []
+    assert asyncio.run(served(200, "")(VM)) == []
 
 
 @pytest.mark.parametrize("status", [401, 404, 409, 500, 503])
 def test_egress_http_any_other_status_is_unavailable_never_an_empty_list(status: int) -> None:
     with pytest.raises(SandboxInfraError) as caught:
-        asyncio.run(served(status)("vm-1"))
+        asyncio.run(served(status)(VM))
     assert caught.value.reason is InfraReason.EGRESS_LOG_UNAVAILABLE
     assert TOKEN not in str(caught.value)
 
@@ -279,7 +288,7 @@ def test_egress_http_a_transport_error_or_timeout_is_unavailable() -> None:
     )
     reader = HttpEgressReader("http://cube-host:29000", TOKEN, settle_seconds=0, client=client)
     with pytest.raises(SandboxInfraError) as caught:
-        asyncio.run(reader("vm-1"))
+        asyncio.run(reader(VM))
     assert caught.value.reason is InfraReason.EGRESS_LOG_UNAVAILABLE
 
 

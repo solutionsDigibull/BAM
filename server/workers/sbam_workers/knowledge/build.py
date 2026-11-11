@@ -24,8 +24,9 @@ Payloads carry ids only; content is read from storage here. Logs carry ids and c
 
 import asyncio
 import logging
+import os
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
@@ -70,6 +71,7 @@ from temporalio.exceptions import ApplicationError
 from sbam_workers import mirror
 from sbam_workers.knowledge.cognee_adapter import CogneeAdapter, CogneeUnavailable, item_key
 from sbam_workers.knowledge.derivatives import DOC_MD, Derivative, derivatives_of
+from sbam_workers.knowledge.embedding_probe import EmbeddingProviderRejected, probe_embeddings
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
 
@@ -79,6 +81,7 @@ BUILD_KNOWLEDGE_ATTEMPTS = 5  # TD §13.3; ProjectPipeline's PLAN uses the same 
 HEARTBEAT_SECONDS = 30.0  # the activity's heartbeat timeout is 2 minutes
 EMPTY_CORPUS = "EmptyCorpus"
 COGNEE_UNAVAILABLE = "CogneeUnavailable"
+EMBEDDING_PROVIDER_REJECTED = "EmbeddingProviderRejected"
 BUILDING_ELSEWHERE = "KnowledgeBuilding"
 NOT_PARSED = "NOT_PARSED"  # not PARSED + CLEAN, or no doc.md derivative (E4.5)
 SYSTEM_SUB = "system:knowledge"  # `created_by` of the snapshot this build pins
@@ -94,6 +97,7 @@ class BuildDeps:
     storage: StorageBackend
     adapter: CogneeAdapter
     heartbeat: Callable[[], None] = lambda: None
+    probe: Callable[[], Awaitable[None]] | None = None  # fails fast on a refused provider key
     derivatives: Callable[[Any], dict[str, Derivative]] = derivatives_of
     clock: Callable[[], datetime] = utcnow
     heartbeat_seconds: float = HEARTBEAT_SECONDS
@@ -140,6 +144,37 @@ def _allocate(deps: BuildDeps, inp: RunInput) -> _Version:
         return _Version(
             version.id, version.version, version.state, version.master_snapshot_id, built
         )
+
+
+def extraction_fingerprint(env: Mapping[str, str]) -> str:
+    """What decides the graph's content. Cognee skips documents it already processed, so a rebuild
+    after a change here (mock -> real LLM, another embedder) would silently keep the old graph."""
+    names = ("LLM_PROVIDER", "LLM_MODEL", "EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS")
+    return "|".join(env.get(name, "") for name in names)
+
+
+def _graph_is_stale(deps: BuildDeps, inp: RunInput, version_id: uuid.UUID, current: str) -> bool:
+    """True when the project's graph came from other models (or from before this was recorded) and
+    this version has not reset it yet. Read only: `_stamp_extraction` records the reset afterwards,
+    so a reset that failed (Cognee down) is tried again by the retry instead of being forgotten."""
+    with deps.sessions() as session:
+        repo = KnowledgeVersionRepository(session, _ctx(inp))
+        row = repo.get(version_id)
+        if row is None:
+            raise RuntimeError("knowledge version vanished")
+        if (row.coverage or {}).get("extraction") == current:
+            return False  # an earlier attempt of this version already reset it (or none was needed)
+        previous = repo.latest_before(row.version)
+        return previous is not None and (previous.coverage or {}).get("extraction") != current
+
+
+def _stamp_extraction(deps: BuildDeps, inp: RunInput, version_id: uuid.UUID, current: str) -> None:
+    with deps.sessions() as session:
+        row = KnowledgeVersionRepository(session, _ctx(inp)).get(version_id)
+        if row is None:
+            raise RuntimeError("knowledge version vanished")
+        row.coverage = {**dict(row.coverage or {}), "extraction": current}
+        session.commit()
 
 
 def _pin_masters(
@@ -290,12 +325,20 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
     if version.state != KnowledgeVersionState.BUILDING.value or version.graph_built:
         return version.id  # a retry after the version finished
     scope = ProjectScope(tenant_id=inp.tenant_id, project_id=inp.project_id)
-    coverage = KnowledgeCoverage()
+    extraction = extraction_fingerprint(os.environ)
+    coverage = KnowledgeCoverage(extraction=extraction)
     try:
         masters, included, master_docs = await asyncio.to_thread(_pin_masters, deps, inp, version)
         items, entries = await asyncio.to_thread(_documents, deps, inp)
         sha = {item.source_id: item.sha256 for item in items}
+        if deps.probe is not None:
+            await deps.probe()
         await deps.adapter.ensure_dataset(scope)
+        if await asyncio.to_thread(_graph_is_stale, deps, inp, version.id, extraction):
+            log.info("graph built by other models: starting it afresh")
+            await deps.adapter.delete_dataset(scope)
+            await deps.adapter.ensure_dataset(scope)  # the dataset may go with its data
+        await asyncio.to_thread(_stamp_extraction, deps, inp, version.id, extraction)
         for item in items:
             entries.append(await _add_one(deps.adapter, scope, item))
         if included and not await _add_masters(deps.adapter, scope, masters):
@@ -304,7 +347,10 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
         for master_doc in master_docs:  # context only: never an FDE source (C3)
             added_docs += await _add_masters(deps.adapter, scope, master_doc)
         coverage = KnowledgeCoverage(
-            documents=_sorted(entries), masters_included=included, master_documents=added_docs
+            documents=_sorted(entries),
+            masters_included=included,
+            master_documents=added_docs,
+            extraction=extraction,
         )
         await asyncio.to_thread(_record, deps, inp, version.id, coverage.documents, sha)
         if not any(e.status is SourceStatus.ADDED for e in entries):
@@ -318,6 +364,13 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
     except EmptyCorpus as exc:
         await asyncio.to_thread(_finish, deps, inp, version.id, coverage, EMPTY_CORPUS)
         raise ApplicationError(str(exc), type=EMPTY_CORPUS, non_retryable=True) from None
+    except EmbeddingProviderRejected as exc:  # a dead key stays dead: do not burn the retries
+        await asyncio.to_thread(
+            _finish, deps, inp, version.id, coverage, EMBEDDING_PROVIDER_REJECTED
+        )
+        raise ApplicationError(
+            str(exc), type=EMBEDDING_PROVIDER_REJECTED, non_retryable=True
+        ) from None
     except CogneeUnavailable as exc:
         if attempt >= BUILD_KNOWLEDGE_ATTEMPTS:  # Temporal will not retry: record the failure
             await asyncio.to_thread(_finish, deps, inp, version.id, coverage, COGNEE_UNAVAILABLE)
@@ -377,6 +430,7 @@ def _deps() -> BuildDeps:
         sessions=mirror.sessions(),
         storage=make_backend(WorkerSettings()),  # type: ignore[call-arg]  # values from the env
         adapter=default_adapter(),
+        probe=probe_embeddings,
     )
 
 
@@ -386,6 +440,7 @@ def _with_heartbeat(deps: BuildDeps) -> BuildDeps:
         storage=deps.storage,
         adapter=deps.adapter,
         heartbeat=activity.heartbeat,
+        probe=deps.probe,
         derivatives=deps.derivatives,
         clock=deps.clock,
         heartbeat_seconds=deps.heartbeat_seconds,

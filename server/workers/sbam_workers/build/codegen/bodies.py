@@ -27,10 +27,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sbam_workers.build.codegen import allowlist as body_rules
 from sbam_workers.build.codegen import state_sql
+from sbam_workers.build.codegen.params import GATES_PARAM, SCHEMA_PARAM
 from sbam_workers.build.codegen.render import RenderedSkeleton, params_json, str_literal
 from sbam_workers.build.codegen.store import LoadedTemplate
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.store import LlmScope
+from sbam_workers.test.seed_check import query_problems
 
 ALIAS: Final = "sbam-codegen"
 PROMPT_ID: Final = "codegen-bodies"
@@ -138,9 +140,15 @@ def request_context(
 ) -> dict[str, str]:
     """The `<data>` blocks of the request: params, allowlist, every rendered file. Nothing else."""
     context = {
-        "manifest": params_json(params),
+        "manifest": params_json(
+            {k: v for k, v in params.items() if k not in (SCHEMA_PARAM, GATES_PARAM)}
+        ),
         "allowed_imports": json.dumps(list(allowlist)),
     }
+    if params.get(GATES_PARAM):  # what the check tool's output must satisfy
+        context["loop_gates"] = str(params[GATES_PARAM])
+    if params.get(SCHEMA_PARAM):  # the tables and columns SQL must be written against
+        context["workflow_schema_sql"] = str(params[SCHEMA_PARAM])
     for name, text in skeleton.files.items():
         context[f"skeleton.{name}"] = text
     return context
@@ -297,7 +305,12 @@ def _bound_names(tree: ast.Module) -> dict[str, int]:
 
 
 def _check_state_queries(
-    queries: Mapping[str, str], fresh_state: Iterable[str], tables: Iterable[str] | None = None
+    queries: Mapping[str, str],
+    fresh_state: Iterable[str],
+    tables: Iterable[str] | None = None,
+    *,
+    hint: bool = False,
+    schema_sql: str = "",
 ) -> list[BodyFinding]:
     field = STATE_QUERIES_FIELD
     expected = list(fresh_state)
@@ -325,11 +338,28 @@ def _check_state_queries(
                 BodyFinding(BodyFindingCode.SQL_UNSAFE, field, f"{name!r} has a format placeholder")
             )
         else:  # parsed, not pattern-matched (A-02): shape, tables and functions
+            known = sorted(set(tables or ()))
+            if schema_sql:
+                findings.extend(
+                    BodyFinding(BodyFindingCode.STATE_QUERY_INVALID, field, f"{name!r}: {reason}")
+                    for reason in query_problems(schema_sql, text)
+                )
+            tail = f" (tables that exist: {', '.join(known)})" if hint and known else ""
             findings.extend(
-                BodyFinding(BodyFindingCode.STATE_QUERY_INVALID, field, f"{name!r}: {reason}")
+                BodyFinding(BodyFindingCode.STATE_QUERY_INVALID, field, f"{name!r}: {reason}{tail}")
                 for reason in state_sql.problems(text, tables)
             )
     return findings
+
+
+_CREATE_TABLE = re.compile(
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\"?([a-z_][a-z0-9_]*)\"?", re.I
+)
+
+
+def schema_tables(schema_sql: object) -> list[str]:
+    """The relations the Workflow's schema.sql creates (empty when it is not known)."""
+    return sorted({m.group(1).lower() for m in _CREATE_TABLE.finditer(str(schema_sql or ""))})
 
 
 def precheck(
@@ -359,7 +389,11 @@ def precheck(
             findings.extend(_shadowing(tree, skeleton))
     findings.extend(
         _check_state_queries(
-            bodies.state_queries, params.get("fresh_state", []), params.get("tables")
+            bodies.state_queries,
+            params.get("fresh_state", []),
+            params.get("tables") or schema_tables(params.get(SCHEMA_PARAM)) or None,
+            hint=bool(params.get(SCHEMA_PARAM)),
+            schema_sql=str(params.get(SCHEMA_PARAM) or ""),
         )
     )
     return findings

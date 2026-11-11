@@ -25,13 +25,16 @@ from dataclasses import dataclass
 
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.knowledge import (
+    MAX_DIFF_LIST,
     MAX_NEIGHBOURS,
     MAX_PASSAGE_CHARS,
     CoverageRow,
+    DiffEntity,
     GraphApiEdge,
     GraphApiNode,
     KnowledgeCounts,
     KnowledgeCoverage,
+    KnowledgeDiff,
     KnowledgeGraphPage,
     KnowledgeNodeDetail,
     KnowledgeVersionList,
@@ -380,6 +383,82 @@ def _titles(
     session: Session, ctx: TenantContext, version_ids: set[uuid.UUID]
 ) -> dict[uuid.UUID, str]:
     return {k: d.title for k, d in _documents_of(session, ctx, version_ids).items()}
+
+
+# --- what changed between two versions ------------------------------------------------------------
+
+
+def _same(name: str) -> str:
+    return " ".join(name.casefold().split())
+
+
+def compare(new: Loaded, old: Loaded) -> dict[str, object]:
+    """Entities by name (ids change on every rebuild), relations by their two names and type."""
+    now = {_same(e.name): e for e in new.entities if e.name.strip()}
+    before = {_same(e.name): e for e in old.entities if e.name.strip()}
+
+    def shown(loaded: Loaded, keys: set[str], pool: dict[str, OkfEntity]) -> list[DiffEntity]:
+        found = [
+            DiffEntity(
+                name=pool[k].name, type=pool[k].type, degree=loaded.degree.get(pool[k].id, 0)
+            )
+            for k in keys
+        ]
+        found.sort(key=lambda d: (-d.degree, d.name.casefold()))
+        return found[:MAX_DIFF_LIST]
+
+    def relation_keys(loaded: Loaded) -> set[tuple[str, str, str]]:
+        names = {e.id: _same(e.name) for e in loaded.entities}
+        return {
+            (names[r.from_], r.type, names[r.to])
+            for r in loaded.relations
+            if r.from_ in names and r.to in names
+        }
+
+    added, removed = set(now) - set(before), set(before) - set(now)
+    both = set(now) & set(before)
+    old_relations, new_relations = relation_keys(old), relation_keys(new)
+    return {
+        "added": len(added),
+        "removed": len(removed),
+        "unchanged": len(both),
+        "retyped": sum(1 for k in both if now[k].type != before[k].type),
+        "relations_added": len(new_relations - old_relations),
+        "relations_removed": len(old_relations - new_relations),
+        "added_entities": shown(new, added, now),
+        "removed_entities": shown(old, removed, before),
+    }
+
+
+def diff(
+    session: Session,
+    ctx: TenantContext,
+    storage: StorageBackend,
+    row: KnowledgeVersion,
+    older: KnowledgeVersion,
+) -> KnowledgeDiff:
+    """Both versions are read from their OKF bundles, like everything else here."""
+    counts = compare(load(storage, row), load(storage, older))
+
+    def names(version: KnowledgeVersion) -> set[str]:
+        coverage = _coverage(version)
+        ids = (
+            {d.document_version_id for d in coverage.bundle.documents} if coverage.bundle else set()
+        )
+        return {t for t in _titles(session, ctx, ids).values() if t}
+
+    now_docs, old_docs = names(row), names(older)
+    return KnowledgeDiff.model_validate(
+        {
+            **counts,
+            "knowledge_version_id": row.id,
+            "against_version_id": older.id,
+            "version": row.version,
+            "against_version": older.version,
+            "documents_added": sorted(now_docs - old_docs),
+            "documents_removed": sorted(old_docs - now_docs),
+        }
+    )
 
 
 # --- OKF download --------------------------------------------------------------------------------

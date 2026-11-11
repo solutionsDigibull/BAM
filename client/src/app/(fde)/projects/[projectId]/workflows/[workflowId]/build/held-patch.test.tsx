@@ -111,7 +111,7 @@ describe("the held patch drawer (#499)", () => {
       [BUILDS]: { body: builds() },
       [`GET ${HELD_URL}`]: { body: { held: null } },
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     await openPatch();
     expect(await screen.findByText(NO_PATCH_MESSAGE)).toBeDefined();
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
@@ -122,7 +122,7 @@ describe("the held patch drawer (#499)", () => {
       [BUILDS]: { body: builds() },
       [`GET ${HELD_URL}`]: { body: { held: held() } },
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     await openPatch();
     expect(await screen.findByText(/changes what the Sub-Skill means/)).toBeDefined();
     // markup in the model's rationale is shown as those characters, never rendered
@@ -141,7 +141,7 @@ describe("the held patch drawer (#499)", () => {
         body: { sub_skill_id: SUB, build_no: 1, decision: "ACCEPTED" },
       },
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     await openPatch();
     fireEvent.change(await screen.findByLabelText("Reason"), { target: { value: "fine" } });
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
@@ -165,7 +165,7 @@ describe("the held patch drawer (#499)", () => {
         body: { sub_skill_id: SUB, build_no: 1, decision: "REJECTED" },
       },
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     await openPatch();
     fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
     await waitFor(() => expect(calls.some((c) => c.path.endsWith("/reject"))).toBe(true));
@@ -180,7 +180,7 @@ describe("the held patch drawer (#499)", () => {
       [`GET ${HELD_URL}`]: { body: { held: held() } },
       [`POST ${HELD_URL}/accept`]: problem(412, "PRECONDITION_FAILED", "Changed since you loaded"),
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     await openPatch();
     fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
@@ -193,7 +193,7 @@ describe("the held patch drawer (#499)", () => {
       [BUILDS]: { body: builds() },
       [`GET ${HELD_URL}`]: problem(403, "FORBIDDEN", "Not allowed"),
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     await openPatch();
     expect(await screen.findByText(/forbidden|not allowed/i)).toBeDefined();
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
@@ -204,7 +204,7 @@ describe("the held patch drawer (#499)", () => {
       [BUILDS]: { body: builds() },
       [`GET ${HELD_URL}`]: problem(404, "NOT_FOUND", "No such Sub-Skill"),
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     await openPatch();
     expect(await screen.findByText("Not found")).toBeDefined();
   });

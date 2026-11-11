@@ -228,6 +228,41 @@ def test_e6_2_t04_an_invented_citation_is_reasked_with_its_code_only(g: Gen) -> 
     )
 
 
+def test_the_prompt_carries_short_ids_and_the_stored_citation_has_the_okf_id(g: Gen) -> None:
+    chunk = g.bundle().chunks[0]
+    short = json.loads(g.answer().replace(chunk.id, "c1"))  # what the model sees and cites
+    bifrost = FakeBifrost([completion(json.dumps(short))])
+    g.run(bifrost)
+    prompt = json.dumps(bifrost.requests[0]["messages"])
+    assert "[chunk c1 doc=" in prompt and chunk.id not in prompt  # no UUID#cN id in the prompt
+    [v] = g.versions()
+    cites = [c for f in (v.structured or {})["features"] for c in f["citations"]]
+    assert cites and all(c["okf_ref_id"] == chunk.id for c in cites)  # stored as the OKF id
+    assert all(c["location"] != {"page": 99} for c in cites)  # and SBAM's real location
+
+
+def test_a_short_id_that_was_never_sent_is_an_unknown_citation(g: Gen) -> None:
+    bad = json.loads(g.answer())
+    bad["features"][0]["citations"][0]["okf_ref_id"] = "c9999"
+    bifrost = FakeBifrost([completion(json.dumps(bad)), completion(g.answer())])
+    g.run(bifrost)
+    assert "UNKNOWN_CITATION c9999" in bifrost.requests[1]["messages"][-1]["content"]
+
+
+def test_a_short_id_cannot_be_used_for_another_documents_chunk(g: Gen) -> None:
+    chunks = g.bundle().chunks
+    other = next(c for c in chunks if c.document_version_id != chunks[0].document_version_id)
+    bad = json.loads(g.answer())
+    cite = bad["scope"]["citations"][0]
+    cite["okf_ref_id"] = "c1"  # a chunk of the first document...
+    cite["document_version_id"] = str(other.document_version_id)  # ...with another document's id
+    bifrost = FakeBifrost([completion(json.dumps(bad)), completion(g.answer())])
+    g.run(bifrost)
+    assert "scope.citations: CITATION_DOCUMENT_MISMATCH" in (
+        bifrost.requests[1]["messages"][-1]["content"]
+    )
+
+
 def test_e6_2_a_citation_with_the_wrong_document_is_refused(g: Gen) -> None:
     bad = json.loads(g.answer())
     bad["scope"]["citations"][0]["document_version_id"] = str(uuid.uuid4())
@@ -307,9 +342,11 @@ def test_e6_2_context_full_holds_every_chunk_entity_and_the_hint(g: Gen) -> None
     ctx = asyncio.run(build_context(bundle, fake_embed, budget_tokens=100_000, hint="More QA"))
     assert ctx.mode == "FULL" and ctx.blocks["hint"] == "More QA"
     assert all(
-        f"[chunk {c.id} doc={c.document_version_id}" in ctx.blocks["chunks"] for c in bundle.chunks
+        f"[chunk {short} doc={c.document_version_id}" in ctx.blocks["chunks"]
+        for short, c in zip((s for s in ctx.refs if s.startswith("c")), bundle.chunks, strict=True)
     )
     assert {c.id for c in bundle.chunks} | {e.id for e in bundle.entities} == set(ctx.citable)
+    assert set(ctx.refs.values()) == set(ctx.citable)  # every short id maps to an OKF id
 
 
 def test_e6_2_context_ranked_prefers_the_chunk_about_the_section(tmp_path: Path) -> None:
@@ -367,3 +404,49 @@ def test_a595_t02_the_first_generation_still_reuses_a_cached_answer(g: Gen) -> N
     second = asyncio.run(generate_version(g.deps(bifrost), again, g.scope()))
     assert bifrost.requests == [] and [v.version for v in g.versions()] == [1, 2]
     assert g.versions()[1].id == second
+
+
+def test_prompt_budget_is_the_smaller_of_the_window_and_the_cap() -> None:
+    from types import SimpleNamespace
+
+    from sbam_workers.sow.context import RESERVED_TOKENS, prompt_budget
+
+    def conf(window: int, cap: int) -> Any:
+        return SimpleNamespace(llm_max_context_tokens=window, sow_context_max_tokens=cap)
+
+    assert prompt_budget(conf(200_000, 80_000)) == 80_000  # the cap wins
+    assert prompt_budget(conf(100_000, 80_000)) == 100_000 - RESERVED_TOKENS  # the window wins
+    assert prompt_budget(conf(200_000, 0)) == 200_000 - RESERVED_TOKENS  # cap off
+
+
+def test_ranked_reports_what_it_dropped_and_which_documents_have_no_chunk(
+    tmp_path: Path,
+) -> None:
+    filler = [f"Quote line {i} about harness crimping and tolerance. " * 12 for i in range(40)]
+    g = Gen(World(tmp_path), *DOCS, *filler)
+    bundle = g.bundle()
+    ctx = asyncio.run(build_context(bundle, fake_embed, budget_tokens=4_000))
+    extra = ctx.manifest
+    assert ctx.mode == "RANKED" and extra["chunks_total"] == len(bundle.chunks)
+    sent_ids = set(ctx.refs.values())
+    assert extra["chunks_dropped"] == len(bundle.chunks) - sum(
+        1 for c in bundle.chunks if c.id in sent_ids
+    )
+    docs = {c.document_version_id for c in bundle.chunks}
+    sent = {c.document_version_id for c in bundle.chunks if c.id in sent_ids}
+    assert extra["documents_without_chunks"] == len(docs - sent)  # said out loud, never silent
+    assert extra["tokens"] <= 4_000 + 50  # the floor never breaks the budget
+
+
+def test_ranked_keeps_a_chunk_of_every_document_that_can_stand_in_for_it(tmp_path: Path) -> None:
+    big = [f"Quote line {i} about harness crimping and tolerance. " * 70 for i in range(4)]
+    g = Gen(World(tmp_path), *DOCS, *big)
+    bundle = g.bundle()
+    ctx = asyncio.run(build_context(bundle, fake_embed, budget_tokens=3_000))
+    assert ctx.mode == "RANKED" and ctx.manifest["chunks_dropped"] > 0
+    sent_ids = set(ctx.refs.values())
+    by_doc = {c.document_version_id: c for c in bundle.chunks}
+    small = [d for d, c in by_doc.items() if c.text in DOCS]
+    assert small and all(by_doc[d].id in sent_ids for d in small)  # the small documents all stay
+    sent = {c.document_version_id for c in bundle.chunks if c.id in sent_ids}
+    assert ctx.manifest["documents_without_chunks"] == len(by_doc) - len(sent)

@@ -7,7 +7,16 @@
 import "@xyflow/react/dist/style.css";
 
 import { useCustom } from "@refinedev/core";
-import { Background, Controls, ReactFlow, type Edge, type Node } from "@xyflow/react";
+import {
+  Background,
+  Controls,
+  Handle,
+  Position,
+  ReactFlow,
+  type Edge,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import {
   Alert,
   App,
@@ -17,7 +26,10 @@ import {
   Flex,
   Input,
   List,
+  Segmented,
   Select,
+  Switch,
+  Table,
   Tag,
   Tooltip,
   Typography,
@@ -31,15 +43,20 @@ import { dataProvider, type ApiError } from "@/providers/data-provider";
 
 import {
   EMPTY_GRAPH,
+  HIDE_ISOLATED_ABOVE,
   MAX_NODES,
-  NODE_H,
-  NODE_W,
+  NEUTRAL,
   PAGE_LIMIT,
   cleanPage,
+  degrees,
   expand,
   label,
   merge,
+  neighbourhood,
+  radius,
+  typeColors,
   typesOf,
+  withoutIsolated,
   type Graph,
   type Positions,
 } from "./graph-model";
@@ -77,15 +94,91 @@ const query = (search: string, types: string[], cursor?: string | null) => {
   return params;
 };
 
+type Bubble = {
+  label: string;
+  type: string;
+  color: string;
+  r: number;
+  degree: number;
+  /** Names are shown for hubs, hits and the selection; the rest appear on hover (less clutter). */
+  named: boolean;
+  dim: boolean;
+  hit: boolean;
+  selected: boolean;
+};
+
+const HIDDEN_HANDLE = { opacity: 0, top: "50%", left: "50%", pointerEvents: "none" } as const;
+
+/** One entity: a circle sized by its relations, coloured by type, named when it matters. */
+function EntityBubble({ data }: NodeProps<Node<Bubble>>) {
+  const { r } = data;
+  return (
+    <div
+      className={`kx-node${data.named ? " kx-named" : ""}`}
+      title={`${data.label} · ${data.type} · ${data.degree} relations`}
+      style={{ width: r * 2, height: r * 2, opacity: data.dim ? 0.18 : 1 }}
+    >
+      <Handle type="target" position={Position.Top} style={HIDDEN_HANDLE} isConnectable={false} />
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          borderRadius: "50%",
+          background: data.color,
+          border: data.selected
+            ? "3px solid #1f1f1f"
+            : data.hit
+              ? "3px solid #faad14"
+              : "2px solid #fff",
+          boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+        }}
+      />
+      <span
+        style={{
+          position: "absolute",
+          top: r * 2 + 3,
+          left: "50%",
+          transform: "translateX(-50%)",
+          whiteSpace: "nowrap",
+          fontSize: 11,
+          lineHeight: "13px",
+          maxWidth: 140,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          padding: "0 3px",
+          borderRadius: 3,
+          background: "rgba(255,255,255,0.85)",
+          opacity: data.named ? 1 : 0, // present for screen readers and tests, shown on hover
+        }}
+        className="kx-label"
+      >
+        {data.label}
+      </span>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={HIDDEN_HANDLE}
+        isConnectable={false}
+      />
+    </div>
+  );
+}
+
+const NODE_TYPES = { entity: EntityBubble };
+const NAMED_HUBS = 12; // how many of the most connected entities are always named
+
 export function Explorer({ projectId, kvId, newer, onSwitch }: Props) {
   const { message } = App.useApp();
   const [search, setSearch] = useState("");
   const [types, setTypes] = useState<string[]>([]);
   const debounced = useDebounced(search, SEARCH_DEBOUNCE_MS);
   const [positions, setPositions] = useState<Positions>({});
+  const [laidOut, setLaidOut] = useState(0); // remounts the canvas so it fits the new layout
   const [selected, setSelected] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [seenTypes, setSeenTypes] = useState<string[]>([]);
+  const [view, setView] = useState<"graph" | "table">("graph");
+  const [showIsolated, setShowIsolated] = useState<boolean | undefined>(undefined);
 
   const first = useCustom<KnowledgeGraphPage, ApiError>({
     url: graphPath(projectId, kvId),
@@ -111,15 +204,27 @@ export function Explorer({ projectId, kvId, newer, onSwitch }: Props) {
   const fresh = typesOf(graph).filter((t) => !seenTypes.includes(t));
   if (fresh.length) setSeenTypes([...seenTypes, ...fresh].sort()); // the filter keeps every type seen
 
+  // Progressive disclosure: a big graph starts with the connected part; the table lists the rest.
+  const deg = useMemo(() => degrees(graph), [graph]);
+  const isolated = graph.nodes.filter((n) => (deg.get(n.id) ?? 0) === 0).length;
+  const wantIsolated = showIsolated ?? graph.nodes.length <= HIDE_ISOLATED_ABOVE;
+  const drawn = useMemo(
+    () => (wantIsolated || isolated === graph.nodes.length ? graph : withoutIsolated(graph)),
+    [graph, wantIsolated, isolated],
+  );
+  const colors = useMemo(() => typeColors(seenTypes), [seenTypes]);
+
   useEffect(() => {
     let live = true;
-    void layoutAsync(graph).then((p) => {
-      if (live) setPositions(p);
+    void layoutAsync(drawn).then((p) => {
+      if (!live) return;
+      setPositions(p);
+      setLaidOut((n) => n + 1);
     });
     return () => {
       live = false;
     };
-  }, [graph]);
+  }, [drawn]);
 
   const loadMore = useCallback(async () => {
     if (!cursor || graph.nodes.length >= MAX_NODES) return;
@@ -154,28 +259,71 @@ export function Explorer({ projectId, kvId, newer, onSwitch }: Props) {
     (name: string) => Boolean(needle) && name.toLowerCase().includes(needle),
     [needle],
   );
-  const nodes: Node[] = useMemo(
+  const lit = useMemo(() => (selected ? neighbourhood(drawn, selected) : null), [drawn, selected]);
+  const hubs = useMemo(() => {
+    const ranked = [...deg.entries()].sort((x, y) => y[1] - x[1]).slice(0, NAMED_HUBS);
+    return new Set(ranked.filter(([, d]) => d > 0).map(([id]) => id));
+  }, [deg]);
+  const nodes: Node<Bubble>[] = useMemo(
     () =>
-      graph.nodes.map((n) => ({
-        id: n.id,
-        position: positions[n.id] ?? { x: 0, y: 0 },
-        data: { label: label(n.name || n.id) },
-        style: {
-          width: NODE_W,
-          height: NODE_H,
-          fontSize: 12,
-          ...(isHit(n.name)
-            ? { borderColor: "#faad14", borderWidth: 2, background: "#fffbe6" }
-            : {}),
-        },
-        className: isHit(n.name) ? "kx-hit" : undefined,
-        ariaLabel: `${n.type}: ${n.name}`,
-      })),
-    [graph.nodes, positions, isHit],
+      drawn.nodes.map((n) => {
+        const degree = deg.get(n.id) ?? 0;
+        const hit = isHit(n.name);
+        const r = radius(degree);
+        return {
+          id: n.id,
+          type: "entity",
+          position: positions[n.id] ?? { x: 0, y: 0 },
+          width: r * 2,
+          height: r * 2,
+          data: {
+            label: label(n.name || n.id),
+            type: n.type,
+            color: colors[n.type] ?? NEUTRAL,
+            r,
+            degree,
+            named: hubs.has(n.id) || hit || n.id === selected || drawn.nodes.length <= 25,
+            dim: lit !== null && !lit.has(n.id),
+            hit,
+            selected: n.id === selected,
+          },
+          className: hit ? "kx-hit" : undefined, // search hits (the e2e and styling hook)
+          ariaLabel: `${n.type}: ${n.name}, ${degree} relations`,
+        };
+      }),
+    [drawn.nodes, positions, deg, colors, hubs, selected, lit, isHit],
   );
   const edges: Edge[] = useMemo(
-    () => graph.edges.map((e) => ({ id: e.id, source: e.from, target: e.to, label: e.type })),
-    [graph.edges],
+    () =>
+      drawn.edges.map((e) => {
+        const on = selected !== null && (e.from === selected || e.to === selected);
+        return {
+          id: e.id,
+          source: e.from,
+          target: e.to,
+          type: "straight",
+          // Relation names only on the selection: all of them at once is noise.
+          label: on ? e.type.replaceAll("_", " ") : undefined,
+          style: {
+            stroke: on ? "#1f1f1f" : "#bfbfbf",
+            strokeWidth: on ? 2 : 1,
+            opacity: lit !== null ? (on ? 1 : 0.08) : 0.55,
+          },
+        };
+      }),
+    [drawn.edges, selected, lit],
+  );
+  const rows = useMemo(
+    () =>
+      graph.nodes
+        .map((n) => ({
+          key: n.id,
+          name: n.name || n.id,
+          type: n.type,
+          relations: deg.get(n.id) ?? 0,
+        }))
+        .sort((x, y) => y.relations - x.relations || x.name.localeCompare(y.name)),
+    [graph.nodes, deg],
   );
 
   if (first.query.isLoading && !page) return <LoadingState />;
@@ -225,6 +373,21 @@ export function Explorer({ projectId, kvId, newer, onSwitch }: Props) {
         <Typography.Text type="secondary" style={{ alignSelf: "center" }}>
           {graph.nodes.length} of {page?.total_estimate ?? 0} entities
         </Typography.Text>
+        {isolated > 0 && isolated < graph.nodes.length ? (
+          <Flex gap={6} align="center">
+            <Switch size="small" checked={wantIsolated} onChange={setShowIsolated} />
+            <Typography.Text type="secondary">Unconnected ({isolated})</Typography.Text>
+          </Flex>
+        ) : null}
+        <Segmented
+          aria-label="View"
+          value={view}
+          onChange={(v) => setView(v as "graph" | "table")}
+          options={[
+            { value: "graph", label: "Graph" },
+            { value: "table", label: "Table" },
+          ]}
+        />
         {cursor && !capped ? (
           <Button loading={loadingMore} onClick={() => void loadMore()}>
             Load more
@@ -246,27 +409,77 @@ export function Explorer({ projectId, kvId, newer, onSwitch }: Props) {
             </Link>
           }
         />
+      ) : view === "table" ? (
+        <Table
+          size="small"
+          pagination={{ pageSize: 25, hideOnSinglePage: true }}
+          dataSource={rows}
+          onRow={(r) => ({ onClick: () => setSelected(r.key), style: { cursor: "pointer" } })}
+          columns={[
+            { title: "Entity", dataIndex: "name", ellipsis: true },
+            {
+              title: "Type",
+              dataIndex: "type",
+              width: 160,
+              render: (t: string) => <Tag color={colors[t] ?? NEUTRAL}>{t}</Tag>,
+            },
+            {
+              title: "Relations",
+              dataIndex: "relations",
+              width: 110,
+              sorter: (x, y) => x.relations - y.relations,
+              defaultSortOrder: "descend",
+            },
+          ]}
+        />
       ) : (
-        <div style={{ height: 560 }} data-testid="knowledge-canvas">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodesConnectable={false}
-            edgesReconnectable={false}
-            nodesDraggable
-            deleteKeyCode={null}
-            selectionKeyCode={null}
-            multiSelectionKeyCode={null}
-            zoomOnDoubleClick={false}
-            onNodeClick={(_, node) => setSelected(node.id)}
-            onlyRenderVisibleElements
-            fitView
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background />
-            <Controls showInteractive={false} />
-          </ReactFlow>
-        </div>
+        <>
+          <Flex gap={16} wrap align="center" style={{ marginBottom: 8 }}>
+            {seenTypes.map((t) => (
+              <Flex key={t} gap={6} align="center">
+                <span
+                  aria-hidden
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: colors[t] ?? NEUTRAL,
+                    display: "inline-block",
+                  }}
+                />
+                <Typography.Text type="secondary">{t}</Typography.Text>
+              </Flex>
+            ))}
+            <Typography.Text type="secondary">
+              Bigger circle = more relations. Click one to light up its neighbours.
+            </Typography.Text>
+          </Flex>
+          <div style={{ height: 560 }} data-testid="knowledge-canvas" className="kx-canvas">
+            <style>{`.kx-node:hover .kx-label{opacity:1 !important;z-index:5}`}</style>
+            <ReactFlow
+              key={laidOut}
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={NODE_TYPES}
+              nodesConnectable={false}
+              edgesReconnectable={false}
+              nodesDraggable
+              deleteKeyCode={null}
+              selectionKeyCode={null}
+              multiSelectionKeyCode={null}
+              zoomOnDoubleClick={false}
+              onNodeClick={(_, node) => setSelected(node.id)}
+              onPaneClick={() => setSelected(null)}
+              onlyRenderVisibleElements
+              minZoom={0.2}
+              fitView
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          </div>
+        </>
       )}
 
       <Drawer

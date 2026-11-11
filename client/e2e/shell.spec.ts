@@ -29,6 +29,9 @@ test("e1_13_t02 FDE shell lists projects and has no Workflow create action", asy
   await page.goto("/");
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByText("No projects assigned — ask your Admin.")).toBeVisible();
+  await page.route(/\/api\/proxy\/api\/v1\/projects\/[^/]+\/workflows(\?.*)?$/, (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ items: [] }) }),
+  );
   await page.goto("/projects/0190f3a2-7b1c-7d4e-8f00-123456789abc/workflows");
   await expect(page.getByText(/SBAM creates the Workflow/)).toBeVisible();
   await expect(page.getByRole("button", { name: /create|new workflow/i })).toHaveCount(0);

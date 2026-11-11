@@ -67,8 +67,9 @@ describe("build dashboard rules (E12.6)", () => {
     ]);
   });
 
-  test("e12_6_t04 Retry only in NEEDS_FDE_REVIEW", () => {
+  test("e12_6_t04 Retry only when the build waits for the FDE", () => {
     expect(canRetry("NEEDS_FDE_REVIEW")).toBe(true);
+    expect(canRetry("TESTING_BLOCKED")).toBe(true); // sandbox unreachable: Retry re-runs the tests
     for (const s of ["BUILDING", "CORRECTING", "CERTIFIED", undefined] as const)
       expect(canRetry(s)).toBe(false);
   });
@@ -102,7 +103,7 @@ describe("build dashboard rules (E12.6)", () => {
 describe("Build & Test screen states (E12.6)", () => {
   test("nothing built yet shows the empty state", async () => {
     fakeApi({ [BUILDS]: { body: builds([], false) } });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     expect(await screen.findByText(EMPTY_MESSAGE)).toBeDefined();
   });
 
@@ -115,7 +116,7 @@ describe("Build & Test screen states (E12.6)", () => {
         ]),
       },
     });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     expect((await screen.findByTestId("grid-stub")).textContent).toBe("MS01.1_intake,MS01.2_x");
     expect(screen.getByText("2 Sub-Skills · 1 waiting for review")).toBeDefined();
     expect(screen.getByText("Live: updates every 3 s")).toBeDefined();
@@ -123,14 +124,72 @@ describe("Build & Test screen states (E12.6)", () => {
 
   test("an API error shows its detail with a retry", async () => {
     fakeApi({ [BUILDS]: problem(503, "UNAVAILABLE", "Try again shortly") });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     expect(await screen.findByText("Try again shortly")).toBeDefined();
     expect(screen.getByRole("button", { name: "Retry" })).toBeDefined();
   });
 
   test("another tenant's or an unassigned project is not found (404)", async () => {
     fakeApi({ [BUILDS]: problem(404, "NOT_FOUND", "No such workflow") });
-    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} initialView="matrix" />);
     expect(await screen.findByText("Not found")).toBeDefined();
+  });
+});
+
+describe("summary cards (the default view)", () => {
+  test("a review state explains itself in words and offers Retry, not a patch that does not exist", async () => {
+    const held = `GET /projects/${P}/workflows/${W}/sub-skills/s1/held-patch`;
+    fakeApi({
+      [BUILDS]: {
+        body: builds(
+          [
+            row({
+              state: "NEEDS_FDE_REVIEW",
+              attempt: 2,
+              gates: { LOOP_TESTS: "FAILED" },
+              loop_tests: { state: "FAIL", passed: 1, total: 4 },
+            }),
+          ],
+          false,
+        ),
+      },
+      [held]: { body: { held: null } },
+    });
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    expect(await screen.findByText(/Automatic correction stopped and needs you/)).toBeDefined();
+    expect(screen.getByText(/Loop tests: 1 of 4 passed/)).toBeDefined();
+    expect(screen.getByText("Attempt 3 of 3")).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Retry MS01.1_intake" }).hasAttribute("disabled"),
+    ).toBe(false);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("button", { name: /Review patch/ })).toBeNull();
+  });
+
+  test("a held patch makes the review button appear", async () => {
+    const held = `GET /projects/${P}/workflows/${W}/sub-skills/s1/held-patch`;
+    fakeApi({
+      [BUILDS]: { body: builds([row({ state: "NEEDS_FDE_REVIEW" })], false) },
+      [held]: {
+        body: {
+          held: {
+            sub_skill_id: "s1",
+            attempt: 1,
+            failed_gate: "AST_HANDOFF",
+            rationale: "r",
+            ops: [],
+            content_sha256: "a".repeat(64),
+          },
+        },
+      },
+    });
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    expect(await screen.findByRole("button", { name: "Review patch MS01.1_intake" })).toBeDefined();
+  });
+
+  test("a blocked sandbox says nothing is wrong with the code", async () => {
+    fakeApi({ [BUILDS]: { body: builds([row({ state: "TESTING_BLOCKED" })], false) } });
+    renderWithRefine(<BuildScreen projectId={P} workflowId={W} />);
+    expect(await screen.findByText(/Nothing is wrong with the code/)).toBeDefined();
   });
 });

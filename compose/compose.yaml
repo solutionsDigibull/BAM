@@ -39,6 +39,8 @@ x-worker: &worker
     LLM_PROJECT_BUDGET_USD: ${LLM_PROJECT_BUDGET_USD:-}
     LLM_TENANT_BUDGET_USD: ${LLM_TENANT_BUDGET_USD:-}
     LLM_PRICE_USD_PER_MTOK: ${LLM_PRICE_USD_PER_MTOK:-}
+    # Most document tokens in one SOW / ISATVON prompt; over it the bundle is ranked per section. Empty = 80000.
+    SOW_CONTEXT_MAX_TOKENS: ${SOW_CONTEXT_MAX_TOKENS:-}
   depends_on: &worker-depends
     api-migrate: { condition: service_completed_successfully } # temporal_runs (run mirror)
     postgres: { condition: service_healthy }
@@ -573,7 +575,7 @@ services:
       CUBE_PROXY_PORT_HTTP: ${CUBE_PROXY_PORT_HTTP:-80}
       CUBE_SANDBOX_DOMAIN: ${CUBE_SANDBOX_DOMAIN:-cube.app}
       SANDBOX_EGRESS_LOG_PATH: ${SANDBOX_EGRESS_LOG_PATH:-}
-      # ...or the collector's HTTP service on another machine: GET <url>/egress/<vm_id>, bearer token
+      # Or the collector's HTTP endpoint when it runs on another host (CubeSandbox in a VM): URL + bearer token.
       SANDBOX_EGRESS_URL: ${SANDBOX_EGRESS_URL:-}
       SANDBOX_EGRESS_TOKEN: ${SANDBOX_EGRESS_TOKEN:-}
       MOCK_API_URL: ${MOCK_API_URL:-}

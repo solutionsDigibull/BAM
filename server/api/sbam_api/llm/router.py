@@ -6,19 +6,23 @@ matches nothing and answers 404, the same as an unknown key. By prompt, zero mat
 selector and the count, never the cached content. The next identical request is asked again.
 """
 
+import uuid
 from collections.abc import Iterator
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from sbam_contracts.llm_cache import LlmCacheInvalidate, LlmCacheInvalidated
+from sbam_contracts.llm_usage import LlmUsage, LlmUsageStage
 from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
-from sbam_api.core.auth import CurrentUser, admin
+from sbam_api.core.auth import CurrentUser, admin, fde
 from sbam_api.core.conventions import not_found
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.session import app_sessions
-from sbam_api.llm.repository import LlmDerivativeRepository
+from sbam_api.llm.repository import LlmCallRepository, LlmDerivativeRepository
+from sbam_api.projects.guard import active_project
 
 router = APIRouter(tags=["llm-cache"])
 
@@ -58,3 +62,29 @@ def invalidate(body: LlmCacheInvalidate, user: Admin, session: Db) -> LlmCacheIn
     )
     session.commit()
     return LlmCacheInvalidated(invalidated=count)
+
+
+def _money(value: Decimal) -> str:
+    return f"{value:.4f}"
+
+
+@router.get("/projects/{project_id}/llm-usage")
+def llm_usage(
+    project_id: Annotated[uuid.UUID, Depends(active_project)],
+    user: Annotated[CurrentUser, Depends(fde)],
+    session: Db,
+) -> LlmUsage:
+    """What the project has spent on model calls, by stage. Counts, tokens and money only."""
+    rows = LlmCallRepository(session, user.context(project_id)).usage_by_alias()
+    return LlmUsage(
+        total_usd=_money(sum((r[5] for r in rows), Decimal(0))),
+        calls=sum(r[1] for r in rows),
+        tokens_in=sum(r[3] for r in rows),
+        tokens_out=sum(r[4] for r in rows),
+        stages=[
+            LlmUsageStage(
+                alias=a, calls=n, failed=bad, tokens_in=tin, tokens_out=tout, cost_usd=_money(c)
+            )
+            for a, n, bad, tin, tout, c in rows
+        ],
+    )

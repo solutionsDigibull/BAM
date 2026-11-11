@@ -144,6 +144,37 @@ describe("Knowledge status and coverage (E5.6)", () => {
     expect(await screen.findByText("Rebuild started.")).toBeDefined();
   });
 
+  test("a mock-built graph is labelled, and missed identifiers are listed", async () => {
+    const coverage = {
+      documents: [],
+      entities: 80,
+      extraction: "mock|openai/sbam-knowledge|openai/sbam-embed|1536",
+      anchors: { total: 200, found: 12, missing: ["UBR10361", "UBR04585"] },
+    };
+    fakeApi({ [LIST]: [list(version({ coverage }))] });
+    render();
+    expect(await screen.findByText("Mock LLM: synthetic graph")).toBeDefined();
+    expect(
+      screen.getByText("12 of 200 identifiers from your documents are in the graph"),
+    ).toBeDefined();
+    expect(screen.getByText(/UBR10361, UBR04585/)).toBeDefined();
+  });
+
+  test("a real-LLM graph with its identifiers has no mock label", async () => {
+    const coverage = {
+      documents: [],
+      entities: 140,
+      extraction: "bifrost|openai/sbam-knowledge|openai/sbam-embed|1536",
+      anchors: { total: 10, found: 9, missing: [] },
+    };
+    fakeApi({ [LIST]: [list(version({ coverage }))] });
+    render();
+    expect(
+      await screen.findByText("9 of 10 identifiers from your documents are in the graph"),
+    ).toBeDefined();
+    expect(screen.queryByText("Mock LLM: synthetic graph")).toBeNull();
+  });
+
   test("e5_6_t04 malformed coverage renders zeros and 'Coverage unavailable'", async () => {
     const broken = { ...version(), coverage: null, counts: null, documents: null } as unknown;
     fakeApi({ [LIST]: list(broken as KnowledgeVersionSummary) });

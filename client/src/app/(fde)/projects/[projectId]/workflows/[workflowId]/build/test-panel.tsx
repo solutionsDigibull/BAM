@@ -57,6 +57,8 @@ import {
   runsUrl,
   STALE_MESSAGE,
   testsUrl,
+  explainCaseError,
+  failuresOf,
   tracesOf,
   tracesUrl,
   writeError,
@@ -326,6 +328,12 @@ export function TestPanel({
   const schema = inputSchemaOf(tests.result.data);
   const runs = runsOf(runsQuery.result.data);
   const latest = runs[0];
+  const latestTraces = useCustom<TestRunTraces, ApiError>({
+    url: tracesUrl(projectId, workflowId, subId, latest?.id ?? ""),
+    method: "get",
+    queryOptions: { enabled: !!latest, retry: false },
+  });
+  const failures = failuresOf(tracesOf(latestTraces.result.data));
   const readOnly = isReadOnly(row.state);
   const [hidden, setHidden] = useState<Set<string>>(new Set()); // optimistic deletes
   const cases = casesOf(dataset).filter((c) => !hidden.has(c.id));
@@ -441,6 +449,17 @@ export function TestPanel({
                 return <Tag color={r.color}>{r.text}</Tag>;
               },
             },
+            {
+              title: "Why",
+              render: (_, c) => {
+                const why = failures.get(c.name);
+                return why ? (
+                  <Typography.Text type="danger" style={{ whiteSpace: "pre-wrap" }}>
+                    {why.message}
+                  </Typography.Text>
+                ) : null;
+              },
+            },
             ...(readOnly
               ? []
               : [
@@ -509,6 +528,20 @@ export function TestPanel({
                 Retry
               </Button>
             }
+          />
+        )}
+        {failures.size > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            data-testid="why-failed"
+            message={
+              failures.size === cases.length &&
+              new Set([...failures.values()].map((f) => f.message)).size === 1
+                ? `All ${failures.size} cases failed for the same reason`
+                : `${failures.size} case${failures.size === 1 ? "" : "s"} failed`
+            }
+            description={explainCaseError([...failures.values()][0]!.message)}
           />
         )}
         {latest ? (

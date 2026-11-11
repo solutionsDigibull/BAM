@@ -53,11 +53,13 @@ from sbam_contracts.isatvon_workbench import (
     WorkbenchTree,
 )
 from sbam_contracts.knowledge import (
+    KnowledgeDiff,
     KnowledgeGraphPage,
     KnowledgeNodeDetail,
     KnowledgeVersionList,
 )
 from sbam_contracts.llm_cache import LlmCacheInvalidate, LlmCacheInvalidated
+from sbam_contracts.llm_usage import LlmUsage, LlmUsageStage
 from sbam_contracts.manifest import (
     Isa14Manifest,
     LoopSpec,
@@ -100,6 +102,7 @@ from sbam_contracts.okf import (
     OkfEntity,
     OkfRelation,
 )
+from sbam_contracts.preflight import Preflight, PreflightCheck
 from sbam_contracts.projects import (
     PipelineTimeline,
     Project,
@@ -248,6 +251,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("knowledge/version_list", KnowledgeVersionList),
     ("knowledge/graph_page", KnowledgeGraphPage),
     ("knowledge/node_detail", KnowledgeNodeDetail),
+    ("knowledge/diff", KnowledgeDiff),
     ("mocks/mock_definition", MockDefinition),
     ("mocks/mock_run_setup", MockRunSetup),
     ("mocks/mock_journal", MockJournal),
@@ -261,6 +265,10 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("promptfoo/test_run_traces", TestRunTraces),
     ("llm_cache/invalidate", LlmCacheInvalidate),
     ("llm_cache/invalidated", LlmCacheInvalidated),
+    ("llm_usage/usage", LlmUsage),
+    ("llm_usage/stage", LlmUsageStage),
+    ("preflight/preflight", Preflight),
+    ("preflight/check", PreflightCheck),
     ("sandbox/limits", SandboxLimits),
     ("sandbox/egress_policy", EgressPolicy),
     ("sandbox/egress_event", EgressEvent),

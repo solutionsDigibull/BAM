@@ -236,6 +236,9 @@ def test_e4_9_t02_restore_ten_days_after_delete_brings_it_back(h: Harness) -> No
     with h.sessions() as s:
         restored = s.scalars(select(AuditLog).where(AuditLog.action == "DOCUMENT_RESTORED")).one()
         assert restored.after is not None and restored.after["knowledge_outdated"] is True
+    with h.sessions() as s:
+        stale = s.scalars(select(DocumentVersion.scan_status)).all()
+        assert stale == [None]  # the old verdict must not skip the new scan
     # It is scanned and parsed again.
     assert len(h.temporal.calls) == calls_before + 1
     assert h.temporal.calls[-1]["workflow"] == "DocumentIngestion"

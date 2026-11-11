@@ -15,8 +15,10 @@ Invalid (dangling relation, text not preserved, no covered document, ...): FAILE
 """
 
 import asyncio
+import json
 import logging
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -66,6 +68,10 @@ class _Inputs:
     outcomes: list[CoverageEntry]
     masters: bytes
     coverage: KnowledgeCoverage
+
+
+def _entity_names(parts: Mapping[str, bytes]) -> list[str]:
+    return [json.loads(line)["name"] for line in parts["entities.jsonl"].splitlines() if line]
 
 
 def _ctx(inp: StageRef) -> TenantContext:
@@ -193,6 +199,8 @@ async def build_bundle(deps: BuildDeps, inp: StageRef) -> uuid.UUID:
     coverage = loaded.coverage.model_copy(
         update={
             "bundle": built.coverage,
+            "entities": built.counts["entities"],  # not graph nodes: chunks, documents, types
+            "anchors": okf.anchor_check(loaded.docs, _entity_names(built.parts)),
             "relations": built.counts["relations"],
             "chunks": built.counts["chunks"],
         }

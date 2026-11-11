@@ -29,6 +29,7 @@ from sbam_contracts import (
     isatvon_workbench,
     knowledge,
     llm_cache,
+    llm_usage,
     manifest,
     manifest_api,
     masters,
@@ -36,6 +37,7 @@ from sbam_contracts import (
     mocks,
     notifications,
     okf,
+    preflight,
     projects,
     promptfoo,
     runs,
@@ -250,6 +252,8 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("promptfoo", harness),
             ("held_patch", held_patch),
             ("llm_cache", llm_cache),
+            ("llm_usage", llm_usage),
+            ("preflight", preflight),
         )
         for stem in module.schemas()
     }

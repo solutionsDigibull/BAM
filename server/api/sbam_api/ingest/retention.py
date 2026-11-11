@@ -342,6 +342,7 @@ def restore_document(
             ),
         )
         version.ingestion_started_at = None  # restored files are scanned and parsed again
+        version.scan_status = None  # the old verdict is stale; the scan sets a new one
         version_repo.update(version, version.row_version)
     document.deleted_at = None
     document.deleted_by = None

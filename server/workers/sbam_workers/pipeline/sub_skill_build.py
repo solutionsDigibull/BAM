@@ -76,7 +76,7 @@ with workflow.unsafe.imports_passed_through():
         SUITE_INVALID,
     )
     from sbam_workers.build.libraries import check_libraries
-    from sbam_workers.build.manifest import build_manifest
+    from sbam_workers.build.manifest import PROVENANCE_MISSING, build_manifest
     from sbam_workers.build.stubs import (
         assemble,
         ast_gate,
@@ -132,8 +132,12 @@ RETRY_TESTS_PATCH = "704-retry-regenerates-tests"
 # it), not a crashed workflow nobody hears about. The other stages' wiring errors still fail loudly.
 # #119: a static tool or clamd that still gives no verdict after the activity's retries is the
 # same kind of defect (no correction can fix it).
+# A manifest the platform cannot build because it lacks something (no active runtime registry, an
+# unapproved SOW) is the same kind of defect. It used to escape as a raw workflow failure and leave
+# the Sub-Skill in BUILDING for good, with Retry disabled. Now it parks in BUILD_ERROR: an admin
+# fixes it, and Retry works.
 PLATFORM_DEFECTS = frozenset(
-    {BUNDLE_TAMPERED, GATE_INPUT_MISMATCH, STATIC_GATE_INFRA, SUITE_INVALID}
+    {BUNDLE_TAMPERED, GATE_INPUT_MISMATCH, STATIC_GATE_INFRA, SUITE_INVALID, PROVENANCE_MISSING}
 )
 MAX_SUMMARY_PATHS = 10
 SPECS: dict[BuildStage, _Spec] = {

@@ -174,3 +174,30 @@ export function jsonText(value: unknown): { text: string; long: boolean } {
   const text = typeof value === "string" ? value : (JSON.stringify(value, null, 2) ?? "");
   return { text, long: text.length > MAX_INLINE_JSON };
 }
+
+/** What a failed case's error means for the person reading it, and what to do about it. */
+export function explainCaseError(message: string): string {
+  if (message.startsWith("fresh state query failed"))
+    return "The generated code's database query failed, so no test can run. Editing the cases will not help: the code (or the database column types) is wrong. Retry asks the corrector again with the database schema in front of it.";
+  if (/^IMPORT_ERROR|BundleError/.test(message))
+    return "The generated code does not import. Retry lets the corrector fix it.";
+  if (/handoff/i.test(message))
+    return "The code did not write its handoff row correctly (exactly one row per pass with every required field).";
+  return "The code failed while the case ran. Open the trace for the pass-by-pass detail.";
+}
+
+export type CaseFailure = { category: string; step: string; pass: number; message: string };
+
+/** The run's failed cases by name, from its traces (a trace's id is the case name). */
+export function failuresOf(traces: HarnessTrace[]): Map<string, CaseFailure> {
+  const out = new Map<string, CaseFailure>();
+  for (const t of traces)
+    if (t.error)
+      out.set(t.case_id, {
+        category: t.error.category,
+        step: t.error.step,
+        pass: t.error.pass,
+        message: t.error.message,
+      });
+  return out;
+}

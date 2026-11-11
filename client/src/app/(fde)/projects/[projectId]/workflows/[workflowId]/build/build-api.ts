@@ -102,8 +102,13 @@ export const buildRows = (builds: unknown): BuildRow[] =>
 export const gateStatus = (row: BuildRow, gate: GateName): GateStatus =>
   row.gates?.[gate] ?? "PENDING";
 
-/** Retry is offered only to a Sub-Skill waiting for the FDE (TD §13.2); the server still answers 409. */
-export const canRetry = (state: SubSkillState | undefined) => state === "NEEDS_FDE_REVIEW";
+/**
+ * Retry is offered only to a Sub-Skill waiting for the FDE (TD §13.2); the server still answers 409.
+ * TESTING_BLOCKED waits too: the sandbox was unreachable, and Retry re-runs only the tests. Without it
+ * a sandbox outage left the Sub-Skill stuck with no button.
+ */
+export const canRetry = (state: SubSkillState | undefined) =>
+  state === "NEEDS_FDE_REVIEW" || state === "TESTING_BLOCKED";
 
 export const POLL_MS = 3_000;
 const MAX_BACKOFF_MS = 30_000;

@@ -200,6 +200,17 @@ def test_e4_3_a_second_run_returns_the_same_answer_and_does_not_rescan(
     assert h.audit(inp.ref_id).count("malware_detected") == 1
 
 
+def test_e4_3_restored_version_with_an_old_verdict_is_scanned_again(
+    h: Harness, server: FakeClamd
+) -> None:
+    """Restore leaves a deleted document in UPLOADED. Its old CLEAN verdict used to be returned
+    without the `scan_clean` transition, so detect_type then failed on state UPLOADED, for good."""
+    inp = h.add_version(scan_status="CLEAN")
+    outcome = scan_version(h.deps, inp)
+    assert outcome.verdict is ScanStatus.CLEAN and server.scans == 1
+    assert h.version(inp.ref_id).state == "PARSING"
+
+
 def test_e4_3_failure_to_remove_the_original_does_not_undo_the_verdict(h: Harness) -> None:
     class StuckDelete:
         def __init__(self, inner: StorageBackend) -> None:

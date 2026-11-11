@@ -32,6 +32,9 @@ class DdlFragment(BaseModel):
     sql: str = Field(min_length=1, max_length=200_000)
 
 
+HANDOFF_WRITES = frozenset({"skill_id", "payload"})  # what templates/*/state_handoff.py.j2 inserts
+
+
 def fragment_errors(
     out: DdlFragment, wanted: set[str], handoff: Mapping[str, set[str]]
 ) -> tuple[str, ...]:
@@ -54,6 +57,12 @@ def fragment_errors(
         have = {c.name.lower() for c in columns(tables[table])}
         for missing in sorted(handoff[table] - have):
             errors.append(f"{SchemaFindingCode.MISSING_TABLE} {table}.{missing} (required field)")
+        # The generated `state_handoff.py` is fixed code: INSERT INTO <table> (skill_id, payload).
+        # A handoff table without those two columns failed at the first insert in the sandbox.
+        for column in sorted(HANDOFF_WRITES - have):
+            errors.append(
+                f"{SchemaFindingCode.MISSING_TABLE} {table}.{column} (written by platform code)"
+            )
     return tuple(errors)
 
 

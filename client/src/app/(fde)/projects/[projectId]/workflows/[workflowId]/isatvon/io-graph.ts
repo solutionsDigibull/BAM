@@ -111,7 +111,7 @@ export function cycleMessage(graph: IoGraph, id: string): string | null {
 export const NODE_W = 200;
 export const NODE_H = 48;
 
-/** Left-to-right dagre positions (top-left corners), as the Knowledge explorer lays out. */
+/** Left-to-right dagre positions (top-left corners): an I/O graph has a direction, unlike knowledge. */
 export function ioLayout(graph: IoGraph): Record<string, { x: number; y: number }> {
   const g = new dagre.graphlib.Graph({ multigraph: true });
   g.setGraph({ rankdir: "LR", nodesep: 28, ranksep: 90 });

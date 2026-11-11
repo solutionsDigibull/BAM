@@ -136,7 +136,8 @@ def create_app(
         ),
     )
     install_error_handlers(app)
-    app.include_router(health_router(checks if checks is not None else default_checks(settings)))
+    app.state.health_checks = dict(checks if checks is not None else default_checks(settings))
+    app.include_router(health_router(app.state.health_checks))
     routers = discover_routers()
     if missing := unguarded_routes(routers):  # every route must say who may call it (E2.2)
         raise RuntimeError(f"routes without an authorization policy: {', '.join(missing)}")

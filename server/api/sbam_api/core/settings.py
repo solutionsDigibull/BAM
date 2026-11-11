@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     # unset LLM_PROVIDER counts as `mock`, so staging/production must set LLM_PROVIDER=bifrost.
     sbam_env: str = Field(default="development", min_length=1)
     llm_provider: Literal["mock", "bifrost"] = "mock"
+    # Where the preflight page asks the gateway whether the provider key works (no key is sent:
+    # Bifrost is reachable from the internal network only).
+    bifrost_url: AnyHttpUrl = AnyHttpUrl("http://bifrost:8080")
     # Product analytics (E16.2): server-side PostHog events from the outbox. Unset host or key = no
     # events (a laptop without the `analytics` profile). The salt hashes user ids into distinct_ids.
     posthog_host: str | None = None  # Compose passes "" when unset: a str, not a URL

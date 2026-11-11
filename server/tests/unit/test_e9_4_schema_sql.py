@@ -34,7 +34,10 @@ from temporalio.exceptions import ApplicationError
 
 HANDOFF = "auth_event_audit_handoff"  # the MS01.1 sample's handoff table
 PROFILES = "investor_profiles"
-FIELDS = "iteration_pass integer, device_fingerprint text, otp_match boolean, access_scope text"
+FIELDS = (
+    "iteration_pass integer, device_fingerprint text, otp_match boolean, access_scope text, "
+    "skill_id text NOT NULL DEFAULT '', payload jsonb NOT NULL DEFAULT '{}'::jsonb"  # what the
+)  # platform's state_handoff code writes
 PROFILES_DDL = f"CREATE TABLE {PROFILES} (id bigserial PRIMARY KEY, investor_id text)"
 HANDOFF_DDL = f"CREATE TABLE {HANDOFF} (id bigserial PRIMARY KEY, {FIELDS})"
 
@@ -452,7 +455,8 @@ def merged_sql() -> tuple[list[str], list[str], list[str]]:
     fragments = {
         "MS01.1": check(PROFILES_DDL),
         "MS01.2": check(
-            f"CREATE TABLE {HANDOFF} (id bigserial PRIMARY KEY, otp_match boolean DEFAULT false)"
+            f"CREATE TABLE {HANDOFF} (id bigserial PRIMARY KEY, otp_match boolean DEFAULT false, "
+            "skill_id text DEFAULT '', payload jsonb DEFAULT '{}'::jsonb)"
         ),
     }
     merged = merge(want, None, fragments)
@@ -489,3 +493,18 @@ def test_e9_4_an_apply_error_names_its_statement_and_leaves_no_database() -> Non
     problems = apply(DSN or "", [PROFILES_DDL, PROFILES_DDL], [PROFILES], [])
     assert [(p.code, p.statement_index) for p in problems] == [(Code.APPLY_ERROR, 1)]
     assert "already exists" in problems[0].message
+
+
+def test_a_handoff_table_without_the_columns_the_platform_code_writes_is_sent_back() -> None:
+    """state_handoff.py inserts (skill_id, payload); a table with only the required fields' columns
+    passed the old check and failed at the first insert in the sandbox."""
+    from sbam_workers.build.schema_sql.fragments import DdlFragment, fragment_errors
+
+    bare = DdlFragment(sql=f"CREATE TABLE {HANDOFF} (id bigserial PRIMARY KEY, otp_match boolean)")
+    lines = fragment_errors(bare, {HANDOFF}, {HANDOFF: {"otp_match"}})
+    assert [line.split("(")[0].strip() for line in lines] == [
+        f"MISSING_TABLE {HANDOFF}.payload",
+        f"MISSING_TABLE {HANDOFF}.skill_id",
+    ]
+    good = DdlFragment(sql=HANDOFF_DDL)
+    assert fragment_errors(good, {HANDOFF}, {HANDOFF: {"otp_match"}}) == ()

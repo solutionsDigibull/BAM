@@ -173,8 +173,16 @@ def params_from_parts(
     }
 
 
+# The Workflow's schema.sql travels with the params to the model's request (never to the template,
+# whose parameter schema is closed). See `SqlBuildInputs._params`.
+SCHEMA_PARAM = "workflow_schema"
+GATES_PARAM = "loop_gates"  # the loop's gate expressions and output contract, as JSON text
+MAX_SCHEMA_BYTES = 60_000
+
+
 def _schema_findings(template: LoadedTemplate, params: Mapping[str, Any]) -> list[str]:
     validator = Draft202012Validator(template.params_schema)
+    params = {k: v for k, v in params.items() if k not in (SCHEMA_PARAM, GATES_PARAM)}
     errors = sorted(validator.iter_errors(params), key=lambda e: [str(p) for p in e.absolute_path])
     return [
         f"{'.'.join(str(p) for p in e.absolute_path) or '<params>'}: {e.message[:200]}"

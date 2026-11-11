@@ -50,6 +50,7 @@ import {
   showValue,
   summary,
 } from "./build-api";
+import { BuildCards } from "./build-cards";
 import { TestPanel } from "./test-panel";
 
 const BuildGrid = dynamic(() => import("./build-grid"), {
@@ -277,7 +278,16 @@ function PatchDrawer({
   );
 }
 
-export function BuildScreen({ projectId, workflowId }: { projectId: string; workflowId: string }) {
+export function BuildScreen({
+  projectId,
+  workflowId,
+  initialView = "cards",
+}: {
+  projectId: string;
+  workflowId: string;
+  initialView?: "cards" | "matrix";
+}) {
+  const [view, setView] = useState<"cards" | "matrix">(initialView);
   const { message } = App.useApp();
   const builds = useCustom<BuildsResponse, ApiError>({
     url: buildsUrl(projectId, workflowId),
@@ -350,10 +360,26 @@ export function BuildScreen({ projectId, workflowId }: { projectId: string; work
           </Meta>
           <Meta>{data?.active ? "Live: updates every 3 s" : "Not building"}</Meta>
         </Flex>
-        <BuildGrid rows={rows} actions={actions} />
-        <Meta>
-          Click a failed gate for its findings · rows waiting for your review are highlighted
-        </Meta>
+        <Segmented
+          aria-label="View"
+          style={{ marginBottom: 12 }}
+          value={view}
+          onChange={(v) => setView(v as "cards" | "matrix")}
+          options={[
+            { value: "cards", label: "Summary" },
+            { value: "matrix", label: "Matrix (every gate)" },
+          ]}
+        />
+        {view === "cards" ? (
+          <BuildCards projectId={projectId} workflowId={workflowId} rows={rows} actions={actions} />
+        ) : (
+          <>
+            <BuildGrid rows={rows} actions={actions} />
+            <Meta>
+              Click a failed gate for its findings · rows waiting for your review are highlighted
+            </Meta>
+          </>
+        )}
       </>
     );
 

@@ -22,7 +22,13 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 from sbam_contracts.canonical import canonical_json
-from sbam_contracts.knowledge import CoverageEntry, GraphEdge, GraphNode, SourceStatus
+from sbam_contracts.knowledge import (
+    AnchorCheck,
+    CoverageEntry,
+    GraphEdge,
+    GraphNode,
+    SourceStatus,
+)
 from sbam_contracts.masters_api import MasterNode
 from sbam_contracts.okf import (
     BUNDLE,
@@ -84,6 +90,9 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+CELL_CHUNK_CHARS = 1200  # about 300 tokens: a few table rows
+
+
 def _location(block: Mapping[str, Any]) -> Location:
     found = {k: block[k] for k in _LOCATION_KEYS if block.get(k) is not None}
     for key in ("page", "line"):
@@ -95,16 +104,46 @@ def _location(block: Mapping[str, Any]) -> Location:
     return Location(**found)
 
 
+def _groups(blocks: list[dict[str, Any]], bounds: list[int]) -> list[tuple[int, int]]:
+    """(first, last) block indexes of each chunk. A block is a chunk of its own, except spreadsheet
+    cells: a cell is a few characters, and a chunk per cell made a BOM thousands of chunks, each
+    with a citation header, in every SOW prompt. Neighbouring cells of a sheet join up to
+    CELL_CHUNK_CHARS."""
+    groups: list[tuple[int, int]] = []
+    for i, block in enumerate(blocks):
+        if groups:
+            first = groups[-1][0]
+            head = blocks[first]
+            if (
+                block.get("type") == "cell"
+                and head.get("type") == "cell"
+                and block.get("sheet") == head.get("sheet")
+                and bool(block.get("unreadable")) == bool(head.get("unreadable"))
+                and bounds[i + 1] - bounds[first] <= CELL_CHUNK_CHARS
+            ):
+                groups[-1] = (first, i)
+                continue
+        groups.append((i, i))
+    return groups
+
+
 def build_chunks(doc: Doc) -> tuple[list[OkfChunk], list[str]]:
-    """One chunk per doc.json block, tiled so the chunks cover doc.md exactly: chunk i runs from
-    block i's start to block i+1's (the first from 0, the last to the end). No usable blocks: one
-    document-scope chunk. Returns the chunks and warnings (codes + ids)."""
+    """One chunk per doc.json block (spreadsheet cells are grouped: `_groups`), tiled so the chunks
+    cover doc.md exactly: a chunk runs from its first block's start to the next chunk's (the first
+    from 0, the last to the end). No usable blocks: one document-scope chunk. Returns the chunks and
+    warnings (codes + ids)."""
     dvid = doc.document_version_id
     starts: list[int] = []
     pos = 0
-    usable = [b for b in doc.blocks if isinstance(b, dict) and isinstance(b.get("text"), str)]
+    # An empty-text block (a table's own block, its cells follow as blocks) has nothing to anchor in
+    # doc.md; keeping it made `find` fail and the whole document fall back to one chunk.
+    usable = [
+        b
+        for b in doc.blocks
+        if isinstance(b, dict) and b.get("text") and isinstance(b["text"], str)
+    ]
     for block in usable:
-        at = doc.text.find(block["text"], pos) if block["text"] else -1
+        at = doc.text.find(block["text"], pos)
         if at < 0:
             break
         starts.append(at)
@@ -122,14 +161,15 @@ def build_chunks(doc: Doc) -> tuple[list[OkfChunk], list[str]]:
         return [whole], warnings
     starts[0] = 0
     bounds = [*starts, len(doc.text)]
-    chunks = []
-    for i, block in enumerate(usable):
+    chunks: list[OkfChunk] = []
+    for first, last in _groups(usable, bounds):
+        block = usable[first]
         chunks.append(
             OkfChunk(
-                id=f"{dvid}#c{i}",
+                id=f"{dvid}#c{len(chunks)}",
                 document_version_id=dvid,
                 location=_location(block),
-                text=doc.text[bounds[i] : bounds[i + 1]],
+                text=doc.text[bounds[first] : bounds[last + 1]],
                 ocr="llm" if block.get("ocr") == "llm" else None,
                 unreadable=bool(block.get("unreadable")),
             )
@@ -269,6 +309,10 @@ def build_parts(
         chunks_by_doc[doc.document_version_id] = chunks
         warnings += notes
     graph = graph_records(nodes, edges, chunks_by_doc)
+    by_sha = {d.document_version_id: d.sha256 for d in docs}
+    twins: dict[str, uuid.UUID] = {}  # content hash -> the lowest-id copy that has entities
+    for dvid in sorted(graph.per_doc, key=str):
+        twins.setdefault(by_sha[dvid], dvid)
     documents = []
     for outcome in sorted(outcomes, key=lambda o: str(o.document_version_id)):
         dvid = outcome.document_version_id
@@ -282,10 +326,14 @@ def build_parts(
             )
             continue
         found = graph.per_doc.get(dvid, 0)
+        # Cognee keys a document by its content hash, so a second copy (the same PDF uploaded and
+        # attached to an email) has chunks but no entities of its own: say which copy holds them.
+        twin = None if found else twins.get(by_sha[dvid])
         documents.append(
             DocumentCoverage(
                 document_version_id=dvid,
                 status=CoverageStatus.COVERED if found else CoverageStatus.CHUNKS_ONLY,
+                reason=f"DUPLICATE_OF {twin}" if twin else None,
                 chunks=len(chunks_by_doc[dvid]),
                 entities=found,
             )
@@ -408,3 +456,32 @@ def parse_blocks(doc_json: bytes | None) -> list[dict[str, Any]]:
         return []
     blocks = data.get("blocks") if isinstance(data, dict) else None
     return [b for b in blocks if isinstance(b, dict)] if isinstance(blocks, list) else []
+
+
+# A candidate identifier: capitals, digits and hyphens, 5+ characters (UBR11758, NSA-RFQ-2026-0418).
+# Kept simple on purpose: lookaheads here made a hostile `A-A-A-...` quadratic and hung the build.
+# Whether it has a digit and a capital is checked in code, in linear time.
+ANCHOR_RE = re.compile(r"[A-Z0-9][A-Z0-9-]{3,}[A-Z0-9]")
+MAX_ANCHORS = 200
+MAX_ANCHOR_TEXT = 2_000_000  # characters scanned per document: bounds the work on any input
+MISSING_SAMPLE = 10
+
+
+def _is_anchor(token: str) -> bool:
+    return any(c.isdigit() for c in token) and any(c.isalpha() for c in token)
+
+
+def anchor_check(docs: Iterable[Doc], entity_names: Iterable[str]) -> AnchorCheck:
+    """The documents' most frequent identifiers, and how many of them are an entity's name (or part
+    of one: the LLM may write `UBR11758 V9.1`). No LLM: it checks the graph against the text."""
+    counts: dict[str, int] = {}
+    for doc in docs:
+        for match in ANCHOR_RE.findall(doc.text[:MAX_ANCHOR_TEXT]):
+            if _is_anchor(match):
+                counts[match] = counts.get(match, 0) + 1
+    anchors = sorted(counts, key=lambda a: (-counts[a], a))[:MAX_ANCHORS]
+    names = [_norm(n) for n in entity_names]
+    missing = [a for a in anchors if not any(_norm(a) in n for n in names)]
+    return AnchorCheck(
+        total=len(anchors), found=len(anchors) - len(missing), missing=missing[:MISSING_SAMPLE]
+    )

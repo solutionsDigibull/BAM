@@ -106,13 +106,21 @@ def test_e0_2_empty_state_and_tables_are_legitimate() -> None:
     raw = variant(
         **{
             IDEF + "s_source.fresh_state_parameters": [],
-            IDEF + "v_variables.no_op_condition": "auth_status is 'LOCKED'",
+            IDEF + "v_variables.no_op_condition": "mobile_number is 'LOCKED'",
             IDEF + "v_variables.escalation_condition": "otp_match == False",
             IDEF + "v_variables.tables": [],
         }
     )
     SubSkill.model_validate(raw)
     assert rules_at(validate_sub_skill(raw)) == [(7, IDEF + "o_outcome.state_handoff_file.table")]
+
+
+def test_a_no_op_condition_on_an_output_is_refused_because_it_runs_before_any_tool() -> None:
+    """It passed validation and then ended every sandbox case with EXPR_UNRESOLVED: nothing has run
+    when no_op_condition is checked, so there is no output to read."""
+    raw = variant(**{IDEF + "v_variables.no_op_condition": "otp_match == False"})
+    found = [v.message for v in validate_sub_skill(raw) if v.path.endswith("no_op_condition")]
+    assert len(found) == 1 and "checked before the first pass" in found[0]
 
 
 def test_e0_2_external_data_kind_accepts_json_strings() -> None:

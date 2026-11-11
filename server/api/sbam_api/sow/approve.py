@@ -36,6 +36,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.pipeline import PipelineInput, PipelineStage, ResumeState, SowApproved
@@ -75,6 +76,27 @@ SOW_APPROVED = "SOW_APPROVED"  # audit action
 CLAIM_STALE = timedelta(seconds=30)  # a delivery claim older than this belongs to a dead process
 # A scope change can't be approved while the current Workflow is being built (E7.2).
 BUILDING = frozenset({WorkflowState.BUILDING.value, WorkflowState.CERTIFYING.value})
+# A Sub-Skill in one of these is not being worked on: it waits for a person (or an admin). The
+# Workflow row stays BUILDING while its build waits, so "building" alone cannot mean "busy".
+PARKED = frozenset(
+    {"NEEDS_FDE_REVIEW", "TESTING_BLOCKED", "BUILD_ERROR", "DEPENDENCY_FAILED", "INVALID"}
+)
+
+
+def _only_waiting(session: Session, ctx: TenantContext, workflow: Any) -> bool:
+    """True when the Workflow is BUILDING but nothing in it is running: every Sub-Skill that is not
+    certified waits for a person. Such a build would otherwise block a scope change for good (the
+    FDE cannot edit the ISATVON or regenerate the schema while it is "building", and nothing else
+    ends it), so a new SOW approval may replace it."""
+    from sbam_api.isatvon.repository import SubSkillRepository
+
+    if workflow.state != WorkflowState.BUILDING.value:
+        return False
+    states = [s.state for s in SubSkillRepository(session, ctx).of_workflow(workflow.id)]
+    waiting = [s for s in states if s in PARKED]
+    return bool(waiting) and all(s in PARKED or s in ("CERTIFIED", "FROZEN") for s in states)
+
+
 SERVICE_ACCOUNT_PREFIX = "service-account-"  # Keycloak's username for a client's own token
 
 
@@ -169,10 +191,12 @@ def _prepare(
         base = versions.get(sow.approved_version_id)
         if base is not None:
             # Here, not at the top: the Workflow model imports the SOW package.
+            from sbam_api.workflows.models import Workflow
             from sbam_api.workflows.repository import WorkflowRepository
 
             workflow = WorkflowRepository(session, ctx).by_sow_version(base.id)
-            if workflow is not None and workflow.state in BUILDING:
+            abandoned = workflow is not None and _only_waiting(session, ctx, workflow)
+            if workflow is not None and workflow.state in BUILDING and not abandoned:
                 raise _conflict(
                     ErrorCode.WORKFLOW_BUILDING,
                     "A build is running",
@@ -180,6 +204,19 @@ def _prepare(
                     "it has finished.",
                 )
             record_impact(session, ctx, base, row)
+            if abandoned and workflow is not None:  # its waiting build is replaced, not left behind
+                apply_transition(
+                    session,
+                    ctx,
+                    TransitionCommand(
+                        model=Workflow,
+                        entity_id=workflow.id,
+                        event="cancel",
+                        actor=Actor.FDE,
+                        actor_id=str(user.user_id),
+                        correlation_id=correlation_id,
+                    ),
+                )
         scope_change = True
         apply_transition(
             session,
@@ -231,15 +268,32 @@ def _prepare(
 
 
 async def _precheck(
-    get_client: Callable[[], Awaitable[Client]], project_id: uuid.UUID, scope_change: bool
+    get_client: Callable[[], Awaitable[Client]],
+    project_id: uuid.UUID,
+    scope_change: bool,
+    waiting_build: bool = False,
 ) -> None:
-    """Before anything is approved: can the pipeline take it? Read-only, no lock held."""
+    """Before anything is approved: can the pipeline take it? Read-only, no lock held.
+    `waiting_build`: the Workflow only waits for a person, so "building" is no excuse."""
     status = await pipeline_status(await get_client(), project_id)
     if scope_change:
-        if status is not None and status.stage not in RESTARTABLE:
+        ok = RESTARTABLE | ({PipelineStage.BUILD_SUB_SKILLS} if waiting_build else set())
+        if status is not None and status.stage not in ok:
             raise PipelineBusy(status.stage)
     elif status is None or status.stage is not PipelineStage.WAIT_SOW_APPROVAL:
         raise PipelineNotWaiting(PipelineStage.WAIT_SOW_APPROVAL)
+
+
+def _waiting_build(session: Session, user: CurrentUser, project_id: uuid.UUID) -> bool:
+    """A plain read: the approved version's Workflow is BUILDING and only waiting for a person."""
+    from sbam_api.workflows.repository import WorkflowRepository
+
+    ctx = user.context(project_id)
+    sow = SowRepository(session, ctx).of_project()
+    if sow is None or sow.approved_version_id is None:
+        return False
+    workflow = WorkflowRepository(session, ctx).by_sow_version(sow.approved_version_id)
+    return workflow is not None and _only_waiting(session, ctx, workflow)
 
 
 def _would_be_scope_change(
@@ -330,6 +384,9 @@ async def deliver_approval(
                     ),
                 ),
                 with_search_attributes=with_search_attributes,
+                also_restartable=frozenset(
+                    {PipelineStage.BUILD_SUB_SKILLS}
+                ),  # validated in `_prepare`
             )
         else:
             await signal_pipeline(
@@ -373,7 +430,9 @@ async def approve_version(
     with sessions() as look:  # read-only, no lock: can the pipeline take an approval at all?
         replaces = await asyncio.to_thread(_would_be_scope_change, look, user, project_id, number)
     if replaces is not None:
-        await _precheck(get_client, project_id, replaces)
+        with sessions() as look:
+            waiting = await asyncio.to_thread(_waiting_build, look, user, project_id)
+        await _precheck(get_client, project_id, replaces, waiting)
     with sessions() as session:
         try:
             prepared = await asyncio.to_thread(

@@ -1,12 +1,12 @@
-import { PagePlaceholder } from "@/components/shell/page-placeholder";
+import { WorkflowsScreen } from "./workflows-screen";
 
 export const metadata = { title: "Workflows" };
 
-export default function WorkflowsPage() {
-  return (
-    <PagePlaceholder
-      title="Workflows"
-      empty="SBAM creates the Workflow after the SOW is approved."
-    />
-  );
+export default async function WorkflowsPage({
+  params,
+}: {
+  params: Promise<{ projectId: string }>;
+}) {
+  const { projectId } = await params;
+  return <WorkflowsScreen projectId={projectId} />;
 }

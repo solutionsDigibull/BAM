@@ -50,6 +50,9 @@ def test_e5_2_t01_three_parsed_documents_make_version_1_ready(w: World) -> None:
     assert sorted(r["document_version_id"] for r in rows) == sorted(docs)
     assert {r["status"] for r in rows} == {"ADDED"}
     assert coverage(v1).entities > 0
+    bundle = coverage(v1).bundle
+    assert bundle is not None  # the headline counts the bundle's entities, not the graph's nodes
+    assert coverage(v1).entities == sum(d.entities for d in bundle.documents)
     assert w.beats >= 1  # cognify ran with the heartbeat task alive
 
 
@@ -376,3 +379,50 @@ def test_450_the_prune_never_leaves_the_projects_dataset(w: World) -> None:
     w.cognee.data[other] = {"foreign_item": b"x"}
     w.build_all(w.run_input())
     assert w.cognee.data[other] == {"foreign_item": b"x"}
+
+
+def test_graph_from_other_models_is_started_afresh(
+    w: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cognee skips documents it already processed, so a rebuild after switching the mock LLM for a
+    real one kept the mock graph (80 junk entities). A change of models resets the dataset once."""
+    w.docs("RFQ", "BOM")
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    w.build_all(w.run_input())
+    assert "delete_dataset" not in w.cognee.calls  # the first graph has nothing to replace
+    w.build_all(w.run_input())
+    assert "delete_dataset" not in w.cognee.calls  # same models: the incremental rebuild stays
+    monkeypatch.setenv("LLM_PROVIDER", "bifrost")
+    inp = w.run_input()
+    w.build(inp)
+    w.build(inp, attempt=2)  # a retry of the same activity must not reset again
+    assert w.cognee.calls.count("delete_dataset") == 1
+    assert (coverage(versions(w.sessions, w.project)[-1]).extraction or "").startswith("bifrost")
+
+
+def test_a_reset_that_failed_is_tried_again_by_the_retry(
+    w: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The version used to be stamped before the reset ran: a Cognee outage during the reset made
+    the retry think it was done, and the old graph stayed."""
+    w.docs("RFQ", "BOM")
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    w.build_all(w.run_input())
+    monkeypatch.setenv("LLM_PROVIDER", "bifrost")
+    real = w.cognee.delete_dataset
+    outage = [True]
+
+    async def flaky(who: Principal, dataset: str) -> None:
+        if outage[0]:
+            outage[0] = False
+            raise EmbeddingException("Cognee went away")
+        await real(who, dataset)
+
+    monkeypatch.setattr(w.cognee, "delete_dataset", flaky)
+    inp = w.run_input()
+    with pytest.raises(ApplicationError):
+        w.build(inp)  # the reset fails: retryable
+    w.build(inp, attempt=2)
+    assert not outage[0] and w.cognee.calls.count("delete_dataset") == 1  # reset ran on the retry
+    w.build(inp, attempt=3)
+    assert w.cognee.calls.count("delete_dataset") == 1  # and only once
