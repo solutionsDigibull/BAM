@@ -11,7 +11,7 @@ import { currentTests } from '../lib/certification'
 import { diffWords } from '../lib/sowDiff'
 import { CertChecklist, DemoTag, ManifestCompare, VersionHistory } from '../components/release'
 import { Banner, Copy, Empty, GateButton, Icon, Pane, Section, Skeleton, StageList, StatusPill, Time, shortHash } from '../components/ui'
-import { DiffText } from './Step2'
+import { DiffText } from '../components/DiffText'
 import { FindingItem, ReviewEditor, codeRev, openCode } from './Step3'
 
 // ---- 3.3 Skills/code review ----------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import './host.css'
 
-export type SlotId = 'scope'
+export type SlotId = 'scope' | 'grid'
 
 let elements: Partial<Record<SlotId, HTMLElement>> = {}
 const subs = new Set<() => void>()

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ragPipeline } from "../rag/ragPipeline";
-import { buildSnapshot, resetSnapshotCache, sowOf } from "./snapshot";
+import { buildSnapshot, buildStarted, gridStep, resetSnapshotCache, sowOf } from "./snapshot";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
 
@@ -9,7 +9,7 @@ const json = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 
 /** Answers the reads the snapshot makes; any other request fails the test. */
-function api(opts: { state: string; versions?: unknown[]; documents?: unknown[]; sow?: unknown }) {
+function api(opts: { state: string; versions?: unknown[]; documents?: unknown[]; sow?: unknown; workflows?: unknown[] }) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
@@ -25,6 +25,7 @@ function api(opts: { state: string; versions?: unknown[]; documents?: unknown[];
           counts: { uploaded: 0, parsed: 0, rejected: 0, failed: 0 },
         });
       if (path === `projects/${PROJECT}/knowledge`) return json({ versions: opts.versions ?? [] });
+      if (path === `projects/${PROJECT}/workflows`) return json({ items: opts.workflows ?? [] });
       if (path === `projects/${PROJECT}/sow`) return json(opts.sow ?? { sow_id: "s1", current: null, approved: null, etag: "e" });
       if (path.includes("/graph"))
         return json({
@@ -174,5 +175,55 @@ describe("the SOW in the workbench snapshot (#713)", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => (String(url).endsWith("/sow") ? new Response("{}", { status: 500 }) : json({ items: [], next_cursor: null, state: "SOW_REVIEW", steps: [], counts: {}, versions: [] }))));
     const snap = await buildSnapshot(PROJECT);
     expect(snap.sow).toBeUndefined();
+  });
+});
+
+const workflow = (state: string, created_at = "2026-11-10T10:00:00Z") =>
+  ({ id: `w-${created_at}`, name: "Onboarding", state, created_at }) as never;
+
+describe("the grid step follows the project's Workflow (#714)", () => {
+  test("test_714_no_workflow_before_the_sow_is_approved_keeps_the_grid_locked", async () => {
+    const calls = api({ state: "SOW_REVIEW" });
+    const snap = await buildSnapshot(PROJECT);
+    expect(snap.steps[1]).toMatchObject({ state: "locked", editable: false });
+    expect(snap.activeStep).toBe(1);
+    expect(calls.some((c) => c.endsWith("/workflows"))).toBe(false); // nothing to ask for yet
+  });
+
+  test("test_714_an_approved_sow_without_a_workflow_yet_is_creating_it", () => {
+    expect(gridStep(undefined, "SOW_APPROVED")).toMatchObject({ state: "active", editable: false });
+  });
+
+  test.each([
+    ["CREATED", "active", false],
+    ["ISATVON_EXTRACTING", "active", false],
+    ["ISATVON_REVIEW", "needs_review", true],
+    ["NEEDS_FDE_REVIEW", "needs_review", true],
+    ["EXTRACTION_FAILED", "failed", true],
+    ["WORKFLOW_VALIDATION_FAILED", "failed", true],
+    ["BUILDING", "done", false],
+    ["CERTIFIED", "done", false],
+    ["CANCELLED", "locked", false],
+  ])("test_714_workflow_%s_is_%s_and_editable_%s", (state, step, editable) => {
+    expect(gridStep(workflow(state), "WORKFLOW_CREATED")).toMatchObject({ state: step, editable });
+  });
+
+  test("test_714_the_newest_workflow_decides_and_the_grid_becomes_the_active_step", async () => {
+    api({
+      state: "WORKFLOW_CREATED",
+      workflows: [workflow("CANCELLED", "2026-11-01T10:00:00Z"), workflow("ISATVON_REVIEW", "2026-11-10T10:00:00Z")],
+    });
+    const snap = await buildSnapshot(PROJECT);
+    expect(snap.steps[1]).toMatchObject({ state: "needs_review", editable: true });
+    expect(snap.activeStep).toBe(2);
+    expect(snap.workflowName).toBe("Onboarding");
+  });
+
+  test("test_714_steps_3_and_4_stay_locked_and_say_so_once_the_build_has_started", async () => {
+    api({ state: "WORKFLOW_CREATED", workflows: [workflow("BUILDING")] });
+    const snap = await buildSnapshot(PROJECT);
+    expect(buildStarted(workflow("BUILDING"))).toBe(true);
+    expect(snap.steps[2]).toMatchObject({ state: "locked", editable: false });
+    expect(snap.steps[2]?.reason).toMatch(/not available in the workbench yet/);
   });
 });

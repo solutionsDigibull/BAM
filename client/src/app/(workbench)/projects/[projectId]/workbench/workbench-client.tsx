@@ -7,6 +7,7 @@ import { setBamApi } from "@/workbench/api/adapter";
 import { setHostSession } from "@/workbench/features/login/session";
 import { createSbamApi } from "@/workbench/http/sbamApi";
 
+import { GridHost } from "./grid-host";
 import { ScopeHost } from "./scope-host";
 
 // The workbench uses browser-only APIs (Uppy, canvas, ResizeObserver), so it is not rendered on the server.
@@ -38,6 +39,7 @@ export function WorkbenchClient({
     <div style={{ height: "100vh" }}>
       <Workbench />
       <ScopeHost projectId={projectId} />
+      <GridHost projectId={projectId} />
     </div>
   );
 }

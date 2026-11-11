@@ -14,7 +14,6 @@ import { NavRail, TopBar } from './components/shell'
 import { AutoChip, Banner, Confirm, Empty, ErrorState, HitlChip, Icon, PanesContext, Skeleton } from './components/ui'
 import { Intake } from './steps/Intake'
 import { HostSlot } from './host/slots'
-import * as Step2 from './steps/Step2'
 import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
 import { FileDetail, IngestReviewFooter, IngestionReview, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
@@ -40,7 +39,8 @@ export interface StepProps { snap: Snapshot; info: StepInfo }
 const PANES: Record<string, { Left?: (p: StepProps) => React.ReactNode; Center: (p: StepProps) => React.ReactNode; Right?: (p: StepProps) => React.ReactNode }> = {
   // Scope: the host's SOW screen, rendered into this slot (workbench-client.tsx / scope-host.tsx).
   '3.1': { Center: () => <HostSlot id="scope" /> },
-  '3.2': { Center: Step2.Center },
+  // Grid: the host's ISATVON grid, rendered into this slot (grid-host.tsx).
+  '3.2': { Center: () => <HostSlot id="grid" /> },
   '4.1': { Center: Step3.ActivitiesCenter },
   '4.3': { Center: Step3.CodeCenter },
   '4.2': { Center: Step3.TemplateCenter }, // Template: a real step (Ready · Running · Review · Failed · Approved)
