@@ -1,6 +1,6 @@
 // The workbench's Snapshot, composed from the SBAM API: documents, the project pipeline and the knowledge
 // versions. Every status shown comes from one of these backend objects; nothing is invented. Steps 2 to 4
-// (skills, contract and checks, tests) are filled in by their own screens' wiring and stay locked here.
+// (skills, contract and checks, tests): step 2 follows the project's Workflow; 3 and 4 stay locked until their screens are wired.
 import type {
   DocumentOut,
   KnowledgeGraphPage,
@@ -9,6 +9,8 @@ import type {
   PipelineTimeline,
   ProjectPipelineState,
   SowOverview,
+  WorkflowState,
+  WorkflowSummary,
 } from "@/contracts";
 
 import type { IngestionRun, RunStatus, Snapshot, Sow, Stage, StepId, StepInfo } from "../api/types";
@@ -23,6 +25,34 @@ const LOCKED = [
   "Generate the ISATVON contract in the skills grid to unlock validation",
   "Approve the manifest and code in validation to unlock testing",
 ];
+
+/** The grid step from the project's Workflow (SBAM creates it when the SOW is approved; the FDE never does). */
+const BUILD_STARTED: ReadonlySet<WorkflowState> = new Set(["BUILDING", "CERTIFYING", "CERTIFIED", "FROZEN"]);
+export function gridStep(w: WorkflowSummary | undefined, pipeline: ProjectPipelineState): Pick<StepInfo, "state" | "reason" | "editable"> {
+  if (!w) {
+    return pipeline === "SOW_APPROVED"
+      ? { state: "active", reason: "Creating the workflow from the approved SOW", editable: false }
+      : { state: "locked", reason: LOCKED[1]!, editable: false };
+  }
+  switch (w.state) {
+    case "CREATED":
+    case "ISATVON_EXTRACTING":
+      return { state: "active", reason: "Extracting the skills from the approved SOW", editable: false };
+    case "ISATVON_REVIEW":
+      return { state: "needs_review", reason: "Review the skills, then Generate", editable: true };
+    case "NEEDS_FDE_REVIEW":
+      return { state: "needs_review", reason: "Some skills need your review", editable: true };
+    case "EXTRACTION_FAILED":
+    case "WORKFLOW_VALIDATION_FAILED":
+      return { state: "failed", reason: "The skills could not be extracted. Regenerate them in the grid.", editable: true };
+    case "CANCELLED":
+      return { state: "locked", reason: "This workflow was cancelled", editable: false };
+    default:
+      return { state: "done", reason: "Completed: the build has started", editable: false };
+  }
+}
+export const buildStarted = (w: WorkflowSummary | undefined): boolean => !!w && BUILD_STARTED.has(w.state);
+const NOT_WIRED = "The build has started. Its screens are not available in the workbench yet.";
 
 const FAILED: ProjectPipelineState[] = ["INGESTION_FAILED", "KNOWLEDGE_FAILED", "SOW_GENERATION_FAILED"];
 
@@ -46,6 +76,11 @@ export function sowOf(o: SowOverview | undefined, state: ProjectPipelineState): 
     approval: appr ? { version: appr.version, at: appr.created_at, by: appr.author ?? "" } : undefined,
   };
 }
+
+/** From SOW approval on, SBAM makes (or has made) the Workflow. */
+const HAS_WORKFLOW: ReadonlySet<ProjectPipelineState> = new Set(["SOW_APPROVED", "WORKFLOW_CREATED"]);
+const newest = (items: WorkflowSummary[]): WorkflowSummary | undefined =>
+  [...items].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
 
 const graphs = new Map<string, KnowledgeGraph>();
 const GRAPH_PAGE = 500;
@@ -114,6 +149,9 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
   const sowOverview = HAS_SOW.has(pipeline.state)
     ? await getJson<SowOverview>(`projects/${projectId}/sow`).then((r) => r.body, () => undefined)
     : undefined;
+  const workflow = HAS_WORKFLOW.has(pipeline.state)
+    ? await getJson<{ items: WorkflowSummary[] }>(`projects/${projectId}/workflows`).then((r) => newest(r.body.items), () => undefined)
+    : undefined;
   const active = documents.filter(isActive);
   const uploads = active.map(toUploadRecord);
   const kv = latest(knowledge);
@@ -158,21 +196,25 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
 
   const one = stepOne(state, uploads.length, kv?.error_reason ?? undefined);
   const steps: StepInfo[] = ([1, 2, 3, 4] as StepId[]).map((n) => {
-    const info = n === 1 ? one : { state: "locked" as const, reason: LOCKED[n - 1]! };
+    const info =
+      n === 1
+        ? { ...one, editable: one.state !== "locked" }
+        : n === 2
+          ? gridStep(workflow, state)
+          : { state: "locked" as const, reason: buildStarted(workflow) ? NOT_WIRED : LOCKED[n - 1]!, editable: false };
     return {
       id: n,
       title: TITLES[n - 1]!,
       ...info,
       stale: false,
-      editable: n === 1 && info.state !== "locked",
       background: n === 1 && ["INGESTING", "KNOWLEDGE_BUILDING", "SOW_GENERATING"].includes(state) ? 1 : 0,
     };
   });
 
   return {
     serverTime: new Date().toISOString(),
-    workflowName: "Workflow",
-    activeStep: 1,
+    workflowName: workflow?.name ?? "Workflow",
+    activeStep: workflow && workflow.state !== "CANCELLED" ? 2 : 1,
     steps,
     uploads,
     scanEvents: scanEventsOf(documents),
