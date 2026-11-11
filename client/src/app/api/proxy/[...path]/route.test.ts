@@ -85,9 +85,9 @@ describe("API proxy (E1.14)", () => {
   });
 
   it("e6_5 a SOW citation id with # is forwarded as %23, not read as a fragment", () => {
-    expect(upstreamPath(["api", "v1", "projects", "p1", "sow", "versions", "1", "citations", "0a1b#c2"])).toBe(
-      "/api/v1/projects/p1/sow/versions/1/citations/0a1b%23c2",
-    );
+    expect(
+      upstreamPath(["api", "v1", "projects", "p1", "sow", "versions", "1", "citations", "0a1b#c2"]),
+    ).toBe("/api/v1/projects/p1/sow/versions/1/citations/0a1b%23c2");
     expect(upstreamPath(["api", "v1", "x?y"])).toBeNull();
   });
 
