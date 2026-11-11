@@ -115,7 +115,11 @@ def fingerprint(isatvon: Mapping[str, Any]) -> str:
     """What the cases are validated against: the bound, the closed input schema, the tables. A
     correction that leaves these alone leaves the tests alone (E11.4b)."""
     context = request_context(isatvon)
-    parts = {key: context[key] for key in ("input_schema", "tables", "limits")}
+    parts = {key: context[key] for key in ("input_schema", "limits")}
+    # The ISATVON's own list, not the seedable one (#738): leaving the handoff table out of the
+    # request must not change every Sub-Skill's fingerprint (an FDE-edited dataset would go stale).
+    raw = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables.tables
+    parts["tables"] = json.dumps(raw)
     return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
 

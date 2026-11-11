@@ -33,8 +33,12 @@ def input_schema(isatvon: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def declared_tables(isatvon: Mapping[str, Any]) -> list[str]:
-    tables: list[str] = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables.tables
-    return tables
+    """The tables a case may seed: `v_variables.tables`, each once, without the handoff table. The
+    runner counts the handoff table's rows per pass, so a seed there can never pass (#738)."""
+    definition = SubSkillModel.model_validate(isatvon).isatvon_definition
+    handoff = definition.o_outcome.state_handoff_file.table.lower()
+    tables = [t for t in definition.v_variables.tables if t.lower() != handoff]
+    return list(dict.fromkeys(tables))
 
 
 def _input_errors(schema: Mapping[str, Any], value: Mapping[str, Any]) -> list[FieldError]:

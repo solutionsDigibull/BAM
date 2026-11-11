@@ -235,7 +235,7 @@ def test_e13_4_a_dataset_the_fde_edited_is_kept_on_a_rebuild() -> None:
 def test_e13_4_the_context_holds_only_this_sub_skills_isatvon() -> None:
     context = request_context(sample())
     assert set(context) == {"sub_skill", "input_schema", "tables", "limits"}
-    assert json.loads(context["tables"]) == ["investor_profiles", "auth_event_audit_handoff"]
+    assert json.loads(context["tables"]) == ["investor_profiles"]  # never the handoff (#738)
 
 
 @pytest.mark.parametrize("extension", ["csv", "json", "xlsx"])
