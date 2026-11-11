@@ -49,9 +49,11 @@ class NotInReview(ApiError):  # noqa: N818 - code name from the E10.2 spec
 async def latest_build_id(client: Client, sub_skill_id: UUID) -> str | None:
     """Id of the Sub-Skill's newest build (highest build_no), running or finished.
 
-    Build numbers are contiguous from 1 (ProjectPipeline starts build_no+1 for each rebuild), so the
-    newest is the last one that exists. Probing needs no visibility store, which the dev/test
-    Temporal servers don't have; a Sub-Skill has a handful of builds, not hundreds.
+    Build numbers are contiguous from 1 (ProjectPipeline starts build_no+1 for each rebuild), but
+    Temporal's retention removes finished ones, oldest first (#735): numbers it no longer has are
+    skipped until one exists, and the first gap after that ends the probe. Probing needs no
+    visibility store, which the dev/test Temporal servers don't have; a Sub-Skill has a handful of
+    builds, not hundreds.
     """
     newest: str | None = None
     for build_no in range(1, MAX_BUILDS + 1):
@@ -60,7 +62,9 @@ async def latest_build_id(client: Client, sub_skill_id: UUID) -> str | None:
             await client.get_workflow_handle(build_id).describe(rpc_timeout=QUERY_TIMEOUT)
         except RPCError as exc:
             if exc.status == RPCStatusCode.NOT_FOUND:
-                break
+                if newest is not None:
+                    break
+                continue  # removed by retention: a newer one may still exist
             raise OrchestratorUnavailable() from None
         newest = build_id
     return newest

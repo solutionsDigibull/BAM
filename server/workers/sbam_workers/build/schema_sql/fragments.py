@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sbam_api.schema_sql.validate import Problem, Script, check
 from sbam_contracts.schema_sql import SchemaFindingCode
 
+from sbam_workers.build.schema_sql.guard import HANDOFF_COLUMNS
 from sbam_workers.build.schema_sql.merge import columns
 from sbam_workers.llm.reask import SchemaInvalidAfterRetries
 
@@ -32,7 +33,7 @@ class DdlFragment(BaseModel):
     sql: str = Field(min_length=1, max_length=200_000)
 
 
-HANDOFF_WRITES = frozenset({"skill_id", "payload"})  # what templates/*/state_handoff.py.j2 inserts
+HANDOFF_WRITES = frozenset(HANDOFF_COLUMNS)  # what templates/*/state_handoff.py.j2 inserts
 
 
 def fragment_errors(

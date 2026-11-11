@@ -23,6 +23,15 @@ END;
 $$"""
 
 
+# The columns templates/*/state_handoff.py.j2 inserts (`INSERT INTO <table> (skill_id, payload)`).
+# A generated handoff table without them gets them from `merge` (#735): platform code writes them,
+# so they are never left to the model.
+HANDOFF_COLUMNS: Final = {
+    "skill_id": "skill_id text NOT NULL DEFAULT ''",
+    "payload": "payload jsonb NOT NULL DEFAULT '{}'::jsonb",
+}
+
+
 def guard_sql(tables: Iterable[str]) -> list[str]:
     """The function once, then both triggers per table (sorted, so the output is stable)."""
     ordered = sorted(set(tables))
