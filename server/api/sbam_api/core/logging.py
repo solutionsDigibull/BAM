@@ -27,6 +27,20 @@ _EXTRA_FIELDS = (
     "action",
     "entity",
     "detail",  # identity audit events (#49)
+    # Ids, counts and codes the workers log. Without these a worker's `extra=` was dropped silently
+    # (a failed SOW logged no cause, a built graph no entity count). Never document text.
+    "tenant_id",
+    "project_id",
+    "sow_version_id",
+    "type",
+    "cause",
+    "version",
+    "entities",
+    "relations",
+    "chunks",
+    "problems",
+    "started",
+    "failed",
 )
 _SECRET_VALUE = re.compile(
     r"(?i)\b(authorization|password|passwd|secret|token|api[_-]?key)\b(\s*[=:]\s*)(\"[^\"]*\"|\S+)"
@@ -62,7 +76,8 @@ class JsonFormatter(logging.Formatter):
             entry["span_id"] = format(span.span_id, "016x")
         for key in _EXTRA_FIELDS:
             if hasattr(record, key):
-                entry[key] = getattr(record, key)
+                value = getattr(record, key)
+                entry[key] = redact(value) if isinstance(value, str) else value
         return json.dumps(entry, default=str)
 
 

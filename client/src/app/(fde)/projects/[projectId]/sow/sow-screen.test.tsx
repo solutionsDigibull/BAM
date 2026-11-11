@@ -106,6 +106,7 @@ describe("SOW screen states (E6.5)", () => {
     render();
     const failed = await screen.findByTestId("sow-failed", {}, { timeout: 5000 }); // 3 requests in turn
     expect(failed.textContent).toContain("LLM_UNAVAILABLE");
+    expect(failed.textContent).toContain("could not be reached"); // what to do, not just a code
     expect(screen.getAllByRole("button", { name: "Regenerate" }).length).toBeGreaterThan(0);
   });
 

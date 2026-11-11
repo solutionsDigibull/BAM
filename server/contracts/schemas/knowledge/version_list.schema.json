@@ -2,6 +2,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:sbam:contracts:knowledge/version_list:0.1.0",
   "$defs": {
+    "AnchorCheck": {
+      "additionalProperties": false,
+      "description": "How many identifiers written in the documents (part numbers, RFQ numbers) became entities.\nA graph can have any entity count; one that misses the documents' own identifiers is wrong.",
+      "properties": {
+        "total": {
+          "default": 0,
+          "title": "Total",
+          "type": "integer"
+        },
+        "found": {
+          "default": 0,
+          "title": "Found",
+          "type": "integer"
+        },
+        "missing": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing",
+          "type": "array"
+        }
+      },
+      "title": "AnchorCheck",
+      "type": "object"
+    },
     "BundleCoverage": {
       "additionalProperties": false,
       "properties": {
@@ -237,6 +262,29 @@
           "default": 0,
           "title": "Chunks",
           "type": "integer"
+        },
+        "anchors": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnchorCheck"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "extraction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extraction"
         },
         "bundle": {
           "anyOf": [

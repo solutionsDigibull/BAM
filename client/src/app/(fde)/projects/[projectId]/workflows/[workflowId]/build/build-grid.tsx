@@ -108,7 +108,11 @@ function RetryCell({ data, context }: ICellRendererParams<BuildRow, unknown, Ctx
   return (
     // a native title, not a Tooltip per row; the wrapper keeps it on a disabled button
     <span
-      title={allowed ? "Retry after your fix" : "Retry is offered in NEEDS_FDE_REVIEW only"}
+      title={
+        allowed
+          ? "Retry after your fix"
+          : "Retry is offered when the build waits for you (review needed, or tests blocked)"
+      }
       style={{ display: "inline-flex", gap: 6 }}
     >
       {/* the loop test cases and the harness trace (E13.7) */}
@@ -172,7 +176,7 @@ const COLUMNS: (ColDef<BuildRow> | ColGroupDef<BuildRow>)[] = [
       colId: g.name,
       headerName: g.label,
       headerTooltip: g.name,
-      width: 92,
+      width: 74,
       cellRenderer: GateCell,
       cellStyle: { display: "flex", justifyContent: "center", alignItems: "center" },
       // the status, so AG Grid redraws a cell when it changes and leaves the others alone
@@ -183,7 +187,7 @@ const COLUMNS: (ColDef<BuildRow> | ColGroupDef<BuildRow>)[] = [
   {
     colId: "retry",
     headerName: "",
-    width: 250,
+    width: 230,
     pinned: "right",
     valueGetter: (p) => p.data?.state,
     cellRenderer: RetryCell,
@@ -235,6 +239,8 @@ export default function BuildGrid({
         rowClassRules={ROW_CLASS}
         context={context}
         suppressCellFocus
+        // long header names wrap instead of being cut ("Conforma…"), so the matrix reads at 74 px a gate
+        defaultColDef={{ wrapHeaderText: true, autoHeaderHeight: true }}
         // ~24 narrow columns: keep them all in the DOM (rows stay virtualised), so a gate scrolled
         // out of view is still there to click and to read for a screen reader
         suppressColumnVirtualisation

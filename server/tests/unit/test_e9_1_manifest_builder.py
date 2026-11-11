@@ -236,7 +236,7 @@ def test_e9_1_empty_fresh_state_is_valid() -> None:
     raw = copy.deepcopy(sample())
     raw["isatvon_definition"]["s_source"]["fresh_state_parameters"] = []
     variables = raw["isatvon_definition"]["v_variables"]  # gates that read no fresh state
-    variables["no_op_condition"] = "otp_match == False"
+    variables["no_op_condition"] = "mobile_number is None"
     variables["escalation_condition"] = "policy_violation == True"
     manifest, _ = build(raw)
     assert manifest["isatvon_definition"]["s_source"]["fresh_state_parameters"] == []

@@ -292,3 +292,69 @@ def test_e5_3_storage_keys_are_content_addressed_under_okf(w: World) -> None:
     where = StorageScope(TENANT, w.project)
     for name, ref in head.parts.items():
         assert ref.storage_key == where.key(Kind.OKF, hashlib.sha256(parts[name]).hexdigest())
+
+
+def test_e5_3_identical_copy_without_entities_names_the_copy_that_has_them() -> None:
+    doc, outcomes, nodes, edges = small()
+    copy = okf.Doc(
+        uuid.uuid4(), doc.text, doc.sha256
+    )  # same bytes, e.g. a PDF and its email attachment
+    outcomes.append(
+        CoverageEntry(document_version_id=copy.document_version_id, status=SourceStatus.ADDED)
+    )
+    built = okf.build_parts([doc, copy], outcomes, nodes, edges, b"")
+    by_id = {d.document_version_id: d for d in built.coverage.documents}
+    assert by_id[doc.document_version_id].reason is None
+    assert by_id[copy.document_version_id].entities == 0
+    assert by_id[copy.document_version_id].reason == f"DUPLICATE_OF {doc.document_version_id}"
+
+
+def test_e5_3_empty_text_table_block_does_not_collapse_the_chunks() -> None:
+    text = "# Routing\n\n| Op | Time |\n| --- | --- |\n| Cut | 5 |\n"
+    blocks = [
+        {"type": "heading", "text": "# Routing"},
+        {"type": "table", "text": ""},  # the table itself; its rows are the blocks after it
+        {"type": "row", "text": "| Op | Time |"},
+        {"type": "row", "text": "| Cut | 5 |"},
+    ]
+    doc = okf.Doc(uuid.uuid4(), text, hashlib.sha256(text.encode()).hexdigest(), blocks)
+    chunks, warnings = okf.build_chunks(doc)
+    assert warnings == [] and len(chunks) == 3
+    assert "".join(c.text for c in chunks) == text
+
+
+def test_e5_3_spreadsheet_cells_are_grouped_into_chunks_not_one_per_cell() -> None:
+    cells = [f"c{n}" for n in range(1000)]
+    text = "| " + " | ".join(cells) + " |\n"
+    blocks = [
+        {"type": "cell", "text": c, "sheet": "S", "cell": f"A{n}"} for n, c in enumerate(cells)
+    ]
+    doc = okf.Doc(uuid.uuid4(), text, hashlib.sha256(text.encode()).hexdigest(), blocks)
+    chunks, warnings = okf.build_chunks(doc)
+    assert warnings == [] and 1 < len(chunks) < 20
+    assert "".join(c.text for c in chunks) == text
+    assert chunks[1].location.cell is not None and chunks[1].location.sheet == "S"
+
+
+def test_e5_3_anchor_check_names_the_identifiers_the_graph_missed() -> None:
+    text = "RFQ NSA-RFQ-2026-0418 asks for UBR11758 ten times: UBR11758 UBR11758. Also UBR99999."
+    doc = okf.Doc(uuid.uuid4(), text, hashlib.sha256(text.encode()).hexdigest())
+    check = okf.anchor_check([doc], ["UBR11758 V9.1", "nsa-rfq-2026-0418", "rfq"])
+    assert (check.total, check.found, check.missing) == (3, 2, ["UBR99999"])
+
+
+def test_e5_3_anchor_check_on_a_document_without_identifiers_is_empty() -> None:
+    doc = okf.Doc(uuid.uuid4(), "Plain words only", "0" * 64)
+    check = okf.anchor_check([doc], [])
+    assert (check.total, check.found, check.missing) == (0, 0, [])
+
+
+def test_e5_3_anchor_check_stays_fast_on_hostile_text() -> None:
+    """A lookahead regex here was quadratic on `A-A-A-...`: a 40 KB upload hung the bundle step."""
+    import time
+
+    for text in ("A-" * 1_000_000, "A" * 2_000_000, "1-" * 1_000_000, "-" * 2_000_000):
+        doc = okf.Doc(uuid.uuid4(), text, "0" * 64)
+        began = time.monotonic()
+        okf.anchor_check([doc], [])
+        assert time.monotonic() - began < 2

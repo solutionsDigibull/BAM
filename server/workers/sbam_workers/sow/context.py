@@ -23,12 +23,25 @@ from uuid import UUID
 from sbam_contracts.okf import Location, OkfChunk, OkfEntity, OkfRelation
 from sbam_contracts.sow import SECTIONS
 
-CHARS_PER_TOKEN: Final = 4  # the same rough measure as the LLM client's size guard
+# Characters per token. 4 is usual for prose, but this text is tables, part numbers and ids:
+# one real SOW prompt was billed 79,710 tokens where 4 predicted 44,854. 3 errs on the safe side,
+# so a bundle that would overflow the model's window is ranked instead of failing at the provider.
+CHARS_PER_TOKEN: Final = 3
 # What the prompt, the JSON Schema and the answer need besides the documents.
 RESERVED_TOKENS: Final = 40_000
 GRAPH_BONUS: Final = 0.15
 LENGTH_PENALTY: Final = 0.05
 MAX_RELATIONS_PER_ENTITY: Final = 20
+FLOOR_CHUNK_TOKENS: Final = 1_500  # the largest chunk that may stand in for a whole document
+
+
+def prompt_budget(settings: Any) -> int:
+    """Tokens of documents one prompt may carry: what the model's window leaves after the reserve,
+    and at most `sow_context_max_tokens` (the cost cap). Over it the context is ranked, not cut."""
+    window = int(settings.llm_max_context_tokens) - RESERVED_TOKENS
+    cap = settings.sow_context_max_tokens
+    return min(window, int(cap)) if cap else window
+
 
 Embed = Callable[[list[str]], Awaitable[list[list[float]]]]
 Mode = Literal["FULL", "RANKED"]
@@ -74,10 +87,15 @@ class SowContext:
     citable: dict[str, frozenset[UUID]]  # okf_ref_id -> the document versions it may cite
     locations: dict[tuple[str, UUID], dict[str, Any]]  # the real location of each citable pair
     manifest: dict[str, Any] = field(default_factory=dict)  # LlmClient.run(manifest_extra=...)
+    refs: dict[str, str] = field(default_factory=dict)  # the short id the model saw -> the OKF id
+
+    def resolve(self, okf_ref_id: str) -> str:
+        """The OKF id behind an id the model cited (itself when it is not one of our short ids)."""
+        return self.refs.get(okf_ref_id, okf_ref_id)
 
 
 def tokens(text: str) -> int:
-    return len(text) // CHARS_PER_TOKEN
+    return -(-len(text) // CHARS_PER_TOKEN)
 
 
 def citation_location(location: Location) -> dict[str, Any]:
@@ -91,17 +109,17 @@ def _where(location: Location) -> str:
     return " ".join(f"{k}={v}" for k, v in citation_location(location).items())
 
 
-def render_chunk(chunk: OkfChunk) -> str:
+def render_chunk(chunk: OkfChunk, ref: str | None = None) -> str:
     return (
-        f"[chunk {chunk.id} doc={chunk.document_version_id} {_where(chunk.location)}]\n"
+        f"[chunk {ref or chunk.id} doc={chunk.document_version_id} {_where(chunk.location)}]\n"
         f"{chunk.text.strip()}"
     )
 
 
-def render_entity(entity: OkfEntity, relations: list[str]) -> str:
-    ref = entity.source_refs[0]
+def render_entity(entity: OkfEntity, relations: list[str], ref: str | None = None) -> str:
+    first = entity.source_refs[0]
     head = (
-        f"[entity {entity.id} doc={ref.document_version_id} {_where(ref.location)}] "
+        f"[entity {ref or entity.id} doc={first.document_version_id} {_where(first.location)}] "
         f"{entity.type}: {entity.name}"
     )
     return "\n".join([head, *(f"  {r}" for r in relations[:MAX_RELATIONS_PER_ENTITY])])
@@ -131,9 +149,18 @@ def _assemble(
     manifest: dict[str, Any],
 ) -> SowContext:
     relations = _relation_lines(bundle)
+    # Short ids (`c1`, `e1`) instead of `<uuid>#c12` and entity UUIDs: they are most of every header
+    # line, and a header is repeated for each of hundreds of chunks and entities in every prompt.
+    # The model cites the short id; `SowContext.resolve` maps it back before anything is stored.
+    refs = {f"c{n}": c.id for n, c in enumerate(chunks, 1)}
+    refs |= {f"e{n}": e.id for n, e in enumerate(entities, 1)}
+    chunk_ref = {real: short for short, real in refs.items() if short[0] == "c"}
+    entity_ref = {real: short for short, real in refs.items() if short[0] == "e"}
     blocks = {
-        "chunks": "\n\n".join(render_chunk(c) for c in chunks) or "(none)",
-        "entities": "\n".join(render_entity(e, relations.get(e.id, [])) for e in entities)
+        "chunks": "\n\n".join(render_chunk(c, chunk_ref[c.id]) for c in chunks) or "(none)",
+        "entities": "\n".join(
+            render_entity(e, relations.get(e.id, []), entity_ref[e.id]) for e in entities
+        )
         or "(none)",
         "masters": bundle.masters.strip() or "(none)",
     }
@@ -156,7 +183,7 @@ def _assemble(
         **manifest,
     }
     return SowContext(
-        mode, blocks, {k: frozenset(v) for k, v in citable.items()}, locations, manifest
+        mode, blocks, {k: frozenset(v) for k, v in citable.items()}, locations, manifest, refs
     )
 
 
@@ -199,14 +226,36 @@ async def build_context(
     # shared equally between the sections.
     room = max(budget_tokens - tokens(full.blocks["masters"]) - tokens(hint or ""), len(names))
     entity_room = room // 4
-    share = (room - entity_room) // len(names)
+    chunk_room = room - entity_room
+
+    # No document should vanish from the SOW because its passages ranked low: before the sections
+    # pick, each document gets its most representative chunk (closest to the sections' queries as a
+    # whole), within a third of the chunk room. A bundle with too many documents for that keeps as
+    # many as fit and says how many it could not (`documents_without_chunks`).
+    mean_query = [sum(col) / len(query_vectors) for col in zip(*query_vectors, strict=True)]
+    best: dict[UUID, tuple[float, int]] = {}
+    for i, (c, v) in enumerate(zip(chunks, chunk_vectors, strict=True)):
+        if tokens(render_chunk(c)) > FLOOR_CHUNK_TOKENS:
+            continue  # a huge chunk is no stand-in for a document
+        score = _cosine(mean_query, v)
+        if c.document_version_id not in best or score > best[c.document_version_id][0]:
+            best[c.document_version_id] = (score, i)
+    picked: set[int] = set()
+    floor_used = 0
+    for _, i in sorted(best.values(), reverse=True):
+        cost = tokens(render_chunk(chunks[i]))
+        if floor_used + cost <= chunk_room // 3:
+            floor_used += cost
+            picked.add(i)
+    docs = {c.document_version_id for c in chunks}
+    share = (chunk_room - floor_used) // len(names)
 
     picked_by_section: dict[str, list[str]] = {}
-    picked: set[int] = set()
     for section, query in zip(names, query_vectors, strict=True):
         ids = _pick(chunks, chunk_vectors, query, entities_of, chunks_of, mean_len, share)
         picked_by_section[section] = [chunks[i].id for i in ids]
         picked.update(ids)
+    missing_docs = len(docs - {chunks[i].document_version_id for i in picked})
 
     selected = [chunks[i] for i in sorted(picked)]
     chosen = {c.id for c in selected}
@@ -228,7 +277,13 @@ async def build_context(
         entities,
         bundle,
         hint,
-        {"budget_tokens": budget_tokens, "sections": picked_by_section},
+        {
+            "budget_tokens": budget_tokens,
+            "sections": picked_by_section,
+            "chunks_total": len(chunks),
+            "chunks_dropped": len(chunks) - len(selected),
+            "documents_without_chunks": missing_docs,
+        },
     )
 
 

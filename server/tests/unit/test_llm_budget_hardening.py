@@ -211,3 +211,58 @@ def test_420_t08_a_price_value_that_is_not_json_refuses_to_start(
 
     with pytest.raises(ValidationError, match="JSON object"):
         WorkerSettings(_env_file=None)  # type: ignore[call-arg]
+
+
+# --- 7. what the project sees: spend by stage --------------------------------------------------
+
+
+def _row(alias: str, status: str, tokens_in: int, tokens_out: int, cost: str) -> dict[str, Any]:
+    return {
+        "alias": alias,
+        "model": "m",
+        "prompt_id": "smoke",
+        "prompt_version": "1",
+        "prompt_sha256": "0" * 64,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "cost_usd": Decimal(cost),
+        "latency_ms": 1,
+        "attempt": 1,
+        "status": status,
+        "trace_id": "t",
+        "context_manifest": {},
+        "correlation_id": "c",
+        "temporal_workflow_id": f"w-{uuid.uuid4()}",
+        "activity_id": "a",
+        "activity_attempt": 1,
+        "project_id": PROJECT,
+        "tenant_id": TENANT,
+    }
+
+
+def test_usage_by_alias_counts_failed_attempts_and_ranks_by_cost() -> None:
+    client, sessions = make_client(
+        FakeBifrost([completion(GOOD, prompt_tokens=1000, completion_tokens=100, cost=0.05)])
+    )
+    run(client, scope(), alias="sbam-sow")
+    with sessions() as session:
+        repo = LlmCallRepository(session, TenantContext(TENANT, PROJECT))
+        repo.insert(_row("sbam-testgen", "SUCCEEDED", 10, 5, "0.0001"))
+        repo.insert(_row("sbam-testgen", "FAILED", 20, 0, "0.0002"))  # billed, so it counts
+        session.commit()
+        rows = repo.usage_by_alias()
+        other = LlmCallRepository(session, TenantContext(TENANT, uuid.uuid4())).usage_by_alias()
+    assert [r[0] for r in rows] == ["sbam-sow", "sbam-testgen"]  # dearest first
+    assert rows[0][1:5] == (1, 0, 1000, 100) and rows[0][5] == Decimal("0.05")
+    assert rows[1][1:5] == (2, 1, 30, 5) and rows[1][5] == Decimal("0.0003")
+    assert other == []  # another project's spend is not visible
+
+
+def test_the_sow_context_cap_defaults_when_empty_and_refuses_junk() -> None:
+    assert settings().sow_context_max_tokens == 80_000
+    assert settings(sow_context_max_tokens="").sow_context_max_tokens == 80_000
+    assert settings(sow_context_max_tokens="0").sow_context_max_tokens == 0
+    with pytest.raises(ValidationError):
+        settings(sow_context_max_tokens="-5")
+    with pytest.raises(ValidationError):
+        settings(sow_context_max_tokens="lots")

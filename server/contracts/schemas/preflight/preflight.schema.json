@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:preflight/preflight:0.1.0",
+  "$defs": {
+    "CheckStatus": {
+      "enum": [
+        "ok",
+        "mock",
+        "degraded",
+        "down"
+      ],
+      "title": "CheckStatus",
+      "type": "string"
+    },
+    "PreflightCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z_]{1,40}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/CheckStatus"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "fix": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fix"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status"
+      ],
+      "title": "PreflightCheck",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "$ref": "#/$defs/CheckStatus"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/PreflightCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "checked_at": {
+      "maxLength": 40,
+      "minLength": 10,
+      "title": "Checked At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "checks",
+    "checked_at"
+  ],
+  "title": "Preflight",
+  "type": "object"
+}

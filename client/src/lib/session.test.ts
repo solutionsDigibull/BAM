@@ -39,10 +39,17 @@ describe("getSession (E0.13)", () => {
     expect(getToken).toHaveBeenCalledWith(expect.objectContaining({ secret: "test-secret" }));
   });
 
-  it("falls back to the dev cookie when there is no Keycloak session", async () => {
+  it("ignores the dev cookie when Keycloak is configured (it carries no access token)", async () => {
     vi.stubEnv("KEYCLOAK_ISSUER", "http://kc.test/realms/bullm");
     vi.stubEnv("SBAM_DEV_AUTH", "1");
     getToken.mockResolvedValue(null);
+    devCookie = "sbam-admin";
+    expect(await getSession()).toBeNull();
+  });
+
+  it("uses the dev cookie only without Keycloak", async () => {
+    vi.stubEnv("KEYCLOAK_ISSUER", "");
+    vi.stubEnv("SBAM_DEV_AUTH", "1");
     devCookie = "sbam-admin";
     expect(await getSession()).toEqual({ roles: ["sbam-admin"] });
   });

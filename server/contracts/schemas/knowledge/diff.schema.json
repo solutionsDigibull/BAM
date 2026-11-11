@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:knowledge/diff:0.1.0",
+  "$defs": {
+    "DiffEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "degree": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Degree",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "DiffEntity",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET P/knowledge/{kv_id}/diff?against={older}`: what the graph gained and lost between two\nversions. An entity is the same when its name is the same (ignoring case and spacing): node ids\nchange whenever the graph is rebuilt, names are what people recognise.",
+  "properties": {
+    "knowledge_version_id": {
+      "format": "uuid",
+      "title": "Knowledge Version Id",
+      "type": "string"
+    },
+    "against_version_id": {
+      "format": "uuid",
+      "title": "Against Version Id",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    },
+    "against_version": {
+      "title": "Against Version",
+      "type": "integer"
+    },
+    "added": {
+      "minimum": 0,
+      "title": "Added",
+      "type": "integer"
+    },
+    "removed": {
+      "minimum": 0,
+      "title": "Removed",
+      "type": "integer"
+    },
+    "unchanged": {
+      "minimum": 0,
+      "title": "Unchanged",
+      "type": "integer"
+    },
+    "retyped": {
+      "minimum": 0,
+      "title": "Retyped",
+      "type": "integer"
+    },
+    "relations_added": {
+      "minimum": 0,
+      "title": "Relations Added",
+      "type": "integer"
+    },
+    "relations_removed": {
+      "minimum": 0,
+      "title": "Relations Removed",
+      "type": "integer"
+    },
+    "added_entities": {
+      "items": {
+        "$ref": "#/$defs/DiffEntity"
+      },
+      "title": "Added Entities",
+      "type": "array"
+    },
+    "removed_entities": {
+      "items": {
+        "$ref": "#/$defs/DiffEntity"
+      },
+      "title": "Removed Entities",
+      "type": "array"
+    },
+    "documents_added": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Documents Added",
+      "type": "array"
+    },
+    "documents_removed": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Documents Removed",
+      "type": "array"
+    }
+  },
+  "required": [
+    "knowledge_version_id",
+    "against_version_id",
+    "version",
+    "against_version",
+    "added",
+    "removed",
+    "unchanged",
+    "retyped",
+    "relations_added",
+    "relations_removed"
+  ],
+  "title": "KnowledgeDiff",
+  "type": "object"
+}

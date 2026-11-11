@@ -372,3 +372,65 @@ def test_e7_2_temporal_down_at_the_restart_is_503_and_nothing_is_approved(h: Har
     problem(h.approve(h.sha(v3), version=v3), 503, "ORCHESTRATOR_UNAVAILABLE")
     assert h.version_row(v3).state == "IN_REVIEW"
     assert h.stored_impact(h.version_row(v3).id) is None
+
+
+# --- a build that only waits for a person no longer blocks a scope change ----------------------
+
+
+def park(h: Harness, wf: uuid.UUID, state: str, only: int | None = None) -> None:
+    """The Workflow is BUILDING; every Sub-Skill (or just the first `only`) is in `state`."""
+    with h.sessions() as s:
+        row = s.get(Workflow, wf)
+        assert row is not None
+        row.state = "BUILDING"
+        subs = list(s.scalars(select(SubSkill)).all())
+        for sub in subs[:only] if only else subs:
+            sub.state = state
+        s.commit()
+
+
+def test_a_build_that_only_waits_for_review_is_replaced_and_its_workflow_cancelled(
+    h: Harness,
+) -> None:
+    """Such a build used to refuse every scope change (409 WORKFLOW_BUILDING) while ISATVON edits
+    and schema regeneration were refused too: no way out. Now the new approval replaces it."""
+    wf = h.approved_v1()
+    h.new_version()
+    v3 = h.save_doc(h.doc(features__0__name="Investor OTP & refunds"))
+    park(h, wf, "NEEDS_FDE_REVIEW")
+    h.pipeline.stage = (
+        PipelineStage.BUILD_SUB_SKILLS
+    )  # the build child is waiting inside this stage
+    assert h.approve(h.sha(v3), version=v3).status_code == 200
+    assert len(h.pipeline.terminated) == 1 and len(h.pipeline.started) == 1
+    with h.sessions() as s:
+        row = s.get(Workflow, wf)
+        assert row is not None and row.state == "CANCELLED"
+    assert h.version_row(v3).state == "APPROVED" and h.version_row(1).state == "SUPERSEDED"
+
+
+def test_a_build_with_a_sub_skill_still_running_still_refuses(h: Harness) -> None:
+    wf = h.approved_v1()
+    h.new_version()
+    v3 = h.save_doc(h.doc(features__0__name="Investor OTP & refunds"))
+    park(h, wf, "NEEDS_FDE_REVIEW", only=1)  # the others are not waiting
+    with h.sessions() as s:
+        others = list(s.scalars(select(SubSkill)).all())[1:]
+        assert others
+        for sub in others:
+            sub.state = "BUILDING"
+        s.commit()
+    problem(h.approve(h.sha(v3), version=v3), 409, "WORKFLOW_BUILDING")
+    assert h.version_row(1).state == "APPROVED"
+
+
+def test_a_waiting_build_is_not_replaced_while_the_pipeline_is_in_another_busy_stage(
+    h: Harness,
+) -> None:
+    wf = h.approved_v1()
+    h.new_version()
+    v3 = h.save_doc(h.doc(features__0__name="Investor OTP & refunds"))
+    park(h, wf, "NEEDS_FDE_REVIEW")
+    h.pipeline.stage = PipelineStage.EXTRACT_SUB_SKILLS
+    problem(h.approve(h.sha(v3), version=v3), 409, "PIPELINE_RUNNING")
+    assert h.version_row(1).state == "APPROVED"

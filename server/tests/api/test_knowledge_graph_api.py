@@ -395,3 +395,72 @@ def test_e5_402_the_okf_bundle_is_saved_as_a_named_zip(h: Harness) -> None:
     assert download.headers["content-type"] == "application/zip"
     assert download.headers["content-disposition"] == content_disposition(params["name"][0])
     assert f'filename="{params["name"][0]}"' in download.headers["content-disposition"]
+
+
+# --- what changed between two versions ---------------------------------------------------------
+
+
+def two_versions(h: Harness) -> tuple[uuid.UUID, uuid.UUID]:
+    dvid, doc = h.document("Molex and Lapp supply parts. Harness H1 uses a Housing.")
+    old_nodes, old_edges = graph_of(
+        dvid,
+        [
+            ("a", "Molex", "organization"),
+            ("b", "Housing", "component"),
+            ("c", "Lapp", "organization"),
+        ],
+        [("a", "b"), ("c", "b")],
+    )
+    first = h.ready([doc], old_nodes, old_edges, number=1, state="OUTDATED")
+    new_nodes, new_edges = graph_of(
+        dvid,
+        [  # new ids (a rebuild changes them), same names; Housing retyped, Lapp gone, Harness new
+            ("x1", "MOLEX ", "organization"),
+            ("x2", "housing", "product"),
+            ("x3", "Harness H1", "product"),
+        ],
+        [("x1", "x2"), ("x3", "x2")],
+    )
+    return first, h.ready([doc], new_nodes, new_edges, number=2)
+
+
+def test_diff_compares_by_name_not_by_node_id(h: Harness) -> None:
+    first, second = two_versions(h)
+    res = h.get(f"/{second}/diff")  # default: against the version before
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert (body["version"], body["against_version"]) == (2, 1)
+    assert (body["added"], body["removed"], body["unchanged"], body["retyped"]) == (1, 1, 2, 1)
+    assert [e["name"] for e in body["added_entities"]] == ["Harness H1"]
+    assert [e["name"] for e in body["removed_entities"]] == ["Lapp"]
+    # molex-housing stays; lapp-housing is gone; harness-housing is new
+    assert (body["relations_added"], body["relations_removed"]) == (1, 1)
+    assert h.get(f"/{second}/diff", against=str(first)).json() == body  # explicit = the same
+
+
+def test_diff_the_other_way_swaps_added_and_removed(h: Harness) -> None:
+    first, second = two_versions(h)
+    body = h.get(f"/{first}/diff", against=str(second)).json()
+    assert [e["name"] for e in body["added_entities"]] == ["Lapp"]
+    assert [e["name"] for e in body["removed_entities"]] == ["Harness H1"]
+
+
+def test_diff_of_the_first_version_has_nothing_to_compare_with(h: Harness) -> None:
+    first, _second = two_versions(h)
+    assert h.get(f"/{first}/diff").status_code == 404
+
+
+def test_diff_against_itself_and_against_a_stranger_is_refused(h: Harness) -> None:
+    _first, second = two_versions(h)
+    assert h.get(f"/{second}/diff", against=str(second)).status_code == 400
+    assert h.get(f"/{second}/diff", against=str(uuid.uuid4())).status_code == 404
+    assert h.get(f"/{second}/diff", against="not-a-uuid").status_code == 422
+
+
+def test_diff_lists_are_capped_but_the_counts_are_complete(h: Harness) -> None:
+    dvid, doc = h.document("Many things.")
+    small = h.ready([doc], *graph_of(dvid, [("s", "Seed", "Concept")]), number=1, state="OUTDATED")
+    many = [(f"n{i}", f"Thing {i}", "Concept") for i in range(250)]
+    big_kv = h.ready([doc], *graph_of(dvid, [("s", "Seed", "Concept"), *many]), number=2)
+    body = h.get(f"/{big_kv}/diff", against=str(small)).json()
+    assert body["added"] == 250 and len(body["added_entities"]) == 100

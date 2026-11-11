@@ -37,6 +37,7 @@ import ast
 import ctypes
 import json
 import os
+import re
 import resource
 import shutil
 import signal
@@ -44,6 +45,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from collections.abc import Awaitable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -71,6 +73,7 @@ from sbam_workers.test.harness import (  # noqa: E402
     HandoffSpec,
     LoopHarnessError,
     LoopTestCase,
+    StateQueryError,
     run_case,
 )
 
@@ -175,9 +178,31 @@ class PgStore:
                 raise ValueError(
                     f"state query {name!r} must be a SELECT with exactly one %s"
                 )
-            row = self.conn.execute(sql, (self.key,)).fetchone()
+            try:
+                row = self.conn.execute(sql, (self.key,)).fetchone()
+            except Exception as exc:
+                raise StateQueryError(self._why(name, exc)) from None
             values[name] = row[0] if row else None
         return {name: values.get(name) for name in names}
+
+    def _why(self, name: str, exc: Exception) -> str:
+        """Identifiers only: which query, what kind of failure, the relation it named, and the tables
+        that exist. That is what lets the corrector fix a query on a table the model invented."""
+        text = f"{name!r}: {type(exc).__name__}"
+        # PostgreSQL leaves `diag.table_name` empty for a missing relation; the name is in the message.
+        found = re.search(r'(?:relation|column|table) "([a-z_][a-z0-9_]{0,62})"', str(exc))
+        if found:
+            text += f" on {found.group(1)}"
+        try:
+            self.conn.rollback()  # a failed statement leaves the transaction aborted
+            rows = self.conn.execute(
+                "SELECT table_name FROM information_schema.tables"
+                " WHERE table_schema = 'public' ORDER BY 1"
+            ).fetchall()
+            tables = [str(r[0]) for r in rows if re.fullmatch(r"[a-z_][a-z0-9_]{0,62}", str(r[0]))]
+        except Exception:
+            tables = []
+        return text + (f"; tables that exist: {', '.join(tables[:20])}" if tables else "")
 
     def apply_script(self, changes: Mapping[str, JsonValue]) -> None:
         for statement in changes.get(SQL_STEP_KEY) or []:  # type: ignore[union-attr]
@@ -790,7 +815,12 @@ if __name__ == "__main__":
     except (
         BaseException
     ) as exc:  # anything left: end now, never wait for a hung thread at shutdown
-        print(f"runner crashed: {type(exc).__name__}", file=sys.stderr)
+        # Where it happened, not what it held: a bare type name sent a debugging session in circles.
+        frames = traceback.extract_tb(exc.__traceback__)
+        own = [f for f in frames if "/opt/sbam/" in f.filename or "run_cases" in f.filename]
+        last = (own or frames)[-1:]  # the last frame of ours: the last of all is usually the stdlib's
+        at = f" at {Path(last[0].filename).name}:{last[0].lineno} in {last[0].name}" if last else ""
+        print(f"runner crashed: {type(exc).__name__}{at}", file=sys.stderr)
         code = EXIT_CRASH
     sys.stdout.flush()
     sys.stderr.flush()

@@ -24,6 +24,14 @@ class Sandbox:
     egress_reader: EgressReader | None  # required exactly when the mode certifies
 
 
+def _egress_source(settings: WorkerSettings) -> bool:
+    """The evidence file, or the collector's HTTP endpoint with its token."""
+    return bool(
+        settings.sandbox_egress_log_path
+        or (settings.sandbox_egress_url and settings.sandbox_egress_token)
+    )
+
+
 def problem(settings: WorkerSettings) -> str | None:
     """What is missing for the configured mode (names only, never values), or None."""
     if settings.sandbox_mode is None:
@@ -34,10 +42,7 @@ def problem(settings: WorkerSettings) -> str | None:
             for name, value in (
                 ("CUBE_API_URL", settings.cube_api_url),
                 ("CUBE_PROXY_NODE_IP", settings.cube_proxy_node_ip),
-                (
-                    "SANDBOX_EGRESS_LOG_PATH or SANDBOX_EGRESS_URL",
-                    settings.sandbox_egress_log_path or settings.sandbox_egress_url,
-                ),
+                ("SANDBOX_EGRESS_LOG_PATH", _egress_source(settings)),
             )
             if not value
         ]
@@ -71,7 +76,7 @@ def make_sandbox(settings: WorkerSettings) -> Sandbox:
     if why is not None or settings.sandbox_mode is None:
         raise SandboxInfraError(InfraReason.NOT_CONFIGURED, why or "SANDBOX_MODE is not set")
     if settings.sandbox_mode is SandboxMode.CUBESANDBOX:
-        if not settings.cube_api_url:  # `problem` checked
+        if not settings.cube_api_url or not _egress_source(settings):  # `problem` checked
             raise SandboxInfraError(InfraReason.NOT_CONFIGURED, "CUBE_API_URL is not set")
         key = settings.cube_api_key.get_secret_value() if settings.cube_api_key else None
         backend: SandboxBackend = CubeSandboxBackend(
@@ -83,7 +88,19 @@ def make_sandbox(settings: WorkerSettings) -> Sandbox:
                 api_key=key,
             )
         )
-        return Sandbox(SandboxMode.CUBESANDBOX, backend, _egress_reader(settings))
+        reader: EgressReader
+        # A collector URL with its token is the explicit choice: it wins over a leftover file path.
+        if settings.sandbox_egress_url and settings.sandbox_egress_token:
+            reader = HttpEgressReader(
+                settings.sandbox_egress_url, settings.sandbox_egress_token.get_secret_value()
+            )
+        elif settings.sandbox_egress_log_path:
+            reader = JsonlEgressReader(settings.sandbox_egress_log_path)
+        else:  # `problem` checked
+            raise SandboxInfraError(
+                InfraReason.NOT_CONFIGURED, "SANDBOX_EGRESS_LOG_PATH is not set"
+            )
+        return Sandbox(SandboxMode.CUBESANDBOX, backend, reader)
     if not settings.sandbox_agent_url or not settings.sandbox_agent_token:  # `problem` checked
         raise SandboxInfraError(InfraReason.NOT_CONFIGURED, "SANDBOX_AGENT_URL is not set")
     local = LocalDockerBackend(

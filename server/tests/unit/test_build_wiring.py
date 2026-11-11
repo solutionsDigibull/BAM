@@ -226,7 +226,11 @@ def test_e11_2b_t01_bodies_inputs_rebuild_what_the_earlier_stages_produced() -> 
     manifest = SkillManifest.model_validate(world.manifest_data())
     assert given.manifest_id == manifest_id
     assert given.template.sha256 == world.template.sha256
-    assert dict(given.params) == params_from_manifest(manifest)
+    extra = {"loop_gates"}  # shown to the model with the manifest, never part of it
+    assert {k: v for k, v in given.params.items() if k not in extra} == params_from_manifest(
+        manifest
+    )
+    assert json.loads(given.params["loop_gates"])["success_gate"]
     assert given.skeleton == render_manifest(world.template, manifest)
     registry_ = sample_registry(DIGEST_BYTE)
     wanted = {

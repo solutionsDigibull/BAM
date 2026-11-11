@@ -52,6 +52,10 @@ class WorkerSettings(BaseSettings):
     bifrost_url: AnyHttpUrl = AnyHttpUrl("http://bifrost:8080")
     llm_timeout_seconds: float = Field(default=120.0, gt=0)
     llm_max_context_tokens: int = Field(default=200_000, ge=1000)
+    # The most document tokens one SOW or ISATVON prompt carries (cost and window cap). Over it the
+    # bundle is ranked per section, with every document kept in. Default: gpt-4o's 128k window less
+    # the reserve, with room to spare. 0 turns the cap off (only `llm_max_context_tokens` applies).
+    sow_context_max_tokens: int = Field(default=80_000, ge=0)
     # Cost control. Identical input (same prompt, schema, documents, alias) is answered from
     # `llm_derivatives` for the whole tenant instead of being billed again. The budgets are opt-in
     # (C-41: no limit by default): once the recorded spend of a project or tenant reaches one, the
@@ -96,7 +100,8 @@ class WorkerSettings(BaseSettings):
     cube_sandbox_domain: str = Field(default="cube.app", min_length=1)
     # JSONL of `EgressEvent`s written by the host collector (compose/sandbox-host), one per attempt
     sandbox_egress_log_path: str | None = None
-    # ...or served over HTTP when the collector runs on another machine (`GET <url>/egress/<vm>`)
+    # Or, when the collector runs on another host (CubeSandbox in a laptop VM, say): its read-only
+    # HTTP endpoint `GET <url>/egress/<vm_id>` with a bearer token. One of the two is required.
     sandbox_egress_url: str | None = None
     sandbox_egress_token: SecretStr | None = None
     sandbox_agent_url: str | None = None  # the local-docker agent
@@ -136,10 +141,17 @@ class WorkerSettings(BaseSettings):
     def _empty_sandbox_value_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
 
-    @field_validator("llm_project_budget_usd", "llm_tenant_budget_usd", mode="before")
+    @field_validator(
+        "llm_project_budget_usd", "llm_tenant_budget_usd", "sow_context_max_tokens", mode="before"
+    )
     @classmethod
     def _empty_budget_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("sow_context_max_tokens", mode="before")
+    @classmethod
+    def _empty_cap_is_the_default(cls, value: object) -> object:
+        return 80_000 if isinstance(value, str) and not value.strip() else value
 
     @field_validator("llm_price_usd_per_mtok", mode="before")
     @classmethod

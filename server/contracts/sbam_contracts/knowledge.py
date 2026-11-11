@@ -118,13 +118,24 @@ class CoverageEntry(_Dto):
     reason: str | None = None  # an error code or type, never document text
 
 
+class AnchorCheck(_Dto):
+    """How many identifiers written in the documents (part numbers, RFQ numbers) became entities.
+    A graph can have any entity count; one that misses the documents' own identifiers is wrong."""
+
+    total: int = 0
+    found: int = 0
+    missing: list[str] = Field(default_factory=list)  # a sample, most frequent first
+
+
 class KnowledgeCoverage(_Dto):
     documents: list[CoverageEntry] = Field(default_factory=list)
     masters_included: int = 0  # master entries in masters.jsonl (E3.6)
     master_documents: int = 0  # parsed master documents added as master context (E3.8b)
-    entities: int = 0  # graph nodes after cognify
+    entities: int = 0  # graph nodes after cognify; the OKF bundle's entity count once it is built
     relations: int = 0  # in the OKF bundle (E5.3)
     chunks: int = 0  # in the OKF bundle (E5.3)
+    anchors: AnchorCheck | None = None  # set with the bundle
+    extraction: str | None = None  # which models built the graph (provider, LLM, embedder, size)
     bundle: BundleCoverage | None = None  # the OKF bundle's view (E5.3), once it is built
 
 
@@ -224,6 +235,36 @@ class SourcePassage(_Dto):
     location: Location
     text: Annotated[str, Field(max_length=MAX_PASSAGE_CHARS)]  # full text: the OKF bundle
     truncated: bool = False
+
+
+MAX_DIFF_LIST = 100  # names listed per side; the counts are always complete
+
+
+class DiffEntity(_Dto):
+    name: str
+    type: str
+    degree: Annotated[int, Field(ge=0)] = 0
+
+
+class KnowledgeDiff(_Dto):
+    """`GET P/knowledge/{kv_id}/diff?against={older}`: what the graph gained and lost between two
+    versions. An entity is the same when its name is the same (ignoring case and spacing): node ids
+    change whenever the graph is rebuilt, names are what people recognise."""
+
+    knowledge_version_id: UUID
+    against_version_id: UUID
+    version: int
+    against_version: int
+    added: Annotated[int, Field(ge=0)]
+    removed: Annotated[int, Field(ge=0)]
+    unchanged: Annotated[int, Field(ge=0)]
+    retyped: Annotated[int, Field(ge=0)]  # same name, another type
+    relations_added: Annotated[int, Field(ge=0)]
+    relations_removed: Annotated[int, Field(ge=0)]
+    added_entities: list[DiffEntity] = Field(default_factory=list)  # most connected first
+    removed_entities: list[DiffEntity] = Field(default_factory=list)
+    documents_added: list[str] = Field(default_factory=list)  # file names
+    documents_removed: list[str] = Field(default_factory=list)
 
 
 class KnowledgeNodeDetail(_Dto):

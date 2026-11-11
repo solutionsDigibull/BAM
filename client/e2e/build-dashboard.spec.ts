@@ -6,7 +6,7 @@ import { expect, test, type Page, type Request, type Route } from "@playwright/t
 
 const PROJECT = "0190f3a2-7b1c-7d4e-8f00-000000000001";
 const WORKFLOW = "0190f3a2-7b1c-7d4e-8f00-0000000000c1";
-const PAGE = `/projects/${PROJECT}/workflows/${WORKFLOW}/build`;
+const PAGE = `/projects/${PROJECT}/workflows/${WORKFLOW}/build?view=matrix`;
 
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });

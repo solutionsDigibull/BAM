@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:940c4381de751f717e68ae8c9f4feb5133282ec85cf73ddcba9c0cc9c85a33e3
+// source-sha256:96594d0e4ba69525671edb1fb6e3d2d01899047df1763629b503f7af369705e1
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -431,6 +431,11 @@ export type AssertionType =
   | "llm_rubric";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CheckStatus".
+ */
+export type CheckStatus = "ok" | "mock" | "degraded" | "down";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "EgressVerdict".
  */
 export type EgressVerdict = "ALLOW" | "BLOCK" | "UNKNOWN";
@@ -595,6 +600,7 @@ export interface SbamContracts {
   KnowledgeVersionList?: KnowledgeVersionList;
   KnowledgeGraphPage?: KnowledgeGraphPage;
   KnowledgeNodeDetail?: KnowledgeNodeDetail;
+  KnowledgeDiff?: KnowledgeDiff;
   MockDefinition?: MockDefinition;
   MockRunSetup?: MockRunSetup;
   MockJournal?: MockJournal;
@@ -608,6 +614,10 @@ export interface SbamContracts {
   TestRunTraces?: TestRunTraces;
   LlmCacheInvalidate?: LlmCacheInvalidate;
   LlmCacheInvalidated?: LlmCacheInvalidated;
+  LlmUsage?: LlmUsage;
+  LlmUsageStage?: LlmUsageStage;
+  Preflight?: Preflight;
+  PreflightCheck?: PreflightCheck;
   SandboxLimits?: SandboxLimits;
   EgressPolicy?: EgressPolicy;
   EgressEvent?: EgressEvent;
@@ -3849,6 +3859,8 @@ export interface KnowledgeCoverage {
   entities?: number;
   relations?: number;
   chunks?: number;
+  anchors?: AnchorCheck | null;
+  extraction?: string | null;
   bundle?: BundleCoverage | null;
 }
 /**
@@ -3859,6 +3871,18 @@ export interface CoverageEntry {
   document_version_id: string;
   status: SourceStatus;
   reason?: string | null;
+}
+/**
+ * How many identifiers written in the documents (part numbers, RFQ numbers) became entities.
+ * A graph can have any entity count; one that misses the documents' own identifiers is wrong.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AnchorCheck".
+ */
+export interface AnchorCheck {
+  total?: number;
+  found?: number;
+  missing?: string[];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -3945,6 +3969,39 @@ export interface SourcePassage {
   location: SbamContracts_Okf__Location;
   text: string;
   truncated?: boolean;
+}
+/**
+ * `GET P/knowledge/{kv_id}/diff?against={older}`: what the graph gained and lost between two
+ * versions. An entity is the same when its name is the same (ignoring case and spacing): node ids
+ * change whenever the graph is rebuilt, names are what people recognise.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "KnowledgeDiff".
+ */
+export interface KnowledgeDiff {
+  knowledge_version_id: string;
+  against_version_id: string;
+  version: number;
+  against_version: number;
+  added: number;
+  removed: number;
+  unchanged: number;
+  retyped: number;
+  relations_added: number;
+  relations_removed: number;
+  added_entities?: DiffEntity[];
+  removed_entities?: DiffEntity[];
+  documents_added?: string[];
+  documents_removed?: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DiffEntity".
+ */
+export interface DiffEntity {
+  name: string;
+  type: string;
+  degree?: number;
 }
 /**
  * The stubs for one API reference (`S.external_data` entry `name`).
@@ -4895,6 +4952,60 @@ export interface LlmCacheInvalidate {
  */
 export interface LlmCacheInvalidated {
   invalidated: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LlmUsage".
+ */
+export interface LlmUsage {
+  /**
+   * Pattern: `^\d+\.\d{4}$`
+   */
+  total_usd: string;
+  calls: number;
+  tokens_in: number;
+  tokens_out: number;
+  stages: LlmUsageStage[];
+}
+/**
+ * One model alias (`sbam-sow`, `sbam-knowledge`, ...): what it was used for is in its name.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LlmUsageStage".
+ */
+export interface LlmUsageStage {
+  alias: string;
+  calls: number;
+  failed: number;
+  tokens_in: number;
+  tokens_out: number;
+  /**
+   * Pattern: `^\d+\.\d{4}$`
+   */
+  cost_usd: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Preflight".
+ */
+export interface Preflight {
+  status: CheckStatus;
+  checks: PreflightCheck[];
+  checked_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PreflightCheck".
+ */
+export interface PreflightCheck {
+  /**
+   * Pattern: `^[a-z_]{1,40}$`
+   */
+  id: string;
+  name: string;
+  status: CheckStatus;
+  reason?: string | null;
+  fix?: string | null;
 }
 /**
  * VM resources and time. Anything outside the policy is rejected, never clamped.

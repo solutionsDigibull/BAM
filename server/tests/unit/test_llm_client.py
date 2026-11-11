@@ -198,6 +198,32 @@ def test_e6_1_a_refused_request_is_not_retried() -> None:
     assert len(bifrost.requests) == 1 and statuses(sessions, sc) == ["FAILED"]
 
 
+def test_a_refusal_names_the_upstream_error_type_but_never_its_message() -> None:
+    body = {"error": {"type": "upstream_credentials_exhausted", "message": "key sk-secret-123 bad"}}
+    bifrost = FakeBifrost([httpx.Response(502, json=body)])
+    client, _ = make_client(bifrost)
+    with pytest.raises(LlmTransportError) as caught:
+        run(client, scope())
+    assert "502, upstream_credentials_exhausted" in str(caught.value)
+    assert "sk-secret" not in str(caught.value)
+    refused = FakeBifrost([httpx.Response(422, json={"error": {"code": "MOCK_FIXTURE_MISSING"}})])
+    client, _ = make_client(refused)
+    with pytest.raises(LlmRequestRejected, match=r"422, MOCK_FIXTURE_MISSING"):
+        run(client, scope())
+    hostile = FakeBifrost(
+        [httpx.Response(400, json={"error": {"type": "x\n<script>" + "y" * 200}})]
+    )
+    client, _ = make_client(hostile)
+    with pytest.raises(LlmRequestRejected) as caught2:
+        run(client, scope())
+    assert "\n" not in str(caught2.value) and "<" not in str(caught2.value)
+    assert len(str(caught2.value)) < 120
+    plain = FakeBifrost([httpx.Response(400, text="not json")])
+    client, _ = make_client(plain)
+    with pytest.raises(LlmRequestRejected, match=r"\(400\)"):
+        run(client, scope())
+
+
 def test_e6_1_cost_is_read_from_the_object_bifrost_really_sends() -> None:
     """Seen live: `usage.cost` is `{"total_cost": 3e-06}`, not a number."""
     bifrost = FakeBifrost([completion(GOOD, cost={"total_cost": 3e-06})])

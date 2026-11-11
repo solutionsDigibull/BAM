@@ -9,6 +9,7 @@ import dayjs from "dayjs";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
+import { PreflightBanner } from "@/components/preflight-banner";
 import {
   ApiErrorState,
   EmptyState,
@@ -33,6 +34,7 @@ import {
   timelineView,
   workflowsPath,
 } from "../workspace-api";
+import { LlmSpend } from "./llm-spend";
 
 const REFRESH_MS = 5000; // while a run is in progress
 
@@ -96,6 +98,7 @@ export function OverviewScreen({ projectId }: { projectId: string }) {
 
   return (
     <Flex vertical gap={16}>
+      <PreflightBanner />
       <Card>
         <Flex justify="space-between" align="start" wrap gap={8}>
           <div>
@@ -161,6 +164,8 @@ export function OverviewScreen({ projectId }: { projectId: string }) {
           ) : null}
         </Card>
       )}
+
+      <LlmSpend projectId={projectId} />
 
       <Card title="Workflows">
         {workflows.query.isLoading ? (

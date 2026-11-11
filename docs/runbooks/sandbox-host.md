@@ -29,8 +29,8 @@ The mode comes from the worker's environment and from nowhere else: no API or UI
 | `CUBE_PROXY_NODE_IP`, `CUBE_PROXY_PORT_HTTP` | CubeSandbox | CubeProxy, port 80 (data plane: exec and file upload; the SDK uses plain HTTP) |
 | `CUBE_SANDBOX_DOMAIN` | CubeSandbox | `cube.app` unless the host was installed with another domain |
 | `CUBE_API_KEY` | CubeSandbox | only when the host enables authentication (it does not by default) |
-| `SANDBOX_EGRESS_LOG_PATH` | CubeSandbox | the file of `EgressEvent` lines the host collector writes (this or the URL is required: no evidence, no certification) |
-| `SANDBOX_EGRESS_URL`, `SANDBOX_EGRESS_TOKEN` | CubeSandbox | the collector's read-only HTTP service when it runs on another machine than the worker: `GET <url>/egress/<vm_id>` with `Authorization: Bearer <token>`. Only a 200 is evidence (an empty 200: nothing attempted); any other status, a timeout or a transport error is `EGRESS_LOG_UNAVAILABLE`. Wins over the file when both are set |
+| `SANDBOX_EGRESS_LOG_PATH` | CubeSandbox | the file of `EgressEvent` lines the host collector writes (required: no evidence, no certification) |
+| `SANDBOX_EGRESS_URL`, `SANDBOX_EGRESS_TOKEN` | CubeSandbox | instead of the file, when the collector runs on another host: its read-only `GET <url>/egress/<vm_id>` and bearer token. Only a 200 is evidence; 401, 404, 409, 503, a timeout or a body that is not events is `EGRESS_LOG_UNAVAILABLE`. Use an address that survives a Wi-Fi change (the Docker gateway, not a LAN IP) |
 | `SANDBOX_AGENT_URL`, `SANDBOX_AGENT_TOKEN` | local | the `sandbox-runner` agent (`make up PROFILES=sandbox-local`) |
 | `SANDBOX_RUNTIME_DIGEST` | local agent | the digest the local runtime reports: `docker image inspect --format '{{.Id}}' skill-runtime:local`, the one `make runtime-registry` registers |
 | `MOCK_API_URL`, `MOCK_API_IP`, `MOCK_CONTROL_TOKEN` | both | the mock API for networked sources; the IP must be an address that carries nothing else (CubeSandbox opens every port of an allowed address) |

@@ -21,7 +21,7 @@ const CHOICES = {
   ],
 };
 
-// Keycloak sign-in when KEYCLOAK_ISSUER is set (#31); the dev role picker stays as a local fallback.
+// Keycloak sign-in when KEYCLOAK_ISSUER is set (#31); the dev role picker only when it is not.
 export function DevLogin({
   portal,
   enabled,
@@ -53,34 +53,31 @@ export function DevLogin({
           />
         )}
         {keycloak && (
-          <form action={keycloakSignIn} style={{ marginBottom: enabled ? 16 : 0 }}>
+          <form action={keycloakSignIn}>
             <input type="hidden" name="portal" value={portal} />
             {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
-            <Button type="primary" htmlType="submit" block>
-              Sign in with Keycloak
+            <Button type="primary" htmlType="submit" size="large" block>
+              Sign in
             </Button>
           </form>
         )}
-        {enabled ? (
+        {enabled && (
           <Flex vertical gap={8}>
             <Typography.Text type="secondary">
-              Development sign-in (SBAM_DEV_AUTH=1)
+              Local sign-in (SBAM_DEV_AUTH=1, no API access)
             </Typography.Text>
             {CHOICES[portal].map((c) => (
               <form key={c.roles} action={devSignIn}>
                 <input type="hidden" name="roles" value={c.roles} />
-                <Button type="primary" htmlType="submit" block>
+                <Button htmlType="submit" block>
                   {c.label}
                 </Button>
               </form>
             ))}
           </Flex>
-        ) : (
-          !keycloak && (
-            <Typography.Text type="secondary">
-              Keycloak sign-in is not configured yet.
-            </Typography.Text>
-          )
+        )}
+        {!keycloak && !enabled && (
+          <Typography.Text type="secondary">Sign-in is not configured.</Typography.Text>
         )}
         <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0 }}>
           <a href={portal === "admin" ? "/login-fde" : "/login-admin"}>

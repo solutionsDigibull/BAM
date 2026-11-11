@@ -32,6 +32,21 @@ export const EMPTY_SOW = "The SOW is generated once knowledge is ready.";
 export const GENERATING = "Generating the SOW…";
 export const FAILED_NO_VERSION =
   "SOW generation failed before a version was written. Regenerate to try again.";
+const FAILURE_HELP: Record<string, string> = {
+  LLM_REJECTED:
+    "The model provider refused the request. Usually its key is invalid or out of credit, or the model is not allowed; ask an admin to check the LLM provider key and credit, then regenerate.",
+  LLM_UNAVAILABLE:
+    "The model provider could not be reached. Nothing was lost; regenerate in a few minutes.",
+  SCHEMA_INVALID:
+    "The model's answer did not match the SOW format after several tries. Regenerating usually fixes it; add a hint if it keeps failing.",
+  CONTEXT_TOO_LARGE:
+    "The knowledge is too large for the model in one request. Remove documents you do not need, or ask an admin for a larger-context model.",
+};
+
+/** What went wrong and what to do about it, for a stored failure code. */
+export const failureHelp = (code: string | null | undefined): string =>
+  (code && FAILURE_HELP[code]) || "Regenerate to try again.";
+
 export const SAVED = (version: number) => `Saved as v${version}`;
 export const NO_CHANGES = "No changes to save.";
 export const APPROVED_BANNER =

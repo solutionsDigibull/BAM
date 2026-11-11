@@ -112,6 +112,21 @@ class LlmTransportError(Exception):
     retryable = True
 
 
+_SAFE_WHY = re.compile(r"[^A-Za-z0-9_.:-]")
+
+
+def _why(response: httpx.Response) -> str:
+    """The upstream's error type or code (`upstream_credentials_exhausted`), so a refusal says which
+    kind it is. Only a short token: never the message, which may quote the request."""
+    try:
+        error = response.json().get("error") or {}
+        token = error.get("type") or error.get("code") or ""
+    except (ValueError, AttributeError):
+        return ""
+    token = _SAFE_WHY.sub("", str(token))[:60]
+    return f", {token}" if token else ""
+
+
 class LlmRequestRejected(Exception):  # noqa: N818
     """Bifrost refused the request itself (4xx other than 429). Retrying the same request cannot
     help."""
@@ -491,9 +506,11 @@ class LlmClient:
             raise LlmTransportError(f"{type(exc).__name__} calling Bifrost") from exc
         latency = int((time.monotonic() - began) * 1000)
         if response.status_code == 429 or response.status_code >= 500:
-            raise LlmTransportError(f"Bifrost answered {response.status_code}")
+            raise LlmTransportError(f"Bifrost answered {response.status_code}{_why(response)}")
         if response.status_code != 200:
-            raise LlmRequestRejected(f"Bifrost refused the request ({response.status_code})")
+            raise LlmRequestRejected(
+                f"Bifrost refused the request ({response.status_code}{_why(response)})"
+            )
         try:
             data = response.json()
             usage = data.get("usage") or {}

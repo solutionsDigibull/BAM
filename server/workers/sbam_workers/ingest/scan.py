@@ -77,7 +77,10 @@ def scan_version(deps: ScanDeps, inp: StageRef) -> ScanOutcome:
     ctx = TenantContext(inp.tenant_id, inp.project_id)
     with deps.sessions() as session:
         version = _load(session, ctx, inp.ref_id)
-        if version.scan_status in (ScanStatus.CLEAN.value, ScanStatus.INFECTED.value):
+        # A verdict only counts once the version has moved past scanning: a restored document keeps
+        # its old verdict in state UPLOADED, and trusting that skipped `scan_clean` for good.
+        scanned = version.state not in (S.UPLOADED.value, S.SCANNING.value)
+        if scanned and version.scan_status in (ScanStatus.CLEAN.value, ScanStatus.INFECTED.value):
             if version.scan_status == ScanStatus.INFECTED.value:
                 _remove_original(deps, ctx, version)  # a retry after the move: finish the cleanup
             return _outcome(version)  # already scanned (an activity retry): same answer

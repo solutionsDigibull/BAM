@@ -459,10 +459,22 @@ def _check_sub_skill(
         except gate_expr.ExpressionError as exc:
             found.append((5, path, str(exc), ErrorCode.GATE_PARSE_ERROR))
             continue
-        for name in sorted(names - known):
-            found.append(
-                (5, path, f"unresolved identifier {name!r}", ErrorCode.UNRESOLVED_IDENTIFIER)
+        # no_op_condition is evaluated before the first pass: no tool has run, so there are no
+        # outputs yet. A condition on one passed validation and then ended every test case with
+        # EXPR_UNRESOLVED in the sandbox.
+        scope = (
+            known - set(output_fields(o.json_schema)) | set(s.fresh_state_parameters)
+            if (field == "no_op_condition")
+            else known
+        )
+        for name in sorted(names - scope):
+            why = (
+                f"unresolved identifier {name!r}"
+                if field != "no_op_condition" or name not in known
+                else f"{name!r} is an output, but no_op_condition is checked before the first pass"
+                " (use an input or fresh state)"
             )
+            found.append((5, path, why, ErrorCode.UNRESOLVED_IDENTIFIER))
 
     # Rule 6: contracts.
     for k, name in enumerate(s.required_inputs):

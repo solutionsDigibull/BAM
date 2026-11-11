@@ -96,6 +96,21 @@ def test_e12_2_a_template_error_names_itself_in_the_notification_too() -> None:
     assert said["error"] == "TemplateError" and said["stage"] == "code build"
 
 
+def test_a_missing_runtime_registry_is_a_build_error_not_a_stuck_building_sub_skill() -> None:
+    """`build_manifest` raised ProvenanceMissing (no active runtime registry): the workflow failed
+    and the Sub-Skill stayed BUILDING for good with Retry disabled. It parks in BUILD_ERROR now."""
+
+    async def scenario(build: Build) -> Any:
+        return await build.finish(), build.actions(), build.state(), notice(build)
+
+    result, actions, state, said = run(
+        scenario, build_manifest=traced("build_manifest", [], raises("ProvenanceMissing"))
+    )
+    assert not result.certified and state == "BUILD_ERROR"
+    assert actions == ["template_error", "sub_skill.build_error"]
+    assert said["error"] == "ProvenanceMissing"
+
+
 def test_e12_2_a_wiring_error_in_another_stage_still_fails_the_workflow_loudly() -> None:
     """Only the gate's two defects are mapped; another stage's `InputMismatch` is not."""
 

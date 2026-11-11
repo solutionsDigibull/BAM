@@ -21,7 +21,7 @@ from sbam_api.core.conventions import ApiError
 from sbam_api.core.ids import uuid7
 from sbam_api.db.base import utcnow
 from sbam_api.db.repository import TenantContext
-from sbam_api.ingest.repository import DocumentVersionRepository
+from sbam_api.ingest.repository import DocumentVersionRepository, waiting_for_ingestion
 from sbam_api.temporal.service import StartSpec, start_run
 
 log = logging.getLogger("sbam_api.ingest")
@@ -116,3 +116,52 @@ async def start_waiting(
 def _waiting_ids(sessions: sessionmaker[Session], ctx: TenantContext) -> list[uuid.UUID]:
     with sessions() as session:
         return [v.id for v in DocumentVersionRepository(session, ctx).waiting_to_start()]
+
+
+async def start_stale_waiting(
+    client: Client,
+    sessions: sessionmaker[Session],
+    before: datetime,
+    limit: int = 50,
+    *,
+    with_search_attributes: bool = True,
+) -> tuple[int, int]:
+    """(started, failed) for versions of any project that waited since before `before`: the sweep
+    behind `StartWaitingIngestions`, so a restored or Temporal-outage document never depends on
+    the next upload to get going. Starting is idempotent (the workflow id names the version)."""
+    waiting = await asyncio.to_thread(_stale_waiting, sessions, before, limit)
+    started = failed = 0
+    for tenant_id, project_id, version_id in waiting:
+        run = await start_ingestion_run(
+            client,
+            sessions,
+            TenantContext(tenant_id, project_id),
+            version_id,
+            f"sweep-{version_id}",
+            with_search_attributes=with_search_attributes,
+        )
+        if run is None:
+            failed += 1
+            await asyncio.to_thread(
+                _defer, sessions, TenantContext(tenant_id, project_id), version_id
+            )
+        else:
+            started += 1
+    return started, failed
+
+
+def _defer(sessions: sessionmaker[Session], ctx: TenantContext, version_id: uuid.UUID) -> None:
+    """Touch a version whose start failed: the sweep takes the longest-untouched first, so a start
+    that keeps failing waits a full grace period behind every other instead of starving them."""
+    with sessions() as session:
+        version = DocumentVersionRepository(session, ctx).get(version_id)
+        if version is not None:
+            version.updated_at = utcnow()
+            session.commit()
+
+
+def _stale_waiting(
+    sessions: sessionmaker[Session], before: datetime, limit: int
+) -> list[tuple[uuid.UUID, uuid.UUID, uuid.UUID]]:
+    with sessions() as session:
+        return waiting_for_ingestion(session, before, limit)

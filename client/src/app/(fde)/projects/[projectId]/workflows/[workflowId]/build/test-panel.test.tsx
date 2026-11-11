@@ -360,3 +360,56 @@ describe("test panel (E13.7)", () => {
     expect(await screen.findByText("Not found")).toBeDefined();
   });
 });
+
+describe("why a case failed", () => {
+  const broken = (name: string) =>
+    trace({
+      case_id: name,
+      terminal: null,
+      iterations: 0,
+      passes: [],
+      error: {
+        category: "RUNTIME_ERROR",
+        pass: 1,
+        step: "gate",
+        message:
+          "fresh state query failed: 'attempt': InvalidTextRepresentation; tables that exist: materials_issued",
+        elapsed_ms: 0,
+      },
+    });
+
+  test("the cases table shows each failure's reason and one summary says what to do", async () => {
+    api(
+      THREE,
+      [
+        run({
+          results: THREE.map((c) => ({
+            case: c.name,
+            type: "terminal_state",
+            passed: false,
+            message: "",
+          })),
+        }),
+      ],
+      {
+        [`GET ${BASE}/test-runs/${RUN}/traces`]: {
+          body: { run_id: RUN, traces: THREE.map((c) => broken(c.name)) },
+        },
+      },
+    );
+    open();
+    const why = await screen.findByTestId("why-failed");
+    expect(why.textContent).toContain("All 3 cases failed for the same reason");
+    expect(why.textContent).toContain("Editing the cases will not help");
+    expect((await screen.findAllByText(/InvalidTextRepresentation/)).length).toBeGreaterThanOrEqual(
+      3,
+    );
+  });
+
+  test("a run with no failing trace shows no failure banner", async () => {
+    api();
+    open();
+    await screen.findByText("first try");
+    expect(screen.queryByTestId("why-failed")).toBeNull();
+  });
+});

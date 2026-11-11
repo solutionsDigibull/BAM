@@ -18,6 +18,7 @@ from sbam_api.storage.local import LocalDiskBackend
 from sbam_api.testgen import seed_fit
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_contracts.build import BuildStageInput
+from sbam_contracts.isatvon14 import SubSkill as SubSkillModel
 from sbam_contracts.testgen import CaseBody, CaseKind, TestgenOutput, dataset_sha256
 from sbam_workers.llm.reask import SchemaInvalidAfterRetries
 from sbam_workers.test.testgen import (
@@ -397,54 +398,66 @@ def test_702_t03_the_edge_hint_comes_once_and_only_with_an_input_error() -> None
     assert drop == ("case 3: /initial_state/0",)  # other lines are unchanged, no hint
 
 
-# --- #704: seed SQL that the Workflow's schema.sql refuses ----------------------------------------
-
-SCHEMA = """
-CREATE TABLE investor_profiles (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    mobile_number text NOT NULL,
-    kyc_status text
-);
-"""
-NULL_SEED = "INSERT INTO investor_profiles (mobile_number) VALUES (NULL)"
-GOOD_SEED = "INSERT INTO investor_profiles (mobile_number) VALUES ('9999900000')"
-NOT_NULL = "column mobile_number is NOT NULL: give it a value, never NULL"
+DDL = (
+    "CREATE TABLE auth_event_audit_handoff (id bigserial PRIMARY KEY, mobile_number text);"
+    "CREATE TABLE investor_profiles (id bigserial PRIMARY KEY, investor_id text);"
+)
 
 
-def seeded(seed: str) -> dict[str, Any]:
-    return {
-        "cases": [
-            case("happy", "PASS_FIRST", "SUCCESS", initial_state=[GOOD_SEED]),
-            case("never passes", "ESCALATION", "ESCALATED", initial_state=[seed]),
-            case("retry", "PASS_AFTER_RETRY", "SUCCESS"),
-        ]
-    }
+def test_the_schema_is_in_the_request_only_when_given_and_never_in_the_fingerprint() -> None:
+    from sbam_workers.test.testgen import fingerprint
+
+    assert "workflow_schema_sql" not in request_context(sample())
+    assert request_context(sample(), DDL)["workflow_schema_sql"] == DDL
+    # the fingerprint decides whether the cases are kept: it must not move with the schema text
+    assert fingerprint(sample()) == fingerprint(sample())
 
 
-def test_704_t04_seed_sql_that_breaks_schema_sql_is_re_asked_with_the_column_rule() -> None:
-    out = TestgenOutput.model_validate(seeded(NULL_SEED))
-    tables = seed_fit.tables_of(SCHEMA)
-    assert check_output(sample(), out, tables) == (f"case 1: /initial_state/0: {NOT_NULL}",)
-    assert check_output(sample(), out) == ()  # no schema.sql yet: nothing to check against
-    w = World([seeded(NULL_SEED), seeded(GOOD_SEED)], schema=SCHEMA)
-    w.run()
-    assert len(w.bifrost.requests) == 2 and NOT_NULL in json.dumps(w.bifrost.requests[1])
-    assert all(NULL_SEED not in c.initial_state for c in w.cases())
+def test_a_seed_naming_a_column_the_schema_lacks_is_sent_back_by_case_and_statement() -> None:
+    seed = "INSERT INTO investor_profiles (investor_id, kit_status) VALUES ('1', 'k')"
+    out = answer(case("bad seed", "EDGE", "SUCCESS", initial_state=[seed]))
+    assert check_output(sample(), out) == ()  # without the schema nothing can be said
+    [line] = check_output(sample(), out, DDL)
+    assert line.startswith("case 3: statement 1:") and "kit_status" in line
+    assert "'k'" not in line  # identifiers only
 
 
-def test_704_t05_a_stored_dataset_that_no_longer_fits_is_generated_again() -> None:
-    w = World([seeded(NULL_SEED), seeded(GOOD_SEED)])  # stored before the check existed
-    first = w.run()
-    w.schema = SCHEMA
-    second = w.run()  # same stage key: the replay cache must not hand back the refused cases
-    assert second != first and [d.version for d in w.datasets()] == [1, 2]
-    assert len(w.bifrost.requests) == 2
-    assert w.run() == second and len(w.bifrost.requests) == 2  # it fits now: reused
+def test_a_state_script_longer_than_the_passes_after_the_first_is_sent_back() -> None:
+    """Three passes means two steps: step i runs before pass i + 2. A third ended the whole sandbox
+    run as DATASET_INVALID after the VM had booted."""
+    limit = SubSkillModel.model_validate(sample()).isatvon_definition.v_variables.max_iterations
+    step = ["UPDATE investor_profiles SET investor_id = 'x' WHERE id = 1"]
+    steps = [step] * limit  # one too many
+    [line] = check_output(sample(), answer(case("too long", "EDGE", "SUCCESS", state_script=steps)))
+    assert line == (
+        f"case 3: /state_script has {limit} steps, at most {limit - 1} "
+        f"(max_iterations {limit} minus the first pass)"
+    )
+    ok = steps[: limit - 1]
+    assert check_output(sample(), answer(case("fits", "EDGE", "SUCCESS", state_script=ok))) == ()
 
 
-def test_704_an_fde_dataset_that_does_not_fit_is_left_alone() -> None:
-    w = World([seeded(NULL_SEED)])
-    first = w.run()
-    mark_edited(w, first)
-    w.schema = SCHEMA
-    assert w.run() == first and len(w.bifrost.requests) == 1
+def test_a_seed_that_writes_the_handoff_table_is_sent_back() -> None:
+    """The runner counts handoff rows and wants exactly one new row per pass: a seeded row made
+    every case fail with 'pass 1 left 2 handoff rows' after a sandbox had been booted."""
+    seed = "INSERT INTO auth_event_audit_handoff (mobile_number) VALUES ('1')"
+    out = answer(case("seeds the log", "EDGE", "SUCCESS", initial_state=[seed]))
+    [line] = [x for x in check_output(sample(), out) if "do not seed" in x]
+    assert line.startswith("case 3: statement 1: do not seed auth_event_audit_handoff")
+    assert "'1'" not in line  # no value echoed
+
+
+def test_a_case_whose_input_contradicts_no_op_condition_is_sent_back() -> None:
+    """An ESCALATION case whose input already satisfies no_op_condition ends NO_OP before any tool
+    runs, so it can never escalate; the run only found out after booting a sandbox."""
+    base = sample()
+    base["isatvon_definition"]["v_variables"]["no_op_condition"] = "mobile_number == 'BLOCKED'"
+    blocked = {**INPUT, "mobile_number": "BLOCKED"}
+    lines = check_output(base, answer(case("bad", "ESCALATION", "ESCALATED", input=blocked)))
+    assert any("already satisfies no_op_condition" in x for x in lines)
+    lines = check_output(base, answer(case("not no-op", "NO_OP", "NO_OP", input=INPUT)))
+    assert any("is not a NO_OP case" in x for x in lines)
+    ok = answer(
+        case("fine", "ESCALATION", "ESCALATED"), case("noop", "NO_OP", "NO_OP", input=blocked)
+    )
+    assert not [x for x in check_output(base, ok) if "no_op_condition" in x]

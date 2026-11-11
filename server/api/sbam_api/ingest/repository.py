@@ -218,6 +218,27 @@ def due_for_purge(
     return list(session.scalars(query))
 
 
+def waiting_for_ingestion(
+    session: Session, before: datetime, limit: int
+) -> list[tuple[uuid.UUID, uuid.UUID, uuid.UUID]]:
+    """System job only (the StartWaitingIngestions schedule): (tenant, project, version) of every
+    tenant's versions that are UPLOADED and were never handed to Temporal, last touched before
+    `before` (a fresh upload is left to its own request), the one untouched longest first. A start
+    that fails is touched (`ingestion._defer`): it goes to the back, not in front of the rest."""
+    query = (
+        select(DocumentVersion.tenant_id, DocumentVersion.project_id, DocumentVersion.id)
+        .where(
+            DocumentVersion.state == S.UPLOADED.value,
+            DocumentVersion.ingestion_started_at.is_(None),
+            DocumentVersion.deleted_at.is_(None),
+            DocumentVersion.updated_at < before,
+        )
+        .order_by(DocumentVersion.updated_at, DocumentVersion.id)  # untouched longest first
+        .limit(limit)
+    )
+    return [(t, p, v) for t, p, v in session.execute(query)]
+
+
 def abandoned_reservations(
     session: Session,
     *,

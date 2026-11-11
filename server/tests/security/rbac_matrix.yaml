@@ -317,6 +317,13 @@ routes:
       <<: *open
       anon: "401 UNAUTHENTICATED"
 
+  # ---- preflight: is the platform ready for real work. Any portal role may ask; no tenant data ----
+  preflight_api_v1_preflight_get:
+    request: {method: GET, path: /api/v1/preflight}
+    expect:
+      <<: *open
+      anon: "401 UNAUTHENTICATED"
+
   import_filetypes_api_v1_admin_filetypes_import_post:  # E3.13; no file = 422 once the role passes
     request: {method: POST, path: /api/v1/admin/filetypes/import}
     expect:
@@ -448,6 +455,15 @@ routes:
     expect:
       <<: *fde_project_resource
       fde_a_assigned: "200"
+
+  diff_api_v1_projects__project_id__knowledge__kv_id__diff_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/knowledge/{kv_id}/diff
+      params: {project_id: "@project_a", kv_id: "@kv_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND" # kv_a is the project's only version: nothing to compare with
 
   node_api_v1_projects__project_id__knowledge__kv_id__nodes__node_id__get:
     request:
@@ -613,6 +629,15 @@ routes:
     request:
       method: GET
       path: /api/v1/projects/{project_id}/pipeline
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  llm_usage_api_v1_projects__project_id__llm_usage_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/llm-usage
       params: {project_id: "@project_a"}
     expect:
       <<: *fde_project_resource

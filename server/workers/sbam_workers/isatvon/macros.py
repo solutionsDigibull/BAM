@@ -78,7 +78,7 @@ from sbam_workers.llm.store import LlmScope, SqlCallStore
 from sbam_workers.llm.trace import LangfuseTracer
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
-from sbam_workers.sow.context import RESERVED_TOKENS, build_context
+from sbam_workers.sow.context import build_context, prompt_budget
 from sbam_workers.sow.generate import SowDeps, _bundle
 
 log = logging.getLogger("sbam_workers.isatvon.macros")
@@ -388,7 +388,7 @@ def _deps() -> SowDeps:
         storage=make_backend(settings),
         llm=LlmClient(settings, PromptRegistry(), SqlCallStore(sessions), LangfuseTracer(settings)),
         embed=embed_texts,
-        budget_tokens=settings.llm_max_context_tokens - RESERVED_TOKENS,
+        budget_tokens=prompt_budget(settings),
         attempts=EXTRACT_ATTEMPTS,
     )
 

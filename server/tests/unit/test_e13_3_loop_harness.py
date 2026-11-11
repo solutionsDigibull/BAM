@@ -354,6 +354,36 @@ def test_e13_3_handoff_write_failure_is_runtime_error() -> None:
     assert trace.error.step == "handoff" and trace.iterations == 0 and trace.ui_updates == []
 
 
+def test_a_fresh_state_query_that_fails_is_a_failed_case_not_a_crashed_runner() -> None:
+    """A generated query on a table the model invented (`UndefinedTable`) used to escape the
+    harness and crash the runner, which classified it as infrastructure and blocked testing."""
+
+    class BadQuery(FakeStore):
+        def read_state(self, names: list[str]) -> dict[str, Any]:
+            raise LookupError('relation "fresh_state" does not exist; password=hunter2')
+
+    tools = FakeTools()
+    trace = run(spec_for(ms01_1()), case("EDGE", "SUCCESS"), tools, BadQuery())
+
+    assert trace.error is not None and trace.error.category == "RUNTIME_ERROR"
+    assert trace.error.step == "gate" and trace.terminal is None and trace.iterations == 0
+    assert trace.error.message == "fresh state query failed: LookupError"  # the type, nothing else
+    assert tools.calls == []  # no tool ran
+
+
+def test_a_fresh_state_query_that_starts_failing_on_a_later_pass_fails_that_case() -> None:
+    class FailsLater(FakeStore):
+        def read_state(self, names: list[str]) -> dict[str, Any]:
+            if self.reads >= 1:
+                raise LookupError("gone")
+            return super().read_state(names)
+
+    trace = run(spec_for(ms01_1()), case("EDGE", "SUCCESS"), FakeTools(), FailsLater())
+
+    assert trace.error is not None and trace.error.category == "RUNTIME_ERROR"
+    assert trace.error.pass_no == 1 and trace.error.message.endswith("LookupError")
+
+
 def test_e13_3_check_output_missing_gate_field_is_schema_mismatch() -> None:
     class NoOtp(FakeTools):
         async def call(self, tool: str, arguments: Mapping[str, JsonValue]) -> dict[str, Any]:
@@ -394,3 +424,22 @@ def test_e13_3_missing_required_input_rejected() -> None:
     )
     with pytest.raises(LoopHarnessError, match="device_fingerprint"):
         run(spec_for(ms01_1()), test_case, FakeTools(), FakeStore())
+
+
+def test_a_state_query_error_message_built_by_the_store_reaches_the_corrector() -> None:
+    """Only the store's own message (identifiers) is passed on; any other exception shows just its
+    type. Without the missing relation and the tables that exist the corrector could not fix it."""
+    from sbam_workers.test.harness import StateQueryError
+
+    class Helpful(FakeStore):
+        def read_state(self, names: list[str]) -> dict[str, Any]:
+            raise StateQueryError(
+                "'attempt': UndefinedTable on fresh_state; tables that exist: a, b"
+            )
+
+    trace = run(spec_for(ms01_1()), case("EDGE", "SUCCESS"), FakeTools(), Helpful())
+    assert trace.error is not None and trace.error.category == "RUNTIME_ERROR"
+    assert trace.error.message == (
+        "fresh state query failed: 'attempt': UndefinedTable on fresh_state; "
+        "tables that exist: a, b"
+    )

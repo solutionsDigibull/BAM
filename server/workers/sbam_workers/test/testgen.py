@@ -56,6 +56,7 @@ from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_api.testgen.repository import CaseRepository, DatasetRepository
 from sbam_api.testgen.service import body_of, files_hashes, mocks_hashes
 from sbam_api.testgen.validate import case_errors, declared_tables, input_schema
+from sbam_contracts import gate_expr
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.build_dashboard import GateStatus
 from sbam_contracts.isatvon14 import SubSkill as SubSkillModel
@@ -73,6 +74,7 @@ from temporalio.exceptions import ApplicationError
 
 from sbam_workers.llm.client import LlmClient, LlmResult
 from sbam_workers.llm.store import LlmScope
+from sbam_workers.test import seed_check
 from sbam_workers.test.mocks import definition_bytes, definition_hash, mock_definitions
 
 STAGE: Final = "generate_tests"
@@ -91,19 +93,22 @@ def allowed_kinds(isatvon: Mapping[str, Any]) -> list[CaseKind]:
     return [k for k in kinds if bound > 1 or k is not CaseKind.PASS_AFTER_RETRY]
 
 
-def request_context(isatvon: Mapping[str, Any]) -> dict[str, str]:
+def request_context(isatvon: Mapping[str, Any], schema_sql: str = "") -> dict[str, str]:
     """The `<data>` blocks of the request, from this Sub-Skill's ISATVON only."""
     model = SubSkillModel.model_validate(isatvon)
     limits = {
         "max_iterations": model.isatvon_definition.v_variables.max_iterations,
         "allowed_kinds": [k.value for k in allowed_kinds(isatvon)],
     }
-    return {
+    context = {
         "sub_skill": json.dumps(model.isatvon_definition.model_dump(mode="json"), sort_keys=True),
         "input_schema": json.dumps(input_schema(isatvon), sort_keys=True),
         "tables": json.dumps(declared_tables(isatvon)),
         "limits": json.dumps(limits, sort_keys=True),
     }
+    if schema_sql:  # the real tables and columns the seed statements must use
+        context["workflow_schema_sql"] = schema_sql
+    return context
 
 
 def fingerprint(isatvon: Mapping[str, Any]) -> str:
@@ -134,8 +139,21 @@ def _input_rule(schema: Mapping[str, Any], path: str) -> str:
     return f"{shown} when given"
 
 
+def _no_op_fires(condition: str, inputs: Mapping[str, Any]) -> bool | None:
+    """Whether no_op_condition holds for these inputs, or None when it reads anything but inputs
+    (fresh state or outputs) or cannot be evaluated."""
+    try:
+        expr = gate_expr.parse(condition)
+        names = gate_expr.identifiers(expr)
+        if not names or not names <= set(inputs):
+            return None
+        return bool(gate_expr.evaluate(expr, dict(inputs), {}, {"max_iterations": 1}))
+    except (gate_expr.ExpressionError, TypeError, ValueError):
+        return None
+
+
 def check_output(
-    isatvon: Mapping[str, Any], out: TestgenOutput, tables: seed_fit.Tables | None = None
+    isatvon: Mapping[str, Any], out: TestgenOutput, schema_sql: str = ""
 ) -> tuple[str, ...]:
     """Error lines for a re-ask: the case index, the field path and, for an input, the rule from
     our input schema, for seed SQL the column rule of `schema.sql` (`tables`, #704), or a stable
@@ -158,22 +176,63 @@ def check_output(
             lines.append(f"case {index}: {path}: {reason}")
     if bad_input:
         lines.append(INPUT_HINT)
+    # no_op_condition is checked on the input before any tool runs, so a case's kind must agree
+    # with it: an ESCALATION case whose input already satisfies it ends NO_OP and never escalates.
+    # Only conditions that read inputs alone can be judged here; anything else is left to the run.
+    no_op = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables.no_op_condition
+    for index, case in enumerate(out.cases):
+        fired = _no_op_fires(no_op, case.input)
+        if fired is None or case.kind is CaseKind.EDGE:
+            continue
+        if fired and case.kind is not CaseKind.NO_OP:
+            lines.append(
+                f"case {index}: /input already satisfies no_op_condition, so the loop ends NO_OP"
+                f" before any tool runs: use an input that does not (kind {case.kind.value})"
+            )
+        elif not fired and case.kind is CaseKind.NO_OP:
+            lines.append(
+                f"case {index}: /input does not satisfy no_op_condition, so it is not a NO_OP case"
+            )
+    # A step runs before pass i + 2, so only max_iterations - 1 steps can ever run; one more ended
+    # the whole run in the VM as "state_script keys [4] are not passes 1..3" (DATASET_INVALID).
+    limit = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables.max_iterations
+    for index, case in enumerate(out.cases):
+        if len(case.state_script) > limit - 1:
+            lines.append(
+                f"case {index}: /state_script has {len(case.state_script)} steps,"
+                f" at most {limit - 1} (max_iterations {limit} minus the first pass)"
+            )
+    # The runner counts the handoff table's rows and expects exactly one new row per pass, so a
+    # seed that writes to it ended the case with "pass 1 left 2 handoff rows".
+    handoff = SubSkillModel.model_validate(
+        isatvon
+    ).isatvon_definition.o_outcome.state_handoff_file.table.lower()
+    for index, case in enumerate(out.cases):
+        for n, statement in enumerate(
+            [*case.initial_state, *(s for st in case.state_script for s in st)], 1
+        ):
+            if re.search(rf"\b(?:into|update)\s+\"?{re.escape(handoff)}\"?\b", statement, re.I):
+                lines.append(
+                    f"case {index}: statement {n}: do not seed {handoff}, it is the handoff log"
+                    " the platform counts (seed other tables or nothing)"
+                )
+    if schema_sql:  # seeds naming a column the schema lacks end the run in the VM (DATASET_INVALID)
+        for index, case in enumerate(out.cases):
+            seeds = [*case.initial_state, *(s for step in case.state_script for s in step)]
+            lines += [f"case {index}: {p}" for p in seed_check.problems(schema_sql, seeds)]
     return tuple(lines)
 
 
 async def generate(
-    client: LlmClient,
-    scope: LlmScope,
-    isatvon: Mapping[str, Any],
-    tables: seed_fit.Tables | None = None,
+    client: LlmClient, scope: LlmScope, isatvon: Mapping[str, Any], schema_sql: str = ""
 ) -> LlmResult[TestgenOutput]:
     return await client.run(
         ALIAS,
         PROMPT_ID,
         TestgenOutput,
-        request_context(isatvon),
+        request_context(isatvon, schema_sql),
         scope,
-        validate=lambda out: check_output(isatvon, out, tables),
+        validate=lambda out: check_output(isatvon, out, schema_sql),
     )
 
 
@@ -415,12 +474,12 @@ class GenerateTests:
         isatvon_of: Callable[[BuildStageInput], Awaitable[Mapping[str, Any]]],
         client: LlmClient,
         store: SqlDatasetStore,
-        schema_of: Callable[[BuildStageInput], str | None] = lambda _: None,
+        schema_of: Callable[[BuildStageInput], Awaitable[str]] | None = None,
     ) -> None:
         self.isatvon_of = isatvon_of
         self.client = client
         self.store = store
-        self.schema_of = schema_of  # the Workflow's latest PASSED schema.sql, None without one
+        self.schema_of = schema_of
 
     @activity.defn(name=STAGE)
     async def run(self, inp: BuildStageInput) -> IdResult:
@@ -446,8 +505,8 @@ class GenerateTests:
         workflow_id = activity.info().workflow_id
         if workflow_id is None:
             raise RuntimeError(f"{STAGE} runs only inside a workflow")
-        scope = stage_scope(inp, workflow_id, replaces)
-        result = await generate(self.client, scope, isatvon, tables)
+        schema_sql = await self.schema_of(inp) if self.schema_of else ""
+        result = await generate(self.client, stage_scope(inp, workflow_id), isatvon, schema_sql)
         cases = [
             (c.kind, CaseBody.model_validate(c.model_dump(exclude={"kind"})))
             for c in result.output.cases

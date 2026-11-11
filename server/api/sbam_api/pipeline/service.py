@@ -187,13 +187,14 @@ async def restart_pipeline(
     pipeline_input: PipelineInput,
     *,
     with_search_attributes: bool = True,
+    also_restartable: frozenset[PipelineStage] = frozenset(),
 ) -> Run:
     """A scope-change approval (E7.2): replace the project's pipeline run by a new one resuming at
     `pipeline_input.resume`. A run still working (extracting, building, ...) is 409
     PIPELINE_RUNNING and nothing changes; one waiting for a person is terminated first (it changes
     no data: the previous Workflow version stays as it is; the reconciler marks its mirror row)."""
     status = await pipeline_status(client, pipeline_input.project_id)
-    if status is not None and status.stage not in RESTARTABLE:
+    if status is not None and status.stage not in RESTARTABLE | also_restartable:
         raise PipelineBusy(status.stage)
     handle = client.get_workflow_handle(pipeline_workflow_id(pipeline_input.project_id))
     try:

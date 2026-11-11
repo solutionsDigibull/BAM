@@ -19,8 +19,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Path, Query, Request
 from fastapi.responses import RedirectResponse
+from sbam_contracts.api import ErrorCode
 from sbam_contracts.knowledge import (
     MAX_GRAPH_LIMIT,
+    KnowledgeDiff,
     KnowledgeGraphPage,
     KnowledgeNodeDetail,
     KnowledgeVersionList,
@@ -29,8 +31,10 @@ from sbam_contracts.runs import RunAccepted
 from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.core.auth import CurrentUser, fde
+from sbam_api.core.conventions import ApiError, not_found
 from sbam_api.core.settings import Settings
 from sbam_api.knowledge import graph
+from sbam_api.knowledge.repository import KnowledgeVersionRepository
 from sbam_api.knowledge.service import start_rebuild
 from sbam_api.pipeline.service import MAX_IDEMPOTENCY_KEY
 from sbam_api.projects.guard import active_project
@@ -121,6 +125,34 @@ def graph_page(
         types=types,
         q=query,
     )
+
+
+@router.get("/projects/{project_id}/knowledge/{kv_id}/diff")
+def diff(
+    project_id: Project,
+    kv_id: UUID,
+    request: Request,
+    user: Reader,
+    sessions: Sessions,
+    against: Annotated[UUID | None, Query()] = None,
+) -> KnowledgeDiff:
+    """What this version gained and lost against an older one (default: the one before it)."""
+    ctx = user.context(project_id)
+    with sessions() as session:
+        row = graph.readable_version(session, ctx, kv_id)
+        if against is None:
+            older = KnowledgeVersionRepository(session, ctx).latest_before(row.version)
+            while older is not None and (
+                older.state not in graph.READABLE or not older.okf_bundle_key
+            ):
+                older = KnowledgeVersionRepository(session, ctx).latest_before(older.version)
+            if older is None:
+                raise not_found()  # the first version has nothing to compare with
+        else:
+            older = graph.readable_version(session, ctx, against)
+        if older.id == row.id:
+            raise ApiError(400, ErrorCode.VALIDATION_ERROR, "Same version", "Pick another version.")
+        return graph.diff(session, ctx, backend(request), row, older)
 
 
 @router.get("/projects/{project_id}/knowledge/{kv_id}/nodes/{node_id}")

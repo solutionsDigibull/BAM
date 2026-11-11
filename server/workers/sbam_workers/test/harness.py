@@ -236,6 +236,34 @@ def _handoff_row(handoff: HandoffSpec, pass_no: int, *scopes: Mapping[str, Any])
     return {f: merged[f] for f in handoff.required_fields}
 
 
+class StateQueryError(Exception):
+    """A fresh-state query failed. The store builds the message from identifiers only (the failing
+    query's name, the exception type, the relation it named, the schema's tables), never SQL text or
+    values, so the harness may pass it on as the case's error."""
+
+
+def _read_state(store: StateStore, names: list[str], pass_no: int) -> dict[str, Any]:
+    """The fresh state, or a failed case. The queries are the generated code's own, so one that
+    fails (a table the model invented, say) is a defect of that code. Letting it escape crashed the
+    whole runner as infrastructure (TESTING_BLOCKED, retried forever) instead of failing the case
+    so the correction loop can fix it. The message names the failure type, never SQL or values."""
+    try:
+        return store.read_state(names)
+    except Exception as exc:
+        detail = str(exc)[:400] if isinstance(exc, StateQueryError) else type(exc).__name__
+        raise _CaseFailedError(
+            HarnessError.model_validate(
+                {
+                    "category": "RUNTIME_ERROR",
+                    "pass": pass_no,
+                    "step": "gate",
+                    "message": f"fresh state query failed: {detail}",
+                    "elapsed_ms": 0,
+                }
+            )
+        ) from None
+
+
 async def run_case(
     spec: CompiledLoopSpec,
     case: LoopTestCase,
@@ -267,7 +295,7 @@ async def run_case(
         )
 
     try:
-        seeded = store.read_state(fresh_state_parameters)
+        seeded = _read_state(store, fresh_state_parameters, 1)
         no_op = EvalContext(
             outputs={}, state=seeded, inputs=case.inputs, iteration=0, max_iterations=limit
         )
@@ -277,7 +305,7 @@ async def run_case(
         for pass_no in range(1, limit + 1):
             if pass_no in case.state_script:
                 store.apply_script(case.state_script[pass_no])
-            state = store.read_state(fresh_state_parameters)  # every pass, never cached
+            state = _read_state(store, fresh_state_parameters, pass_no)  # every pass, never cached
             arguments: dict[str, JsonValue] = {**case.inputs, ITERATION_FIELD: pass_no}
             action_output, action_ms = await _timed(
                 "action", pass_no, spec.budget_ms, partial(tools.call, case.action_tool, arguments)

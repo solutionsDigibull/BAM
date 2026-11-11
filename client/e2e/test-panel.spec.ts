@@ -8,7 +8,7 @@ const PROJECT = "0190f3a2-7b1c-7d4e-8f00-000000000001";
 const WORKFLOW = "0190f3a2-7b1c-7d4e-8f00-0000000000c1";
 const SUB = "0190f3a2-7b1c-7d4e-8f00-0000000000d1";
 const RUN = "0190f3a2-7b1c-7d4e-8f00-0000000000e1";
-const PAGE = `/projects/${PROJECT}/workflows/${WORKFLOW}/build`;
+const PAGE = `/projects/${PROJECT}/workflows/${WORKFLOW}/build?view=matrix`;
 const SKILL = "MS01.1_Investor_Auth";
 const SHA = "a".repeat(64);
 const SHA2 = "b".repeat(64);

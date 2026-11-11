@@ -16,12 +16,14 @@ import {
   Row,
   Statistic,
   Table,
+  Tag,
   Typography,
 } from "antd";
 import dayjs from "dayjs";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { PreflightBanner } from "@/components/preflight-banner";
 import {
   ApiErrorState,
   EmptyState,
@@ -52,10 +54,19 @@ import {
   rebuildPath,
   retryDocumentPath,
 } from "./knowledge-api";
+import { KnowledgeDiffCard } from "./knowledge-diff";
 
 const newKey = () => globalThis.crypto.randomUUID();
 const when = (value: string | null | undefined) =>
   value ? dayjs(value).format("D MMM YYYY, HH:mm") : "—";
+
+/** A coverage reason for people: `DUPLICATE_OF <id>` names the other copy by its file name. */
+function readable(reason: string | null | undefined, rows: CoverageRow[]): string {
+  const twin = reason?.match(/^DUPLICATE_OF (\S+)$/)?.[1];
+  if (!twin) return reason ?? "";
+  const title = rows.find((r) => r.document_version_id === twin)?.title;
+  return title ? `Identical file: ${title}` : "Identical to another uploaded file";
+}
 
 export function KnowledgePanel({
   projectId,
@@ -152,9 +163,15 @@ export function KnowledgePanel({
   const allFailed = rows.length > 0 && failed.length === rows.length;
   const counts = current.counts;
   const coverageMissing = !current.coverage || rows.length === 0;
+  const mock = current.coverage?.extraction?.startsWith("mock|") ?? false;
+  const anchors = current.coverage?.anchors;
+  const anchorTotal = anchors?.total ?? 0;
+  const anchorFound = anchors?.found ?? 0;
+  const anchorShare = anchorTotal > 0 ? anchorFound / anchorTotal : 1;
 
   return (
     <Flex vertical gap={16}>
+      <PreflightBanner />
       <Card>
         <Flex justify="space-between" align="start" wrap gap={8}>
           <div>
@@ -165,7 +182,10 @@ export function KnowledgePanel({
               Started {when(current.created_at)} · Finished {when(current.finished_at)}
             </Typography.Text>
           </div>
-          <StatusBadge status={current.status} />
+          <Flex gap={8} align="center">
+            {mock ? <Tag color="orange">Mock LLM: synthetic graph</Tag> : null}
+            <StatusBadge status={current.status} />
+          </Flex>
         </Flex>
 
         {building ? (
@@ -205,6 +225,20 @@ export function KnowledgePanel({
           </Col>
         </Row>
 
+        {anchors && anchorTotal > 0 ? (
+          <Alert
+            style={{ marginTop: 16 }}
+            type={anchorShare < 0.5 ? "warning" : anchorShare < 0.8 ? "info" : "success"}
+            showIcon
+            message={`${anchorFound} of ${anchorTotal} identifiers from your documents are in the graph`}
+            description={
+              anchors.missing && anchors.missing.length > 0
+                ? `Not found, most frequent first: ${anchors.missing.join(", ")}`
+                : undefined
+            }
+          />
+        ) : null}
+
         <Flex gap={12} align="center" wrap style={{ marginTop: 16 }}>
           <Button disabled={building} loading={rebuild.mutation.isPending} onClick={onRebuild}>
             Rebuild
@@ -224,6 +258,10 @@ export function KnowledgePanel({
           {current.okf_sha256 ? <HashChip value={current.okf_sha256} /> : null}
         </Flex>
       </Card>
+
+      {current.status === "READY" || current.status === "OUTDATED" ? (
+        <KnowledgeDiffCard projectId={projectId} kvId={current.id} version={current.version} />
+      ) : null}
 
       <Card title="Coverage">
         {coverageMissing ? (
@@ -246,7 +284,7 @@ export function KnowledgePanel({
               {
                 title: "Reason",
                 dataIndex: "reason",
-                render: (reason: string | null | undefined) => reason ?? "",
+                render: (reason: string | null | undefined) => readable(reason, rows),
               },
               {
                 title: "",

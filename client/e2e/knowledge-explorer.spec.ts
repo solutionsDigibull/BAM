@@ -102,6 +102,14 @@ async function fakeGraph(page: Page, fake: Fake) {
 async function open(page: Page, baseURL: string, versions: () => unknown[] = () => [version()]) {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL }]);
   await page.route(PROJECTS, (r) => json(r, { items: [project] }));
+  // The panel also asks for the platform check and the change list. An unmocked call would reach the real
+  // proxy, answer 401 (a dev-cookie session has no token) and bounce the page to sign-in.
+  await page.route(`${API}/preflight`, (r) =>
+    json(r, { status: "ok", checks: [], checked_at: "2026-11-07T10:00:00+00:00" }),
+  );
+  await page.route(`${API}/projects/${PROJECT}/knowledge/*/diff**`, (r) =>
+    json(r, { type: "about:blank", title: "Not found", status: 404, code: "NOT_FOUND" }, 404),
+  );
   await page.route(`${API}/projects/${PROJECT}/knowledge`, (r) =>
     json(r, { versions: versions() }),
   );
