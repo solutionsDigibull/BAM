@@ -84,6 +84,13 @@ describe("API proxy (E1.14)", () => {
     expect(upstreamPath(segments)).toBeNull();
   });
 
+  it("e6_5 a SOW citation id with # is forwarded as %23, not read as a fragment", () => {
+    expect(upstreamPath(["api", "v1", "projects", "p1", "sow", "versions", "1", "citations", "0a1b#c2"])).toBe(
+      "/api/v1/projects/p1/sow/versions/1/citations/0a1b%23c2",
+    );
+    expect(upstreamPath(["api", "v1", "x?y"])).toBeNull();
+  });
+
   it("e1_14_t03 absolute URL through the route is a 400 with no outbound request", async () => {
     const res = await call(GET, "http://169.254.169.254/latest");
     expect(res.status).toBe(400);
