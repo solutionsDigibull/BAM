@@ -105,8 +105,9 @@ export function setUi(patch: Partial<Ui> | ((s: Ui) => Partial<Ui>)) {
 
 export const getUi = () => state
 
+// The third argument is for the server render: the host's ScopeHost renders under Next's SSR, and React refuses a store without it.
 export const useUi = <T,>(select: (s: Ui) => T) =>
-  useSyncExternalStore(cb => { subs.add(cb); return () => { subs.delete(cb) } }, () => select(state))
+  useSyncExternalStore(cb => { subs.add(cb); return () => { subs.delete(cb) } }, () => select(state), () => select(state))
 
 void trackerStorage.load().then(r => setUi(s => ({ tracker: { ...s.tracker, statuses: r.statuses, basis: r.basis, loaded: true, storageError: r.error } })))
 
