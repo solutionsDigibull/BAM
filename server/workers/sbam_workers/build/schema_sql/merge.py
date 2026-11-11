@@ -8,6 +8,10 @@ Order of the script:
    by name), then functions, indexes and triggers, each sorted and de-duplicated;
 3. the platform guard of every handoff table (`guard.py`), last.
 
+A generated handoff table is made to accept the platform's insert (#735): the columns it writes
+(`skill_id`, `payload`) are added when missing, and NOT NULL is dropped from a column it leaves
+empty. An uploaded base stays verbatim.
+
 A table defined twice the same way (columns compared as a set) is kept once; defined differently,
 it is a CONFLICT finding, never last-write-wins (R17). A declared table without DDL is
 MISSING_TABLE; a handoff table without one of its `required_fields` is MISSING_TABLE too.
@@ -18,11 +22,12 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+import sqlglot
 from sbam_api.schema_sql.validate import Problem, Script, Statement
 from sbam_contracts.schema_sql import TABLE_NAME, SchemaFindingCode
 from sqlglot import exp
 
-from sbam_workers.build.schema_sql.guard import guard_sql
+from sbam_workers.build.schema_sql.guard import HANDOFF_COLUMNS, guard_sql
 
 # PostgreSQL's reserved key words (Appendix C, "reserved" in the PostgreSQL column): a table
 # named after one only works quoted, and generated code never quotes, so it is refused.
@@ -88,6 +93,54 @@ def name_problem(table: str) -> Problem | None:
 def columns(statement: Statement) -> list[exp.ColumnDef]:
     schema = statement.tree.this if statement.tree is not None else None
     return [c for c in getattr(schema, "expressions", []) if isinstance(c, exp.ColumnDef)]
+
+
+_SERIAL = frozenset({"SERIAL", "BIGSERIAL", "SMALLSERIAL"})
+
+
+def _left_empty(column: exp.ColumnDef) -> exp.ColumnConstraint | None:
+    """The NOT NULL of a column the platform's INSERT leaves empty (no default, not the primary
+    key, not a serial), or None."""
+    constraints = list(column.args.get("constraints") or [])
+    kinds = [c.args.get("kind") for c in constraints]
+    filled = (exp.DefaultColumnConstraint, exp.PrimaryKeyColumnConstraint)
+    data_type = column.args.get("kind")
+    if any(isinstance(k, filled) for k in kinds):
+        return None
+    if data_type is not None and data_type.sql(dialect="postgres").upper() in _SERIAL:
+        return None
+    for constraint, kind in zip(constraints, kinds, strict=True):
+        if isinstance(kind, exp.NotNullColumnConstraint) and not kind.args.get("allow_null"):
+            return constraint  # type: ignore[no-any-return]
+    return None
+
+
+def insertable_handoff(statement: Statement) -> Statement:
+    """The generated CREATE TABLE of a handoff table made to accept the platform's
+    `state_handoff.py` insert, `INSERT INTO <table> (skill_id, payload)` (#735): the two columns
+    added when missing, and NOT NULL dropped from a column that insert leaves empty. A table
+    that already accepts it is returned unchanged (byte-identical)."""
+    if statement.tree is None:
+        return statement
+    tree = statement.tree.copy()
+    schema = tree.this
+    current = [c for c in schema.expressions if isinstance(c, exp.ColumnDef)]
+    have = {c.name.lower() for c in current}
+    missing = [ddl for name, ddl in HANDOFF_COLUMNS.items() if name not in have]
+    loosened = [
+        constraint
+        for column in current
+        if column.name.lower() not in HANDOFF_COLUMNS
+        and (constraint := _left_empty(column)) is not None
+    ]
+    if not missing and not loosened:
+        return statement
+    for constraint in loosened:
+        constraint.pop()
+    for ddl in missing:
+        added = sqlglot.parse_one(f"CREATE TABLE t ({ddl})", dialect="postgres")
+        schema.append("expressions", added.this.expressions[0])
+    return Statement(statement.index, tree.sql(dialect="postgres", pretty=True), tree)
 
 
 def _shape(statement: Statement) -> tuple[str, ...]:
@@ -195,6 +248,9 @@ def merge(declared: Declared, base: Script | None, fragments: Mapping[str, Scrip
                     table=table,
                 )
             )
+
+    for table in sorted(declared.handoff.keys() & valid & generated.keys()):
+        generated[table] = insertable_handoff(generated[table])
 
     statements = [s.text for s in (base.statements if base is not None else [])]
     statements += [generated[t].text for t in _ordered(generated)]

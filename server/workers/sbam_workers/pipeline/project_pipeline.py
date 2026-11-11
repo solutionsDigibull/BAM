@@ -139,6 +139,11 @@ MANIFEST_DRAFT_PATCH = "e9-5-workflow-manifest-draft"
 # #694: a failed schema.sql returns the Workflow to ISATVON_REVIEW and the Sub-Skills that Generate
 # sent to BUILDING back to VALID, and the notification names them. Older runs: nothing applied.
 SCHEMA_FAILURE_PATCH = "e10-1c-schema-failure-recovery"
+# #735: each rebuild round re-runs build_schema_sql first, so a schema.sql that passed before a
+# platform fix (e.g. the handoff columns) is refreshed instead of failing every rebuild. One id per
+# round: `patched` is memoized per id for the whole run, so a single id replayed False in an old
+# round would keep every later round of a running pipeline unpatched (#706).
+REBUILD_SCHEMA_PATCH = "735-rebuild-refreshes-schema"
 MAX_PARALLEL_EXTRACTIONS = 4
 WAITING_FOR = {
     PipelineStage.WAIT_SOW_APPROVAL: "sow_approved",
@@ -401,6 +406,8 @@ class ProjectPipeline:
             await self._wait(PipelineStage.WAIT_REBUILD, lambda: bool(self.rebuilds))
             rebuild = self.rebuilds.pop(0)
             await self._workflow("retry", Actor.FDE, rebuild.actor_id, nth=round_no)
+            if workflow.patched(f"{REBUILD_SCHEMA_PATCH}-{round_no}"):
+                await self._refresh_schema_sql()
             await self._enter(PipelineStage.BUILD_SUB_SKILLS)
             again = self._with_unblocked(
                 [s for s in self.needs_review if s in set(rebuild.sub_skill_ids)]
@@ -409,6 +416,25 @@ class ProjectPipeline:
             self.needs_review = [s for s in self.needs_review if s not in again] + still
             round_no += 1
         await self._workflow("all_sub_skills_certified")
+
+    async def _refresh_schema_sql(self) -> None:
+        """#735: build the schema.sql again before a rebuild round. The stored DDL answers are
+        replayed and `record` keeps one version per script, so an unchanged schema adds nothing.
+        A failure never stops the rebuild: its FAILED version is recorded for the FDE, and builds
+        keep using the last PASSED one."""
+        await self._enter(PipelineStage.BUILD_SCHEMA_SQL)
+        queue, timeout, attempts = PLAN["build_schema_sql"]
+        try:
+            await workflow.execute_activity(
+                "build_schema_sql",
+                self._workflow_ref(),
+                task_queue=queue.value,
+                start_to_close_timeout=timeout,
+                retry_policy=RetryPolicy(maximum_attempts=attempts),
+                result_type=IdResult,
+            )
+        except ActivityError:
+            workflow.logger.warning("schema.sql refresh failed; the rebuild keeps the last PASSED")
 
     async def _stage_certify_macros(self) -> None:
         await self._enter(PipelineStage.CERTIFY_MACROS)
