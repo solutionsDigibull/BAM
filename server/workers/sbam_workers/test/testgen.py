@@ -172,8 +172,6 @@ def check_output(
                 lines.append(f"case {index}: {e.path}: {_input_rule(schema, e.path)}")
             else:
                 lines.append(f"case {index}: {e.path}")
-        for path, reason in seed_fit.errors(case.initial_state, case.state_script, tables or {}):
-            lines.append(f"case {index}: {path}: {reason}")
     if bad_input:
         lines.append(INPUT_HINT)
     # no_op_condition is checked on the input before any tool runs, so a case's kind must agree
@@ -505,8 +503,10 @@ class GenerateTests:
         workflow_id = activity.info().workflow_id
         if workflow_id is None:
             raise RuntimeError(f"{STAGE} runs only inside a workflow")
-        schema_sql = await self.schema_of(inp) if self.schema_of else ""
-        result = await generate(self.client, stage_scope(inp, workflow_id), isatvon, schema_sql)
+        schema_sql = schema or ""
+        result = await generate(
+            self.client, stage_scope(inp, workflow_id, replaces), isatvon, schema_sql
+        )
         cases = [
             (c.kind, CaseBody.model_validate(c.model_dump(exclude={"kind"})))
             for c in result.output.cases

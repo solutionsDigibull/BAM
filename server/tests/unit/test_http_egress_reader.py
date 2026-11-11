@@ -133,7 +133,7 @@ def test_the_collector_url_needs_its_token_and_then_makes_an_http_reader(
 ) -> None:
     assert problem(settings(monkeypatch)) == "SANDBOX_EGRESS_LOG_PATH not set"
     url_only = settings(monkeypatch, SANDBOX_EGRESS_URL="http://c:29000")
-    assert problem(url_only) == "SANDBOX_EGRESS_LOG_PATH not set"
+    assert problem(url_only) == "SANDBOX_EGRESS_LOG_PATH, SANDBOX_EGRESS_TOKEN not set"
     both = settings(monkeypatch, SANDBOX_EGRESS_URL="http://c:29000", SANDBOX_EGRESS_TOKEN=TOKEN)
     assert problem(both) is None
     assert isinstance(make_sandbox(both).egress_reader, HttpEgressReader)

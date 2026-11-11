@@ -89,7 +89,7 @@ from sbam_workers.settings import WorkerSettings
 from sbam_workers.test import promptfoo_suite as suite_stage
 from sbam_workers.test import testgen as testgen_stage
 from sbam_workers.test.promptfoo_suite import BuildPromptfooSuite
-from sbam_workers.test.testgen import GenerateTests, SqlDatasetStore, SqlSchemaSource
+from sbam_workers.test.testgen import GenerateTests, SqlDatasetStore
 
 INPUT_MISMATCH = assemble_stage.INPUT_MISMATCH
 LOOP_SPEC_INVALID = "LoopSpecInvalid"
@@ -373,7 +373,6 @@ def _static_gate() -> StaticGate:
 @lru_cache(maxsize=1)
 def _generate_tests() -> GenerateTests:
     settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
-    storage = make_backend(settings)
     return GenerateTests(
         SqlBuildInputs(sessions).tests_sub_skill,
         _llm(settings, sessions),

@@ -15,7 +15,6 @@ from fixtures import fixture_path
 from llm_db import FakeBifrost, completion, make_client
 from openpyxl.writer import excel as excel_writer
 from sbam_api.storage.local import LocalDiskBackend
-from sbam_api.testgen import seed_fit
 from sbam_api.testgen.models import CaseRow, DatasetRow
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.isatvon14 import SubSkill as SubSkillModel

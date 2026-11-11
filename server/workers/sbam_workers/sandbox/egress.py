@@ -24,7 +24,6 @@ import logging
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Final
-from urllib.parse import quote
 
 import httpx
 from pydantic import ValidationError
