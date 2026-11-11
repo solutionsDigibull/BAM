@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { Snapshot } from "../api/types";
@@ -18,6 +19,9 @@ vi.stubGlobal(
 import { getGoal, resetGoal, skipGoal } from "../lib/goal";
 import { setUi } from "../lib/store";
 import { AssistantPane } from "./AssistantPane";
+
+// The pane reads the upload rows, whose Retry runs through useAction (needs the app's query client).
+const render = (ui: React.ReactElement) => rtlRender(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
 
 const snap = { uploads: [], sowGeneration: [], persist: {}, steps: [], testHistory: [], versions: [], scanEvents: [] } as unknown as Snapshot;
 
