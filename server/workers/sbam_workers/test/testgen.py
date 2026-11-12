@@ -8,7 +8,9 @@
   (`sbam_api.testgen.validate.case_errors`: the input against `input_schema`, the seed-SQL
   allowlist, the 500-row budget, a terminal the kind can reach). A reply with a bad case is
   re-asked with the case index and the field path only, at most three times, and a case that never
-  validates is never stored. `max_iterations = 1` removes `PASS_AFTER_RETRY` from the allowed kinds.
+  validates is never stored. `max_iterations = 1` removes `PASS_AFTER_RETRY` from the allowed kinds,
+  and so does a Sub-Skill with no table to seed (#746). A refused seed statement is re-asked with
+  the allowlist's reason; with no seedable table, a hint says to leave the seed SQL empty.
 * One mock definition is written per API reference that names a route (`test/mocks.py`, E13.5),
   stored content-addressed like the files and hashed into the dataset: change a stub and the
   dataset's sha256 changes. A definition that could forward or record is refused before anything
@@ -86,11 +88,20 @@ TEST_DATA_STALE: Final = "TestDataStale"  # error type: an FDE's tests no longer
 FIXED_TIME: Final = datetime(2000, 1, 1, tzinfo=UTC)  # keeps an xlsx's bytes the same every run
 
 
-def allowed_kinds(isatvon: Mapping[str, Any]) -> list[CaseKind]:
-    """The kinds the model may use: `PASS_AFTER_RETRY` needs a second iteration to pass in."""
+def _bound_kinds(isatvon: Mapping[str, Any]) -> list[CaseKind]:
+    """The kinds the bound allows: `PASS_AFTER_RETRY` needs a second iteration to pass in."""
     bound = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables.max_iterations
     kinds = [k for k in CaseKind if k is not CaseKind.FDE]
     return [k for k in kinds if bound > 1 or k is not CaseKind.PASS_AFTER_RETRY]
+
+
+def allowed_kinds(isatvon: Mapping[str, Any]) -> list[CaseKind]:
+    """The kinds the model may use. `PASS_AFTER_RETRY` also needs a table to seed: only a
+    `state_script` makes a later pass see different data, and it writes declared tables (#746)."""
+    kinds = _bound_kinds(isatvon)
+    if declared_tables(isatvon):
+        return kinds
+    return [k for k in kinds if k is not CaseKind.PASS_AFTER_RETRY]
 
 
 def request_context(isatvon: Mapping[str, Any], schema_sql: str = "") -> dict[str, str]:
@@ -116,6 +127,11 @@ def fingerprint(isatvon: Mapping[str, Any]) -> str:
     correction that leaves these alone leaves the tests alone (E11.4b)."""
     context = request_context(isatvon)
     parts = {key: context[key] for key in ("input_schema", "limits")}
+    # The bound's kinds, not the offered ones (#746): a Sub-Skill without a seedable table keeps
+    # its fingerprint, so its datasets do not go stale.
+    limits = json.loads(context["limits"])
+    limits["allowed_kinds"] = [k.value for k in _bound_kinds(isatvon)]
+    parts["limits"] = json.dumps(limits, sort_keys=True)
     # The ISATVON's own list, not the seedable one (#738): leaving the handoff table out of the
     # request must not change every Sub-Skill's fingerprint (an FDE-edited dataset would go stale).
     raw = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables.tables
@@ -127,6 +143,11 @@ INPUT_HINT: Final = (
     "every case input must satisfy input_schema; a kind whose condition cannot be reached with a"
     " valid input (e.g. a required input left null) is written as an EDGE case instead"
 )
+NO_TABLES_HINT: Final = (
+    "tables is empty: this Sub-Skill has no table a case may seed, so leave initial_state and"
+    " state_script empty in every case"
+)
+_SEED_PATHS: Final = ("/initial_state/", "/state_script/")
 
 
 def _input_rule(schema: Mapping[str, Any], path: str) -> str:
@@ -174,10 +195,16 @@ def check_output(
             if e.path.startswith("/input/"):
                 bad_input = True
                 lines.append(f"case {index}: {e.path}: {_input_rule(schema, e.path)}")
+            elif e.path.startswith(_SEED_PATHS):
+                # the allowlist's reason is platform text, never the statement (#746)
+                lines.append(f"case {index}: {e.path}: {e.message}")
             else:
                 lines.append(f"case {index}: {e.path}")
     if bad_input:
         lines.append(INPUT_HINT)
+    seeds = any(c.initial_state or any(c.state_script) for c in out.cases)
+    if seeds and not declared_tables(isatvon):
+        lines.append(NO_TABLES_HINT)
     # no_op_condition is checked on the input before any tool runs, so a case's kind must agree
     # with it: an ESCALATION case whose input already satisfies it ends NO_OP and never escalates.
     # Only conditions that read inputs alone can be judged here; anything else is left to the run.
