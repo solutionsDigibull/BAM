@@ -398,7 +398,8 @@ def test_702_t03_the_edge_hint_comes_once_and_only_with_an_input_error() -> None
     drop = check_output(
         sample(), answer(case("b", "EDGE", "SUCCESS", initial_state=["DROP TABLE x"]))
     )
-    assert drop == ("case 3: /initial_state/0",)  # other lines are unchanged, no hint
+    # a seed line carries the allowlist's reason (#746), never the statement; no hint
+    assert drop == ("case 3: /initial_state/0: only INSERT and UPDATE statements are allowed",)
 
 
 DDL = (
