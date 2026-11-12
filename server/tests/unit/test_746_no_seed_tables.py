@@ -47,7 +47,7 @@ def test_746_t01_no_seedable_table_offers_no_pass_after_retry() -> None:
 
 
 def test_746_t02_the_fingerprint_is_unchanged() -> None:
-    """The bound's kinds, as before #746: a Sub-Skill without a seedable table keeps its datasets."""
+    """The bound's kinds, as before #746: no seedable table still keeps its datasets."""
     isatvon = only_handoff()
     context = request_context(isatvon)
     bound = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables.max_iterations
@@ -84,7 +84,5 @@ def test_746_t04_the_no_tables_hint_comes_once_and_only_when_needed() -> None:
     lines = check_output(only_handoff(), output(seeded, {**seeded, "name": "again"}))
     assert lines.count(NO_TABLES_HINT) == 1
     assert check_output(only_handoff(), output()) == ()  # no seed SQL: nothing to say
-    with_table = case(
-        "bad", "EDGE", "SUCCESS", initial_state=["INSERT INTO x (id) VALUES (1)"]
-    )
+    with_table = case("bad", "EDGE", "SUCCESS", initial_state=["INSERT INTO x (id) VALUES (1)"])
     assert NO_TABLES_HINT not in check_output(sample(), output(with_table))

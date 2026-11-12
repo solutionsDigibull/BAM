@@ -202,8 +202,8 @@ def check_output(
                 lines.append(f"case {index}: {e.path}")
     if bad_input:
         lines.append(INPUT_HINT)
-    seeds = any(c.initial_state or any(c.state_script) for c in out.cases)
-    if seeds and not declared_tables(isatvon):
+    seeded = any(c.initial_state or any(c.state_script) for c in out.cases)
+    if seeded and not declared_tables(isatvon):
         lines.append(NO_TABLES_HINT)
     # no_op_condition is checked on the input before any tool runs, so a case's kind must agree
     # with it: an ESCALATION case whose input already satisfies it ends NO_OP and never escalates.
