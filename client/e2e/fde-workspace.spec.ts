@@ -24,7 +24,15 @@ const project = {
 
 const signIn = async (page: Page, baseURL: string) => {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: "sbam-fde", url: baseURL }]);
-  await page.route(`${API}/projects`, (r) => json(r, { items: [project] }));
+  // A call no test fakes (notifications, preflight, llm-usage, ...) answers 404. With no sbam-api the
+  // proxy would answer 401, and a 401 signs the user out mid-test (#742). Routes added later win.
+  await page.route(`${API}/**`, (r) =>
+    json(r, { type: "about:blank", title: "Not Found", status: 404 }, 404),
+  );
+  await page.route(
+    (url) => url.pathname.endsWith("/api/proxy/api/v1/projects"), // with or without ?limit
+    (r) => json(r, { items: [project] }),
+  );
 };
 
 type Tus = { creations: { metadata: string; authorization: string | undefined }[] };
