@@ -373,11 +373,24 @@ class SqlDatasetStore:
             for data in stored
         ]
 
-    def fits(self, inp: BuildStageInput, dataset_id: uuid.UUID, tables: seed_fit.Tables) -> bool:
-        """Whether every case of the dataset seeds rows `schema.sql` accepts (#704)."""
+    def fits(
+        self,
+        inp: BuildStageInput,
+        dataset_id: uuid.UUID,
+        tables: seed_fit.Tables,
+        max_iterations: int,
+    ) -> bool:
+        """Whether every case of the dataset runs under today's rules: its seeds fit `schema.sql`
+        (#704) and its state script has at most `max_iterations - 1` steps (a step runs before
+        pass i + 2). A dataset written before the second rule existed is refused by the runner
+        (DATASET_INVALID), so reusing it would loop in TESTING_BLOCKED for ever (#772)."""
         with self.sessions() as session:
             rows = CaseRepository(session, self._ctx(inp)).of_dataset(dataset_id)
-            return not any(seed_fit.errors(r.initial_state, r.state_script, tables) for r in rows)
+            return not any(
+                len(r.state_script) > max_iterations - 1
+                or seed_fit.errors(r.initial_state, r.state_script, tables)
+                for r in rows
+            )
 
     def refresh_mocks(self, inp: BuildStageInput, isatvon: Mapping[str, Any]) -> uuid.UUID:
         """The newest dataset, or a new version of it whose mocks answer the current API
@@ -519,10 +532,13 @@ class GenerateTests:
         newest = self.store.newest(inp)
         replaces: uuid.UUID | None = None
         if newest is not None and newest.generated_for == wanted:
-            if newest.edited_by_fde or self.store.fits(inp, newest.id, tables):
+            variables = SubSkillModel.model_validate(isatvon).isatvon_definition.v_variables
+            if newest.edited_by_fde or self.store.fits(
+                inp, newest.id, tables, variables.max_iterations
+            ):
                 # same bounds, same tables: the cases stay, the mocks follow the API references
                 return IdResult(id=self.store.refresh_mocks(inp, isatvon))
-            replaces = newest.id  # generated cases the sandbox would refuse: ask again (#704)
+            replaces = newest.id  # generated cases the sandbox would refuse: ask again (#704, #772)
         elif newest is not None and newest.edited_by_fde:
             if newest.generated_for is None:  # written before the fingerprint: keep their cases
                 return IdResult(id=self.store.refresh_mocks(inp, isatvon))

@@ -354,6 +354,69 @@ def test_e11_4b_edited_tests_from_before_the_fingerprint_are_kept() -> None:
     assert w.run() == first and len(w.datasets()) == 1
 
 
+# --- #772: a stored dataset that breaks today's state_script rule is not reused ----------------
+
+
+def set_state_script(w: World, steps: list[list[str]]) -> None:
+    """What an older generation could leave behind: a state script the current rule refuses."""
+    with w.sessions() as s:
+        for row in s.scalars(select(CaseRow)):
+            row.state_script = steps
+        s.commit()
+
+
+def limit_of(w: World) -> int:
+    return SubSkillModel.model_validate(w.isatvon).isatvon_definition.v_variables.max_iterations
+
+
+def retouched(isatvon: dict[str, Any]) -> dict[str, Any]:
+    """A correction that leaves the bounds alone: same fingerprint, a different question."""
+    patched: dict[str, Any] = json.loads(json.dumps(isatvon))
+    patched["isatvon_definition"]["t_tech_stack"]["fixed_check_tool"] = "other_check_tool"
+    assert fingerprint(patched) == fingerprint(isatvon)
+    return patched
+
+
+def test_wg22_t01_a_generated_dataset_with_too_long_a_state_script_is_regenerated() -> None:
+    again = {"cases": [case("happy, asked again", "PASS_FIRST", "SUCCESS"), *GOOD["cases"][1:]]}
+    w = World([GOOD, again])
+    first = w.run()
+    set_state_script(w, [[] for _ in range(limit_of(w))])  # one step more than the bound allows
+    after_a_correction(w, retouched(w.isatvon))
+    second = w.run()
+    assert second != first and [d.version for d in w.datasets()] == [1, 2]
+    assert len(w.bifrost.requests) == 2  # asked again; the first dataset stays as evidence
+
+
+def test_wg22_t02_a_state_script_at_the_limit_is_reused() -> None:
+    w = World([GOOD])
+    first = w.run()
+    set_state_script(w, [[] for _ in range(limit_of(w) - 1)])  # exactly max_iterations - 1 steps
+    assert w.run() == first
+    assert len(w.datasets()) == 1 and len(w.bifrost.requests) == 1
+
+
+def test_wg22_t03_an_fde_edited_dataset_is_left_alone() -> None:
+    w = World([GOOD])
+    first = w.run()
+    mark_edited(w, first)
+    set_state_script(w, [[] for _ in range(limit_of(w))])
+    assert w.run() == first
+    assert len(w.datasets()) == 1 and len(w.bifrost.requests) == 1
+
+
+def test_wg22_t04_one_iteration_allows_no_state_script_steps() -> None:
+    isatvon = sample(**{IDEF + "v_variables.max_iterations": 1})
+    noop = {"cases": [*GOOD["cases"][:2], case("nothing to do", "NO_OP", "NO_OP")]}
+    again = {"cases": [*GOOD["cases"][:2], case("nothing to do, asked again", "NO_OP", "NO_OP")]}
+    w = World([GOOD, noop, again], isatvon)
+    first = w.run()
+    set_state_script(w, [[]])  # one step, but max_iterations - 1 is zero
+    after_a_correction(w, retouched(w.isatvon))
+    assert w.run() != first
+    assert [d.version for d in w.datasets()] == [1, 2]
+
+
 def test_e13_6_an_assertion_type_the_suite_does_not_know_is_re_asked_and_never_stored() -> None:
     typo = case("typo", "EDGE", "SUCCESS", assertions=[{"type": "looks_fine"}])
     w = World([{"cases": [*GOOD["cases"], typo]}, GOOD])
