@@ -114,3 +114,50 @@ than their own TTL plus five minutes, and logs each one.
 
 Platform owner (D3). A run that certifies on a host that was not accepted is a certification defect: stop certifying and open
 an issue with the run id.
+
+## Building and registering the template (WG-1, #749)
+
+The host needs one template per `skill-runtime` digest, with the alias `sbam-rt-<first 56 hex of the digest>`.
+`scripts/sandbox-template.sh` does it in one step, **on the host**, from a checkout:
+
+```bash
+scripts/sandbox-template.sh                                   # the local skill-runtime:local image
+scripts/sandbox-template.sh --runtime-image skill-runtime@sha256:<digest>
+scripts/sandbox-template.sh --force                           # rebuild and re-register
+```
+
+What it does: reads the digest the manifests record (the registry digest of a pinned image, or the image id of a
+local build), builds `compose/docker/sandbox-template.Dockerfile` from a small context (the runtime image, the staged
+in-VM runner and the pinned `envd`), writes the full digest to `/etc/sbam-runtime`, pushes the image to the host's
+plain-HTTP registry (`127.0.0.1:5000`) and runs `cubemastercli tpl create-from-image` with `--alias`. It does nothing
+when a READY template already carries the alias. A forced rebuild makes a new template and the alias **moves** to it, so
+an alias always names exactly one template.
+
+The registry must be reachable by CubeMaster: `docker run -d --name sbam-registry --restart=always -p 127.0.0.1:5000:5000 registry:2`.
+The digest in the manifests is `docker image inspect --format '{{.Id}}' skill-runtime:local` on a laptop build; a
+template for any other digest is never used (`TEMPLATE_DIGEST_MISMATCH`).
+
+Check it: create a sandbox from the alias and read `/etc/sbam-runtime`. The adapter does this on every run and stops the
+run when the digest differs.
+
+## A development host on WSL2 (not for certification)
+
+A WSL2 Ubuntu 24.04 distro with nested virtualization (`/dev/kvm`) runs CubeSandbox well enough to develop the adapter. It
+is **not** the production host and nothing certified on it counts as production-certified. What it needs, learned the hard way:
+
+| Need | Why |
+|---|---|
+| systemd on (`/etc/wsl.conf`: `[boot] systemd=true`) | CubeSandbox installs systemd units |
+| bpffs mounted (`/etc/fstab`: `bpffs /sys/fs/bpf bpf defaults 0 0`) | Cubelet pins eBPF maps there |
+| An XFS filesystem at `/data/cubelet` (a loop file such as `/var/lib/cubelet-xfs.img` mounted via `/etc/fstab`) | Cubelet refuses any other filesystem |
+| `iptables` and Docker installed inside the distro | the egress rules and MySQL, Redis and MinIO containers need them |
+| **A long-lived session**, for example `wsl.exe -d Ubuntu-24.04 --user root -e sleep infinity` | WSL stops a distro with no session even when its services run, which takes the sandbox host down mid-run |
+| Free ports | WSL2 shares one network between distros, so CubeAPI cannot use 3000 (the web app) and the egress service needs 8443. The dev install runs CubeAPI on **13000** |
+| The runtime image inside the distro's Docker (`docker save skill-runtime:local \| wsl.exe -d Ubuntu-24.04 -u root docker load`) | the image id is kept, so the alias still matches the manifests |
+
+From a Docker Desktop container the control plane answers at `http://host.docker.internal:13000`. The `worker-test` service
+sits on an internal network with no route out, so a development override must attach it to an edge network and set the
+`CUBE_*` variables (names only in `compose/.env.example`; the values belong in your own `.env`).
+
+If a run ends `INFRA_ERROR` and the host answers `template has no ready replica`, the distro was restarting: wait until
+`systemctl list-units 'cube-sandbox*'` shows every unit active, then retry. An infrastructure error never spends a correction.
