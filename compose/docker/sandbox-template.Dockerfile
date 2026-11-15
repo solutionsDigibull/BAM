@@ -33,11 +33,15 @@ COPY --from=cubebase /usr/local/bin/cube-entrypoint.sh /usr/local/bin/cube-entry
 # able to change the runner, its child entrypoint or the harness on disk. The base image owns /opt/sbam/harness
 # as 10001, so ownership is taken back here.
 COPY --from=harness /tmp/harness/ /opt/sbam/harness/
+# /work is where a run's files go and where the runner recreates out/ before it writes the outputs (ADR 0027): it
+# must belong to the run user. WORKDIR in the runtime image creates it as root, and the upload agent only
+# creates the directories below it as the run user, so a root-owned /work made every run crash in write_outputs.
 RUN test -n "${RUNTIME_DIGEST}" \
  && printf '%s\n' "${RUNTIME_DIGEST}" > /etc/sbam-runtime \
  && chmod 0444 /etc/sbam-runtime \
  && chown -R root:root /opt/sbam \
- && chmod -R go-w /opt/sbam
+ && chmod -R go-w /opt/sbam \
+ && install -d -o 10001 -g 10001 -m 0755 /work
 ENV ENVD_PORT=49983
 EXPOSE 49983
 # envd starts in the background and the CMD keeps the VM alive; the platform runs the work through envd.
