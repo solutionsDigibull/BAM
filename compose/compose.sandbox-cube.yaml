@@ -1,21 +1,21 @@
-# Points `worker-test` at a CubeSandbox host that Docker Desktop can reach, for example the WSL2 development host
-# (WG-1, #749, docs/runbooks/sandbox-host.md). Load it after the core files:
+# Points `worker-test` at the WSL2 development CubeSandbox host, from Docker Desktop (WG-1, #749,
+# docs/runbooks/sandbox-host.md). Load it after the core files:
 #   docker compose -f compose.yaml -f compose.override.yaml -f compose.sandbox-cube.yaml -p sbam up -d worker-test
 #
-# A DEVELOPMENT override, not a production one: production reaches the host over Netbird and sets the same CUBE_*
-# variables. Nothing here is a secret. Override any value from your shell or compose/.env.
+# A DEVELOPMENT override, not a production one: production reaches its host over Netbird and sets the CUBE_* and
+# SANDBOX_EGRESS_* variables itself. Nothing here is a secret.
 #
-# Values in compose/.env win over the defaults below, and shell variables win over compose/.env. To use the WSL2
-# development host while compose/.env points at another host, set all three from the shell (the port too: a stale
-# CUBE_PROXY_PORT_HTTP sends the data plane to the wrong port and every run ends HOST_UNREACHABLE):
-#   CUBE_API_URL=http://host.docker.internal:13000 CUBE_PROXY_NODE_IP=host.docker.internal CUBE_PROXY_PORT_HTTP=80 \
-#     docker compose -f compose.yaml -f compose.override.yaml -f compose.sandbox-cube.yaml -p sbam up -d worker-test
+# It does NOT read the CUBE_* and SANDBOX_EGRESS_* values of compose/.env, which describe another host (the team's):
+# a stale value there sent the data plane to the wrong port and the evidence read to a collector that was not
+# reachable, and every run ended in an infrastructure error. Use the DEV_* names below to change what this file
+# points at, for example DEV_CUBE_API_URL=http://host.docker.internal:13000.
 #
 # Honest limits of this override:
-#  - the egress evidence file is an EMPTY placeholder, because the collector does not exist yet (WG-14). A run on this
-#    host is real and isolated, but it has no egress evidence, so treat its results as development evidence only;
-#  - the mock API runs on the internal network, which a microVM on the host cannot reach, so cases that call a mocked
-#    outside service cannot run here until WG-14/WG-17 give the VM a route to it.
+#  - the egress evidence file is an EMPTY placeholder, because the collector does not exist for this host yet
+#    (WG-14). A run on this host is real and isolated, but it has no egress evidence, so treat its results as
+#    development evidence only;
+#  - the mock API runs on the internal network, which a microVM on the host cannot reach, so cases that call a
+#    mocked outside service cannot run here until WG-14/WG-17 give the VM a route to it.
 services:
   worker-test:
     # The core worker sits only on sbam_internal, which has no route out. The sandbox host is outside the stack.
@@ -24,7 +24,12 @@ services:
     volumes:
       - ./sandbox-cube/egress.dev.jsonl:/egress/egress.jsonl:ro
     environment:
-      SANDBOX_MODE: ${SANDBOX_MODE:-CUBESANDBOX}
-      CUBE_API_URL: ${CUBE_API_URL:-http://host.docker.internal:13000}
-      CUBE_PROXY_NODE_IP: ${CUBE_PROXY_NODE_IP:-host.docker.internal}
-      SANDBOX_EGRESS_LOG_PATH: ${SANDBOX_EGRESS_LOG_PATH:-/egress/egress.jsonl}
+      SANDBOX_MODE: CUBESANDBOX
+      CUBE_API_URL: ${DEV_CUBE_API_URL:-http://host.docker.internal:13000}
+      CUBE_PROXY_NODE_IP: ${DEV_CUBE_PROXY_NODE_IP:-host.docker.internal}
+      CUBE_PROXY_PORT_HTTP: ${DEV_CUBE_PROXY_PORT_HTTP:-80}
+      CUBE_API_KEY: ""
+      # The factory prefers an HTTP collector over the file when a URL is set, so this host never inherits one.
+      SANDBOX_EGRESS_URL: ""
+      SANDBOX_EGRESS_TOKEN: ""
+      SANDBOX_EGRESS_LOG_PATH: /egress/egress.jsonl
