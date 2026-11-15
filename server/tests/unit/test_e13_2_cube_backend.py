@@ -219,6 +219,52 @@ def test_e13_2_files_are_written_as_the_run_user_and_the_hosts_file_as_root() ->
     )  # tests never run as the user that writes the hosts file
 
 
+def test_wg1_t06_the_read_only_hosts_file_is_made_writable_for_the_write_and_restored() -> None:
+    """The first real run found /etc/hosts mounted read-only in the VM: envd answered 500."""
+    b = backend()
+    vm = run(b.create(spec()))
+    run(b.put_files(vm, {"/etc/hosts": b"1.2.3.4 x\n"}, system=True))
+    box = FakeSandbox.boxes["vm-1"]
+    assert [(cmd, kwargs["user"]) for cmd, kwargs in box.runs] == [
+        ("mount -o remount,rw /etc/hosts", SYSTEM_USER),
+        ("mount -o remount,ro /etc/hosts", SYSTEM_USER),
+    ]
+    assert box.writes == [("/etc/hosts", b"1.2.3.4 x\n", SYSTEM_USER)]
+
+
+def test_wg1_t07_other_files_are_never_remounted() -> None:
+    b = backend()
+    vm = run(b.create(spec()))
+    run(b.put_files(vm, {"/work/request.json": b"{}"}))
+    run(b.put_files(vm, {"/etc/other": b"x"}, system=True))
+    assert FakeSandbox.boxes["vm-1"].runs == []
+
+
+def test_wg1_t08_a_refused_remount_is_infrastructure_and_nothing_is_written() -> None:
+    b = backend()
+    vm = run(b.create(spec()))
+    box = FakeSandbox.boxes["vm-1"]
+    box.on_run = lambda cmd, kwargs: cubesandbox.CommandResult("", "denied", 1)
+    with pytest.raises(SandboxInfraError) as caught:
+        run(b.put_files(vm, {"/etc/hosts": b"x"}, system=True))
+    assert caught.value.reason is InfraReason.RUNNER_FAILED
+    assert box.writes == []
+
+
+def test_wg1_t09_the_hosts_file_is_put_back_read_only_even_when_the_write_fails() -> None:
+    b = backend()
+    vm = run(b.create(spec()))
+    box = FakeSandbox.boxes["vm-1"]
+
+    def broken(path: str, data: bytes, *, user: str | None = None) -> None:
+        raise RuntimeError("write failed")
+
+    box.files.write = broken  # type: ignore[method-assign]
+    with pytest.raises(SandboxInfraError):
+        run(b.put_files(vm, {"/etc/hosts": b"x"}, system=True))
+    assert box.runs[-1][0] == "mount -o remount,ro /etc/hosts"
+
+
 def test_e13_2_the_vms_own_digest_is_read_as_root() -> None:
     b = backend()
     vm = run(b.create(spec()))
