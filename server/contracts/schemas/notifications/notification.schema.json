@@ -13,7 +13,9 @@
         "DOCUMENT_REJECTED",
         "GENERATION_FAILED",
         "STAGE_COMPLETED",
-        "REMINDER"
+        "REMINDER",
+        "TOKEN_BUDGET_WARNING",
+        "TOKEN_BUDGET_LIMIT"
       ],
       "title": "NotificationType",
       "type": "string"

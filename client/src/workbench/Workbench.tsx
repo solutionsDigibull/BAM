@@ -22,7 +22,7 @@ import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
 import { AssistantPane } from './components/AssistantPane'
 import { goalStage, skipGoal, useGoal } from './lib/goal'
 import { ReleasePrep, SkillReview } from './steps/Review'
-import { SCREEN_ROUTES, STEP_SCREEN, TASKS, screenByPath, screenLabel, stageOf, subtasksOf } from './tracker/trackerConfig'
+import { GOAL_PATH, SCREEN_ROUTES, STEP_SCREEN, TASKS, screenByPath, screenLabel, stageOf, subtasksOf } from './tracker/trackerConfig'
 import { AutoContextFooter, SyncFooter, SyncView } from './rag/KnowledgeSync'
 import { RagScreen } from './rag/RagScreens'
 import { ragPipeline, useRag } from './rag/ragPipeline'
@@ -133,6 +133,14 @@ function WorkbenchBody() {
   // Pane geometry never changes with the stage (21 Oct 2026, per user): only the person collapses or opens a pane.
   // Internal diagnostics (scan, quarantine, file detail) have no FDE role in this build: old URLs open Upload.
   useEffect(() => { if (screen?.item.internal) navigate(SCREEN_ROUTES['1.1']!.path, { replace: true }) }, [screen])
+  // The goal has its own address (#720): Upload without a saved goal shows it at #/goal, and #/goal moves on to Upload
+  // once one is saved. Only after the project's goal has been read, so a reload never flashes the wrong screen.
+  const goalLoaded = useGoal(s => s.loaded), goalSaved = useGoal(s => s.saved)
+  useEffect(() => {
+    if (screen?.id !== '1.1' || !goalLoaded) return
+    if (!goalSaved && path !== GOAL_PATH) navigate(GOAL_PATH, { replace: true })
+    else if (goalSaved && path === GOAL_PATH) navigate(SCREEN_ROUTES['1.1']!.path, { replace: true })
+  }, [screen?.id, path, goalLoaded, goalSaved])
   // Old paths (moved or renamed screens) redirect; "/" and unknown paths open wherever the work is right now.
   useEffect(() => {
     if (screen) return

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:df8b6ddffd05de4bafb62b3a13e551cff86e4f844f86f2ab727208dd807e9056
+// source-sha256:1af55c4077cad20ae123247bc224f4bf171ad810c409d5ea0b81fa36cbf849e1
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -390,7 +390,9 @@ export type NotificationType =
   | "DOCUMENT_REJECTED"
   | "GENERATION_FAILED"
   | "STAGE_COMPLETED"
-  | "REMINDER";
+  | "REMINDER"
+  | "TOKEN_BUDGET_WARNING"
+  | "TOKEN_BUDGET_LIMIT";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "CoverageStatus".
@@ -506,6 +508,11 @@ export type RepoSource = "ISATVON" | "ADMIN_AGENTS" | "ADMIN_TOOLING" | "FDE";
 export type DecidedBy = "AUTO" | "FDE";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RejectReason".
+ */
+export type RejectReason = "NOT_HTTPS" | "HAS_CREDENTIALS" | "HAS_QUERY" | "PRIVATE_ADDRESS" | "INVALID_URL";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "BudgetScope".
  */
 export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
@@ -588,6 +595,8 @@ export interface SbamContracts {
   Project?: Project;
   ProjectCreate?: ProjectCreate;
   ProjectPatch?: ProjectPatch;
+  ProjectGoalPut?: ProjectGoalPut;
+  ProjectGoalOut?: ProjectGoalOut;
   ProjectMembersPut?: ProjectMembersPut;
   ProjectMembers?: ProjectMembers;
   PipelineTimeline?: PipelineTimeline;
@@ -652,6 +661,7 @@ export interface SbamContracts {
   RunnerRequest?: RunnerRequest;
   RunnerOutputs?: RunnerOutputs;
   RepoDecision?: RepoDecision;
+  RepoCatalog?: RepoCatalog;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
 }
@@ -2977,6 +2987,7 @@ export interface Project {
   description: string | null;
   context_notes: string | null;
   allow_restricted?: boolean;
+  goal?: string | null;
   status: ProjectStatus;
   pipeline_state: ProjectPipelineState;
   row_version: number;
@@ -3008,6 +3019,26 @@ export interface ProjectPatch {
   description?: string | null;
   context_notes?: string | null;
   allow_restricted?: boolean | null;
+}
+/**
+ * `PUT /projects/{id}/goal` with `If-Match` (#720): the new goal; `null` clears it.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectGoalPut".
+ */
+export interface ProjectGoalPut {
+  goal: string | null;
+}
+/**
+ * `GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set). The ETag
+ * header is the project's `row_version`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectGoalOut".
+ */
+export interface ProjectGoalOut {
+  project_id: string;
+  goal: string | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -5753,6 +5784,51 @@ export interface RepoChoice {
    */
   url: string;
   commit?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoCatalog".
+ */
+export interface RepoCatalog {
+  project_id: string;
+  structure_version: string;
+  /**
+   * @maxItems 500
+   */
+  candidates?: CatalogCandidate[];
+  /**
+   * @maxItems 500
+   */
+  rejected?: CatalogRejection[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CatalogCandidate".
+ */
+export interface CatalogCandidate {
+  id: string;
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  ref?: string | null;
+  notes?: string;
+  source: RepoSource;
+  master_entry_id: string;
+  stable_id: string;
+  row_label?: string | null;
+  agent_name?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CatalogRejection".
+ */
+export interface CatalogRejection {
+  value: string;
+  reason: RejectReason;
+  source: RepoSource;
+  master_entry_id: string;
+  stable_id: string;
 }
 /**
  * A project's caps.

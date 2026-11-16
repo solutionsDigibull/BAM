@@ -35,6 +35,8 @@ class NotificationType(StrEnum):
     GENERATION_FAILED = "GENERATION_FAILED"
     STAGE_COMPLETED = "STAGE_COMPLETED"
     REMINDER = "REMINDER"
+    TOKEN_BUDGET_WARNING = "TOKEN_BUDGET_WARNING"  # noqa: S105  first alert: the FDE
+    TOKEN_BUDGET_LIMIT = "TOKEN_BUDGET_LIMIT"  # noqa: S105  second alert, stop: FDE and Admin
 
 
 class Notification(BaseModel):

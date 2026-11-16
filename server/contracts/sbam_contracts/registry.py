@@ -108,6 +108,8 @@ from sbam_contracts.projects import (
     PipelineTimeline,
     Project,
     ProjectCreate,
+    ProjectGoalOut,
+    ProjectGoalPut,
     ProjectMembers,
     ProjectMembersPut,
     ProjectPatch,
@@ -115,6 +117,7 @@ from sbam_contracts.projects import (
     WorkflowSummary,
 )
 from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
+from sbam_contracts.repo_catalog import RepoCatalog
 from sbam_contracts.repo_decision import RepoDecision
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
@@ -214,6 +217,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("projects/project", Project),
     ("projects/project_create", ProjectCreate),
     ("projects/project_patch", ProjectPatch),
+    ("projects/project_goal_put", ProjectGoalPut),
+    ("projects/project_goal", ProjectGoalOut),
     ("projects/project_members_put", ProjectMembersPut),
     ("projects/project_members", ProjectMembers),
     ("projects/pipeline_timeline", PipelineTimeline),
@@ -278,6 +283,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sandbox/runner_request", RunnerRequest),
     ("sandbox/runner_outputs", RunnerOutputs),
     ("repo/decision", RepoDecision),
+    ("repo/catalog", RepoCatalog),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
 )
