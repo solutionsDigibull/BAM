@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:96594d0e4ba69525671edb1fb6e3d2d01899047df1763629b503f7af369705e1
+// source-sha256:df8b6ddffd05de4bafb62b3a13e551cff86e4f844f86f2ab727208dd807e9056
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -487,6 +487,33 @@ export type InfraReason =
   | "DESTROY_FAILED"
   | "CANCELLED"
   | "SUPERSEDED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoOutcome".
+ */
+export type RepoOutcome = "REPO" | "GENERATED";
+/**
+ * Where a candidate came from: the priority order of ADR 0028, in the order it is tried.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoSource".
+ */
+export type RepoSource = "ISATVON" | "ADMIN_AGENTS" | "ADMIN_TOOLING" | "FDE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DecidedBy".
+ */
+export type DecidedBy = "AUTO" | "FDE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BudgetScope".
+ */
+export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BudgetLevel".
+ */
+export type BudgetLevel = "OK" | "FIRST_ALERT" | "SECOND_ALERT" | "STOPPED";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -624,6 +651,9 @@ export interface SbamContracts {
   SandboxRun?: SandboxRun;
   RunnerRequest?: RunnerRequest;
   RunnerOutputs?: RunnerOutputs;
+  RepoDecision?: RepoDecision;
+  BudgetCaps?: BudgetCaps;
+  BudgetState?: BudgetState;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -805,6 +835,30 @@ export interface TTechStack {
    * @minItems 1
    */
   libraries: [Library, ...Library[]];
+  source_repos?:
+    | []
+    | [SourceRepo]
+    | [SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo
+      ]
+    | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -813,6 +867,26 @@ export interface TTechStack {
 export interface Library {
   package: string;
   version_constraint?: string | null;
+}
+/**
+ * An open-source repository this Sub-Skill's code starts from (ADR 0028, decision 1).
+ *
+ * `commit` is empty until the fetcher resolves `ref` (a branch or tag) to one and pins it.
+ * `licence` is data here (an SPDX id as the FDE or the catalog wrote it): the allowlist is
+ * enforced when the repository is fetched, never by this contract.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SourceRepo".
+ */
+export interface SourceRepo {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  ref?: string | null;
+  commit?: string | null;
+  licence?: string | null;
+  reason: string;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -1424,6 +1498,30 @@ export interface FlatTechStack {
   secondary_tools?: string[] | null;
   gateway_routing?: string | null;
   libraries?: Library[] | null;
+  source_repos?:
+    | []
+    | [SourceRepo]
+    | [SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo, SourceRepo]
+    | [
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo,
+        SourceRepo
+      ]
+    | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -1738,6 +1836,7 @@ export interface WorkflowManifest {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   runtime_image_digest: string;
+  mcp_server?: McpServerEntry | null;
   evidence_index?: EvidenceEntry[];
   certification?: WorkflowCertification | null;
   integrity: Integrity;
@@ -1806,6 +1905,50 @@ export interface Dag {
   edges: {
     [k: string]: JsonValue | undefined;
   }[];
+}
+/**
+ * The single FastMCP server that holds every Sub-Skill's tools, built into one image (C-50 is
+ * kept: every Sub-Skill has both an action and a check tool). `registry_id` is empty until the
+ * server is registered in Bifrost, which happens only after certification.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "McpServerEntry".
+ */
+export interface McpServerEntry {
+  /**
+   * Pattern: `^wf_[a-z0-9]+(_[a-z0-9]+)*$`
+   */
+  name: string;
+  version: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  image_digest: string;
+  registry_id?: string | null;
+  /**
+   * @minItems 2
+   */
+  tools: [McpToolEntry, McpToolEntry, ...McpToolEntry[]];
+}
+/**
+ * One tool of the Workflow server: the Action or the Fixed Check tool of one Sub-Skill.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "McpToolEntry".
+ */
+export interface McpToolEntry {
+  /**
+   * Pattern: `^MS\d{2}_\d+__(action|check)$`
+   */
+  name: string;
+  skill_id: string;
+  role: "action" | "check";
+  input_schema: {
+    [k: string]: JsonValue | undefined;
+  };
+  output_schema: {
+    [k: string]: JsonValue | undefined;
+  };
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -5340,4 +5483,302 @@ export interface RunnerResources {
   wall_ms: number;
   cpu_ms: number;
   peak_rss_kb: number;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoDecision".
+ */
+export interface RepoDecision {
+  sub_skill_id: string;
+  outcome: RepoOutcome;
+  /**
+   * @maxItems 20
+   */
+  candidates?:
+    | []
+    | [RepoCandidate]
+    | [RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ]
+    | [
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate,
+        RepoCandidate
+      ];
+  chosen?: RepoChoice | null;
+  decided_by: DecidedBy;
+  actor_id?: string | null;
+  decided_at: string;
+  reason: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoCandidate".
+ */
+export interface RepoCandidate {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  source: RepoSource;
+  score: number;
+  licence?: string | null;
+  /**
+   * @maxItems 8
+   */
+  reasons?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoChoice".
+ */
+export interface RepoChoice {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  commit?: string | null;
+}
+/**
+ * A project's caps.
+ *
+ * Every field has the ADR 0028 default, so `BudgetCaps()` is the platform default.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BudgetCaps".
+ */
+export interface BudgetCaps {
+  sub_skill_tokens?: number;
+  workflow_tokens?: number;
+  knowledge_tokens?: number;
+  first_alert_pct?: number;
+  second_alert_pct?: number;
+}
+/**
+ * What one build has used, as the workbench meter and the alerts read it.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BudgetState".
+ */
+export interface BudgetState {
+  scope: BudgetScope;
+  used: number;
+  cap: number;
+  level: BudgetLevel;
+  raised_once?: boolean;
 }

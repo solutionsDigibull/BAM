@@ -17,6 +17,7 @@ from jsonschema import Draft202012Validator
 from pydantic import BaseModel
 from sbam_contracts import (
     audit,
+    budget,
     build_dashboard,
     code_view,
     documents,
@@ -40,6 +41,7 @@ from sbam_contracts import (
     preflight,
     projects,
     promptfoo,
+    repo_decision,
     runs,
     runtime_registry,
     sandbox,
@@ -223,6 +225,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
         f"{folder}/{stem}"
         for folder, module in (
             ("audit", audit),
+            ("budget", budget),
             ("build", build_dashboard),
             ("build", schema_sql),
             ("code", code_view),
@@ -254,6 +257,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("llm_cache", llm_cache),
             ("llm_usage", llm_usage),
             ("preflight", preflight),
+            ("repo", repo_decision),
         )
         for stem in module.schemas()
     }

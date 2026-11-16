@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:budget/state:0.1.0",
+  "$defs": {
+    "BudgetLevel": {
+      "enum": [
+        "OK",
+        "FIRST_ALERT",
+        "SECOND_ALERT",
+        "STOPPED"
+      ],
+      "title": "BudgetLevel",
+      "type": "string"
+    },
+    "BudgetScope": {
+      "enum": [
+        "SUB_SKILL",
+        "WORKFLOW",
+        "KNOWLEDGE"
+      ],
+      "title": "BudgetScope",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What one build has used, as the workbench meter and the alerts read it.",
+  "properties": {
+    "scope": {
+      "$ref": "#/$defs/BudgetScope"
+    },
+    "used": {
+      "minimum": 0,
+      "title": "Used",
+      "type": "integer"
+    },
+    "cap": {
+      "maximum": 1000000000,
+      "minimum": 1,
+      "title": "Cap",
+      "type": "integer"
+    },
+    "level": {
+      "$ref": "#/$defs/BudgetLevel"
+    },
+    "raised_once": {
+      "default": false,
+      "title": "Raised Once",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "scope",
+    "used",
+    "cap",
+    "level"
+  ],
+  "title": "BudgetState",
+  "type": "object"
+}
