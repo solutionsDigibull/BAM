@@ -6,7 +6,8 @@ no timeout, so every call runs in a worker thread under `asyncio.wait_for`.
 
 Rules worth knowing
   * Tests run as the unprivileged `sbam` user, never as root. Only `system=True` file writes (the
-    hosts file) are root's. The SDK runs `bash -l -c <cmd>`, so every argv element is quoted here
+    hosts file, which the platform mounts read-only and which is remounted writable for the write)
+    are root's. The SDK runs `bash -l -c <cmd>`, so every argv element is quoted here
     and nothing else is ever part of the command text.
   * Output goes to files inside the VM and is read back through `head -c`, so a case that prints
     gigabytes cannot fill the worker's memory (the SDK reads a whole stream into one string) and no
@@ -42,6 +43,10 @@ CONTROL_TIMEOUT_S: Final = 30.0
 EXEC_SLACK_S: Final = 30.0  # envd enforces the run's deadline; the client waits a bit longer
 TIMEOUT_EXIT_CODE: Final = 124
 RUNTIME_DIGEST_PATH: Final = "/etc/sbam-runtime"
+# CubeSandbox mounts these as read-only tmpfs files, so envd cannot write them (the error is
+# "chown ...: read-only file system"). Root in the VM can remount one writable for the write and put
+# it back (WG-1, found on the first run against a real host).
+READ_ONLY_RUNTIME_FILES: Final = frozenset({"/etc/hosts", "/etc/resolv.conf"})
 STDOUT_PATH: Final = "/tmp/.sbam-stdout"  # noqa: S108 - inside the VM, written by the run user
 STDERR_PATH: Final = "/tmp/.sbam-stderr"  # noqa: S108
 
@@ -188,9 +193,38 @@ class CubeSandboxBackend:
         box = self._vm(vm)
         user = SYSTEM_USER if system else RUN_USER
         for path, data in files.items():
-            await self._call(
-                lambda p=path, d=data: box.files.write(p, d, user=user),  # type: ignore[misc]
+            remounted = system and path in READ_ONLY_RUNTIME_FILES
+            if remounted:
+                await self._remount(box, path, writable=True)
+            try:
+                await self._call(
+                    lambda p=path, d=data: box.files.write(p, d, user=user),  # type: ignore[misc]
+                    InfraReason.RUNNER_FAILED,
+                )
+            finally:
+                if remounted:
+                    await self._remount(box, path, writable=False, best_effort=True)
+
+    async def _remount(
+        self, box: Any, path: str, *, writable: bool, best_effort: bool = False
+    ) -> None:
+        """Make a read-only runtime file writable (as root) or read-only again. Putting it back is
+        best effort: the file is root's and mode 0644, so the run user cannot change it either way.
+        """
+        mode = "rw" if writable else "ro"
+        line = f"mount -o remount,{mode} {shlex.quote(path)}"
+        try:
+            result = await self._call(
+                lambda: box.commands.run(line, timeout=CONTROL_TIMEOUT_S, user=SYSTEM_USER),
                 InfraReason.RUNNER_FAILED,
+            )
+        except SandboxInfraError:
+            if best_effort:
+                return
+            raise
+        if int(result.exit_code) != 0 and not best_effort:
+            raise SandboxInfraError(
+                InfraReason.RUNNER_FAILED, "the VM would not make its hosts file writable"
             )
 
     async def exec(

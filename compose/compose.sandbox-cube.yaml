@@ -1,0 +1,35 @@
+# Points `worker-test` at the WSL2 development CubeSandbox host, from Docker Desktop (WG-1, #749,
+# docs/runbooks/sandbox-host.md). Load it after the core files:
+#   docker compose -f compose.yaml -f compose.override.yaml -f compose.sandbox-cube.yaml -p sbam up -d worker-test
+#
+# A DEVELOPMENT override, not a production one: production reaches its host over Netbird and sets the CUBE_* and
+# SANDBOX_EGRESS_* variables itself. Nothing here is a secret.
+#
+# It does NOT read the CUBE_* and SANDBOX_EGRESS_* values of compose/.env, which describe another host (the team's):
+# a stale value there sent the data plane to the wrong port and the evidence read to a collector that was not
+# reachable, and every run ended in an infrastructure error. Use the DEV_* names below to change what this file
+# points at, for example DEV_CUBE_API_URL=http://host.docker.internal:13000.
+#
+# Honest limits of this override:
+#  - the egress evidence file is an EMPTY placeholder, because the collector does not exist for this host yet
+#    (WG-14). A run on this host is real and isolated, but it has no egress evidence, so treat its results as
+#    development evidence only;
+#  - the mock API runs on the internal network, which a microVM on the host cannot reach, so cases that call a
+#    mocked outside service cannot run here until WG-14/WG-17 give the VM a route to it.
+services:
+  worker-test:
+    # The core worker sits only on sbam_internal, which has no route out. The sandbox host is outside the stack.
+    networks: [sbam_internal, sbam_edge]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ./sandbox-cube/egress.dev.jsonl:/egress/egress.jsonl:ro
+    environment:
+      SANDBOX_MODE: CUBESANDBOX
+      CUBE_API_URL: ${DEV_CUBE_API_URL:-http://host.docker.internal:13000}
+      CUBE_PROXY_NODE_IP: ${DEV_CUBE_PROXY_NODE_IP:-host.docker.internal}
+      CUBE_PROXY_PORT_HTTP: ${DEV_CUBE_PROXY_PORT_HTTP:-80}
+      CUBE_API_KEY: ""
+      # The factory prefers an HTTP collector over the file when a URL is set, so this host never inherits one.
+      SANDBOX_EGRESS_URL: ""
+      SANDBOX_EGRESS_TOKEN: ""
+      SANDBOX_EGRESS_LOG_PATH: /egress/egress.jsonl
