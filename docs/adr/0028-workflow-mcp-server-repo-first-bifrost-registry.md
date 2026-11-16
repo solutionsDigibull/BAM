@@ -35,7 +35,8 @@ a confirmed decision. Where this ADR changes a *default* of an earlier ADR it sa
    of [0013](0013-versioning-immutability-and-reuse.md) (C-33), so any change to a repository or a patch gives a
    new PATCH version.
 3. **One MCP server per workflow.** Every Sub-Skill keeps its Action tool and its independent Fixed Check
-   tool (C-50 is unchanged), namespaced `MS01.1__action` and `MS01.1__check`, and all of them are registered in
+   tool (C-50 is unchanged), namespaced `MS01_1__action` and `MS01_1__check` (no dot: model clients restrict tool names to letters,
+   digits, underscore and hyphen, and Bifrost adds `<server>-` in front), and all of them are registered in
    one FastMCP server, built into one image pinned by digest. The order of the steps stays in the manifest DAG
    (`next` and data edges), not in the server. The server calls no model at run time. The Workflow manifest
    records the server name, version, tool list and image digest.
