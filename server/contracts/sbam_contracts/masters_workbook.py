@@ -1,4 +1,8 @@
-"""Workbook layout and checks for the admin masters (BAM 0.2, TD §7.3.1, issue E0.4).
+"""Workbook layout and checks for the admin masters (Masters 0.3 since #781; ADR 0029).
+
+The five editable masters use the approved Admin Masters UI columns (`masters_v03.COLUMNS`):
+column A holds the id column (`Org ID`, `Rule ID`, ...), which is also the row label; the other
+columns follow in the approved order. Filetype keeps its frozen BAM 0.2 layout (`Filetype #n`).
 
 Everything here is pure: it works on cell grids that are already read (rows of cell values, row 1
 first). Reading the .xlsx with openpyxl belongs to the importer (E3.3). Error paths look like
@@ -19,19 +23,18 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sbam_contracts.api import DiffKind, ErrorCode, FieldError, StructureDiff
 from sbam_contracts.masters import (
     README_MAX_COLUMNS,
-    AgentsPayload,
     FiletypePayload,
     MasterIdentity,
-    MasterPayload,
+    MasterStatus,
     MasterType,
-    OrganizationPayload,
     RagReference,
-    RulesPayload,
-    SkillsPayload,
-    ToolingPayload,
     cell_text,
     identify,
+    source_kind,
 )
+from sbam_contracts.masters_v03 import COLUMNS as V03_COLUMNS
+from sbam_contracts.masters_v03 import ID_KEY, MasterPayloadV03, stable_id, status_of
+from sbam_contracts.masters_v03 import PAYLOAD_MODELS as V03_MODELS
 
 MAX_WORKBOOK_BYTES: Final = 15 * 1024 * 1024
 # Zip-bomb guard (E3.3): the members may expand to 100 MB in total, at most 100x their packed size.
@@ -61,89 +64,23 @@ TABS: Final = {
     MasterType.FILETYPE: "Filetype",
 }
 ROW_LABEL_PREFIX: Final = {
-    MasterType.ORGANIZATION: "Unit",
-    MasterType.RULES: "Rule",
-    MasterType.AGENTS: "Agent",
-    MasterType.SKILLS: "Skill",
+    MasterType.ORGANIZATION: "ORG",
+    MasterType.RULES: "RULE-CUSTOM",
+    MasterType.AGENTS: "AG",
+    MasterType.SKILLS: "SK",
     MasterType.TOOLING: "TOOL",
     MasterType.FILETYPE: "Filetype",
 }
-# Row labels are '<prefix> #n', except Tooling whose label is its stable id (TOOL-MFG-01).
-TOOLING_LABEL: Final = re.compile(r"TOOL-[A-Z0-9][A-Z0-9-]*\s*")
-# (column name in row 2, payload field). The order is the workbook order and is frozen.
+# The row label of an editable master is its id (column A): one line, at most 64 characters.
+ID_LABEL: Final = re.compile(r"\S[^\r\n]{0,63}")
+# Row 2, column A: the id column's own header, or "Name" for the frozen Filetype tab.
+ID_HEADER: Final = {t: V03_COLUMNS[t][0][1] for t in V03_COLUMNS} | {MasterType.FILETYPE: "Name"}
+# (column name in row 2, payload field) after column A. The order is the approved order.
 COLUMNS: Final[dict[MasterType, tuple[tuple[str, str], ...]]] = {
-    MasterType.ORGANIZATION: (
-        ("Org Name", "org_name"),
-        ("Type", "type"),
-        ("Code", "code"),
-        ("Location", "location"),
-        ("Org Details", "org_details"),
-        ("Employees", "employees"),
-        ("Customers", "customers"),
-        ("Offerings", "offerings"),
-        ("Competencies", "competencies"),
-        ("Data Sources", "data_sources"),
-        ("Systems/Tools", "systems_tools"),
-        ("Assets", "assets"),
-        ("Certifications", "certifications"),
-        ("Misc / Audit", "misc_audit"),
-    ),
-    MasterType.RULES: (
-        ("Domain Rule", "domain_rule"),
-        ("PCB Panelization", "pcb_panelization"),
-        ("Components (BOM)", "components_bom"),
-        ("Materials & Finish", "materials_finish"),
-        ("Box Build", "box_build"),
-        ("Machine HR Rates", "machine_hr_rates"),
-        ("Outsourced Services", "outsourced_services"),
-        ("Assembly Routing", "assembly_routing"),
-        ("Rules (DFM/Sourcing)", "rules_dfm_sourcing"),
-        ("Misc", "misc"),
-        ("RAG Reference", "rag_reference"),
-    ),
-    MasterType.AGENTS: (
-        ("Agent Name", "agent_name"),
-        ("Description", "description"),
-        ("Model", "model"),
-        ("Repo", "repo"),
-        ("API", "api"),
-        ("MCP Server", "mcp_server"),
-        ("Script", "script"),
-        ("Prompt", "prompt"),
-        ("Eval", "eval"),
-        ("Logs", "logs"),
-        ("Misc", "misc"),
-    ),
-    MasterType.SKILLS: (
-        ("Skill", "skill"),
-        ("Documents", "documents"),
-        ("RFQ / Inquiries", "rfq_inquiries"),
-        ("Currency", "currency"),
-        ("Supplier Master", "supplier_master"),
-        ("Commodity Pricing", "commodity_pricing"),
-        ("Shipping & Logistics", "shipping_logistics"),
-        ("Templates", "templates"),
-        ("HITL Governance", "hitl_governance"),
-        ("Misc", "misc"),
-        ("RAG Reference", "rag_reference"),
-    ),
-    MasterType.TOOLING: (
-        ("Category", "category"),
-        ("Examples", "examples"),
-        ("Links / Path", "links_path"),
-        ("Owner / access", "owner_access"),
-        ("Status", "record_status"),
-        ("Source version / checked_at", "source_version_checked_at"),
-        ("Search tag", "search_tag"),
-        ("Tenant / account scope", "tenant_account_scope"),
-        ("Entity / Node Type", "entity_node_type"),
-        ("Security / Access Level", "security_access_level"),
-        ("Refresh Frequency", "refresh_frequency"),
-        ("Parent Entity", "parent_entity"),
-        ("Source / evidence ref", "source_evidence_ref"),
-        ("Binding / review state", "binding_review_state"),
-        ("Search aliases / category", "search_aliases_category"),
-    ),
+    **{
+        t: tuple((header, key) for key, header, _ in cols if key != ID_KEY[t])
+        for t, cols in V03_COLUMNS.items()
+    },
     MasterType.FILETYPE: (
         ("File Format", "file_format"),
         ("Tier", "tier"),
@@ -152,28 +89,11 @@ COLUMNS: Final[dict[MasterType, tuple[tuple[str, str], ...]]] = {
         ("Example", "example"),
     ),
 }
-COLUMN_NUMBER_START: Final = {
-    MasterType.ORGANIZATION: 1,
-    MasterType.RULES: 0,
-    MasterType.AGENTS: 1,
-    MasterType.SKILLS: 0,
-    MasterType.TOOLING: 1,
-    MasterType.FILETYPE: 1,
-}
-PayloadModel = (
-    type[OrganizationPayload]
-    | type[RulesPayload]
-    | type[AgentsPayload]
-    | type[SkillsPayload]
-    | type[ToolingPayload]
-    | type[FiletypePayload]
-)
+# Column numbers in the Metadata row 1 start at 1 (column B) on every tab.
+COLUMN_NUMBER_START: Final = dict.fromkeys(MasterType, 1)
+PayloadModel = type[MasterPayloadV03] | type[FiletypePayload]
 PAYLOAD_MODELS: Final[dict[MasterType, PayloadModel]] = {
-    MasterType.ORGANIZATION: OrganizationPayload,
-    MasterType.RULES: RulesPayload,
-    MasterType.AGENTS: AgentsPayload,
-    MasterType.SKILLS: SkillsPayload,
-    MasterType.TOOLING: ToolingPayload,
+    **V03_MODELS,
     MasterType.FILETYPE: FiletypePayload,
 }
 
@@ -186,7 +106,7 @@ class MasterRow(BaseModel):
     master_type: MasterType
     row_label: str
     sheet_row: int = Field(ge=1)
-    payload: MasterPayload
+    payload: MasterPayloadV03 | FiletypePayload
     identity: MasterIdentity
 
 
@@ -309,8 +229,9 @@ def _validate_headers(master_type: MasterType, grid: Grid) -> list[FieldError]:
     while headers and not headers[-1]:
         headers.pop()
     errors: list[FieldError] = []
-    if not headers or headers[0] != "Name":
-        errors.append(FieldError(path=f"{tab}!row2:colA", message="column A must be 'Name'"))
+    first = ID_HEADER[master_type]
+    if not headers or headers[0] != first:
+        errors.append(FieldError(path=f"{tab}!row2:colA", message=f"column A must be {first!r}"))
     expected = [name for name, _ in COLUMNS[master_type]]
     actual = headers[1:]
     for index, want, got, kind in _header_diffs(expected, actual):
@@ -418,23 +339,28 @@ def _error_path(master_type: MasterType, row: int, names: list[str], loc: Sequen
     return f"{TABS[master_type]}!row{row}"
 
 
-def _row_values(
-    master_type: MasterType, sheet_row: int, body: list[Any], texts: list[str]
-) -> tuple[dict[str, Any], list[FieldError]]:
+def _row_values(master_type: MasterType, body: list[Any], texts: list[str]) -> dict[str, Any]:
     values: dict[str, Any] = {}
-    errors: list[FieldError] = []
     for index, ((_, field), text) in enumerate(zip(COLUMNS[master_type], texts, strict=True)):
-        if field == "rag_reference":
-            try:
-                values[field] = parse_rag_cell(text)
-            except ValueError as exc:
-                path = _col_path(master_type, sheet_row, index)
-                errors.append(FieldError(path=path, message=str(exc)))
-        elif field == "tier":
+        if field == "tier":
             values[field] = _tier(body[index] if index < len(body) else None)
+        elif field == "kind" and not text.strip():
+            continue  # a blank Kind is an Agent (the model's default)
         else:
             values[field] = text
-    return values, errors
+    return values
+
+
+def row_identity(master_type: MasterType, label: str, payload: Any) -> MasterIdentity:
+    """Filetype: the frozen BAM 0.2 rules. Masters 0.3: the id column, then its Status column."""
+    if master_type == MasterType.FILETYPE:
+        return identify(master_type, label, payload)
+    sid = stable_id(master_type, payload) or label.strip().upper()
+    return MasterIdentity(
+        stable_id=sid,
+        status=status_of(payload) or MasterStatus.PROPOSED,
+        source_kind=source_kind(master_type, label, sid),
+    )
 
 
 def _parse_row(
@@ -449,20 +375,19 @@ def _parse_row(
         return None, []  # tab note or empty row
     label_path = f"{tab}!row{sheet_row}:colA"
     if not label.strip():
-        return None, [FieldError(path=label_path, message="row label is missing")]
-    prefix = ROW_LABEL_PREFIX[master_type]
-    if master_type == MasterType.TOOLING:
-        if not TOOLING_LABEL.fullmatch(label):
-            message = "row label must be a Tooling id like 'TOOL-MFG-01'"
-            return None, [FieldError(path=label_path, message=message)]
-    elif not re.fullmatch(rf"{prefix} #\d+\s*", label):
-        message = f"row label must look like '{prefix} #n'"
+        message = f"{ID_HEADER[master_type]} is missing"
         return None, [FieldError(path=label_path, message=message)]
-    if not any(texts):
+    filetype = master_type == MasterType.FILETYPE
+    if filetype and not re.fullmatch(r"Filetype #\d+\s*", label):
+        return None, [FieldError(path=label_path, message="row label must look like 'Filetype #n'")]
+    if not filetype and not ID_LABEL.fullmatch(label.strip()):
+        message = f"{ID_HEADER[master_type]} must be one line of at most 64 characters"
+        return None, [FieldError(path=label_path, message=message)]
+    if filetype and not any(texts):
         return None, []  # label only: a blank template row, not an entry
-    values, errors = _row_values(master_type, sheet_row, body, texts)
-    if errors:
-        return None, errors
+    values = _row_values(master_type, body, texts)
+    if not filetype:
+        values[ID_KEY[master_type]] = label.strip()
     names = [field for _, field in columns]
     try:
         payload = PAYLOAD_MODELS[master_type].model_validate(values)
@@ -473,18 +398,12 @@ def _parse_row(
             )
             for e in exc.errors()
         ]
-    try:
-        identity = identify(master_type, label, payload)
-    except ValueError as exc:
-        misc_index = next(i for i, name in enumerate(names) if name in ("misc", "misc_audit"))
-        path = _col_path(master_type, sheet_row, misc_index)
-        return None, [FieldError(path=path, message=str(exc))]
     row = MasterRow(
         master_type=master_type,
-        row_label=label,
+        row_label=label.strip() if not filetype else label,
         sheet_row=sheet_row,
         payload=payload,
-        identity=identity,
+        identity=row_identity(master_type, label, payload),
     )
     return row, []
 
