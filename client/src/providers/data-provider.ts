@@ -3,6 +3,7 @@
 import type { BaseRecord, DataProvider, HttpError } from "@refinedev/core";
 
 import type { FieldError, ProblemDetail } from "@/contracts";
+import { endSession } from "@/lib/session-ended";
 
 export const API_BASE = "/api/proxy/api/v1";
 
@@ -25,6 +26,8 @@ function fieldErrors(errors: FieldError[] | undefined): HttpError["errors"] {
 }
 
 export async function toApiError(res: Response): Promise<ApiError> {
+  // 401 from the proxy = the session is over: leave for login instead of polling on (#796).
+  if (res.status === 401) endSession();
   let problem: Partial<ProblemDetail> | undefined;
   try {
     problem = (await res.json()) as Partial<ProblemDetail>;

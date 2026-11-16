@@ -2,10 +2,7 @@
 // src/proxy.ts); this only tells Refine what to do when an API call comes back 401.
 import type { AuthProvider } from "@refinedev/core";
 
-const loginPath = () =>
-  typeof window !== "undefined" && window.location.pathname.startsWith("/admin")
-    ? "/login-admin"
-    : "/login-fde";
+import { loginPath } from "@/lib/session-ended";
 
 export const authProvider: AuthProvider = {
   login: async () => ({ success: false, redirectTo: loginPath() }),
