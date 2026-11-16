@@ -30,6 +30,8 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   GENERATION_FAILED: "Generation failed",
   STAGE_COMPLETED: "Stage completed",
   REMINDER: "Reminder",
+  TOKEN_BUDGET_WARNING: "Token budget",
+  TOKEN_BUDGET_LIMIT: "Token budget limit",
 };
 
 export const typeLabel = (type: NotificationType): string => TYPE_LABEL[type] ?? type;
