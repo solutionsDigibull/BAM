@@ -45,6 +45,8 @@ async function call<T>(
 export const getJson = <T>(path: string) => call<T>("GET", path);
 export const postJson = <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
   call<T>("POST", path, body ?? {}, headers);
+export const putJson = <T>(path: string, body: unknown, headers?: Record<string, string>) =>
+  call<T>("PUT", path, body, headers);
 export const deleteJson = (path: string) => call<null>("DELETE", path);
 
 /** Every row of a cursor-paged list (`{ items, next_cursor }`), up to a safety cap. */
