@@ -17,6 +17,7 @@ vi.stubGlobal(
 );
 
 import { getGoal, resetGoal, skipGoal } from "../lib/goal";
+import { installGoalApi } from "../lib/goal.fake";
 import { setUi } from "../lib/store";
 import { AssistantPane } from "./AssistantPane";
 
@@ -31,6 +32,7 @@ beforeEach(() => {
   window.history.pushState(null, "", `/projects/t${++n}/workbench`);
   localStorage.clear();
   sessionStorage.clear();
+  installGoalApi(); // the goal is read from and saved on the project (#720)
   resetGoal();
   skipGoal(); // a project that already has work resumes: no goal box
 });
@@ -88,7 +90,7 @@ describe("the Enterprise Assistant pane (#711)", () => {
     expect(getGoal().text).toBe("Build an AI agent that automates quoting for sales managers in India");
     expect(screen.getByLabelText("Message the Enterprise Assistant")).toBeTruthy();
     expect(screen.getByText("Build an AI agent that automates quoting for sales managers in India")).toBeTruthy();
-    expect(screen.getByText(/Saved on this device for this project/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/Saved on the project/)).toBeTruthy());
   });
 
   test("test_719_the_goal_box_only_shows_on_upload", () => {

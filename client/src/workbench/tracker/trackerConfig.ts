@@ -117,8 +117,12 @@ export const SCREEN_ROUTES: Readonly<Record<string, ScreenRoute>> =
   Object.fromEntries(SUBTASKS.map(s => [s.id, { path: s.path!, ...(s.step ? { step: s.step } : {}) }]))
 /** The screen where each backend workbench step is worked on. */
 export const STEP_SCREEN: Readonly<Record<StepId, string>> = { 1: '3.1', 2: '3.2', 3: '4.2', 4: '4.8' }
+/** The goal screen's own address (#720). It is Upload's first stage (the goal box alone), so it opens screen 1.1:
+ *  Upload sends a project without a goal here, and this address moves on to Upload once a goal is saved. */
+export const GOAL_PATH = '/goal'
 export const screenByPath = (path: string) => {
-  const item = SUBTASKS.find(s => s.path === path)
+  const at = path === GOAL_PATH ? '/ingestion/upload' : path
+  const item = SUBTASKS.find(s => s.path === at)
   return item ? { id: item.id, path: item.path!, step: item.step, item } : undefined
 }
 /** The user-facing name of a screen (never its ID). */
