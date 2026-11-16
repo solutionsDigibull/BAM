@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:df8b6ddffd05de4bafb62b3a13e551cff86e4f844f86f2ab727208dd807e9056
+// source-sha256:244d1224f9589667d3a739eaa7989efe617000eabef4c4731a97601970db2478
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -390,7 +390,9 @@ export type NotificationType =
   | "DOCUMENT_REJECTED"
   | "GENERATION_FAILED"
   | "STAGE_COMPLETED"
-  | "REMINDER";
+  | "REMINDER"
+  | "TOKEN_BUDGET_WARNING"
+  | "TOKEN_BUDGET_LIMIT";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "CoverageStatus".

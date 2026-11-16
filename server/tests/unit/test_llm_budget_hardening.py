@@ -15,7 +15,11 @@ from llm_db import PROJECT, TENANT, FakeBifrost, completion, make_client, scope,
 from pydantic import BaseModel, ConfigDict, ValidationError
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.repository import LlmCallRepository
+from sbam_contracts.budget import BudgetCaps
 from sbam_workers.llm.budget import BudgetExceeded
+
+# These calls are 1.5 M tokens each; the USD budget is under test here, not the token caps (WG-5).
+BIG_CAPS = BudgetCaps(sub_skill_tokens=10**9, workflow_tokens=10**9, knowledge_tokens=10**9)
 
 GOOD = json.dumps({"count": 3, "label": "ok"})
 TOKENS: dict[str, Any] = {
@@ -169,20 +173,25 @@ def test_420_t05_a_free_model_is_declared_with_a_zero_price_and_never_blinds_the
     prices = {"sbam-sow": {"in": 0, "out": 0}}
     bifrost = FakeBifrost([no_cost()])
     client, _ = make_client(bifrost, llm_project_budget_usd="1", llm_price_usd_per_mtok=prices)
+    client.budget.caps = BIG_CAPS
     for rfq in "ABC":
         run(client, scope(), rfq)
     assert len(bifrost.requests) == 3
 
 
-def test_420_t05_without_a_budget_nothing_changes() -> None:
+def test_420_t05_a_configured_price_is_recorded_without_a_budget_wg5_t04() -> None:
+    """Before WG-5 a price applied only while a USD budget was set, so a priced alias (Cognee's)
+    showed 0.00. Now the price fills in the cost of every call that reports none."""
     bifrost = FakeBifrost([no_cost()])
     client, sessions = make_client(
         bifrost, llm_price_usd_per_mtok={"sbam-sow": {"in": 9, "out": 9}}
     )
+    client.budget.caps = BIG_CAPS
     for rfq in "ABC":
         run(client, scope(), rfq)
-    with sessions() as session:  # the table is only read while a budget is set
-        assert LlmCallRepository(session, TenantContext(TENANT, PROJECT)).spent() == 0
+    with sessions() as session:  # 3 calls x (1 M x 9 + 0.5 M x 9) USD per M tokens
+        spent = LlmCallRepository(session, TenantContext(TENANT, PROJECT)).spent()
+    assert spent == Decimal("40.5")
 
 
 def test_420_t06_a_reply_with_no_tokens_is_not_blind() -> None:

@@ -338,6 +338,7 @@ class LlmClient:
                     return LlmResult(reused, row_id, "", 0, cached=True)
 
         await self.budget.check(scope, alias)
+        await self.budget.check_tokens(scope, alias)
 
         trace_id = new_trace_id()
         shown = trace_view(messages)
