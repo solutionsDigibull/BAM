@@ -25,6 +25,7 @@ FROM ${RUNTIME_IMAGE}
 ARG RUNTIME_DIGEST
 # root: envd runs as root in the VM and the platform writes files such as /etc/hosts as root. Tests never run as
 # root: the adapter always executes them as user `sbam` (uid 10001), which the runtime image already defines.
+# hadolint ignore=DL3002
 USER root
 COPY --from=cubebase /usr/bin/envd /usr/bin/envd
 COPY --from=cubebase /usr/bin/tini /usr/bin/tini
