@@ -49,11 +49,13 @@ class ItemSource(StrEnum):
     DOCUMENT = "DOCUMENT"  # a parsed document version (doc.md / doc.json)
     MASTERS = "MASTERS"  # the project's master context, masters.jsonl (E3.6)
     MASTER_DOCUMENT = "MASTER_DOCUMENT"  # a parsed master document's doc.md (E3.8b)
+    PROJECT_GOAL = "PROJECT_GOAL"  # the FDE's goal for the project, as goal.md (#720)
 
 
 class KnowledgeItem(_Dto):
     """One file to add to the project's dataset. `source_id` is the document version id, the
-    master snapshot id for MASTERS, or the master document id for MASTER_DOCUMENT. `source_id` +
+    master snapshot id for MASTERS, the master document id for MASTER_DOCUMENT, or the project id
+    for PROJECT_GOAL. `source_id` +
     `sha256` is the idempotency key (E5.1-T08).
     """
 

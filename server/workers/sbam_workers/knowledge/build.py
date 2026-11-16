@@ -9,9 +9,12 @@ a fake Cognee and a temp-dir storage; the activity only builds the real ones. Fo
   3. take the project's document versions that are PARSED with a CLEAN scan and have a `doc.md`
      derivative; the rest are FAILED in the coverage with a reason;
   4. add each document on its own: one that Cognee refuses is FAILED, the others go on. Cognee
-     or Bifrost down (`CogneeUnavailable`) fails the attempt, which Temporal retries;
+     or Bifrost down (`CogneeUnavailable`) fails the attempt, which Temporal retries. The
+     project's goal (#720), when an FDE set one, is added as `goal.md`: context like the masters,
+     never a document of the coverage, and a refusal does not fail the build;
   5. prune the project's dataset to this build's scope (#450): every item that is not one of
-     these documents, this snapshot or its master documents is removed (a deleted or replaced
+     these documents, this snapshot, its master documents or the current goal is removed (a
+     changed goal, a deleted or replaced
      document, an older snapshot), with the graph nodes only it sourced. Only once something
      was added: a build that fails before that never strips the graph the READY version uses;
   6. cognify (heartbeating from a separate task: it runs for minutes), then count the entities;
@@ -48,8 +51,10 @@ from sbam_api.knowledge.service import (
     record_source,
 )
 from sbam_api.masters.service import create_snapshot, export_master_context, snapshot_documents
+from sbam_api.projects.models import Project
+from sbam_api.projects.repository import ProjectRepository
 from sbam_api.state_machine.service import SYSTEM_ACTOR_ID
-from sbam_api.storage.base import StorageBackend
+from sbam_api.storage.base import Kind, StorageBackend, StorageScope
 from sbam_api.storage.factory import make_backend
 from sbam_contracts.documents import ScanStatus
 from sbam_contracts.knowledge import (
@@ -214,6 +219,30 @@ def _pin_masters(
     return item, len(report.included), documents
 
 
+def goal_markdown(goal: str) -> bytes:
+    """`goal.md`: the FDE's goal as one small Markdown file Cognee reads like any other."""
+    return f"# Project goal\n\n{goal.strip()}\n".encode()
+
+
+def _goal(deps: BuildDeps, inp: RunInput) -> KnowledgeItem | None:
+    """The project's goal (#720) as a PROJECT_GOAL item, None when no goal is set. Stored once per
+    content (the key names its hash), so a rebuild with the same goal adds nothing new."""
+    with deps.sessions() as session:
+        project: Project | None = ProjectRepository(session, _ctx(inp)).get(inp.project_id)
+        goal = project.goal if project is not None else None
+    if not goal:
+        return None
+    stored = deps.storage.put(
+        goal_markdown(goal), StorageScope(inp.tenant_id, inp.project_id), Kind.OKF, "text/markdown"
+    )
+    return KnowledgeItem(
+        source=ItemSource.PROJECT_GOAL,
+        source_id=inp.project_id,
+        sha256=stored.sha256,
+        storage_key=stored.storage_key,
+    )
+
+
 def _documents(deps: BuildDeps, inp: RunInput) -> tuple[list[KnowledgeItem], list[CoverageEntry]]:
     """Items for the usable document versions; FAILED entries for the others."""
     items: list[KnowledgeItem] = []
@@ -330,6 +359,7 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
     try:
         masters, included, master_docs = await asyncio.to_thread(_pin_masters, deps, inp, version)
         items, entries = await asyncio.to_thread(_documents, deps, inp)
+        goal = await asyncio.to_thread(_goal, deps, inp)
         sha = {item.source_id: item.sha256 for item in items}
         if deps.probe is not None:
             await deps.probe()
@@ -346,6 +376,9 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
         added_docs = 0
         for master_doc in master_docs:  # context only: never an FDE source (C3)
             added_docs += await _add_masters(deps.adapter, scope, master_doc)
+        if goal is not None and not await _add_masters(deps.adapter, scope, goal):
+            goal = None  # context only, like the masters: a refusal never fails the build
+        context = (masters, *master_docs, *([goal] if goal else []))
         coverage = KnowledgeCoverage(
             documents=_sorted(entries),
             masters_included=included,
@@ -355,7 +388,7 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
         await asyncio.to_thread(_record, deps, inp, version.id, coverage.documents, sha)
         if not any(e.status is SourceStatus.ADDED for e in entries):
             raise EmptyCorpus("no document could be added")
-        await deps.adapter.prune(scope, {item_key(i) for i in (*items, masters, *master_docs)})
+        await deps.adapter.prune(scope, {item_key(i) for i in (*items, *context)})
         await _heartbeating(deps, deps.adapter.cognify(scope))
         page = await deps.adapter.graph_page(scope, None, 1)
         coverage = coverage.model_copy(update={"entities": page.total_nodes})
