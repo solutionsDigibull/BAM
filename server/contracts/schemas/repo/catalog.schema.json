@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:repo/catalog:0.1.0",
+  "$defs": {
+    "CatalogCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "url": {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "title": "Url",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Notes",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RepoSource"
+        },
+        "master_entry_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Master Entry Id",
+          "type": "string"
+        },
+        "stable_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Stable Id",
+          "type": "string"
+        },
+        "row_label": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Label"
+        },
+        "agent_name": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Name"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "source",
+        "master_entry_id",
+        "stable_id"
+      ],
+      "title": "CatalogCandidate",
+      "type": "object"
+    },
+    "CatalogRejection": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "maxLength": 200,
+          "title": "Value",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/RejectReason"
+        },
+        "source": {
+          "$ref": "#/$defs/RepoSource"
+        },
+        "master_entry_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Master Entry Id",
+          "type": "string"
+        },
+        "stable_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Stable Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "reason",
+        "source",
+        "master_entry_id",
+        "stable_id"
+      ],
+      "title": "CatalogRejection",
+      "type": "object"
+    },
+    "RejectReason": {
+      "enum": [
+        "NOT_HTTPS",
+        "HAS_CREDENTIALS",
+        "HAS_QUERY",
+        "PRIVATE_ADDRESS",
+        "INVALID_URL"
+      ],
+      "title": "RejectReason",
+      "type": "string"
+    },
+    "RepoSource": {
+      "description": "Where a candidate came from: the priority order of ADR 0028, in the order it is tried.",
+      "enum": [
+        "ISATVON",
+        "ADMIN_AGENTS",
+        "ADMIN_TOOLING",
+        "FDE"
+      ],
+      "title": "RepoSource",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "project_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "structure_version": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Structure Version",
+      "type": "string"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/CatalogCandidate"
+      },
+      "maxItems": 500,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "rejected": {
+      "items": {
+        "$ref": "#/$defs/CatalogRejection"
+      },
+      "maxItems": 500,
+      "title": "Rejected",
+      "type": "array"
+    }
+  },
+  "required": [
+    "project_id",
+    "structure_version"
+  ],
+  "title": "RepoCatalog",
+  "type": "object"
+}
