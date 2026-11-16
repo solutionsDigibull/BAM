@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:projects/project_goal:0.1.0",
+  "description": "`GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set). The ETag\nheader is the project's `row_version`.",
+  "properties": {
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "goal": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Goal"
+    }
+  },
+  "required": [
+    "project_id",
+    "goal"
+  ],
+  "title": "ProjectGoalOut",
+  "type": "object"
+}

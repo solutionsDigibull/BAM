@@ -6,7 +6,7 @@ Issues E3.1, E2.4.
 
 import uuid
 
-from sbam_contracts.projects import ProjectStatus
+from sbam_contracts.projects import GOAL_MAX, ProjectStatus
 from sbam_contracts.state_machines import MachineName
 from sqlalchemy import Boolean, ForeignKey, Index, String, Text, UniqueConstraint, Uuid, false, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -29,6 +29,8 @@ class Project(Stateful, TenantOwned, Base):
     context_notes: Mapped[str | None] = mapped_column(Text)  # Markdown; the client sanitises it
     # E3.6: Restricted master entries may enter this project's knowledge context (sbam-admin only).
     allow_restricted: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # #720: the FDE's goal ("Build an AI agent that automates ..."), written by an assigned FDE.
+    goal: Mapped[str | None] = mapped_column(String(GOAL_MAX))
     status: Mapped[str] = mapped_column(String(20), default=ProjectStatus.ACTIVE.value)
 
 
