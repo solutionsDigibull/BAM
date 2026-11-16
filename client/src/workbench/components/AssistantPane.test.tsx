@@ -91,6 +91,10 @@ describe("the Enterprise Assistant pane (#711)", () => {
     expect(screen.getByLabelText("Message the Enterprise Assistant")).toBeTruthy();
     expect(screen.getByText("Build an AI agent that automates quoting for sales managers in India")).toBeTruthy();
     await waitFor(() => expect(screen.getByText(/Saved on the project/)).toBeTruthy());
+    // #798: the ISATVON template under the goal, read-only, with the goal as typed in Instructions
+    const rows = await screen.findByLabelText("ISATVON template");
+    expect(rows.textContent).toContain("Goal: Build an AI agent that automates quoting for sales managers in India");
+    expect(rows.querySelector("[contenteditable]")).toBeNull();
   });
 
   test("test_719_the_goal_box_only_shows_on_upload", () => {

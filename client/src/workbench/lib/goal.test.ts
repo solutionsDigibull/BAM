@@ -42,7 +42,7 @@ describe("the project goal is stored on the project, with nothing invented from 
   test("test_719_the_goal_holds_only_what_was_typed_no_generated_draft", async () => {
     await opened("p-b");
     await saveGoal("RFQ responses for procurement teams in Europe");
-    expect(Object.keys(getGoal()).sort()).toEqual(["goal", "loaded", "saved", "text"]);
+    expect(Object.keys(getGoal()).sort()).toEqual(["goal", "isatvon", "loaded", "saved", "text"]);
   });
 
   test("test_720_t30_the_goal_is_saved_on_the_project_with_if_match", async () => {
@@ -123,6 +123,24 @@ describe("the project goal is stored on the project, with nothing invented from 
     await opened("p-blank");
     await saveGoal("   ");
     expect(getGoal().saved).toBe(false);
+  });
+
+  test("test_798_t10_the_isatvon_template_comes_with_the_saved_goal", async () => {
+    await opened("p-tpl");
+    expect(getGoal().isatvon).toEqual([]); // no goal yet: nothing to show
+    await saveGoal("Quoting for sales in India");
+    const [i] = getGoal().isatvon;
+    expect(i).toEqual({
+      key: "I",
+      label: "Instructions",
+      text: "You are an FDE Agent operating under ISATVON constraints.\nGoal: Quoting for sales in India",
+    });
+  });
+
+  test("test_798_t11_a_goal_saved_elsewhere_brings_its_template", async () => {
+    api.goals.set("p-tpl2", { goal: "Lead generation for marketing teams in Europe", version: 2 });
+    await opened("p-tpl2");
+    expect(getGoal().isatvon.map((s) => s.key)).toEqual(["I", "N"]);
   });
 
   test("test_719_free_text_without_for_and_in_still_parses", () => {
