@@ -117,6 +117,7 @@ from sbam_contracts.projects import (
     WorkflowSummary,
 )
 from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
+from sbam_contracts.repo_catalog import RepoCatalog
 from sbam_contracts.repo_decision import RepoDecision
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
@@ -282,6 +283,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sandbox/runner_request", RunnerRequest),
     ("sandbox/runner_outputs", RunnerOutputs),
     ("repo/decision", RepoDecision),
+    ("repo/catalog", RepoCatalog),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
 )

@@ -513,6 +513,16 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "202"
 
+  # ---- Repo catalog (WG-6) ----------------------------------------------------------------
+  repo_catalog_api_v1_projects__project_id__repo_catalog_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/repo-catalog
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   # ---- SOW (E6.3) -------------------------------------------------------------------------
   sow_api_v1_projects__project_id__sow_get:
     request:
