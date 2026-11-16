@@ -13,6 +13,10 @@ The steps, each one before anything later can run:
   7. `upsert` without row errors writes, in one transaction, a new entry per new stable id and a new
      version per changed payload. Anything else writes nothing (`applied: false`).
 
+A workbook holds the Masters 0.3 columns only. Fields that are not columns (the Rules Engine
+editor fields, `legacy_0_2`) are kept from the entry's current version, so an import never wipes
+them; a master without a Status column keeps the entry's status.
+
 ponytail: the report is answered synchronously (a 15 MB read-only workbook parses in seconds, in the
 threadpool); move it to a Temporal activity if workbooks grow.
 """
@@ -29,10 +33,12 @@ import openpyxl
 from sbam_contracts.api import ErrorCode, FieldError
 from sbam_contracts.masters import FiletypePayload, MasterType
 from sbam_contracts.masters_api import ImportMode, ImportReport, ImportRowError, ImportTabReport
+from sbam_contracts.masters_v03 import ID_KEY, status_of
 from sbam_contracts.masters_workbook import (
     COLUMN_NUMBER_START,
     COLUMNS,
     HEADER_ROWS,
+    ID_HEADER,
     MAX_WORKBOOK_BYTES,
     TAB_ORDER,
     TAB_ORDER_WITH_TOOLING,
@@ -294,7 +300,9 @@ def _row_error(error: FieldError) -> ImportRowError:
         return ImportRowError(tab=error.path.split("!")[0], message=error.message)
     tab, col = match["tab"], match["col"]
     master_type = _TAB_TYPES.get(tab)
-    column: str | None = "Name" if col == "A" else None
+    column: str | None = None
+    if col == "A":
+        column = ID_HEADER[master_type] if master_type is not None else "Name"
     if master_type is not None and col.isdigit():
         index = int(col) - COLUMN_NUMBER_START[master_type]
         names = COLUMNS[master_type]
@@ -329,6 +337,8 @@ def _apply(
             seen.add(row.identity.stable_id)
             payload = row.payload.model_dump(mode="json", by_alias=True)
             entry = existing.get(row.identity.stable_id)
+            if entry is not None and entry.id in current:
+                payload = _keep_non_columns(master_type, current[entry.id].payload, payload)
             if entry is None:
                 report.created += 1
                 if write:
@@ -341,6 +351,17 @@ def _apply(
                     _new_version(session, user, repo, entry, row, payload)
         report.missing = len(existing.keys() - seen)
     return tabs
+
+
+def _keep_non_columns(
+    master_type: MasterType, current: dict[str, Any], incoming: dict[str, Any]
+) -> dict[str, Any]:
+    """The workbook's columns from `incoming`, every other field from the current version."""
+    if master_type not in ID_KEY:
+        return incoming  # Filetype: every field is a column
+    columns = {field for _, field in COLUMNS[master_type]} | {ID_KEY[master_type]}
+    kept = {k: v for k, v in current.items() if k not in columns and k in incoming}
+    return {**incoming, **kept}
 
 
 def _create(
@@ -386,7 +407,8 @@ def _new_version(
         )
     )
     entry.current_version = number
-    entry.status = row.identity.status.value
+    if not isinstance(row.payload, FiletypePayload) and status_of(row.payload) is not None:
+        entry.status = row.identity.status.value  # Rules / Tools: their Status column
     repo.update(entry, entry.row_version)
     _audit(session, user, "MASTER_VERSION_CREATED", entry, version)
 

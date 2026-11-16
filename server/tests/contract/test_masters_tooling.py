@@ -14,13 +14,13 @@ from sbam_contracts.masters import (
     MasterType,
     RagReference,
     RulesPayload,
-    SourceKind,
     ToolingPayload,
     extract_tooling_status,
     identify,
     is_restricted,
 )
 from sbam_contracts.masters_api import MasterEntryCreate, SnapshotEntry, snapshot_document
+from sbam_contracts.masters_v03 import ToolingPayloadV03
 from sbam_contracts.masters_workbook import (
     COLUMNS,
     TAB_ORDER,
@@ -30,8 +30,9 @@ from sbam_contracts.masters_workbook import (
 )
 
 REPO = Path(__file__).resolve().parents[3]
-BAM_0_2 = REPO / "docs/reference/BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx"
-MFG_V0_2 = REPO / "docs/reference/ui/admin-masters/BuLLM - Manufacturing Masters v0.2.xlsx"
+# Masters 0.3 (#781): Tooling is the approved Tool Factory registry. The BAM 0.2 identity rules
+# below stay tested: they are the migration's input.
+WORKBOOK = REPO / "server/tests/fixtures/masters/masters_0_3.xlsx"
 
 Sheets = dict[str, list[list[Any]]]
 
@@ -46,66 +47,50 @@ def load(path: Path) -> Sheets:
         book.close()
 
 
-def with_tooling(sheets: Sheets, tooling: list[list[Any]]) -> Sheets:
-    """The BAM 0.2 workbook with a Tooling tab between Skills and Filetype."""
-    out: Sheets = {}
-    for tab in TAB_ORDER:
-        if tab == "Filetype":
-            out[TOOLING_TAB] = tooling
-        out[tab] = sheets[tab]
-    return out
-
-
-@pytest.fixture(name="mfg_tooling", scope="module")
-def fixture_mfg_tooling() -> list[list[Any]]:
-    return load(MFG_V0_2)[TOOLING_TAB]
-
-
-@pytest.fixture(name="bam")
-def fixture_bam() -> Sheets:
-    return load(BAM_0_2)
+@pytest.fixture(name="book")
+def fixture_book() -> Sheets:
+    return load(WORKBOOK)
 
 
 # --- Tooling in the workbook layout --------------------------------------------------------------
 
 
-def test_e3_2_tooling_columns_match_the_v0_2_workbook_row_2(mfg_tooling: list[list[Any]]) -> None:
-    header = [str(c).strip() for c in mfg_tooling[1] if c is not None]
-    assert header[0] == "Name"
+def test_e3_2_tooling_columns_match_the_approved_headers(book: Sheets) -> None:
+    header = [str(c).strip() for c in book[TOOLING_TAB][1] if c is not None]
+    assert header[0] == "Tooling ID"
     assert header[1:] == [name for name, _ in COLUMNS[MasterType.TOOLING]]
 
 
-def test_e3_2_workbook_without_tooling_still_validates(bam: Sheets) -> None:
-    assert validate_structure(bam) == []
+def test_e3_2_workbook_without_tooling_still_validates(book: Sheets) -> None:
+    without = {tab: grid for tab, grid in book.items() if tab != TOOLING_TAB}
+    assert tuple(without) == TAB_ORDER
+    assert validate_structure(without) == []
 
 
-def test_e3_2_workbook_with_the_v0_2_tooling_tab_parses_eleven_tools(
-    bam: Sheets, mfg_tooling: list[list[Any]]
-) -> None:
-    report = parse_workbook(with_tooling(bam, mfg_tooling))
+def test_e3_2_workbook_with_the_tooling_tab_parses_its_tools(book: Sheets) -> None:
+    report = parse_workbook(book)
     assert report.errors == []
     tools = [r for r in report.rows if r.master_type == MasterType.TOOLING]
-    assert [r.identity.stable_id for r in tools] == [f"TOOL-MFG-{n:02d}" for n in range(1, 12)]
-    assert {r.identity.status for r in tools} == {MasterStatus.PROPOSED}  # "Category recorded; …"
-    assert {r.identity.source_kind for r in tools} == {SourceKind.TEMPLATE_ROW}
+    assert [r.identity.stable_id for r in tools] == ["TF-01", "TOOL-MCP-01", "TOOL-API-01"]
     first = tools[0].payload
-    assert isinstance(first, ToolingPayload)
-    assert (first.category, first.examples) == ("MCP", "WebMCP")
+    assert isinstance(first, ToolingPayloadV03)
+    assert (first.tool_name, first.category, first.bullm_badge) == (
+        "Claude Code",
+        "Agents",
+        "BuLLM Recommended",
+    )
 
 
-def test_e3_2_tooling_tab_in_the_wrong_place_is_a_structure_error(
-    bam: Sheets, mfg_tooling: list[list[Any]]
-) -> None:
-    moved = {**bam, TOOLING_TAB: mfg_tooling}  # after Filetype
+def test_e3_2_tooling_tab_in_the_wrong_place_is_a_structure_error(book: Sheets) -> None:
+    tooling = book[TOOLING_TAB]
+    moved = {**{t: g for t, g in book.items() if t != TOOLING_TAB}, TOOLING_TAB: tooling}
     assert [e.path for e in validate_structure(moved)] == ["workbook!tabs"]
 
 
-def test_e3_2_tooling_row_label_must_be_a_tool_id(
-    bam: Sheets, mfg_tooling: list[list[Any]]
-) -> None:
-    grid = [list(r) for r in mfg_tooling]
-    grid[3][0] = "Tool #1"
-    report = parse_workbook(with_tooling(bam, grid))
+def test_e3_2_tooling_id_must_be_one_short_line(book: Sheets) -> None:
+    grid = [list(r) for r in book[TOOLING_TAB]]
+    grid[3][0] = "TF-01\nsecond line"
+    report = parse_workbook({**book, TOOLING_TAB: grid})
     assert [e.path for e in report.errors] == ["Tooling!row4:colA"]
 
 

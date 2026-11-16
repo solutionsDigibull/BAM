@@ -1,6 +1,8 @@
-"""E0.4 contract tests: the consolidated masters workbook against the BAM 0.2 contract.
+"""E0.4 contract tests: the masters workbook against the contract (Masters 0.3 since #781).
 
-The workbook is read straight from docs/reference (no copy; the fixture pack is issue E0.8).
+The workbook is the synthetic 0.3 fixture (`tests/fixtures/masters/masters_0_3.xlsx`, built by
+`scripts/build_masters_reference_0_3.py fixture`). The BAM 0.2 models stay tested in
+`test_masters_extraction.py`: they are the migration's input.
 Cells are read as written (`data_only=False`), so nothing is ever evaluated.
 """
 
@@ -13,23 +15,27 @@ import pytest
 from pydantic import ValidationError
 from sbam_contracts.api import DiffKind, ErrorCode, FieldError, StructureDiff
 from sbam_contracts.masters import (
-    AgentsPayload,
     FiletypePayload,
     MasterStatus,
     MasterType,
-    OrganizationPayload,
-    RagReference,
     ReadmeTab,
-    RulesPayload,
-    SkillsPayload,
     SourceKind,
-    ToolingPayload,
     schemas,
 )
 from sbam_contracts.masters_api import ImportMode, ImportReport, ImportRowError, ImportTabReport
+from sbam_contracts.masters_v03 import (
+    ID_KEY,
+    AgentKind,
+    AgentsPayloadV03,
+    OrganizationPayloadV03,
+    RulesPayloadV03,
+    SkillsPayloadV03,
+    ToolingPayloadV03,
+)
 from sbam_contracts.masters_workbook import (
     COLUMNS,
     FILETYPE_COUNT,
+    ID_HEADER,
     MAX_UNPACKED_BYTES,
     MAX_WORKBOOK_BYTES,
     PAYLOAD_MODELS,
@@ -46,7 +52,7 @@ from sbam_contracts.masters_workbook import (
 )
 
 REPO = Path(__file__).resolve().parents[3]
-WORKBOOK = REPO / "docs/reference/BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx"
+WORKBOOK = REPO / "server/tests/fixtures/masters/masters_0_3.xlsx"
 SCHEMAS = REPO / "server/contracts/schemas/masters"
 
 Sheets = dict[str, list[list[Any]]]
@@ -89,11 +95,11 @@ def test_e0_4_t01_row_counts_per_master(sheets: Sheets) -> None:
     rows = parse_workbook(sheets).rows
     counts = {t: sum(1 for r in rows if r.master_type == t) for t in MasterType}
     assert counts == {
-        MasterType.ORGANIZATION: 4,  # Unit #5 is a blank template row
-        MasterType.RULES: 6,
-        MasterType.AGENTS: 5,  # Agent #6 is a blank template row
-        MasterType.SKILLS: 8,
-        MasterType.TOOLING: 0,  # the BAM 0.2 one-sheet workbook has no Tooling tab
+        MasterType.ORGANIZATION: 2,
+        MasterType.RULES: 3,
+        MasterType.AGENTS: 3,
+        MasterType.SKILLS: 2,
+        MasterType.TOOLING: 3,
         MasterType.FILETYPE: FILETYPE_COUNT,
     }
 
@@ -109,71 +115,52 @@ def test_e0_4_t01_filetype_has_exactly_43_rows_and_a_note_that_is_not_an_entry(
 
 
 def test_e0_4_t01_stable_ids_and_statuses_for_every_row(sheets: Sheets) -> None:
+    """The id column is the stable id; Rules and Tools take their status from their Status column
+    (Active -> APPROVED, Archived -> RETIRED, anything else PROPOSED); the rest start PROPOSED."""
     by_type: dict[MasterType, list[tuple[str, str, str]]] = {}
     for row in parse_workbook(sheets).rows:
         identity = row.identity
         by_type.setdefault(row.master_type, []).append(
             (identity.stable_id, identity.status, identity.source_kind)
         )
+    template, admin = "TEMPLATE_ROW", "ADMIN_ENTRY"
     assert by_type[MasterType.ORGANIZATION] == [
-        ("BU-AERO-01", "ILLUSTRATIVE", "BAM_0_2_SAMPLE"),
-        ("ORG-EMS", "PROPOSED", "TEMPLATE_ROW"),
-        ("ORG-CAB", "PROPOSED", "TEMPLATE_ROW"),
-        ("ORG-CORE", "ILLUSTRATIVE", "TEMPLATE_ROW"),
+        ("ORG-HQ-01", "PROPOSED", template),
+        ("ORG-BU-01", "PROPOSED", template),
     ]
-    assert [(s, st) for s, st, _ in by_type[MasterType.RULES]] == [
-        ("Rule #1", "ILLUSTRATIVE"),
-        ("RULE-BOM", "PROPOSED"),
-        ("RULE-OFFER", "PROPOSED"),
-        ("RULE-EXCESS", "PROPOSED"),
-        ("RULE-REPORT", "PROPOSED"),
-        ("RULE-CORE", "ILLUSTRATIVE"),
+    assert by_type[MasterType.RULES] == [
+        ("RULE-POLICY-BOM", "APPROVED", template),
+        ("RULE-CHECK-DFM", "PROPOSED", template),
+        ("RULE-OLD-01", "RETIRED", template),
     ]
-    assert [(s, st) for s, st, _ in by_type[MasterType.AGENTS]] == [
-        ("Agent #1", "ILLUSTRATIVE"),
-        ("AG-INTAKE", "PROPOSED"),
-        ("AG-OFFER", "PROPOSED"),
-        ("AG-COST", "PROPOSED"),
-        ("AG-QA", "PROPOSED"),
+    assert by_type[MasterType.AGENTS] == [
+        ("AG-01", "PROPOSED", template),
+        ("AS-01", "PROPOSED", admin),
+        ("AG-02", "PROPOSED", template),
     ]
-    assert [(s, st) for s, st, _ in by_type[MasterType.SKILLS]] == [
-        ("Skill #1", "ILLUSTRATIVE"),
-        ("SK-INTAKE", "PROPOSED"),
-        ("SK-BOM", "PROPOSED"),
-        ("SK-OFFER", "PROPOSED"),
-        ("SK-COST", "PROPOSED"),
-        ("SK-ANALYZE", "PROPOSED"),
-        ("SK-EXPORT", "PROPOSED"),
-        ("SK-CORE", "ILLUSTRATIVE"),
+    assert [s for s, _, _ in by_type[MasterType.SKILLS]] == ["SK-01", "SK-02"]
+    assert by_type[MasterType.TOOLING] == [
+        ("TF-01", "APPROVED", admin),
+        ("TOOL-MCP-01", "PROPOSED", template),
+        ("TOOL-API-01", "PROPOSED", template),
     ]
     assert all(
         st == "PROPOSED" and kind == "TEMPLATE_ROW" for _, st, kind in by_type[MasterType.FILETYPE]
     )
 
 
-def test_e0_4_t01_sample_rows_are_exactly_row_one_of_each_editable_tab(sheets: Sheets) -> None:
-    samples = [
-        (r.master_type, r.row_label.strip())
-        for r in parse_workbook(sheets).rows
-        if r.identity.source_kind == SourceKind.BAM_0_2_SAMPLE
-    ]
-    assert samples == [
-        (MasterType.ORGANIZATION, "Unit #1"),
-        (MasterType.RULES, "Rule #1"),
-        (MasterType.AGENTS, "Agent #1"),
-        (MasterType.SKILLS, "Skill #1"),
-    ]
+def test_e0_4_t01_there_are_no_sample_rows_in_masters_0_3(sheets: Sheets) -> None:
+    kinds = {r.identity.source_kind for r in parse_workbook(sheets).rows}
+    assert SourceKind.BAM_0_2_SAMPLE not in kinds
 
 
-def test_e0_4_t01_rag_references_parse_into_seven_key_objects(sheets: Sheets) -> None:
+def test_e0_4_t01_agent_kinds_and_the_id_in_the_payload(sheets: Sheets) -> None:
     rows = parse_workbook(sheets).rows
-    refs = [
-        r.payload.rag_reference
-        for r in rows
-        if isinstance(r.payload, RulesPayload | SkillsPayload) and r.payload.rag_reference
-    ]
-    assert [ref.id_field for ref in refs] == ["DOM-PCBA-01", "PRJ-RFQ-2026-001"]
-    assert all(isinstance(ref, RagReference) for ref in refs)
+    agents = [r.payload for r in rows if isinstance(r.payload, AgentsPayloadV03)]
+    assert [a.kind for a in agents] == [AgentKind.AGENT, AgentKind.ASSISTANT, AgentKind.AGENT]
+    for row in rows:
+        if row.master_type != MasterType.FILETYPE:
+            assert getattr(row.payload, ID_KEY[row.master_type]) == row.row_label
 
 
 def test_e0_4_t01_no_sbam_metadata_in_payloads_or_columns() -> None:
@@ -186,8 +173,12 @@ def test_e0_4_t01_no_sbam_metadata_in_payloads_or_columns() -> None:
 
 def test_e0_4_t01_column_tables_match_the_models_field_for_field() -> None:
     for master_type, model in PAYLOAD_MODELS.items():
-        assert [field for _, field in COLUMNS[master_type]] == list(model.model_fields), master_type
-    assert [len(COLUMNS[t]) for t in MasterType] == [14, 11, 11, 11, 15, 5]
+        fields = [field for _, field in COLUMNS[master_type]]
+        if master_type == MasterType.FILETYPE:
+            assert fields == list(model.model_fields)
+        else:  # column A is the id; editor fields and legacy_0_2 follow the columns
+            assert [ID_KEY[master_type], *fields] == list(model.model_fields)[: len(fields) + 1]
+    assert [len(COLUMNS[t]) for t in MasterType] == [13, 8, 7, 9, 10, 5]
 
 
 def test_e0_4_t01_column_names_come_from_the_workbook_row_2(sheets: Sheets) -> None:
@@ -196,9 +187,11 @@ def test_e0_4_t01_column_names_come_from_the_workbook_row_2(sheets: Sheets) -> N
         (MasterType.RULES, "Rules"),
         (MasterType.AGENTS, "Agents"),
         (MasterType.SKILLS, "Skills"),
+        (MasterType.TOOLING, "Tooling"),
         (MasterType.FILETYPE, "Filetype"),
     ):
         header = [str(c).strip() for c in sheets[tab][1] if c is not None]
+        assert header[0] == ID_HEADER[master_type], tab
         assert header[1:] == [name for name, _ in COLUMNS[master_type]], tab
 
 
@@ -276,11 +269,11 @@ def test_e0_4_t05_rag_reference_schema_has_seven_required_keys_and_no_extras() -
 def test_e0_4_t01_models_are_the_ones_the_schemas_describe() -> None:
     assert ReadmeTab.model_json_schema().items() <= schemas()["readme"].items()  # + $schema/$id
     assert {
-        OrganizationPayload,
-        RulesPayload,
-        AgentsPayload,
-        SkillsPayload,
-        ToolingPayload,
+        OrganizationPayloadV03,
+        RulesPayloadV03,
+        AgentsPayloadV03,
+        SkillsPayloadV03,
+        ToolingPayloadV03,
         FiletypePayload,
     } == set(PAYLOAD_MODELS.values())
 
@@ -290,27 +283,27 @@ def test_e0_4_t01_models_are_the_ones_the_schemas_describe() -> None:
 
 def test_e0_4_t06_renamed_column_is_rejected_with_its_path(sheets: Sheets) -> None:
     changed = mutated(sheets)
-    misc = [str(c).strip() if c else c for c in changed["Rules"][1]].index("Misc")
-    changed["Rules"][1][misc] = "Notes"
+    names = [str(c).strip() if c else c for c in changed["Rules"][1]]
+    changed["Rules"][1][names.index("Stop / review condition")] = "Notes"
     report = parse_workbook(changed)
     assert report.code == ErrorCode.STRUCTURE_MISMATCH
-    assert paths(report) == ["Rules!row2:col9"]
+    assert paths(report) == ["Rules!row2:col4"]
     assert report.rows == []  # nothing is imported from a changed structure
 
 
 def test_e0_4_t06_extra_column_is_rejected_with_its_path(sheets: Sheets) -> None:
     changed = mutated(sheets)
     row = changed["Rules"][1]
-    row[:] = [*row[:12], "Priority"]  # a 12th data column after RAG Reference (numbered 0..10)
+    row[:] = [*row[:9], "Priority"]  # after Skill ref (Rule ID, then columns numbered 1..8)
     report = parse_workbook(changed)
     assert report.code == ErrorCode.STRUCTURE_MISMATCH
-    assert paths(report) == ["Rules!row2:col11"]
+    assert paths(report) == ["Rules!row2:col9"]
     assert "unexpected column 'Priority'" in report.errors[0].message
 
 
 def test_e0_4_t06_removed_column_is_rejected(sheets: Sheets) -> None:
     changed = mutated(sheets)
-    changed["Agents"][1] = [c for c in changed["Agents"][1] if str(c).strip() != "Eval"]
+    changed["Agents"][1] = [c for c in changed["Agents"][1] if str(c).strip() != "Tools"]
     errors = validate_structure(changed)
     assert errors, "a removed column must be reported"
     assert errors[0].path.startswith("Agents!row2:col")
@@ -345,7 +338,7 @@ def test_e0_4_t06_filetype_with_42_rows_is_rejected(sheets: Sheets) -> None:
 def test_e0_4_t06_whitespace_only_header_differences_are_not_a_structure_change(
     sheets: Sheets,
 ) -> None:
-    # The shipped workbook has ' Logs' and 'Name ' with stray spaces; they must keep validating.
+    # Stray spaces around a header ('Name ', ' Logs' in BAM 0.2) must keep validating.
     changed = mutated(sheets)
     changed["Agents"][1] = [f" {c} " if c else c for c in changed["Agents"][1]]
     assert validate_structure(changed) == []
@@ -354,14 +347,14 @@ def test_e0_4_t06_whitespace_only_header_differences_are_not_a_structure_change(
 # --- Row-level errors carry their path ------------------------------------------------------------
 
 
-def test_e0_4_t07_unknown_organization_type_in_the_workbook_is_reported_with_its_path(
+def test_e0_4_t07_unknown_agent_kind_in_the_workbook_is_reported_with_its_path(
     sheets: Sheets,
 ) -> None:
     changed = mutated(sheets)
-    changed["Organization"][4][2] = "Plant"  # Unit #2, column "Type" (numbered 2)
+    changed["Agents"][4][2] = "Bot"  # AS-01, column "Kind" (numbered 2)
     report = parse_workbook(changed)
     assert report.code == ErrorCode.VALIDATION_ERROR
-    assert paths(report) == ["Organization!row5:col2"]
+    assert paths(report) == ["Agents!row5:col2"]
 
 
 def test_e0_4_t07_filetype_tier_outside_1_to_3_is_reported(sheets: Sheets) -> None:
@@ -372,35 +365,31 @@ def test_e0_4_t07_filetype_tier_outside_1_to_3_is_reported(sheets: Sheets) -> No
     assert paths(parse_workbook(changed)) == ["Filetype!row4:col2"]
 
 
-def test_e0_4_t04_unknown_status_in_the_workbook_is_reported_at_the_misc_cell(
-    sheets: Sheets,
-) -> None:
+def test_e0_4_t04_a_free_text_status_never_fails_and_counts_as_proposed(sheets: Sheets) -> None:
     changed = mutated(sheets)
-    changed["Rules"][4][10] = "Source fields needed. Status: Foo"  # Rule #2 Misc (numbered 9)
+    changed["Rules"][3][6] = "Under review by QA"  # RULE-POLICY-BOM Status (numbered 6)
     report = parse_workbook(changed)
-    assert paths(report) == ["Rules!row5:col9"]
-    assert report.errors[0].message == "unknown status Foo"
+    assert report.errors == []
+    rule = next(r for r in report.rows if r.identity.stable_id == "RULE-POLICY-BOM")
+    assert rule.identity.status == MasterStatus.PROPOSED
 
 
-def test_e0_4_t05_broken_rag_cell_in_the_workbook_is_reported(sheets: Sheets) -> None:
+def test_e0_4_t05_an_id_that_is_not_one_short_line_is_reported(sheets: Sheets) -> None:
     changed = mutated(sheets)
-    changed["Rules"][3][11] = "[1, 2]"  # Rule #1 RAG Reference (numbered 10)
-    report = parse_workbook(changed)
-    assert paths(report) == ["Rules!row4:col10"]
-    changed["Rules"][3][11] = json.dumps({"Example": "only one key"})
-    assert paths(parse_workbook(changed)) == ["Rules!row4:col10"]
+    changed["Skills"][4][0] = "S" * 65
+    assert paths(parse_workbook(changed)) == ["Skills!row5:colA"]
 
 
 def test_e0_4_t01_duplicate_stable_id_is_reported(sheets: Sheets) -> None:
     changed = mutated(sheets)
-    changed["Agents"][5][2] = str(changed["Agents"][4][2])  # Agent #3 now carries AG-INTAKE too
+    changed["Agents"][5][0] = "ag-01"  # AG-02 now carries AG-01 too (ids are upper-cased)
     report = parse_workbook(changed)
-    assert any("duplicate stable id AG-INTAKE" in e.message for e in report.errors)
+    assert any("duplicate stable id AG-01" in e.message for e in report.errors)
 
 
 def test_e0_4_t01_bad_row_label_is_reported(sheets: Sheets) -> None:
     changed = mutated(sheets)
-    changed["Skills"][4][0] = "Step #2"
+    changed["Skills"][4][0] = "SK-02\nsecond line"
     assert paths(parse_workbook(changed)) == ["Skills!row5:colA"]
 
 
@@ -410,12 +399,12 @@ def test_e0_4_t01_bad_row_label_is_reported(sheets: Sheets) -> None:
 def test_e0_4_t08_formula_text_in_the_workbook_stays_literal(sheets: Sheets) -> None:
     changed = mutated(sheets)
     evil = '=HYPERLINK("http://evil")'
-    changed["Organization"][4][1] = evil  # Unit #2 Org Name
+    changed["Organization"][4][1] = evil  # ORG-BU-01 Company / Type
     report = parse_workbook(changed)
     assert report.errors == []
-    unit2 = next(r for r in report.rows if r.identity.stable_id == "ORG-EMS")
-    assert isinstance(unit2.payload, OrganizationPayload)
-    assert unit2.payload.org_name == evil
+    unit = next(r for r in report.rows if r.identity.stable_id == "ORG-BU-01")
+    assert isinstance(unit.payload, OrganizationPayloadV03)
+    assert unit.payload.company_type == evil
 
 
 def test_e0_4_t08_the_shipped_workbook_holds_no_real_formulas() -> None:
@@ -485,9 +474,11 @@ def headers(sheets: Sheets, tab: str) -> list[object]:
 def test_e3_3_t02_renamed_rules_column_is_a_renamed_diff(sheets: Sheets) -> None:
     bad = mutated(sheets)
     row = headers(bad, "Rules")
-    row[row.index("Components (BOM)")] = "BOM"
+    row[row.index("Owner / version")] = "Owner"
     assert diffs(bad) == [
-        StructureDiff(tab="Rules", expected="Components (BOM)", actual="BOM", kind=DiffKind.RENAMED)
+        StructureDiff(
+            tab="Rules", expected="Owner / version", actual="Owner", kind=DiffKind.RENAMED
+        )
     ]
 
 
@@ -538,9 +529,9 @@ def test_e3_3_tab_diffs(sheets: Sheets) -> None:
 def test_e3_3_structure_errors_keep_their_messages(sheets: Sheets) -> None:
     bad = mutated(sheets)
     row = headers(bad, "Rules")
-    row[row.index("Components (BOM)")] = "BOM"
+    row[row.index("Owner / version")] = "Owner"
     report = parse_workbook(bad)
-    assert report.errors[0].message == "expected 'Components (BOM)', found 'BOM'"
+    assert report.errors[0].message == "expected 'Owner / version', found 'Owner'"
 
 
 def test_e3_3_diff_is_omitted_from_errors_without_one() -> None:

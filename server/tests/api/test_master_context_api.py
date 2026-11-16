@@ -42,23 +42,25 @@ def h(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[MastersHarnes
 
 
 def seed(h: MastersHarness, project_id: str) -> None:
-    h.entry("ORGANIZATION", payload={"code": "ORG-001", "org_name": "Rocketreach"})
-    h.entry(
-        payload={
-            "domain_rule": "RULE-BOM: applies to BOM.",
-            "rag_reference": rag(
-                **{"ID Field": "DOM-PCBA-01", "Entity / Node Type": "DomainKnowledge"},
-                **{"Parent Entity": "ORG-001", "Links / Path": LINK},
-            ),
-        }
+    """Masters 0.3 (#781): the graph links of a migrated 0.2 entry come from its kept RAG
+    Reference (`legacy_0_2`); a 0.3 entry is a node of its own master type."""
+    h.entry("ORGANIZATION", payload={"org_id": "ORG-001", "company_type": "Rocketreach"})
+    legacy = rag(
+        **{"ID Field": "DOM-PCBA-01", "Entity / Node Type": "DomainKnowledge"},
+        **{"Parent Entity": "ORG-001", "Links / Path": LINK},
     )
     h.entry(
         payload={
-            "domain_rule": "RULE-COST: margins.",
-            "rag_reference": rag(**{"Security / Access Level": "Restricted"}),
+            "rule_id": "RULE-BOM",
+            "rule_type_description": "applies to BOM.",
+            "legacy_0_2": {"rag_reference": json.dumps(legacy)},
         }
     )
-    h.entry(payload={"domain_rule": "Engineering rules"}, row_label="Rule #1")  # sample row
+    h.entry(
+        "TOOLING",
+        payload={"tooling_id": "TOOL-COST", "category": "Costing", "owner_access": "Restricted"},
+    )
+    h.entry(payload={"rule_id": "RULE-SAMPLE", "record_status": "Illustrative"})
 
 
 def export(h: MastersHarness, tmp_path: Path, project_id: str, snapshot_project: str) -> Any:
@@ -88,8 +90,8 @@ def test_e3_6_export_writes_typed_nodes_and_a_complete_report(
         "ORG-001",
     )
     assert sorted((x.stable_id, x.reason) for x in report.excluded) == [
-        ("RULE-COST", "RESTRICTED"),
-        ("Rule #1", "ILLUSTRATIVE"),
+        ("RULE-SAMPLE", "ILLUSTRATIVE"),
+        ("TOOL-COST", "RESTRICTED"),
     ]
     assert len(report.included) + len(report.excluded) == 4  # the snapshot size
 
@@ -109,7 +111,7 @@ def test_e3_6_t04_admin_allows_restricted_then_it_is_included(
     assert res.status_code == 200, res.text
     assert res.json()["allow_restricted"] is True
     report = export(h, tmp_path, project["id"], project["id"])
-    assert "RULE-COST" in report.included
+    assert "TOOL-COST" in report.included
     assert [x.reason for x in report.excluded] == ["ILLUSTRATIVE"]
 
 
@@ -155,7 +157,7 @@ def test_e3_6_t07_pointers_are_never_fetched(
     report = export(h, tmp_path, project["id"], project["id"])
     assert calls == []
     rule = next(n for n in read(tmp_path, report) if n["node_id"] == "DOM-PCBA-01")
-    assert rule["payload"]["rag_reference"]["Links / Path"] == LINK  # text only
+    assert LINK in rule["payload"]["legacy_0_2"]["rag_reference"]  # text only, never fetched
 
 
 def test_e3_6_t08_snapshot_of_another_project_is_rejected(

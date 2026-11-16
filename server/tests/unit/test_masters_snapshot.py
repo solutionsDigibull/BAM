@@ -28,7 +28,11 @@ def entry(
         status=status,
         version=version,
         payload=payload
-        or ({"domain_rule": f"{stable_id}: policy"} if master_type == "RULES" else {}),
+        or (
+            {"rule_id": stable_id, "rule_type_description": "policy"}
+            if master_type == "RULES"
+            else {}
+        ),
     )
 
 
@@ -66,7 +70,7 @@ def test_e3_2_every_entry_is_pinned_with_its_status_and_restricted_flag() -> Non
     restricted_tool = entry(
         "TOOL-MFG-02",
         master_type="TOOLING",
-        payload={"category": "API", "security_access_level": "Restricted"},
+        payload={"category": "API", "owner_access": "Restricted - platform admins"},
     )
     rows = [
         entry("Rule #1", status="ILLUSTRATIVE"),

@@ -181,9 +181,7 @@ def test_e1_2_t05_fixtures_validate_against_the_generated_schemas() -> None:
 
 def test_e1_2_t05_masters_rows_validate_against_the_generated_schemas() -> None:
     book = openpyxl.load_workbook(
-        fixture_path("masters", "BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx"),
-        data_only=False,
-        read_only=True,
+        fixture_path("masters", "masters_0_3.xlsx"), data_only=False, read_only=True
     )
     try:
         sheets = {
@@ -193,9 +191,10 @@ def test_e1_2_t05_masters_rows_validate_against_the_generated_schemas() -> None:
         book.close()
     rows = parse_workbook(sheets).rows
     assert rows
-    for row in rows:
+    for row in rows:  # Masters 0.3 since #781; Filetype keeps its frozen schema
         payload = row.payload.model_dump(mode="json", by_alias=True)
-        validator(f"masters/{row.master_type.value.lower()}").validate(payload)
+        folder = "masters" if row.master_type.value == "FILETYPE" else "masters_v03"
+        validator(f"{folder}/{row.master_type.value.lower()}").validate(payload)
 
 
 def test_e1_2_t05_bad_skill_id_is_rejected_by_the_schema_pattern() -> None:

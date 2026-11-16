@@ -1,4 +1,7 @@
-"""The project's repository catalog: the Agents `repo` and Tooling `links_path` columns, parsed.
+"""The project's repository catalog: the Agents `reference` and Tooling `links_path` columns.
+
+Masters 0.3 (#781): the Agents "Reference" column also names the agent a proposed one enhances;
+plain text in a cell is not a link and is ignored (`parse_cell`), unsafe links are still rejected.
 
 Reads the entries the project's masters snapshot would pin (the tenant's and the project's own;
 ILLUSTRATIVE and RETIRED never, Restricted only when the project allows it) at their current
@@ -10,7 +13,8 @@ repositories.
 import uuid
 from typing import Any
 
-from sbam_contracts.masters import STRUCTURE_VERSION, MasterStatus, MasterType
+from sbam_contracts.masters import MasterStatus, MasterType
+from sbam_contracts.masters_v03 import STRUCTURE_VERSION
 from sbam_contracts.repo_catalog import (
     CatalogCandidate,
     CatalogRejection,
@@ -30,7 +34,7 @@ from sbam_api.repo_catalog.parse import candidate_id, parse_cell
 
 # (master type, payload column, source) of the two columns the catalog reads.
 COLUMNS: tuple[tuple[MasterType, str, RepoSource], ...] = (
-    (MasterType.AGENTS, "repo", RepoSource.ADMIN_AGENTS),
+    (MasterType.AGENTS, "reference", RepoSource.ADMIN_AGENTS),
     (MasterType.TOOLING, "links_path", RepoSource.ADMIN_TOOLING),
 )
 
