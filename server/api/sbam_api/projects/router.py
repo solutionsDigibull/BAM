@@ -1,5 +1,5 @@
 """Projects API (E3.1): admin CRUD + archive under `/admin/projects`, and the FDE's `/projects`.
-Members (E2.4): `GET/PUT /admin/projects/{id}/members`.
+Members (E2.4): `GET/PUT /admin/projects/{id}/members`. Goal (#720): `GET/PUT /projects/{id}/goal`.
 """
 
 import uuid
@@ -9,7 +9,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Request, Response
 from sbam_contracts.api import Page
 from sbam_contracts.projects import Project as ProjectOut
-from sbam_contracts.projects import ProjectCreate, ProjectMembers, ProjectMembersPut, ProjectPatch
+from sbam_contracts.projects import (
+    ProjectCreate,
+    ProjectGoalOut,
+    ProjectGoalPut,
+    ProjectMembers,
+    ProjectMembersPut,
+    ProjectPatch,
+)
 from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser, admin, fde
@@ -19,11 +26,14 @@ from sbam_api.db.session import app_sessions
 from sbam_api.identity.models import User
 from sbam_api.identity.router import tenant_user
 from sbam_api.projects import service
+from sbam_api.projects.guard import active_project
 from sbam_api.projects.models import Project
 
 router = APIRouter(tags=["projects"])
 
 Admin = Annotated[CurrentUser, Depends(admin)]
+Fde = Annotated[CurrentUser, Depends(fde)]
+FdeProject = Annotated[uuid.UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 
 
 def db(request: Request) -> Iterator[Session]:
@@ -107,6 +117,30 @@ def put_members(
     project_id: uuid.UUID, body: ProjectMembersPut, user: Admin, session: Db
 ) -> ProjectMembers:
     return _members(project_id, service.set_members(session, user, project_id, body))
+
+
+def _goal(project: Project, response: Response) -> ProjectGoalOut:
+    response.headers["ETag"] = etag(project.row_version)
+    return ProjectGoalOut(project_id=project.id, goal=project.goal)
+
+
+@router.get("/projects/{project_id}/goal")
+def get_goal(project_id: FdeProject, user: Fde, session: Db, response: Response) -> ProjectGoalOut:
+    """The FDE's goal for the project (#720); `goal` is null before one is set."""
+    return _goal(service.get(session, user, project_id), response)
+
+
+@router.put("/projects/{project_id}/goal")
+def put_goal(
+    project_id: FdeProject,
+    body: ProjectGoalPut,
+    user: Fde,
+    session: Db,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> ProjectGoalOut:
+    """Set (or, with null, clear) the goal. `If-Match` is the project's ETag."""
+    return _goal(service.set_goal(session, user, project_id, body, if_match), response)
 
 
 @router.get("/projects")

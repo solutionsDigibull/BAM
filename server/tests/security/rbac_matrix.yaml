@@ -393,6 +393,27 @@ routes:
       fde_a_unassigned: "404 NOT_FOUND"
       fde_b: "404 NOT_FOUND"
 
+  # The FDE's goal (#720): the one project field an assigned FDE writes.
+  get_goal_api_v1_projects__project_id__goal_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/goal
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  put_goal_api_v1_projects__project_id__goal_put:
+    request:
+      method: PUT
+      path: /api/v1/projects/{project_id}/goal
+      params: {project_id: "@project_a"}
+      headers: {if-match: "@etag_project_a"}
+      json: {goal: "Build an AI agent that automates quoting for sales managers in India"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   list_documents_api_v1_projects__project_id__documents_get:
     request:
       method: GET

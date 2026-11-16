@@ -10,6 +10,8 @@
 * Members (E2.4): PUT replaces the set under the same row lock. Every id must be an ACTIVE sbam-fde
   of the tenant; each bad one is a 422 error on `user_ids.<i>` (another tenant's user looks
   missing). PROJECT_MEMBERS_CHANGED carries the ids before and after.
+* Goal (#720): the one project field an assigned FDE writes. PROJECT_GOAL_SET carries the goal
+  before and after.
 """
 
 import uuid
@@ -17,7 +19,13 @@ from typing import Any
 
 from sbam_contracts.api import ErrorCode, FieldError
 from sbam_contracts.identity import UserStatus
-from sbam_contracts.projects import ProjectCreate, ProjectMembersPut, ProjectPatch, ProjectStatus
+from sbam_contracts.projects import (
+    ProjectCreate,
+    ProjectGoalPut,
+    ProjectMembersPut,
+    ProjectPatch,
+    ProjectStatus,
+)
 from sbam_contracts.state_machines import Actor
 from sbam_contracts.state_machines import ProjectPipelineState as P
 from sbam_contracts.state_machines import WorkflowState as W
@@ -157,6 +165,31 @@ def update(
     except IntegrityError:
         session.rollback()
         raise duplicate_name() from None
+    return project
+
+
+def set_goal(
+    session: Session,
+    user: CurrentUser,
+    project_id: uuid.UUID,
+    body: ProjectGoalPut,
+    if_match: str | None,
+) -> Project:
+    """The FDE's goal (#720): If-Match (428/412) on the project; an unchanged goal writes nothing.
+    The route's `active_project` already answered 404 (not assigned) and 409 (archived)."""
+    repo = _repo(session, user)
+    project: Project | None = repo.get_for_update(project_id)
+    if project is None:
+        raise not_found()
+    check_if_match(if_match, project.row_version)
+    require_active(project)
+    if project.goal == body.goal:
+        return project
+    before = {"goal": project.goal}
+    project.goal = body.goal
+    repo.update(project, project.row_version)
+    _audit(session, user, "PROJECT_GOAL_SET", project, before, {"goal": project.goal})
+    session.commit()
     return project
 
 

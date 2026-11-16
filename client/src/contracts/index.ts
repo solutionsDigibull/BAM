@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:244d1224f9589667d3a739eaa7989efe617000eabef4c4731a97601970db2478
+// source-sha256:7b03c77a242102259bc16889c1950659edfb07282d37e86a0df1b102a1204283
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -590,6 +590,8 @@ export interface SbamContracts {
   Project?: Project;
   ProjectCreate?: ProjectCreate;
   ProjectPatch?: ProjectPatch;
+  ProjectGoalPut?: ProjectGoalPut;
+  ProjectGoalOut?: ProjectGoalOut;
   ProjectMembersPut?: ProjectMembersPut;
   ProjectMembers?: ProjectMembers;
   PipelineTimeline?: PipelineTimeline;
@@ -2979,6 +2981,7 @@ export interface Project {
   description: string | null;
   context_notes: string | null;
   allow_restricted?: boolean;
+  goal?: string | null;
   status: ProjectStatus;
   pipeline_state: ProjectPipelineState;
   row_version: number;
@@ -3010,6 +3013,26 @@ export interface ProjectPatch {
   description?: string | null;
   context_notes?: string | null;
   allow_restricted?: boolean | null;
+}
+/**
+ * `PUT /projects/{id}/goal` with `If-Match` (#720): the new goal; `null` clears it.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectGoalPut".
+ */
+export interface ProjectGoalPut {
+  goal: string | null;
+}
+/**
+ * `GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set). The ETag
+ * header is the project's `row_version`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectGoalOut".
+ */
+export interface ProjectGoalOut {
+  project_id: string;
+  goal: string | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

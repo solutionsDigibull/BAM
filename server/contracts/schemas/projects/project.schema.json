@@ -81,6 +81,18 @@
       "title": "Allow Restricted",
       "type": "boolean"
     },
+    "goal": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Goal"
+    },
     "status": {
       "$ref": "#/$defs/ProjectStatus"
     },
