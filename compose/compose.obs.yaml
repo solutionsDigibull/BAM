@@ -79,9 +79,8 @@ services:
       sbam_internal: { aliases: [grafana-lgtm] } # sbam-api/workers export to otel-collector:4317
     volumes:
       - lgtm_data:/data
-      # Alert rules provisioned into Grafana (E4.3: ClamAV signatures older than 24 h).
-      - ./obs/alerting/clamav.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/clamav.yaml:ro
-      # Dashboards and operator alerts as code (E16.1, TD §17.3); see compose/grafana/README.md.
+      # Dashboards and operator alerts as code (E16.1, TD §17.3); see compose/grafana/README.md. The ClamAV
+      # signature-age alert (E4.3) is `sbam-clamav-signatures-stale` in provisioning/alerting/rules.yaml (#793).
       - ./grafana/provisioning/dashboards/sbam.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/sbam.yaml:ro
       - ./grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/sbam:ro
       - ./grafana/provisioning/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
