@@ -193,6 +193,8 @@ def _move(conn: sa.Connection, entry: Any, number: int, stable_id: str, label: s
 def upgrade() -> None:
     conn = op.get_bind()
     for entry in _current(conn):
+        if ID_KEY[entry.master_type] in entry.payload:
+            continue  # already 0.3 (made after an earlier upgrade): no 0.2 model has an id key
         payload = to_v03(
             entry.master_type, dict(entry.payload), entry.status, entry.stable_id, entry.row_label
         )
