@@ -30,7 +30,7 @@ def set_goal(w: World, goal: str | None) -> None:
 
 
 def goal_keys(w: World) -> set[str]:
-    """Dataset items owned by the project itself: only the goal is (item key `<source_id>_<sha>`)."""
+    """Dataset items owned by the project itself, i.e. the goal (key `<source_id>_<sha>`)."""
     return {k for k in keys_of(w) if k.startswith(f"{w.project}_")}
 
 
@@ -99,7 +99,9 @@ def test_720_t20_the_sow_is_generated_with_the_goal_as_a_data_block(g: Gen) -> N
     g.run(bifrost, sc=sc)
     assert GOAL in bifrost.requests[0]["messages"][1]["content"]
     [row] = g.calls(sc)
-    assert row.context_manifest["_extra"]["goal_sha256"] == hashlib.sha256(GOAL.encode()).hexdigest()
+    assert (
+        row.context_manifest["_extra"]["goal_sha256"] == hashlib.sha256(GOAL.encode()).hexdigest()
+    )
 
 
 def test_720_t21_without_a_goal_the_sow_context_is_unchanged(g: Gen) -> None:
