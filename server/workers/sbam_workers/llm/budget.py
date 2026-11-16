@@ -15,23 +15,37 @@ import asyncio
 import logging
 from decimal import Decimal
 
+from sbam_contracts.budget import BudgetCaps, BudgetLevel, BudgetScope
+from sbam_contracts.notifications import NotificationType
+
 from sbam_workers.llm.store import CallStore, LlmScope
 from sbam_workers.settings import WorkerSettings
 
 log = logging.getLogger("sbam_workers.llm")
 MILLION = Decimal(1_000_000)
+# Aliases whose tokens count against the knowledge build's cap (Cognee's own two, ADR 0028); every
+# other alias counts against the Workflow build's. A Sub-Skill's own cap needs the Sub-Skill id in
+# the call scope and comes with the per-project settings (#776).
+KNOWLEDGE_ALIASES = frozenset({"sbam-knowledge", "sbam-embed"})
+PERCENT = {BudgetLevel.FIRST_ALERT: "first", BudgetLevel.SECOND_ALERT: "second"}
 
 
 class BudgetExceeded(Exception):  # noqa: N818
-    """Recorded spend reached a configured budget. Retrying cannot help until it is raised."""
+    """Recorded spend or tokens reached a budget. Retrying cannot help until it is raised."""
 
     retryable = False
 
 
+STOP_REASON = "token budget reached"  # what a stopped build shows (NEEDS_FDE_REVIEW)
+
+
 class Budget:
-    def __init__(self, settings: WorkerSettings, store: CallStore) -> None:
+    def __init__(
+        self, settings: WorkerSettings, store: CallStore, caps: BudgetCaps | None = None
+    ) -> None:
         self.settings = settings
         self.store = store
+        self.caps = caps or BudgetCaps()  # per-project caps arrive with #776
         # Aliases whose calls used tokens but came back with no cost and no configured price while
         # a budget is set: their spend cannot be counted, so the budget refuses them.
         self.blind: set[str] = set()
@@ -44,9 +58,9 @@ class Budget:
         )
 
     def cost_of(self, alias: str, tokens_in: int, tokens_out: int, reported: Decimal) -> Decimal:
-        """Bifrost's figure, else (budget set) the configured price for the alias, else 0."""
+        """Bifrost's figure, else the configured price for the alias, else 0."""
         price = self.settings.llm_price_usd_per_mtok.get(alias)
-        if reported > 0 or price is None or not self.active:
+        if reported > 0 or price is None:
             return reported
         return (tokens_in * price["in"] + tokens_out * price["out"]) / MILLION
 
@@ -81,3 +95,50 @@ class Budget:
                 raise BudgetExceeded(
                     f"the {what} has spent ${spent:.4f} of its ${limit:.4f} LLM budget"
                 )
+
+    async def check_tokens(self, scope: LlmScope, alias: str) -> None:
+        """Refuse the call when the build's recorded tokens reached the cap, and alert once at
+        each level. The count is a query over `llm_calls` (failed attempts included), so a retry
+        that reuses an activity id cannot step around it."""
+        kind = BudgetScope.KNOWLEDGE if alias in KNOWLEDGE_ALIASES else BudgetScope.WORKFLOW
+        used = await asyncio.to_thread(
+            self.store.tokens, scope, KNOWLEDGE_ALIASES, inside=kind is BudgetScope.KNOWLEDGE
+        )
+        level = self.caps.level(kind, used)
+        if level is BudgetLevel.OK:
+            return
+        cap = self.caps.cap(kind)
+        what = "knowledge build" if kind is BudgetScope.KNOWLEDGE else "workflow build"
+        pct = {
+            BudgetLevel.FIRST_ALERT: self.caps.first_alert_pct,
+            BudgetLevel.SECOND_ALERT: self.caps.second_alert_pct,
+            BudgetLevel.STOPPED: 100,
+        }[level]
+        type_ = (
+            NotificationType.TOKEN_BUDGET_WARNING
+            if level is BudgetLevel.FIRST_ALERT
+            else NotificationType.TOKEN_BUDGET_LIMIT
+        )
+        action = (
+            "The build has stopped. Raise the limit or retry after review."
+            if level is BudgetLevel.STOPPED
+            else ""
+        )
+        try:  # an alert that cannot be written must never block the call that triggered it
+            await asyncio.to_thread(
+                self.store.alert,
+                scope,
+                type_,
+                f"{kind.value}:{level.value}",
+                {
+                    "percent": f"{pct}%",
+                    "what": what,
+                    "used": f"{used:,}",
+                    "cap": f"{cap:,}",
+                    "next_action": action,
+                },
+            )
+        except Exception:
+            log.exception("token budget alert could not be written")
+        if level is BudgetLevel.STOPPED:
+            raise BudgetExceeded(f"{STOP_REASON}: {used:,} of {cap:,} tokens ({what})")

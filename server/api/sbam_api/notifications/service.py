@@ -76,10 +76,19 @@ TEMPLATES: dict[NotificationType, tuple[str, str]] = {
         "Reminder",
         "{project} is waiting for {waiting_for}.",
     ),
+    NotificationType.TOKEN_BUDGET_WARNING: (
+        "Token budget {percent} used",
+        "{project} has used {percent} of its {what} token budget ({used} of {cap} tokens).",
+    ),
+    NotificationType.TOKEN_BUDGET_LIMIT: (
+        "Token budget {percent} used",
+        "{project} has used {percent} of its {what} token budget ({used} of {cap} tokens). "
+        "{next_action}",
+    ),
 }
 # Types an Admin also receives: failures they may have to act on. Admins have no FDE-portal
 # access, so their copy carries no link.
-ADMIN_TYPES = frozenset({NotificationType.GENERATION_FAILED})
+ADMIN_TYPES = frozenset({NotificationType.GENERATION_FAILED, NotificationType.TOKEN_BUDGET_LIMIT})
 
 
 def clean_param(value: object) -> str:
