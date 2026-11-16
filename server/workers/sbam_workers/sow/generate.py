@@ -15,6 +15,8 @@ a fake Bifrost and a temp-dir storage; the activity only builds the real ones. F
   5. SBAM, not the model, numbers the features (`F-<module>-<n>`, in module order) and copies each
      citation's location from the bundle;
   6. the version is stored GENERATED with its canonical sha256 and the `llm_calls` row it came from.
+  The FDE's goal for the project (#720), when set, is one more data block, read as it is at
+  generation time; its sha256 goes to the context manifest.
 Re-asks exhausted: the version is stored GENERATION_FAILED (`SCHEMA_INVALID`) and the activity
 fails non-retryable (`SchemaInvalidAfterRetries`), so the pipeline goes to SOW_GENERATION_FAILED.
 Bifrost down: retryable until the last attempt, which stores `LLM_UNAVAILABLE`; a request Bifrost
@@ -37,6 +39,8 @@ from sbam_api.knowledge.graph import load
 from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.knowledge.repository import KnowledgeVersionRepository
 from sbam_api.knowledge.service import read_okf_part
+from sbam_api.projects.models import Project
+from sbam_api.projects.repository import ProjectRepository
 from sbam_api.sow.models import SowVersion
 from sbam_api.sow.repository import SowVersionRepository
 from sbam_api.sow.service import Generation, record_generation
@@ -194,10 +198,12 @@ def _bundle(deps: SowDeps, inp: StageRef) -> Bundle:
                 "bundle.json does not match okf_sha256", type="HASH_MISMATCH", non_retryable=True
             )
         loaded = load(deps.storage, row)
+        project: Project | None = ProjectRepository(session, _ctx(inp)).get(inp.project_id)
+        goal = project.goal if project is not None else None  # #720: as it is now
     manifest = BundleManifest.model_validate_json(head)
     masters = manifest.parts.get("masters.jsonl")
     text = read_okf_part(deps.storage, masters.storage_key).decode("utf-8") if masters else ""
-    return Bundle(list(loaded.chunks.values()), loaded.entities, loaded.relations, text)
+    return Bundle(list(loaded.chunks.values()), loaded.entities, loaded.relations, text, goal)
 
 
 def _record(deps: SowDeps, inp: StageRef, gen: Generation) -> uuid.UUID:
