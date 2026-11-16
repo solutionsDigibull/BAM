@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:repo/decision:0.1.0",
+  "$defs": {
+    "DecidedBy": {
+      "enum": [
+        "AUTO",
+        "FDE"
+      ],
+      "title": "DecidedBy",
+      "type": "string"
+    },
+    "RepoCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "title": "Url",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RepoSource"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "licence": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licence"
+        },
+        "reasons": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "url",
+        "source",
+        "score"
+      ],
+      "title": "RepoCandidate",
+      "type": "object"
+    },
+    "RepoChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "title": "Url",
+          "type": "string"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "RepoChoice",
+      "type": "object"
+    },
+    "RepoOutcome": {
+      "enum": [
+        "REPO",
+        "GENERATED"
+      ],
+      "title": "RepoOutcome",
+      "type": "string"
+    },
+    "RepoSource": {
+      "description": "Where a candidate came from: the priority order of ADR 0028, in the order it is tried.",
+      "enum": [
+        "ISATVON",
+        "ADMIN_AGENTS",
+        "ADMIN_TOOLING",
+        "FDE"
+      ],
+      "title": "RepoSource",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "sub_skill_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "outcome": {
+      "$ref": "#/$defs/RepoOutcome"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/RepoCandidate"
+      },
+      "maxItems": 20,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "chosen": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RepoChoice"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "decided_by": {
+      "$ref": "#/$defs/DecidedBy"
+    },
+    "actor_id": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Actor Id"
+    },
+    "decided_at": {
+      "format": "date-time",
+      "title": "Decided At",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sub_skill_id",
+    "outcome",
+    "decided_by",
+    "decided_at",
+    "reason"
+  ],
+  "title": "RepoDecision",
+  "type": "object"
+}

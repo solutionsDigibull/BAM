@@ -482,6 +482,71 @@
       "title": "SkillMetadata",
       "type": "object"
     },
+    "SourceRepo": {
+      "additionalProperties": false,
+      "description": "An open-source repository this Sub-Skill's code starts from (ADR 0028, decision 1).\n\n`commit` is empty until the fetcher resolves `ref` (a branch or tag) to one and pins it.\n`licence` is data here (an SPDX id as the FDE or the catalog wrote it): the allowlist is\nenforced when the repository is fetched, never by this contract.",
+      "properties": {
+        "url": {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "title": "Url",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        },
+        "licence": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licence"
+        },
+        "reason": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "reason"
+      ],
+      "title": "SourceRepo",
+      "type": "object"
+    },
     "StateHandoffFile": {
       "additionalProperties": false,
       "properties": {
@@ -598,6 +663,22 @@
           "minItems": 1,
           "title": "Libraries",
           "type": "array"
+        },
+        "source_repos": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SourceRepo"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Repos"
         }
       },
       "required": [

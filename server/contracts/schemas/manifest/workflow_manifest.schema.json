@@ -93,6 +93,108 @@
       "type": "object"
     },
     "JsonValue": {},
+    "McpServerEntry": {
+      "additionalProperties": false,
+      "description": "The single FastMCP server that holds every Sub-Skill's tools, built into one image (C-50 is\nkept: every Sub-Skill has both an action and a check tool). `registry_id` is empty until the\nserver is registered in Bifrost, which happens only after certification.",
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "pattern": "^wf_[a-z0-9]+(_[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "image_digest": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Image Digest",
+          "type": "string"
+        },
+        "registry_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Registry Id"
+        },
+        "tools": {
+          "items": {
+            "$ref": "#/$defs/McpToolEntry"
+          },
+          "minItems": 2,
+          "title": "Tools",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "image_digest",
+        "tools"
+      ],
+      "title": "McpServerEntry",
+      "type": "object"
+    },
+    "McpToolEntry": {
+      "additionalProperties": false,
+      "description": "One tool of the Workflow server: the Action or the Fixed Check tool of one Sub-Skill.",
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "pattern": "^MS\\d{2}_\\d+__(action|check)$",
+          "title": "Name",
+          "type": "string"
+        },
+        "skill_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "action",
+            "check"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "input_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Input Schema",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Output Schema",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "skill_id",
+        "role",
+        "input_schema",
+        "output_schema"
+      ],
+      "title": "McpToolEntry",
+      "type": "object"
+    },
     "Provenance": {
       "additionalProperties": false,
       "properties": {
@@ -431,6 +533,17 @@
       "pattern": "^(sha256:)?[0-9a-f]{64}$",
       "title": "Runtime Image Digest",
       "type": "string"
+    },
+    "mcp_server": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/McpServerEntry"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "evidence_index": {
       "items": {

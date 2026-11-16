@@ -50,6 +50,7 @@ from sbam_contracts.isatvon14 import (
     Library,
     Parameter,
     ShortText,
+    SourceRepo,
     StateHandoffFile,
     Text,
     VVariables,
@@ -143,6 +144,9 @@ class FlatTechStack(_Strict):
     secondary_tools: list[ShortText] | None = None
     gateway_routing: ShortText | None = None
     libraries: list[Library] | None = None
+    # Unset on every manifest built before ADR 0028, and dump() leaves unset keys out, so their
+    # hashes do not change (WG4-T02).
+    source_repos: list[SourceRepo] | None = Field(default=None, max_length=10)
 
 
 class FlatVariables(_Strict):
@@ -265,6 +269,19 @@ ISA14_SRIM_DEFAULTS: Final = SrimRuntimeDefaults.model_validate(
         },
         "audit": {"telemetry": "PostgreSQL_Audit_Logs"},
         "ui": {"target": "SRIM_UI_Canvas", "method": "Embedded_iFrames_Widgets"},
+    }
+)
+
+# The gateway value of a manifest whose server is registered in the Bifrost MCP gateway (ADR 0028,
+# decision 4). `Gateway.route_via` is free text, so any manifest already accepts it.
+# `SBAM_SRIM_DEFAULTS` is `ISA14_SRIM_DEFAULTS` with that one value changed. It is NOT yet what a
+# tenant without its own values gets: manifests claim a gateway only once registration exists
+# (WG-12 switches the default), and a frozen manifest keeps the value it was built with.
+BIFROST_GATEWAY: Final = "Bifrost_MCP_Gateway"
+SBAM_SRIM_DEFAULTS: Final = SrimRuntimeDefaults.model_validate(
+    {
+        **ISA14_SRIM_DEFAULTS.model_dump(mode="json"),
+        "gateway": {"route_via": BIFROST_GATEWAY},
     }
 )
 
@@ -480,6 +497,61 @@ class Integrity(_Strict):
     content_sha256: Annotated[str, Field(strict=True, pattern=HASH_PATTERN.pattern)]
 
 
+# --- The one MCP server of a Workflow (ADR 0028, decision 3) --------------------------------------
+
+MCP_SERVER_NAME = re.compile(r"^wf_[a-z0-9]+(_[a-z0-9]+)*$")  # Bifrost forbids hyphens and spaces
+MCP_TOOL_NAME = re.compile(
+    r"^MS\d{2}_\d+__(action|check)$"
+)  # no dot: model clients restrict tool names
+_SKILL_PREFIX = re.compile(r"^MS(\d{2})\.(\d+)_")
+
+
+class McpToolEntry(_Strict):
+    """One tool of the Workflow server: the Action or the Fixed Check tool of one Sub-Skill."""
+
+    name: Annotated[str, Field(strict=True, max_length=80, pattern=MCP_TOOL_NAME.pattern)]
+    skill_id: ShortText
+    role: Literal["action", "check"]
+    input_schema: dict[str, JsonValue]
+    output_schema: dict[str, JsonValue]
+
+    @model_validator(mode="after")
+    def _named_after_its_skill_and_role(self) -> Self:
+        skill = _SKILL_PREFIX.match(self.skill_id)
+        if skill is None:
+            raise ValueError("skill_id must be MSnn.m_<Name>")
+        if self.name != f"MS{skill.group(1)}_{skill.group(2)}__{self.role}":
+            raise ValueError(f"tool {self.name!r} is not the {self.role} tool of {self.skill_id!r}")
+        return self
+
+
+class McpServerEntry(_Strict):
+    """The single FastMCP server that holds every Sub-Skill's tools, built into one image (C-50 is
+    kept: every Sub-Skill has both an action and a check tool). `registry_id` is empty until the
+    server is registered in Bifrost, which happens only after certification."""
+
+    name: Annotated[str, Field(strict=True, max_length=64, pattern=MCP_SERVER_NAME.pattern)]
+    version: ShortText
+    image_digest: Digest
+    registry_id: ShortText | None = None
+    tools: list[McpToolEntry] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def _a_sound_server(self) -> Self:
+        if VERSION.match(self.version) is None:
+            raise ValueError(f"version {self.version!r} is not MAJOR.0.PATCH")
+        names = [tool.name for tool in self.tools]
+        if len(set(names)) != len(names):
+            raise ValueError("tool names must be unique")
+        roles: dict[str, set[str]] = {}
+        for tool in self.tools:
+            roles.setdefault(tool.skill_id, set()).add(tool.role)
+        for skill_id, present in roles.items():
+            if present != {"action", "check"}:
+                raise ValueError(f"{skill_id}: needs both an action and a check tool")
+        return self
+
+
 class WorkflowManifest(_Strict):
     """The final SBAM output for one Workflow (TD §11.3). Without `certification` it is the build's
     draft (E9.5): bundle and certification ids may still be null. Once certified, none may be."""
@@ -496,6 +568,9 @@ class WorkflowManifest(_Strict):
     schema_sql: SchemaSql
     dag: Dag
     runtime_image_digest: Digest
+    # Unset until the Workflow server is assembled (WG-10) and on every manifest built before
+    # ADR 0028; dump() leaves it out then, so those manifests keep their hash.
+    mcp_server: McpServerEntry | None = None
     evidence_index: list[EvidenceEntry] = Field(default_factory=list)
     certification: WorkflowCertification | None = None
     integrity: Integrity

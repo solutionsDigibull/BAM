@@ -175,6 +175,29 @@ class Library(_Strict):
     version_constraint: ShortText | None = None
 
 
+# An https URL with no credentials, query or fragment: a token in a repository URL must never be
+# stored or logged. Whether the host may be fetched is the fetcher's decision (WG-7), not this
+# contract's.
+REPO_URL_PATTERN: Final = r"^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$"
+RepoUrl = Annotated[str, Field(strict=True, max_length=SHORT_CHARS, pattern=REPO_URL_PATTERN)]
+# The commit a repository is pinned to: a git object name (SHA-1 or SHA-256), lower-case hex.
+GitCommit = Annotated[str, Field(strict=True, pattern=r"^([0-9a-f]{40}|[0-9a-f]{64})$")]
+
+
+class SourceRepo(_Strict):
+    """An open-source repository this Sub-Skill's code starts from (ADR 0028, decision 1).
+
+    `commit` is empty until the fetcher resolves `ref` (a branch or tag) to one and pins it.
+    `licence` is data here (an SPDX id as the FDE or the catalog wrote it): the allowlist is
+    enforced when the repository is fetched, never by this contract."""
+
+    url: RepoUrl
+    ref: ShortText | None = None
+    commit: GitCommit | None = None
+    licence: ShortText | None = None
+    reason: Text
+
+
 class TTechStack(_Strict):
     execution_layer: ShortText
     action_tool: ShortText
@@ -182,6 +205,7 @@ class TTechStack(_Strict):
     secondary_tools: list[ShortText] | None = None
     gateway_routing: ShortText | None = None
     libraries: list[Library] = Field(min_length=1)
+    source_repos: list[SourceRepo] | None = Field(default=None, max_length=10)
 
 
 # --- V: variables ---------------------------------------------------------------------------------

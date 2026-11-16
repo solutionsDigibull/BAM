@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
+from sbam_contracts.budget import BudgetCaps, BudgetState
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
 from sbam_contracts.code_view import CodeAttemptList, CodeDiff, CodeFileView
 from sbam_contracts.documents import (
@@ -114,6 +115,7 @@ from sbam_contracts.projects import (
     WorkflowSummary,
 )
 from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
+from sbam_contracts.repo_decision import RepoDecision
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sandbox import (
@@ -275,4 +277,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sandbox/run", SandboxRun),
     ("sandbox/runner_request", RunnerRequest),
     ("sandbox/runner_outputs", RunnerOutputs),
+    ("repo/decision", RepoDecision),
+    ("budget/caps", BudgetCaps),
+    ("budget/state", BudgetState),
 )
