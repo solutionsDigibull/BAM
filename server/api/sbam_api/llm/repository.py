@@ -90,6 +90,17 @@ class LlmCallRepository(TenantScopedRepository[LlmCall]):
             query = query.where(LlmCall.project_id == self.ctx.project_id)
         return Decimal(str(self.session.scalar(query) or 0))
 
+    def tokens(self, aliases: frozenset[str], *, inside: bool) -> int:
+        """Tokens (in + out) of every attempt of the project whose alias is in `aliases` (`inside`)
+        or not. Failed attempts count: the provider billed them. The project is the context's."""
+        query = select(func.coalesce(func.sum(LlmCall.tokens_in + LlmCall.tokens_out), 0)).where(
+            LlmCall.tenant_id == self.ctx.tenant_id,
+            LlmCall.project_id == self.ctx.project_id,
+            LlmCall.deleted_at.is_(None),
+            LlmCall.alias.in_(aliases) if inside else LlmCall.alias.not_in(aliases),
+        )
+        return int(self.session.scalar(query) or 0)
+
 
 class LlmDerivativeRepository(TenantScopedRepository[LlmDerivative]):
     model = LlmDerivative

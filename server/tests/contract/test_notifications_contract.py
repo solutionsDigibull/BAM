@@ -24,11 +24,11 @@ def make(**over: Any) -> dict[str, Any]:
     }
 
 
-def test_e10_4_the_ten_notification_types() -> None:
+def test_e10_4_the_notification_types() -> None:
     assert {t.value for t in NotificationType} == {
         "SOW_READY", "BREAKDOWN_READY", "SUBSKILL_NEEDS_REVIEW", "WORKFLOW_CERTIFIED",
         "WORKFLOW_FROZEN", "EXPORT_READY", "DOCUMENT_REJECTED", "GENERATION_FAILED",
-        "STAGE_COMPLETED", "REMINDER",
+        "STAGE_COMPLETED", "REMINDER", "TOKEN_BUDGET_WARNING", "TOKEN_BUDGET_LIMIT",
     }  # fmt: skip
 
 

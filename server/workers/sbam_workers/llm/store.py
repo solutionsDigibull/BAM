@@ -9,6 +9,8 @@ from typing import Any, Protocol
 
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.repository import LlmCallRepository, LlmDerivativeRepository
+from sbam_api.notifications.service import Source, notify_project
+from sbam_contracts.notifications import NotificationType
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -46,6 +48,16 @@ class CallStore(Protocol):
 
     def spent(self, scope: LlmScope, *, tenant: bool = False) -> Decimal:
         """Recorded spend of the scope's project, or of its whole tenant."""
+        ...
+
+    def tokens(self, scope: LlmScope, aliases: frozenset[str], *, inside: bool) -> int:
+        """Tokens (in + out) recorded for the scope's project, for these aliases or all others."""
+        ...
+
+    def alert(
+        self, scope: LlmScope, type: NotificationType, key: str, params: dict[str, object]
+    ) -> None:
+        """Tell the project's people once per `key` (a repeat writes nothing)."""
         ...
 
 
@@ -101,3 +113,22 @@ class SqlCallStore:
         with self.sessions() as session:
             ctx = TenantContext(scope.tenant_id, None if tenant else scope.project_id)
             return LlmCallRepository(session, ctx).spent()
+
+    def tokens(self, scope: LlmScope, aliases: frozenset[str], *, inside: bool) -> int:
+        with self.sessions() as session:
+            ctx = TenantContext(scope.tenant_id, scope.project_id)
+            return LlmCallRepository(session, ctx).tokens(aliases, inside=inside)
+
+    def alert(
+        self, scope: LlmScope, type: NotificationType, key: str, params: dict[str, object]
+    ) -> None:
+        with self.sessions() as session:
+            notify_project(
+                session,
+                scope.tenant_id,
+                type=type,
+                project_id=scope.project_id,
+                source=Source("token-budget", key),
+                params=params,
+            )
+            session.commit()

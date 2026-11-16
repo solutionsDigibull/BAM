@@ -9,6 +9,10 @@ Rules worth knowing
   * Archive answers 409 PIPELINE_RUNNING unless `pipeline_state` is idle, failed, in SOW review,
     has a Workflow created, or is cancelled.
   * Edits need `If-Match` (428 when missing, 412 when stale).
+  * Goal (#720): one sentence an FDE assigned to the project writes ("Build an AI agent that
+    automates ... for ... in ..."), trimmed, 1..300 characters with no control characters. `GET` /
+    `PUT /projects/{id}/goal`; the ETag is the project's, so `PUT` needs `If-Match`; `null` clears
+    it. It is extra context for the knowledge build and SOW generation, read when they run.
   * Members (E2.4): PUT replaces the whole set. Every id must be an ACTIVE `sbam-fde` user of the
     tenant (422 on `user_ids.<i>` otherwise); at most 50, no duplicates. An archived project
     answers 409 PROJECT_ARCHIVED.
@@ -22,7 +26,7 @@ Rules worth knowing
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
@@ -41,6 +45,13 @@ ClientName = Annotated[
 ]
 Description = Annotated[str, StringConstraints(max_length=2000)]
 ContextNotes = Annotated[str, StringConstraints(max_length=10000)]  # Markdown, stored as text
+GOAL_MAX: Final = 300
+ProjectGoal = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=GOAL_MAX, pattern=_NO_CONTROL
+    ),
+]
 
 
 class ProjectStatus(StrEnum):
@@ -92,11 +103,26 @@ class Project(BaseModel):
     description: str | None
     context_notes: str | None
     allow_restricted: bool = False
+    goal: str | None = None  # the FDE's goal (#720)
     status: ProjectStatus
     pipeline_state: ProjectPipelineState
     row_version: int
     created_at: datetime
     updated_at: datetime
+
+
+class ProjectGoalPut(_Request):
+    """`PUT /projects/{id}/goal` with `If-Match` (#720): the new goal; `null` clears it."""
+
+    goal: ProjectGoal | None
+
+
+class ProjectGoalOut(BaseModel):
+    """`GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set). The ETag
+    header is the project's `row_version`."""
+
+    project_id: UUID
+    goal: str | None
 
 
 class ProjectMembersPut(_Request):
@@ -180,6 +206,8 @@ def schemas() -> dict[str, dict[str, Any]]:
         "project": Project,
         "project_create": ProjectCreate,
         "project_patch": ProjectPatch,
+        "project_goal_put": ProjectGoalPut,
+        "project_goal": ProjectGoalOut,
         "project_members_put": ProjectMembersPut,
         "project_members": ProjectMembers,
         "pipeline_timeline": PipelineTimeline,

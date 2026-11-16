@@ -13,6 +13,7 @@ holds exactly those ids, so a citation of anything not sent is refused (`UNKNOWN
 Pure apart from `embed`, which the caller passes (Bifrost `sbam-embed`; a fake in tests).
 """
 
+import hashlib
 import heapq
 import math
 from collections.abc import Awaitable, Callable, Mapping
@@ -78,6 +79,7 @@ class Bundle:
     entities: list[OkfEntity]
     relations: list[OkfRelation]
     masters: str = ""  # masters.jsonl as stored
+    goal: str | None = None  # the FDE's goal for the project (#720), read when the SOW is generated
 
 
 @dataclass(frozen=True)
@@ -164,6 +166,9 @@ def _assemble(
         or "(none)",
         "masters": bundle.masters.strip() or "(none)",
     }
+    if bundle.goal:  # #720: what the FDE wants built; context, never citable
+        blocks["goal"] = bundle.goal
+        manifest = {**manifest, "goal_sha256": hashlib.sha256(bundle.goal.encode()).hexdigest()}
     if hint:
         blocks["hint"] = hint
     citable: dict[str, set[UUID]] = {}

@@ -1,12 +1,13 @@
 // Goal screen (4 Nov 2026, approved assistant redesign): one large typeable input with a cycling example as ghost text,
-// no dropdown sentence and no What / Who / Where cards. Sending the goal saves it in this browser (lib/goal.ts) and shows it
-// as the first chat message; that opens the files pane, and adding files opens the outputs pane. No approval step.
+// no dropdown sentence and no What / Who / Where cards. Sending the goal saves it on the project (lib/goal.ts, #720) and
+// shows it as the first chat message; that opens the files pane, and adding files opens the outputs pane. No approval step.
+// The goal screen has its own address, #/goal (#720); once a goal is saved, the Upload screen (#/ingestion/upload) takes over.
 // Caret fix (5 Nov 2026, screenshot): the fixed phrase "Build an AI agent that automates " is real text the box starts
 // with and the caret starts right after it; typing replaces the cycling example tail.
 import './goal.css'
 import { useEffect, useRef, useState } from 'react'
 import { setUi } from '../lib/store'
-import { saveGoal, useGoal } from '../lib/goal'
+import { GOAL_MAX, saveGoal, useGoal } from '../lib/goal'
 import { Icon } from '../components/ui'
 import bull from '../assets/login/bull-head-transparent.png'
 
@@ -34,11 +35,11 @@ function useMarquee(active: boolean): string {
   return text
 }
 
-/** Sends a typed goal: saved for this project in this browser and shown as the first chat message. */
+/** Sends a typed goal: saved on the project and shown as the first chat message. */
 export function sendGoal(raw: string) {
   const text = raw.trim()
   if (!text) return
-  saveGoal(text)
+  void saveGoal(text)
   setUi({ fdeGoals: /^build an ai agent/i.test(text) ? text : GOAL_PREFIX + (/^[A-Z][a-z]/.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text) })
 }
 
@@ -112,7 +113,7 @@ export function GoalCapture() {
     <p className="goal-lede">Type the goal. BuLL does the rest.</p>
     <div className="goal-box" ref={boxRef}>
       {value === GOAL_PREFIX && <div className="goal-ghost" aria-hidden><span className="goal-ghost-pre">{GOAL_PREFIX}</span><span className="goal-ghost-tail">{example}</span></div>}
-      <textarea ref={ta} className="goal-input" rows={1} value={value} aria-label="Agent goal"
+      <textarea ref={ta} className="goal-input" rows={1} value={value} aria-label="Agent goal" maxLength={GOAL_MAX}
         onChange={e => {
           if (e.target.value.startsWith(GOAL_PREFIX)) { setValue(e.target.value); return }
           // An edit landed inside the fixed phrase (drop, spell-check, autofill): restore it and put the caret after it.
@@ -133,11 +134,14 @@ export function GoalCapture() {
 /** The saved goal as the first chat message, with one line saying where it is kept. Nothing is generated from it. */
 export function GoalExpansion() {
   const text = useGoal(s => s.text)
+  const error = useGoal(s => s.error)
   if (!text) return null
   return <>
     <div className="as-urow"><div className="as-uline"><div className="as-msg as-user"><p>{text}</p></div></div></div>
     <div className="as-arow"><span className="as-avatar" aria-hidden><img src={bull.src} alt="" /></span><div className="as-abody"><div className="as-msg as-bot">
-      <p>Saved on this device for this project. Add your files on the left to start.</p>
+      {error
+        ? <p role="alert">{error}</p>
+        : <p>Saved on the project. The knowledge graph and the SOW use it as context. Add your files on the left to start.</p>}
     </div></div></div>
   </>
 }
