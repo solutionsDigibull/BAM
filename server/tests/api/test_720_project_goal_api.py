@@ -32,14 +32,19 @@ def h(tmp_path: Path) -> Iterator[Harness]:
 def test_720_t01_a_new_project_has_no_goal(h: Harness) -> None:
     res = h.call("GET", path(h), h.fde())
     assert res.status_code == 200, res.text
-    assert res.json() == {"project_id": h.project, "goal": None}
+    assert res.json() == {"project_id": h.project, "goal": None, "isatvon": []}
     assert res.headers["etag"] == '"1"'
 
 
 def test_720_t02_the_assigned_fde_sets_the_goal_and_it_is_audited(h: Harness) -> None:
     res = put(h, {"goal": f"  {GOAL}  "})
     assert res.status_code == 200, res.text
-    assert res.json() == {"project_id": h.project, "goal": GOAL}  # trimmed
+    assert res.json() | {"isatvon": None} == {
+        "project_id": h.project,
+        "goal": GOAL,
+        "isatvon": None,
+    }
+    # trimmed; the ISATVON template under it is #798's
     assert res.headers["etag"] == '"2"'
     again = h.call("GET", path(h), h.fde())
     assert again.json()["goal"] == GOAL and again.headers["etag"] == '"2"'

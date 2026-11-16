@@ -16,6 +16,7 @@ from sbam_contracts.projects import (
     ProjectMembers,
     ProjectMembersPut,
     ProjectPatch,
+    goal_isatvon,
 )
 from sqlalchemy.orm import Session
 
@@ -121,7 +122,9 @@ def put_members(
 
 def _goal(project: Project, response: Response) -> ProjectGoalOut:
     response.headers["ETag"] = etag(project.row_version)
-    return ProjectGoalOut(project_id=project.id, goal=project.goal)
+    return ProjectGoalOut(
+        project_id=project.id, goal=project.goal, isatvon=goal_isatvon(project.goal)
+    )
 
 
 @router.get("/projects/{project_id}/goal")
