@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_v03/tooling:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "tooling_id": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Tooling Id",
+      "type": "string"
+    },
+    "tool_name": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Tool Name",
+      "type": "string"
+    },
+    "category": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Category",
+      "type": "string"
+    },
+    "links_path": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Links Path",
+      "type": "string"
+    },
+    "owner_access": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Owner Access",
+      "type": "string"
+    },
+    "record_status": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Record Status",
+      "type": "string"
+    },
+    "source_version_checked_at": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Source Version Checked At",
+      "type": "string"
+    },
+    "refresh_frequency": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Refresh Frequency",
+      "type": "string"
+    },
+    "record_type": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Record Type",
+      "type": "string"
+    },
+    "source_tab": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Source Tab",
+      "type": "string"
+    },
+    "bullm_badge": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Bullm Badge",
+      "type": "string"
+    }
+  },
+  "structure_version": "Masters 0.3",
+  "title": "ToolingPayloadV03",
+  "type": "object"
+}

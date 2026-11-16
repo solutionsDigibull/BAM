@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_v03/bulk_report:0.1.0",
+  "$defs": {
+    "BulkConflict": {
+      "properties": {
+        "row": {
+          "minimum": 1,
+          "title": "Row",
+          "type": "integer"
+        },
+        "stable_id": {
+          "title": "Stable Id",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "row",
+        "stable_id",
+        "fields"
+      ],
+      "title": "BulkConflict",
+      "type": "object"
+    },
+    "BulkRowError": {
+      "properties": {
+        "row": {
+          "minimum": 1,
+          "title": "Row",
+          "type": "integer"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "row",
+        "code",
+        "message"
+      ],
+      "title": "BulkRowError",
+      "type": "object"
+    },
+    "MasterType": {
+      "enum": [
+        "ORGANIZATION",
+        "RULES",
+        "AGENTS",
+        "SKILLS",
+        "TOOLING",
+        "FILETYPE"
+      ],
+      "title": "MasterType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "master_type": {
+      "$ref": "#/$defs/MasterType"
+    },
+    "mode": {
+      "enum": [
+        "validate-only",
+        "upsert"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "applied": {
+      "title": "Applied",
+      "type": "boolean"
+    },
+    "created": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Created",
+      "type": "array"
+    },
+    "skipped_exact": {
+      "minimum": 0,
+      "title": "Skipped Exact",
+      "type": "integer"
+    },
+    "conflicts": {
+      "items": {
+        "$ref": "#/$defs/BulkConflict"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/BulkRowError"
+      },
+      "title": "Errors",
+      "type": "array"
+    }
+  },
+  "required": [
+    "master_type",
+    "mode",
+    "applied",
+    "created",
+    "skipped_exact",
+    "conflicts",
+    "errors"
+  ],
+  "title": "MasterBulkReport",
+  "type": "object"
+}

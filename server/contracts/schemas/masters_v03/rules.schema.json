@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_v03/rules:0.1.0",
+  "$defs": {
+    "MicroPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Name",
+          "type": "string"
+        },
+        "text": {
+          "default": "",
+          "maxLength": 32767,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "structure_version": "Masters 0.3",
+      "title": "MicroPrompt",
+      "type": "object"
+    },
+    "RulePrompts": {
+      "additionalProperties": false,
+      "properties": {
+        "system": {
+          "default": "",
+          "maxLength": 32767,
+          "title": "System",
+          "type": "string"
+        },
+        "micro": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MicroPrompt"
+          },
+          "maxItems": 50,
+          "title": "Micro",
+          "type": "array"
+        }
+      },
+      "structure_version": "Masters 0.3",
+      "title": "RulePrompts",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "rule_id": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Rule Id",
+      "type": "string"
+    },
+    "rule_type_description": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Rule Type Description",
+      "type": "string"
+    },
+    "source_evidence": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Source Evidence",
+      "type": "string"
+    },
+    "mapping_enforcement": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Mapping Enforcement",
+      "type": "string"
+    },
+    "stop_review_condition": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Stop Review Condition",
+      "type": "string"
+    },
+    "owner_version": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Owner Version",
+      "type": "string"
+    },
+    "record_status": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Record Status",
+      "type": "string"
+    },
+    "effective_expiry": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Effective Expiry",
+      "type": "string"
+    },
+    "skill_ref": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Skill Ref",
+      "type": "string"
+    },
+    "applies_to": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Applies To",
+      "type": "string"
+    },
+    "fde_use": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Fde Use",
+      "type": "string"
+    },
+    "client_use": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Client Use",
+      "type": "string"
+    },
+    "acts_on": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Acts On",
+      "type": "string"
+    },
+    "prompts": {
+      "$ref": "#/$defs/RulePrompts",
+      "default": {
+        "system": "",
+        "micro": []
+      }
+    }
+  },
+  "structure_version": "Masters 0.3",
+  "title": "RulesPayloadV03",
+  "type": "object"
+}

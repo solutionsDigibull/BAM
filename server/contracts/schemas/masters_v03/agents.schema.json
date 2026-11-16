@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_v03/agents:0.1.0",
+  "$defs": {
+    "AgentKind": {
+      "enum": [
+        "Agent",
+        "Assistant"
+      ],
+      "title": "AgentKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Agent Id",
+      "type": "string"
+    },
+    "agent_name": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Agent Name",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/AgentKind",
+      "default": "Agent"
+    },
+    "type": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Type",
+      "type": "string"
+    },
+    "reference": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Reference",
+      "type": "string"
+    },
+    "source": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Source",
+      "type": "string"
+    },
+    "tools": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Tools",
+      "type": "string"
+    },
+    "model": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Model",
+      "type": "string"
+    }
+  },
+  "structure_version": "Masters 0.3",
+  "title": "AgentsPayloadV03",
+  "type": "object"
+}
