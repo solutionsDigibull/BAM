@@ -168,7 +168,8 @@ def test_mui_2_t06_0054_migrates_0_2_rows_and_leaves_0_3_rows_alone(
         "RULE-OLD",
     )
     assert old[1].payload["rule_type_description"] == "RULE-OLD: x"
-    assert old[1].payload["legacy_0_2"]["_row_label"] == "Rule #9"
+    legacy = old[1].payload["legacy_0_2"]
+    assert isinstance(legacy, dict) and legacy["_row_label"] == "Rule #9"
     assert (new[1].version, new[1].payload["rule_id"]) == (1, "RULE-NATIVE")  # untouched
 
 

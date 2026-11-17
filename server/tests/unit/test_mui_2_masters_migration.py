@@ -7,6 +7,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 from sbam_contracts.masters import (
     AgentsPayload,
     MasterStatus,
@@ -21,7 +22,7 @@ from sbam_contracts.masters_v03 import PAYLOAD_MODELS, is_restricted, status_of
 MIGRATION = (
     Path(__file__).resolve().parents[2] / "api/sbam_api/migrations/versions/0056_masters_0_3.py"
 )
-OLD_MODELS = {
+OLD_MODELS: dict[str, type[BaseModel]] = {
     "ORGANIZATION": OrganizationPayload,
     "RULES": RulesPayload,
     "AGENTS": AgentsPayload,

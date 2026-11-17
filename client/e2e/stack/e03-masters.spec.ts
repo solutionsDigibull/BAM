@@ -33,12 +33,9 @@ test("e15_1_t03 masters round-trip is identical; a changed structure is rejected
   await admin.goto("/admin/masters");
   await expect(admin.getByRole("button", { name: "Import workbook" })).toBeVisible();
 
-  const upsert = await postFile(
-    admin,
-    "/admin/masters/import",
-    workbook("masters_0_3.xlsx"),
-    { mode: "upsert" },
-  );
+  const upsert = await postFile(admin, "/admin/masters/import", workbook("masters_0_3.xlsx"), {
+    mode: "upsert",
+  });
   expect(upsert.status, JSON.stringify(upsert.body)).toBe(200);
   const applied = upsert.body as Report;
   expect(applied.tabs.flatMap((t) => t.errors)).toEqual([]);

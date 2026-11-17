@@ -205,7 +205,8 @@ def test_e3_4_a_value_at_the_excel_cell_limit_round_trips(h: ImportHarness) -> N
     res = h.call("POST", "/admin/masters/RULES", h.admin_a(), json={"payload": payload})
     assert res.status_code == 201, res.text
     exported = export(h)
-    assert len(book(exported)["Rules"].cell(4, 2).value) == 32_767
+    value = book(exported)["Rules"].cell(4, 2).value
+    assert isinstance(value, str) and len(value) == 32_767
     report = h.upload(exported.content, mode="validate-only").json()
     assert tab(report, "Rules")["unchanged"] == 1
 
