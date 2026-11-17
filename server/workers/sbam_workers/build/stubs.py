@@ -52,6 +52,20 @@ async def static_gate(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "static_gate"))
 
 
+@activity.defn(name="import_gate")  # registered by `wiring.py`; the workflow's typed handle
+async def import_gate(inp: BuildStageInput) -> IdResult:
+    """Real (#761): every module imports with no side effect, in a sandbox VM of the pinned runtime;
+    raises GateFailed with the attempt id, the verdict is in `gate_results`."""
+    return IdResult(id=stage_stub_id(inp, "import_gate"))
+
+
+@activity.defn(name="compliance_gates")  # registered by `wiring.py`; the workflow's typed handle
+async def compliance_gates(inp: BuildStageInput) -> IdResult:
+    """Real (#761): the REPO_LICENCE, DEPENDENCY_VULN and MCP_COMPLIANCE rows of the bundle;
+    raises GateFailed with the attempt id when one fails."""
+    return IdResult(id=stage_stub_id(inp, "compliance_gates"))
+
+
 @activity.defn(name="review_code")  # registered by `wiring.py`; the workflow's typed handle
 async def review_code(inp: BuildStageInput) -> IdResult:
     """Real (#759): one model review of the stored bundle after the AST and static gates passed;

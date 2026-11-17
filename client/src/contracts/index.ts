@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:bbf5d6e8e661431f921d1255f080775169256251ec57f0b2e7904b57e649d097
+// source-sha256:b6170407a93233a05c5d960664c62df038f8b1929a1edc5d8b6cda0e7d9ab329
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -170,6 +170,8 @@ export type BuildStage =
   | "assemble"
   | "ast_gate"
   | "static_gate"
+  | "import_gate"
+  | "compliance_gates"
   | "review_code"
   | "generate_tests"
   | "build_promptfoo_suite"
@@ -214,6 +216,9 @@ export type GateName =
   | "CLAMAV"
   | "BANDIT"
   | "IMPORT_RESOLUTION"
+  | "REPO_LICENCE"
+  | "DEPENDENCY_VULN"
+  | "MCP_COMPLIANCE"
   | "REVIEW"
   | "LOOP_TESTS";
 /**
