@@ -358,7 +358,7 @@ class World:
         return uuid.UUID(res.json()["id"])
 
     def _create_master(self, role: str) -> uuid.UUID:
-        body = {"payload": {"domain_rule": "RULE-BOM: applies to BOM. Policy: compare"}}
+        body = {"payload": {"rule_id": "RULE-BOM", "rule_type_description": "Policy: compare"}}
         res = self.call("POST", "/admin/masters/RULES", role, json=body)
         assert res.status_code == 201, res.text
         return uuid.UUID(res.json()["id"])

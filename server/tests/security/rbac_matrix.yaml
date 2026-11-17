@@ -229,7 +229,7 @@ routes:
       method: POST
       path: /api/v1/admin/masters/{master_type}
       params: {master_type: RULES}
-      json: {payload: {domain_rule: "RULE-OFFER: applies to offers. Policy: approved FX only"}}
+      json: {payload: {rule_id: RULE-OFFER, rule_type_description: "Policy: approved FX only"}}
     expect:
       <<: *tenant_admin_list
       admin_a: "201"
@@ -248,7 +248,7 @@ routes:
       path: /api/v1/admin/masters/{master_type}/{entry_id}/versions
       params: {master_type: RULES, entry_id: "@master_a"}
       headers: {if-match: "@etag_master_a"}
-      json: {payload: {domain_rule: "RULE-BOM: applies to BOM. Policy: v2", misc: "Status: Proposed"}}
+      json: {payload: {rule_id: RULE-BOM, rule_type_description: "Policy: v2", record_status: Proposed}}
     expect:
       <<: *tenant_admin_a_resource
       admin_a: "201"
