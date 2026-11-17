@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:5d91ecbbe91650e6627da4086fd9f3db74b090792bd86864edc0f6b7e5e4750d
+// source-sha256:d586b5fbb57ca5def4281f3c332486ee53fc2bdbadf04e1106f21390b31c122d
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -722,6 +722,7 @@ export interface SbamContracts {
   RunnerOutputs?: RunnerOutputs;
   RepoDecision?: RepoDecision;
   RepoCatalog?: RepoCatalog;
+  RepoOverlay?: RepoOverlay;
   RepoScanReport?: RepoScanReport;
   RepoScoutAnswer?: RepoScoutAnswer;
   BudgetCaps?: BudgetCaps;
@@ -2084,6 +2085,40 @@ export interface Build {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   schema_sql_sha256: string;
+  repos?:
+    | []
+    | [RepoOverlay]
+    | [RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay
+      ]
+    | [
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay
+      ]
+    | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -2096,6 +2131,188 @@ export interface TemplateRef {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoOverlay".
+ */
+export interface RepoOverlay {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  /**
+   * Pattern: `^([0-9a-f]{40}|[0-9a-f]{64})$`
+   */
+  commit: string;
+  licence?: string | null;
+  scan_report_sha256?: string | null;
+  repo_dir: string;
+  /**
+   * @maxItems 20
+   */
+  licence_files?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  vendor_tree_sha256: string;
+  /**
+   * @maxItems 50
+   */
+  patches?: PatchRecord[];
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  patched_tree_sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PatchRecord".
+ */
+export interface PatchRecord {
+  path: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+  reason: string;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  files: [string, ...string[]];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
