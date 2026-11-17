@@ -1,7 +1,7 @@
 """masters: BAM 0.2 payloads -> Masters 0.3 (the approved Admin Masters UI)
 
-Revision ID: 0054_masters_0_3
-Revises: 0053_project_goal
+Revision ID: 0056_masters_0_3
+Revises: 0055_gate_result_review
 Create Date: 2026-11-16
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -31,8 +31,8 @@ from typing import Any
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0054_masters_0_3"
-down_revision: str | Sequence[str] | None = "0053_project_goal"
+revision: str = "0056_masters_0_3"
+down_revision: str | Sequence[str] | None = "0055_gate_result_review"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

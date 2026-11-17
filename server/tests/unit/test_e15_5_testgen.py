@@ -274,7 +274,7 @@ def test_e15_5_testgen_is_listed_as_a_ready_task() -> None:
     from sbam_workers.evals.golden import load_tasks
 
     ready = sorted(t.task for t in load_tasks() if t.status == "ready")
-    assert ready == sorted([Task.OCR, Task.TESTGEN, Task.CORRECTION, Task.CODEGEN])
+    assert ready == sorted([Task.OCR, Task.TESTGEN, Task.CORRECTION, Task.CODEGEN, Task.REVIEW])
 
 
 def test_e15_5_the_committed_testgen_baseline_is_valid_and_matches_the_set() -> None:

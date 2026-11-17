@@ -7,13 +7,26 @@
 # "tenant_id": ["<uuid>"] (ADR 0002, amended). The UUIDs are fixed so tests and fixtures can use them.
 set -euo pipefail
 
-kc=/opt/keycloak/bin/kcadm.sh
+kc="${KCADM:-/opt/keycloak/bin/kcadm.sh}" # KCADM: a test double (server/tests/unit/test_828_keycloak_seed_skip.py)
 realm=bullm
 TENANT_A=6a1f3e2c-0b7d-4c55-9a51-1c2f0a7e4b11
 TENANT_B=8d2b9c4e-5f60-4a18-b3c7-2e9d4f1a6c22
 
 "$kc" config credentials --server "${KC_URL:-http://keycloak:8080}" --realm master \
   --user admin --password "$KEYCLOAK_ADMIN_PASSWORD" >/dev/null
+
+# Skip the whole seed when it already ran with this script and these inputs (#828). The seed makes about 60 kcadm
+# calls (a JVM each) and used to take 3 to 8 minutes on every `up`. The fingerprint is kept in the realm attribute
+# sbamSeedFingerprint; a changed script or input, or a fresh realm, runs the full seed. SEED_FORCE=1 forces it (for
+# example after a user was changed by hand). Dev only: staging and prod never run this script.
+# Read the whole realm: `--fields attributes` lists no custom attributes (it shows an empty map).
+fingerprint=$({ cat "$0"; printf '%s\n%s\n%s\n' "$SEED_USER_PASSWORD" "${KEYCLOAK_ADMIN_CLIENT_SECRET:-}" \
+  "${API_PORT:-8000}"; } | sha256sum | cut -d' ' -f1)
+if [ -z "${SEED_FORCE:-}" ] && "$kc" get "realms/$realm" 2>/dev/null \
+  | grep -q "\"sbamSeedFingerprint\" *: *\"$fingerprint\""; then
+  echo "seed up to date (set SEED_FORCE=1 to run it anyway)"
+  exit 0
+fi
 
 csv() { "$kc" get "$@" -r "$realm" --format csv --noquotes; }
 
@@ -147,4 +160,5 @@ ensure_user fde-a2 sbam-fde "$TENANT_A"
 ensure_user admin-b sbam-admin "$TENANT_B"
 ensure_user fde-b1 sbam-fde "$TENANT_B"
 ensure_user fde-ab sbam-fde "$TENANT_A" "$TENANT_B" # two orgs: claim absent unless one is selected
+"$kc" update "realms/$realm" -s "attributes.sbamSeedFingerprint=$fingerprint" >/dev/null
 echo "seed complete"

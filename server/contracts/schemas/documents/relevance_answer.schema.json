@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/relevance_answer:0.1.0",
+  "$defs": {
+    "RelevanceLevel": {
+      "enum": [
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ],
+      "title": "RelevanceLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the model answers when asked how useful one parsed document is for the project's goal\n(#802). Nothing else is accepted: a model that adds a field is re-asked, never stored. `score`\nonly orders documents within a level; the level and the reason are what the FDE reads.",
+  "properties": {
+    "level": {
+      "$ref": "#/$defs/RelevanceLevel"
+    },
+    "score": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Score",
+      "type": "integer"
+    },
+    "reason": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "level",
+    "score",
+    "reason"
+  ],
+  "title": "RelevanceAnswer",
+  "type": "object"
+}

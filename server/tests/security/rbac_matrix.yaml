@@ -450,6 +450,16 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "409 CONFLICT"  # the seeded document has not failed
 
+  # #802: re-score every parsed document against the goal.
+  rescore_relevance_api_v1_projects__project_id__documents_relevance_rescore_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/documents/relevance/rescore
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "409 CONFLICT"  # the seeded project has no goal yet
+
   start_api_v1_projects__project_id__pipeline_start_post:
     request:
       method: POST

@@ -253,6 +253,22 @@ make down                                 # stop (data kept);  make reset CONFIR
 | http://localhost:8025 | Mailpit: catches Keycloak invite and password emails (dev only) |
 | http://localhost:3001 / :3002 | Langfuse / Grafana (profile `obs`) |
 
+**When to rebuild images (#804).** `make up` runs the `dev` image targets with `server/` and `client/` bind-mounted,
+so a code change needs **no rebuild and no `make up`**: the API reloads itself, the workers restart on a changed
+`.py` file, and `next dev` reloads the web app. Run `make up` (it always passes `--build`) only after a change to a
+lockfile (`server/uv.lock`, `client/pnpm-lock.yaml`), a Dockerfile, a compose file or a database migration (the
+`api-migrate` service applies it on `make up`). To rebuild one service only, for example:
+`docker compose --env-file compose/.env -f compose/compose.yaml -f compose/compose.override.yaml up -d --build sbam-api`.
+In the `dev` stages the dependencies are installed before any source is copied, so a rebuild after a code-only change
+takes seconds; keep it that way (no `chown -R` of `node_modules` or `/opt/venv`: it took up to 48 minutes).
+The web container keeps `node_modules` in a Docker volume that Docker fills only once; the one-shot `web-deps` service
+refreshes it from the image whenever `client/pnpm-lock.yaml` changed (#817), so a `make up` after a lockfile change
+needs no `docker volume rm`.
+The `keycloak-seed` job (about 60 Keycloak calls, 3 to 8 minutes) skips itself when the seed script, `SEED_USER_PASSWORD`,
+`KEYCLOAK_ADMIN_CLIENT_SECRET` and `API_PORT` are unchanged since the last run (a fingerprint in the realm, #828). If you
+changed a seeded user by hand in Keycloak and want it reset, run it with `SEED_FORCE=1` (for example
+`docker compose ... run --rm -e SEED_FORCE=1 keycloak-seed`).
+
 **Calling the API from its docs.** On http://localhost:8000/api/v1/docs click **Authorize**, then
 **Authorize** again in the dialog (leave `client_secret` empty). Sign in as a seeded user (`admin-a`, `fde-a1`, …,
 password `SEED_USER_PASSWORD`). "Try it out" then calls the API as that user, with the same RBAC as the web app.

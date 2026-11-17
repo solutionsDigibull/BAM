@@ -93,3 +93,17 @@ describe("a backend document as a workbench upload row (#711)", () => {
     }
   });
 });
+
+describe("a document's relevance to the goal reaches its upload row (#802)", () => {
+  test("test_802_t46_relevance_is_carried_when_scored_and_absent_otherwise", () => {
+    const relevance = {
+      level: "LOW" as const,
+      score: 10,
+      reason: "A holiday calendar; nothing about the goal.",
+      goal_sha256: "b".repeat(64),
+      scored_at: "2026-11-17T09:00:00Z",
+    };
+    expect(toUploadRecord(doc("PARSED", { relevance })).relevance).toEqual(relevance);
+    expect(toUploadRecord(doc("PARSED")).relevance).toBeUndefined();
+  });
+});

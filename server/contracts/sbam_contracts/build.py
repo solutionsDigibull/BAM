@@ -132,6 +132,7 @@ class BuildStage(StrEnum):
     ASSEMBLE = "assemble"
     AST_GATE = "ast_gate"
     STATIC_GATE = "static_gate"
+    REVIEW = "review_code"  # #759: one model review of the code after every gate passed
     GENERATE_TESTS = "generate_tests"
     BUILD_PROMPTFOO_SUITE = "build_promptfoo_suite"
     RUN_SANDBOX_TESTS = "run_sandbox_tests"

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:build/review_answer:0.1.0",
+  "$defs": {
+    "ReviewCategory": {
+      "description": "What kind of deviation a finding is; the finding code is `REVIEW_<category>`.",
+      "enum": [
+        "SPEC_MISMATCH",
+        "MISSING_REQUIREMENT",
+        "WRONG_OUTPUT",
+        "HANDOFF",
+        "STATE_WRITE",
+        "SAFETY",
+        "OTHER"
+      ],
+      "title": "ReviewCategory",
+      "type": "string"
+    },
+    "ReviewFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/ReviewCategory"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "message": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        }
+      },
+      "required": [
+        "category",
+        "severity",
+        "message"
+      ],
+      "title": "ReviewFinding",
+      "type": "object"
+    },
+    "ReviewVerdict": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "title": "ReviewVerdict",
+      "type": "string"
+    },
+    "Severity": {
+      "description": "How serious a static-gate finding is (E12.4). A gate fails on a HIGH finding; LOW and MEDIUM\nones are reported (Bandit's own scale; Ruff, Black, MyPy and ClamAV findings are all HIGH).",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "verdict": {
+      "$ref": "#/$defs/ReviewVerdict"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/ReviewFinding"
+      },
+      "maxItems": 20,
+      "title": "Findings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "verdict"
+  ],
+  "title": "ReviewAnswer",
+  "type": "object"
+}

@@ -20,6 +20,9 @@ One execution per uploaded file, id `ingest-<document_version_id>` on sbam-inges
    30 minutes at most with a 60 s heartbeat. After the last attempt, or at the timeout,
    `mark_ocr_failed` makes the pages unreadable (OCR_UNAVAILABLE or TIMEOUT). Each step must call
    `require_clean` first.
+6. Relevance (#802): after a successful parse, `score_relevance` asks the model how useful the
+   document is for the project's goal (nothing is asked without a goal). Advice only: a failure is
+   ignored and the version stays PARSED.
 
 Each step keeps this workflow's name and its input and output types.
 """
@@ -46,7 +49,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.pipeline import IdsResult, StageRef
     from sbam_contracts.runs import TaskQueue, ingest_workflow_id
 
-    from sbam_workers.ingest import attachments, ocr, parsing, type_detection
+    from sbam_workers.ingest import attachments, ocr, parsing, relevance, type_detection
     from sbam_workers.ingest.scan import PERMANENT, mark_scan_failed, scan_clamav
     from sbam_workers.registry import workflow_for
 
@@ -118,6 +121,8 @@ class DocumentIngestion:
             if not detected.ids or not workflow.patched("e4-5-parse"):  # started before E4.5
                 return detected
             result = await self._parse(inp)
+            if result.ids and workflow.patched("802-score-relevance"):  # started before #802
+                await self._score(inp)
             if result.ids and workflow.patched("e4-6-attachments"):  # started before E4.6
                 await self._attachments(inp)
             return result
@@ -150,6 +155,20 @@ class DocumentIngestion:
             outcome = await self._ocr(inp)
         # Failed: nothing goes on. Parsed, or no loader for the type yet: the version is handed on.
         return IdsResult(ids=[inp.ref_id] if outcome.parsed or outcome.code is None else [])
+
+    async def _score(self, inp: StageRef) -> None:
+        """How useful the parsed document is for the goal (#802). Advice only: if the model or the
+        provider fails, the document goes on unscored and this execution ends normally."""
+        try:
+            await workflow.execute_activity(
+                relevance.score_relevance,
+                inp,
+                task_queue=TaskQueue.INGEST.value,
+                start_to_close_timeout=relevance.SCORE_TIMEOUT,
+                retry_policy=relevance.SCORE_RETRY,
+            )
+        except ActivityError:
+            pass
 
     async def _attachments(self, inp: StageRef) -> None:
         """E-mail attachments (E4.6): each becomes a child document with its own `DocumentIngestion`

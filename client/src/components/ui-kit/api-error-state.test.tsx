@@ -13,6 +13,19 @@ describe("ApiErrorState (E1.14)", () => {
     expect(onReload).toHaveBeenCalledOnce();
   });
 
+  test("e1_14_t04b 412 without onReload still shows a Reload button that reloads the page", () => {
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    try {
+      render(<ApiErrorState error={{ statusCode: 412 }} />);
+      expect(screen.getByRole("dialog")).toBeDefined();
+      fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+      expect(reload).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   test("e1_14_t06 423 shows the locked banner", () => {
     render(<ApiErrorState error={{ statusCode: 423, problem: { code: "LOCKED" } }} />);
     expect(screen.getByText(LOCKED_MESSAGE)).toBeDefined();

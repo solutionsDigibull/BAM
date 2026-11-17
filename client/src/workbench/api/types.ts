@@ -1,3 +1,4 @@
+import type { DocumentRelevance } from '@/contracts'
 // Domain types shared by the adapter, the mock backend and the UI.
 // Every status the UI shows comes from one of these backend-owned objects.
 
@@ -69,6 +70,8 @@ export interface UploadRecord {
   released: boolean
   /** The loader's verdict once the file was read; absent until then. */
   parse?: ParseInfo
+  /** How useful the file is for the project's goal, read from its content by the backend (#802); absent until scored. */
+  relevance?: DocumentRelevance
   /** Tier-1 ClamAV static signature scan verdict. */
   clamavVerdict?: 'clean' | 'threat' | 'pending'
   /** Tier-2 Repel heuristic & adversarial prompt injection verdict. */

@@ -143,6 +143,22 @@ describe("the project goal is stored on the project, with nothing invented from 
     expect(getGoal().isatvon.map((s) => s.key)).toEqual(["I", "N"]);
   });
 
+  test("test_802_t44_saving_a_goal_asks_the_backend_to_rescore_the_files", async () => {
+    await opened("p-rescore");
+    await saveGoal("Answer customer questions about our product catalogue");
+    await vi.waitFor(() => expect(api.rescores).toEqual(["p-rescore"]));
+  });
+
+  test("test_802_t45_a_rescore_that_fails_never_unsaves_the_goal", async () => {
+    await opened("p-rescore-down");
+    api.rescoreStatus = 503;
+    await saveGoal("Answer customer questions about our product catalogue");
+    await vi.waitFor(() => expect(api.rescores).toEqual(["p-rescore-down"]));
+    expect(getGoal().saved).toBe(true);
+    expect(getGoal().error).toBeUndefined();
+    expect(api.goals.get("p-rescore-down")?.goal).toBe("Answer customer questions about our product catalogue");
+  });
+
   test("test_719_free_text_without_for_and_in_still_parses", () => {
     expect(parseGoal("Lead generation")).toEqual({ what: "Lead generation", who: "your team", where: "your market" });
   });
