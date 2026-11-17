@@ -86,6 +86,11 @@ class WorkflowManifestRepository(TenantScopedRepository[WorkflowManifestRow]):
 class GateResultRepository(TenantScopedRepository[GateResultRow]):
     model = GateResultRow
 
+    def of_attempt(self, code_attempt_id: uuid.UUID) -> list[GateResultRow]:
+        """Every gate result recorded for one code attempt, by gate name (WG-15 code preview)."""
+        query = self._scoped().where(GateResultRow.code_attempt_id == code_attempt_id)
+        return list(self.session.scalars(query.order_by(GateResultRow.gate)))
+
     def for_stage(
         self, sub_skill_id: uuid.UUID, gate: str, build_no: int, cycle: int, attempt: int
     ) -> GateResultRow | None:

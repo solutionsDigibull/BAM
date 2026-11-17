@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:d586b5fbb57ca5def4281f3c332486ee53fc2bdbadf04e1106f21390b31c122d
+// source-sha256:80cf43ab77485bdbe4d7ebf9bf0c6950c82e2c1346f8e26dffd87d117020c723
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -267,6 +267,18 @@ export type SowVersionSource = "GENERATED" | "EDITED";
  * via the `definition` "SectionChange".
  */
 export type SectionChange = "ADDED" | "REMOVED" | "MODIFIED" | "UNCHANGED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GroupKind".
+ */
+export type GroupKind = "sub_skill" | "workflow";
+/**
+ * Where a file of the Workflow's code comes from (ADR 0028, WG-15).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FileTag".
+ */
+export type FileTag = "reused" | "customized" | "generated";
 /**
  * What a run works on; `subject_id` is that entity's id.
  *
@@ -630,6 +642,8 @@ export interface SbamContracts {
   CodeAttemptList?: CodeAttemptList;
   CodeFileView?: CodeFileView;
   CodeDiff?: CodeDiff;
+  WorkflowCodeTree?: WorkflowCodeTree;
+  WorkflowFileView?: WorkflowFileView;
   SowNewVersionRequest?: SowNewVersionRequest;
   SowImpact?: SowImpact;
   Run?: Run;
@@ -3265,6 +3279,63 @@ export interface CodeDiff {
   changed: boolean;
   unified: string;
   truncated: boolean;
+}
+/**
+ * GET W/code: the Workflow's code as stored: a group per Sub-Skill, plus the Workflow's own.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeTree".
+ */
+export interface WorkflowCodeTree {
+  workflow_id: string;
+  groups: WorkflowCodeGroup[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeGroup".
+ */
+export interface WorkflowCodeGroup {
+  kind: GroupKind;
+  group_id: string;
+  label: string;
+  build_no?: number | null;
+  cycle?: number | null;
+  attempt?: number | null;
+  status?: string | null;
+  files: WorkflowCodeFile[];
+  gates: GateStatusRow[];
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeFile".
+ */
+export interface WorkflowCodeFile {
+  path: string;
+  sha256: string;
+  tag: FileTag;
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GateStatusRow".
+ */
+export interface GateStatusRow {
+  gate: string;
+  status: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowFileView".
+ */
+export interface WorkflowFileView {
+  group_id: string;
+  path: string;
+  tag: FileTag;
+  sha256: string;
+  content: string;
+  truncated: boolean;
+  findings: CodeFinding[];
 }
 /**
  * `POST P/sow/new-version` (E7.2): start a scope change from the approved version. The

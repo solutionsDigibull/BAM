@@ -12,11 +12,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Path, Query, Request
 from sbam_contracts.build import RetryAccepted, RetryRequest, SubSkillRetry
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
-from sbam_contracts.code_view import CodeAttemptList, CodeDiff, CodeFileView
+from sbam_contracts.code_view import (
+    CodeAttemptList,
+    CodeDiff,
+    CodeFileView,
+    WorkflowCodeTree,
+    WorkflowFileView,
+)
 from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.builds import code_view, dashboard, patch_decision
+from sbam_api.builds import code_view, dashboard, patch_decision, workflow_code
 from sbam_api.builds.service import ensure_waiting, retry_build
 from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import validate_idempotency_key
@@ -56,6 +62,32 @@ def gates(
 ) -> GatesResponse:
     with sessions() as session:
         return dashboard.gates(session, user, project_id, workflow_id, sub_id, attempt)
+
+
+@router.get("/projects/{project_id}/workflows/{workflow_id}/code")
+def workflow_code_tree(
+    project_id: Project, workflow_id: UUID, user: User, sessions: Sessions
+) -> WorkflowCodeTree:
+    """The whole Workflow's code as stored, a tag per file (read only, WG-15)."""
+    with sessions() as session:
+        return workflow_code.tree(session, user, project_id, workflow_id)
+
+
+@router.get("/projects/{project_id}/workflows/{workflow_id}/code/files")
+def workflow_code_file(
+    project_id: Project,
+    workflow_id: UUID,
+    group: Annotated[str, Query(min_length=1, max_length=64)],
+    path: CodePath,
+    request: Request,
+    user: User,
+    sessions: Sessions,
+) -> WorkflowFileView:
+    """One file of the Workflow's code: `group` is a Sub-Skill id or `workflow` (read only)."""
+    with sessions() as session:
+        return workflow_code.file_view(
+            session, backend(request), user, project_id, workflow_id, group, path
+        )
 
 
 @router.get(f"{CODE}/attempts")
