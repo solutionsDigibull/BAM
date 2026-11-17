@@ -533,6 +533,18 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"
 
+  # ---- Repo scans (WG-7) ------------------------------------------------------------------
+  # No report is stored for this hash, so the assigned FDE gets 404 too; the 200 is in
+  # tests/api/test_wg7_repo_scans_api.py.
+  repo_scan_api_v1_projects__project_id__repo_scans__report_sha256__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/repo-scans/{report_sha256}
+      params: {project_id: "@project_a", report_sha256: "0000000000000000000000000000000000000000000000000000000000000000"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- SOW (E6.3) -------------------------------------------------------------------------
   sow_api_v1_projects__project_id__sow_get:
     request:

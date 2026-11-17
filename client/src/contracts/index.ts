@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:2735e5a6bb355bb6678ef451cd29e00dd8daf6ac71d0066739907f26d3269aca
+// source-sha256:960a0d5f1557058fa250741be7c1be0b6bf52597aeda2b8b233f75c2f8e243f1
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -221,9 +221,9 @@ export type GateName =
  * ones are reported (Bandit's own scale; Ruff, Black, MyPy and ClamAV findings are all HIGH).
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "Severity".
+ * via the `definition` "sbam_contracts__build_dashboard__Severity".
  */
-export type Severity = "LOW" | "MEDIUM" | "HIGH";
+export type SbamContracts_BuildDashboard__Severity = "LOW" | "MEDIUM" | "HIGH";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ReviewVerdict".
@@ -543,6 +543,26 @@ export type DecidedBy = "AUTO" | "FDE";
 export type RejectReason = "NOT_HTTPS" | "HAS_CREDENTIALS" | "HAS_QUERY" | "PRIVATE_ADDRESS" | "INVALID_URL";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FetchDecision".
+ */
+export type FetchDecision = "VENDORED" | "REFUSED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RefusalReason".
+ */
+export type RefusalReason = "HOST_NOT_APPROVED" | "CLONE_FAILED" | "LICENCE" | "MALWARE" | "UNSAFE_TREE" | "TOO_LARGE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LicenceVerdict".
+ */
+export type LicenceVerdict = "ALLOWED" | "REFUSED" | "UNKNOWN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "sbam_contracts__repo_scan__Severity".
+ */
+export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "BudgetScope".
  */
 export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
@@ -702,6 +722,8 @@ export interface SbamContracts {
   RunnerOutputs?: RunnerOutputs;
   RepoDecision?: RepoDecision;
   RepoCatalog?: RepoCatalog;
+  RepoOverlay?: RepoOverlay;
+  RepoScanReport?: RepoScanReport;
   RepoScoutAnswer?: RepoScoutAnswer;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
@@ -1379,7 +1401,7 @@ export interface Finding {
   expected?: string | null;
   actual?: string | null;
   package?: string | null;
-  severity?: Severity | null;
+  severity?: SbamContracts_BuildDashboard__Severity | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -1614,7 +1636,7 @@ export interface ReviewAnswer {
  */
 export interface ReviewFinding {
   category: ReviewCategory;
-  severity: Severity;
+  severity: SbamContracts_BuildDashboard__Severity;
   message: string;
   file?: string | null;
   line?: number | null;
@@ -2063,6 +2085,40 @@ export interface Build {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   schema_sql_sha256: string;
+  repos?:
+    | []
+    | [RepoOverlay]
+    | [RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay
+      ]
+    | [
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay
+      ]
+    | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -2075,6 +2131,188 @@ export interface TemplateRef {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoOverlay".
+ */
+export interface RepoOverlay {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  /**
+   * Pattern: `^([0-9a-f]{40}|[0-9a-f]{64})$`
+   */
+  commit: string;
+  licence?: string | null;
+  scan_report_sha256?: string | null;
+  repo_dir: string;
+  /**
+   * @maxItems 20
+   */
+  licence_files?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  vendor_tree_sha256: string;
+  /**
+   * @maxItems 50
+   */
+  patches?: PatchRecord[];
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  patched_tree_sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PatchRecord".
+ */
+export interface PatchRecord {
+  path: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+  reason: string;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  files: [string, ...string[]];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -6350,6 +6588,311 @@ export interface CatalogRejection {
   source: RepoSource;
   master_entry_id: string;
   stable_id: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoScanReport".
+ */
+export interface RepoScanReport {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  host: string;
+  ref?: string | null;
+  commit?: string | null;
+  decision: FetchDecision;
+  /**
+   * @maxItems 10
+   */
+  refusals?:
+    | []
+    | [RefusalReason]
+    | [RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason
+      ]
+    | [
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason
+      ]
+    | [
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason
+      ];
+  licence?: LicenceFinding | null;
+  /**
+   * @maxItems 500
+   */
+  dependency_licences?: DependencyLicence[];
+  /**
+   * @maxItems 500
+   */
+  vulnerabilities?: VulnFinding[];
+  /**
+   * @maxItems 500
+   */
+  static_findings?: StaticFinding[];
+  /**
+   * @maxItems 100
+   */
+  clam_findings?: ClamFinding[];
+  files_scanned?: number;
+  /**
+   * @maxItems 100
+   */
+  unsafe_paths?: string[];
+  health?: Health;
+  bundle_sha256?: string | null;
+  bundle_files?: number;
+  /**
+   * @maxItems 20
+   */
+  notes?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LicenceFinding".
+ */
+export interface LicenceFinding {
+  spdx?: string | null;
+  source: string;
+  verdict: LicenceVerdict;
+  override?: LicenceOverride | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LicenceOverride".
+ */
+export interface LicenceOverride {
+  reason: string;
+  by: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DependencyLicence".
+ */
+export interface DependencyLicence {
+  ecosystem: string;
+  name: string;
+  version: string;
+  spdx?: string | null;
+  verdict: LicenceVerdict;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "VulnFinding".
+ */
+export interface VulnFinding {
+  ecosystem: string;
+  package: string;
+  version: string;
+  id: string;
+  summary?: string;
+  severity?: SbamContracts_RepoScan__Severity;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StaticFinding".
+ */
+export interface StaticFinding {
+  tool: string;
+  rule: string;
+  path: string;
+  line?: number;
+  severity?: SbamContracts_RepoScan__Severity;
+  message?: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ClamFinding".
+ */
+export interface ClamFinding {
+  path: string;
+  signature: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Health".
+ */
+export interface Health {
+  last_commit_at?: string | null;
+  last_release_at?: string | null;
+  archived?: boolean | null;
+  /**
+   * @maxItems 10
+   */
+  flags?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string];
 }
 /**
  * What the model answers when asked which candidates fit a Sub-Skill. Advice only: the

@@ -84,6 +84,22 @@
           "pattern": "^(sha256:)?[0-9a-f]{64}$",
           "title": "Schema Sql Sha256",
           "type": "string"
+        },
+        "repos": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/RepoOverlay"
+              },
+              "maxItems": 10,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repos"
         }
       },
       "required": [
@@ -1163,6 +1179,47 @@
       "title": "Parameter",
       "type": "object"
     },
+    "PatchRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "reason",
+        "files"
+      ],
+      "title": "PatchRecord",
+      "type": "object"
+    },
     "Persistence": {
       "additionalProperties": false,
       "properties": {
@@ -1257,6 +1314,92 @@
         "sow_refs"
       ],
       "title": "Provenance",
+      "type": "object"
+    },
+    "RepoOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "title": "Url",
+          "type": "string"
+        },
+        "commit": {
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+          "title": "Commit",
+          "type": "string"
+        },
+        "licence": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licence"
+        },
+        "scan_report_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scan Report Sha256"
+        },
+        "repo_dir": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Repo Dir",
+          "type": "string"
+        },
+        "licence_files": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Licence Files",
+          "type": "array"
+        },
+        "vendor_tree_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Vendor Tree Sha256",
+          "type": "string"
+        },
+        "patches": {
+          "items": {
+            "$ref": "#/$defs/PatchRecord"
+          },
+          "maxItems": 50,
+          "title": "Patches",
+          "type": "array"
+        },
+        "patched_tree_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Patched Tree Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "commit",
+        "repo_dir",
+        "vendor_tree_sha256",
+        "patched_tree_sha256"
+      ],
+      "title": "RepoOverlay",
       "type": "object"
     },
     "RuntimeUi": {
