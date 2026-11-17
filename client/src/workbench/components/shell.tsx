@@ -3,7 +3,7 @@ import { useUppyState } from '@uppy/react'
 import type { Snapshot } from '../api/types'
 import { setUi, uppy, useUi } from '../lib/store'
 import { goScreen, navigate, usePath } from '../lib/route'
-import { GLOBAL_ROUTES, STATUS_LABEL, SUBTASKS, TASKS, globalByPath, screenByPath, screenLabel, stageOf, subtasksOf, taskStatus, type TrackerStatus } from '../tracker/trackerConfig'
+import { GLOBAL_ROUTES, GOAL_PATH, STATUS_LABEL, SUBTASKS, TASKS, globalByPath, screenByPath, screenLabel, stageOf, subtasksOf, taskStatus, type TrackerStatus } from '../tracker/trackerConfig'
 import { useStatuses } from '../tracker/useTrackerStore'
 import { signOut, useSession } from '../features/login/session'
 import { AutoChip, HitlChip, Icon, Tip, fmtFull, fmtTime } from './ui'
@@ -31,10 +31,11 @@ export function TopBar({ syncedAt, offline }: { snap?: Snapshot; syncedAt: numbe
         <button className="icon-btn nav-drawer-btn" onClick={() => setUi(s => ({ drawer: s.drawer === 'nav' ? null : 'nav' }))} aria-label="Open navigation" title="Navigation"><Icon name="menu" /></button>
         <BrandLockup />
         {/* Each crumb can shrink and ellipsize; the full text is in its tooltip. The screen name keeps priority. */}
-        <nav aria-label="Breadcrumb" className="crumbs">
+        {/* The goal screen (#/goal) is the start of the work, not a step of Ingestion: no breadcrumb there. */}
+        {path !== GOAL_PATH && <nav aria-label="Breadcrumb" className="crumbs">
           <button className="link crumb-link crumb" onClick={() => navigate('/')} title={first}>{first}</button>
           {current && <><Icon name="chevron" size={12} /><strong className="crumb crumb-current" title={current} aria-current="page">{current}</strong></>}
-        </nav>
+        </nav>}
       </div>
       <div className="topbar-right">
         <span className={`sync ${offline ? 'tone-err' : 'tone-muted'}`} role="status" title={syncedAt ? `Last backend sync ${fmtFull(new Date(syncedAt).toISOString())}` : undefined}>
