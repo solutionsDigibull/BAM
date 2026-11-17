@@ -28,6 +28,7 @@ import type {
 } from "@/contracts";
 import { download } from "@/app/(admin)/admin/masters/masters-api";
 import type { ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import { cycleMessage, ioGraph } from "./io-graph";
 import type { EditRequest, RowAction } from "./isatvon-grid";
@@ -78,14 +79,14 @@ export function WorkbenchScreen({
     url: treeUrl(projectId, workflowId),
     method: "get",
     queryOptions: {
-      refetchInterval: (q) => {
+      refetchInterval: guardPoll((q) => {
         const s = q.state.data?.data?.workflow_state;
         return s === "ISATVON_EXTRACTING"
           ? EXTRACT_POLL_MS
           : isEditable(s)
             ? REVIEW_POLL_MS
             : false;
-      },
+      }),
     },
   });
   const { mutateAsync } = useCustomMutation<WorkbenchSubSkill, ApiError>();

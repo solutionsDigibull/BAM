@@ -38,6 +38,7 @@ import type {
   RunAccepted,
 } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import {
   ALL_FAILED,
@@ -84,7 +85,9 @@ export function KnowledgePanel({
     method: "get",
     queryOptions: {
       // Polls only while the newest version builds; React Query pauses it while the tab is hidden.
-      refetchInterval: (q) => (isBuilding(latest(q.state.data?.data?.versions)) ? POLL_MS : false),
+      refetchInterval: guardPoll((q) =>
+        isBuilding(latest(q.state.data?.data?.versions)) ? POLL_MS : false,
+      ),
       refetchIntervalInBackground: false,
     },
   });

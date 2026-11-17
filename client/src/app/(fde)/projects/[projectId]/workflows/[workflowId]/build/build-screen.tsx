@@ -33,6 +33,7 @@ import type {
   HeldPatchResponse,
 } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import type { GridActions } from "./build-grid";
 import {
@@ -293,7 +294,7 @@ export function BuildScreen({
     url: buildsUrl(projectId, workflowId),
     method: "get",
     queryOptions: {
-      refetchInterval: (q) => pollMs(q.state.data?.data, q.state.fetchFailureCount),
+      refetchInterval: guardPoll((q) => pollMs(q.state.data?.data, q.state.fetchFailureCount)),
       retry: false, // the poll interval is the retry, with backoff
     },
   });

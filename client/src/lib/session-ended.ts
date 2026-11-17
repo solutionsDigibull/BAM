@@ -30,3 +30,23 @@ export function endSession(): void {
 export const resetSessionEnded = (): void => {
   ended = false;
 };
+
+const statusOf = (error: unknown): number | undefined => {
+  const e = error as { statusCode?: number; status?: number } | null | undefined;
+  return e?.statusCode ?? e?.status;
+};
+
+/**
+ * Wraps a `refetchInterval` callback: once the polled query itself failed with 401 the session is
+ * over, so polling stops and the user goes to login. Only polled queries do this; the shell widgets
+ * (notification centre, project switcher) and writes keep their own handling.
+ */
+export function guardPoll<Q extends { state: { error: unknown } }, R>(
+  interval: (query: Q) => R,
+): (query: Q) => R | false {
+  return (query) => {
+    if (statusOf(query.state.error) !== 401) return interval(query);
+    endSession();
+    return false;
+  };
+}
