@@ -21,10 +21,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 # --- dev: node_modules live in the image (Compose keeps them in a named volume) -------------------
+# node_modules stays root-owned and readable: `chown -R` on it copied over 1 GB of small files into a new layer
+# and took 48 minutes (#804). Only the source is owned by uid 10001, and `next dev` writes to `.next`.
 FROM deps AS dev
-COPY client/ ./
+COPY --chown=10001:10001 client/ ./
 # .next exists so Compose's named volume for it starts owned by uid 10001, not root.
-RUN mkdir -p .next && chown -R sbam:sbam /app/client
+RUN mkdir -p .next && chown sbam:sbam . .next
 USER 10001:10001
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
