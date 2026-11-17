@@ -61,12 +61,24 @@ export function ApiErrorState({
           action={reload}
         />
       );
-    case 412:
+    case 412: {
+      // The modal is a blocking gate (not closable), so it must always offer a way out.
+      const doReload = onReload ?? (() => window.location.reload());
       return (
-        <Modal open={isClient} title="Out of date" closable={false} footer={reload ?? null}>
+        <Modal
+          open={isClient}
+          title="Out of date"
+          closable={false}
+          footer={
+            <Button type="primary" onClick={doReload}>
+              Reload
+            </Button>
+          }
+        >
           {STALE_MESSAGE}
         </Modal>
       );
+    }
     case 422:
       return (
         <Alert
