@@ -243,3 +243,17 @@
   .bam-wb .goal-exit .goal-head, .bam-wb .goal-exit .goal-lede, .bam-wb .fs-fly, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-nav, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist .assist, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .as-viewport > * { animation: none; }
   .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"]::before { display: none; }
 }
+
+/* ---- What / Who / Where cards under the goal box (#822, UI team 17 Nov 2026) ---- */
+.bam-wb .goal-parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.bam-wb .goal-part { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-align: left; cursor: pointer;
+  transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease; }
+.bam-wb .goal-part:hover { border-color: var(--bl-blue); background: color-mix(in srgb, var(--bl-blue-soft) 60%, var(--surface)); box-shadow: 0 2px 6px rgb(0 0 0 / .08); transform: translateY(-1px); }
+.bam-wb .goal-part:focus-visible { outline: none; box-shadow: var(--focus); }
+.bam-wb .goal-part-label { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--bl-blue); }
+.bam-wb .goal-part-value { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
+.bam-wb .goal-part-empty .goal-part-value { color: var(--muted); }
+/* Hero stage: the cards row hugs the same 660px centered width as the goal box. */
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-parts { width: 100%; max-width: 660px; margin-inline: auto; }
+@media (prefers-reduced-motion: reduce) { .bam-wb .goal-part { transition: none; } .bam-wb .goal-part:hover { transform: none; } }

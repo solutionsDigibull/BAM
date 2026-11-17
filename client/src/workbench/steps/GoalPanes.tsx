@@ -7,7 +7,7 @@
 import './goal.css'
 import { useEffect, useRef, useState } from 'react'
 import { setUi } from '../lib/store'
-import { GOAL_MAX, saveGoal, useGoal } from '../lib/goal'
+import { GOAL_MAX, goalSpans, saveGoal, useGoal, type GoalSpan } from '../lib/goal'
 import { Icon } from '../components/ui'
 import bull from '../assets/login/bull-head-transparent.png'
 
@@ -82,6 +82,8 @@ function flyCard(box: HTMLElement, text: string, go: () => void) {
   }, 100)
 }
 
+const GOAL_PARTS = [{ label: 'What', hint: 'what it automates' }, { label: 'Who', hint: 'for who' }, { label: 'Where', hint: 'in where' }] as const
+
 /** Middle pane on Upload while the thread is empty and no goal is expanded yet. */
 export function GoalCapture() {
   const PLEN = GOAL_PREFIX.length
@@ -97,6 +99,14 @@ export function GoalCapture() {
   useEffect(() => { const e = ta.current; if (e) { e.style.height = 'auto'; e.style.height = `${Math.min(e.scrollHeight, 160)}px` } }, [value])
   const typed = value.slice(PLEN)
   const empty = !typed.trim()
+  const spans = goalSpans(value)
+  /** Click a What/Who/Where card: select its part in the box; a part not written yet puts the caret at the end. */
+  const highlightPart = (span: GoalSpan) => {
+    const e = ta.current
+    if (!e) return
+    e.focus()
+    e.setSelectionRange(span ? span[0] : e.value.length, span ? span[1] : e.value.length)
+  }
   const boxRef = useRef<HTMLDivElement>(null)
   const send = () => {
     if (empty || leaving.current) return
@@ -127,6 +137,18 @@ export function GoalCapture() {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
         }} />
       <button type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></button>
+    </div>
+    <div className="goal-parts" role="group" aria-label="What, who and where in your goal">
+      {GOAL_PARTS.map((p, i) => {
+        const span = spans[i] ?? null
+        const text = span ? value.slice(span[0], span[1]) : ''
+        return <button type="button" key={p.label} className={`goal-part${span ? '' : ' goal-part-empty'}`}
+          aria-label={text ? `${p.label}: ${text}. Highlight it in the goal.` : `${p.label} is not in the goal yet. Go to the end of the goal.`}
+          onClick={() => highlightPart(span)}>
+          <span className="goal-part-label">{p.label}</span>
+          <span className="goal-part-value">{text || p.hint}</span>
+        </button>
+      })}
     </div>
   </div>
 }
