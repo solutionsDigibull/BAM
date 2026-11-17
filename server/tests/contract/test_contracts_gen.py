@@ -44,6 +44,7 @@ from sbam_contracts import (
     promptfoo,
     repo_catalog,
     repo_decision,
+    repo_scan,
     review,
     runs,
     runtime_registry,
@@ -263,6 +264,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("preflight", preflight),
             ("repo", repo_catalog),
             ("repo", repo_decision),
+            ("repo", repo_scan),
             ("build", review),
         )
         for stem in module.schemas()

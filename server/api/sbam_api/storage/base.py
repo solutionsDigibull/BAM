@@ -30,6 +30,7 @@ class Kind(StrEnum):
     TESTS = "tests"
     EXPORTS = "exports"
     QUARANTINE = "quarantine"  # infected uploads, never served (E4.3)
+    REPOS = "repos"  # fetched repository trees and their scan reports (WG-7, #755)
 
 
 @dataclass(frozen=True)
