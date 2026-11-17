@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:4ff0f81897651ecb91f19d14156f9867803a217ef8b425bd72787cb26e5ce3be
+// source-sha256:da42365a5c350c5f9b04c7d6908ab795684403decbd77645e758a8250a757525
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -353,6 +353,11 @@ export type BlockType = "heading" | "paragraph" | "list_item" | "row" | "cell" |
 export type AttachmentOutcome = "REGISTERED" | "FILE_LIMIT_REACHED" | "TOO_LARGE" | "TOO_DEEP";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RelevanceLevel".
+ */
+export type RelevanceLevel = "HIGH" | "MEDIUM" | "LOW";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterType".
  */
 export type MasterType = "ORGANIZATION" | "RULES" | "AGENTS" | "SKILLS" | "TOOLING" | "FILETYPE";
@@ -619,6 +624,7 @@ export interface SbamContracts {
   ParseReport?: ParseReport;
   ParseOutcome?: ParseOutcome;
   OcrPage?: OcrPage;
+  RelevanceAnswer?: RelevanceAnswer;
   MasterEntryCreate?: MasterEntryCreate;
   MasterVersionCreate?: MasterVersionCreate;
   MasterEntry?: MasterEntry;
@@ -3531,6 +3537,19 @@ export interface OcrPage {
   unreadable?: boolean;
 }
 /**
+ * What the model answers when asked how useful one parsed document is for the project's goal
+ * (#802). Nothing else is accepted: a model that adds a field is re-asked, never stored. `score`
+ * only orders documents within a level; the level and the reason are what the FDE reads.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RelevanceAnswer".
+ */
+export interface RelevanceAnswer {
+  level: RelevanceLevel;
+  score: number;
+  reason: string;
+}
+/**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterEntryCreate".
  */
@@ -3992,6 +4011,25 @@ export interface DocumentOut {
   parse_report?: ParseReport | null;
   parent_document_id?: string | null;
   archive_path?: string | null;
+  relevance?: DocumentRelevance | null;
+}
+/**
+ * How useful the document is for the project's goal, read from its parsed content (#802).
+ * Advisory only: it never blocks, rejects or deletes a document. `goal_sha256` is the goal it was
+ * scored against, so a changed goal is visibly stale until the document is scored again.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DocumentRelevance".
+ */
+export interface DocumentRelevance {
+  level: RelevanceLevel;
+  score: number;
+  reason: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  goal_sha256: string;
+  scored_at: string;
 }
 /**
  * One deleted document that is due for purging (IDs only, like every workflow input).

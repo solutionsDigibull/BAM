@@ -85,6 +85,9 @@ class DocumentVersion(Stateful, ProjectOwned, Base):
     parse_report: Mapped[dict[str, object] | None] = mapped_column(Json)
     derived_md_key: Mapped[str | None] = mapped_column(String(255))  # doc.md
     derived_json_key: Mapped[str | None] = mapped_column(String(255))  # doc.json
+    # #802: how useful the parsed document is for the project's goal (`DocumentRelevance` as JSON).
+    # NULL until scored; advisory only, never part of any state decision.
+    relevance: Mapped[dict[str, object] | None] = mapped_column(Json)
 
 
 class UploadReservation(ProjectOwned, Base):
