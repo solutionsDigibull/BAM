@@ -117,12 +117,89 @@ class ProjectGoalPut(_Request):
     goal: ProjectGoal | None
 
 
+class IsatvonKey(StrEnum):
+    I = "I"  # noqa: E741 - the ISATVON letter
+    S = "S"
+    A = "A"
+    T = "T"
+    V = "V"
+    O = "O"  # noqa: E741 - the ISATVON letter
+    N = "N"
+
+
+class GoalIsatvonSection(BaseModel):
+    """One row of the ISATVON template shown under the FDE's goal (#798)."""
+
+    key: IsatvonKey
+    label: str
+    text: str
+
+
+# The ISATVON template the workbench shows under the FDE's goal (#798): fixed, read-only,
+# display only (nothing downstream reads it). `{goal}` is the goal exactly as the FDE typed it.
+GOAL_ISATVON_TEMPLATE: Final[tuple[tuple[IsatvonKey, str, str], ...]] = (
+    (
+        IsatvonKey.I,
+        "Instructions",
+        "You are an FDE Agent operating under ISATVON constraints.\nGoal: {goal}",
+    ),
+    (
+        IsatvonKey.S,
+        "Source",
+        "Processed data with frontmatter metadata and entity-relationship graph nodes, RAG data,"
+        " 3-admin masters, S3/DB. Missing Data Guard: if a required field is absent, halt and send"
+        " N_notification - never assume. Answers cite the frontmatter/graph node.",
+    ),
+    (
+        IsatvonKey.A,
+        "Automation",
+        "Explicit pass/fail conditions per step, decision gates (approve / retry / halt), typed"
+        " success_gate, and what triggers human approval.",
+    ),
+    (
+        IsatvonKey.T,
+        "Tech Stack (T_tech_stack)",
+        "Array of FastMCP tool bindings with interface names - nothing else may be called; routing"
+        " through MCP and LLM gateway.",
+    ),
+    (
+        IsatvonKey.V,
+        "Variables",
+        "max_iterations, budget_limit (USD), timeout_seconds + other hard limits as typed values.",
+    ),
+    (
+        IsatvonKey.O,
+        "Outcome",
+        "JSON schema, typed fields and enums, written to PostgreSQL JSONB - must validate before"
+        " handoff.",
+    ),
+    (
+        IsatvonKey.N,
+        "Notification",
+        "Webhook/alert channels + trigger list (error, halt, missing data, budget exceeded,"
+        " timeout), payload with what halted, which gate, last valid state.",
+    ),
+)
+
+
+def goal_isatvon(goal: str | None) -> list[GoalIsatvonSection]:
+    """The template with the goal filled into I; empty while no goal is set (#798)."""
+    if not goal:
+        return []
+    return [
+        GoalIsatvonSection(key=key, label=label, text=text.replace("{goal}", goal))
+        for key, label, text in GOAL_ISATVON_TEMPLATE
+    ]
+
+
 class ProjectGoalOut(BaseModel):
-    """`GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set). The ETag
-    header is the project's `row_version`."""
+    """`GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set) and the
+    ISATVON template shown under it (#798; empty while no goal is set). The ETag header is the
+    project's `row_version`."""
 
     project_id: UUID
     goal: str | None
+    isatvon: list[GoalIsatvonSection] = Field(default_factory=list)
 
 
 class ProjectMembersPut(_Request):
