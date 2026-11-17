@@ -37,6 +37,7 @@ from sbam_contracts.documents import (
     MAX_ACTIVE_FILES,
     PURGE_RETENTION_DAYS,
     DocumentOut,
+    DocumentRelevance,
     ParseReport,
     PurgeOutcome,
     PurgeTarget,
@@ -182,6 +183,9 @@ def to_out(document: Document, version: DocumentVersion) -> DocumentOut:
         parse_code=ErrorCode(version.parse_code) if version.parse_code else None,
         parse_report=(
             ParseReport.model_validate(version.parse_report) if version.parse_report else None
+        ),
+        relevance=(
+            DocumentRelevance.model_validate(version.relevance) if version.relevance else None
         ),
     )
 

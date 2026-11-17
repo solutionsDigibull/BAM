@@ -86,6 +86,46 @@
       "title": "AttachmentReport",
       "type": "object"
     },
+    "DocumentRelevance": {
+      "additionalProperties": false,
+      "description": "How useful the document is for the project's goal, read from its parsed content (#802).\nAdvisory only: it never blocks, rejects or deletes a document. `goal_sha256` is the goal it was\nscored against, so a changed goal is visibly stale until the document is scored again.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/RelevanceLevel"
+        },
+        "score": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Score",
+          "type": "integer"
+        },
+        "reason": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "goal_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Goal Sha256",
+          "type": "string"
+        },
+        "scored_at": {
+          "format": "date-time",
+          "title": "Scored At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "score",
+        "reason",
+        "goal_sha256",
+        "scored_at"
+      ],
+      "title": "DocumentRelevance",
+      "type": "object"
+    },
     "DocumentVersionState": {
       "enum": [
         "UPLOADED",
@@ -282,6 +322,15 @@
       ],
       "title": "RejectedMember",
       "type": "object"
+    },
+    "RelevanceLevel": {
+      "enum": [
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ],
+      "title": "RelevanceLevel",
+      "type": "string"
     }
   },
   "description": "A document with the state of its stored file (`GET`, `POST .../restore`).",
@@ -410,6 +459,17 @@
       ],
       "default": null,
       "title": "Archive Path"
+    },
+    "relevance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DocumentRelevance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
