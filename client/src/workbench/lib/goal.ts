@@ -1,17 +1,19 @@
 // The FDE's goal for a project ("Build an AI agent that automates ... for ... in ..."), typed on the goal screen (#/goal).
 // It is stored on the project (#720: GET / PUT /projects/{id}/goal with If-Match), so every FDE and device sees the same
 // goal, and the knowledge build and SOW generation read it as extra context. Nothing is generated from it here.
+// With it the API sends the fixed ISATVON template shown under the goal (#798, read-only): it is kept as sent.
 import { useSyncExternalStore } from 'react'
 
-import type { ProjectGoalOut } from '@/contracts'
+import type { GoalIsatvonSection, ProjectGoalOut } from '@/contracts'
 
 import { ApiFailure, getJson, putJson } from '../http/http'
 
 export interface Goal { what: string; who: string; where: string }
 /** `saved` opens "+ Add files". `loaded` is false until the project's goal has been read (no redirect before that).
  *  `text` is empty for a project that already had work when this screen was introduced. `error` says why the last
- *  save did not reach the project (the goal is kept on screen, so the work can go on). */
-export interface GoalState { goal: Goal; text: string; saved: boolean; loaded: boolean; error?: string }
+ *  save did not reach the project (the goal is kept on screen, so the work can go on). `isatvon` is the template the
+ *  server sent with the goal (#798): empty until the project has a saved goal. */
+export interface GoalState { goal: Goal; text: string; saved: boolean; loaded: boolean; isatvon: GoalIsatvonSection[]; error?: string }
 
 /** The server's limit (`sbam_contracts.projects.GOAL_MAX`). */
 export const GOAL_MAX = 300
@@ -31,7 +33,7 @@ export function parseGoal(text: string): Goal {
 export const cleanGoal = (raw: string) => raw.replace(/\s+/g, ' ').trim()
 
 // ---- the store: one goal per project, read from and written to the project ------------------------------------
-const EMPTY: GoalState = { goal: { what: '', who: '', where: '' }, text: '', saved: false, loaded: false }
+const EMPTY: GoalState = { goal: { what: '', who: '', where: '' }, text: '', saved: false, loaded: false, isatvon: [] }
 /** The project whose workbench is open (its id is in the URL); one module serves every project in a session. */
 const projectId = () => (typeof window === 'undefined' ? undefined : /\/projects\/([^/]+)/.exec(window.location.pathname)?.[1])
 const goalPath = (project: string) => `projects/${project}/goal`
@@ -61,7 +63,7 @@ async function load(project: string) {
     etag = tag
     if (rev !== at) return // the FDE saved or skipped meanwhile: theirs stands
     const text = body.goal ?? ''
-    gs = { goal: text ? parseGoal(text) : EMPTY.goal, text, saved: !!text || gs.saved, loaded: true }
+    gs = { goal: text ? parseGoal(text) : EMPTY.goal, text, saved: !!text || gs.saved, loaded: true, isatvon: body.isatvon ?? [] }
   } catch (e) {
     if (loadedFor !== project) return
     gs = { ...gs, loaded: true, error: e instanceof Error ? e.message : String(e) }
@@ -79,8 +81,10 @@ function commit(next: GoalState) {
 async function put(project: string, goal: string | null, retry = true): Promise<void> {
   try {
     const headers: Record<string, string> = etag ? { 'if-match': etag } : {}
-    const { etag: tag } = await putJson<ProjectGoalOut>(goalPath(project), { goal }, headers)
-    if (loadedFor === project) etag = tag
+    const { body, etag: tag } = await putJson<ProjectGoalOut>(goalPath(project), { goal }, headers)
+    if (loadedFor !== project) return
+    etag = tag
+    if (gs.text === (body.goal ?? '')) { gs = { ...gs, isatvon: body.isatvon ?? [] }; emit() } // still the goal on screen
   } catch (e) {
     // Missing or stale ETag (another FDE or tab saved first): read the current one and try once more.
     if (retry && e instanceof ApiFailure && (e.statusCode === 412 || e.statusCode === 428)) {
@@ -104,7 +108,7 @@ export async function saveGoal(raw: string): Promise<void> {
     commit({ ...getGoal(), error: `A goal is at most ${GOAL_MAX} characters (this one has ${text.length}).` })
     return
   }
-  commit({ goal: parseGoal(text), text, saved: true, loaded: true })
+  commit({ goal: parseGoal(text), text, saved: true, loaded: true, isatvon: [] })
   const project = loadedFor
   if (!project) return
   try {

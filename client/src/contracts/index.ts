@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:7951cc82a6eba164702d1a900905a6bcc67c03e4ba7f57623d522577a2347a42
+// source-sha256:5b7ad30e9b9d3752e6eccb7e2e0a22b0979f9de5eb7d750a8aeccdb5fc9e4688
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -324,6 +324,11 @@ export type UserStatus = "INVITED" | "ACTIVE" | "DEACTIVATED";
  * via the `definition` "ProjectStatus".
  */
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "IsatvonKey".
+ */
+export type IsatvonKey = "I" | "S" | "A" | "T" | "V" | "O" | "N";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "PipelineStepStatus".
@@ -3043,8 +3048,9 @@ export interface ProjectGoalPut {
   goal: string | null;
 }
 /**
- * `GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set). The ETag
- * header is the project's `row_version`.
+ * `GET` / `PUT /projects/{id}/goal`: the project's goal (None before one is set) and the
+ * ISATVON template shown under it (#798; empty while no goal is set). The ETag header is the
+ * project's `row_version`.
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ProjectGoalOut".
@@ -3052,6 +3058,18 @@ export interface ProjectGoalPut {
 export interface ProjectGoalOut {
   project_id: string;
   goal: string | null;
+  isatvon?: GoalIsatvonSection[];
+}
+/**
+ * One row of the ISATVON template shown under the FDE's goal (#798).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GoalIsatvonSection".
+ */
+export interface GoalIsatvonSection {
+  key: IsatvonKey;
+  label: string;
+  text: string;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

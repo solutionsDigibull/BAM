@@ -19,6 +19,7 @@ import {
 } from "@/components/ui-kit";
 import type { PipelineTimeline, Project, RunAccepted, WorkflowSummary } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import {
   EMPTY_OVERVIEW,
@@ -45,8 +46,9 @@ export function OverviewScreen({ projectId }: { projectId: string }) {
     url: pipelinePath(projectId),
     method: "get",
     queryOptions: {
-      refetchInterval: (q) =>
+      refetchInterval: guardPoll((q) =>
         q.state.data && isRunning(q.state.data.data.state) ? REFRESH_MS : false,
+      ),
     },
   });
   const workflows = useCustom<{ items: WorkflowSummary[] }, ApiError>({

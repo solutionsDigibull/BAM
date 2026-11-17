@@ -42,6 +42,7 @@ import type {
   SowVersionSummary,
 } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import { PROJECTS_RESOURCE } from "../../workspace-api";
 import {
@@ -124,10 +125,11 @@ export function SowScreen({ projectId }: { projectId: string }) {
     pagination: { mode: "off" },
     // While the SOW stage runs, so a generation that fails before writing a version shows as failed (#376).
     queryOptions: {
-      refetchInterval: (q) =>
+      refetchInterval: guardPoll((q) =>
         q.state.data?.data.find((p) => p.id === projectId)?.pipeline_state === "SOW_GENERATING"
           ? POLL_MS
           : false,
+      ),
     },
   });
   const project = projects.result.data?.find((p) => p.id === projectId);
