@@ -130,6 +130,7 @@ from sbam_contracts.projects import (
 from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
 from sbam_contracts.repo_catalog import RepoCatalog, RepoScoutAnswer
 from sbam_contracts.repo_decision import RepoDecision
+from sbam_contracts.repo_overlay import RepoOverlay
 from sbam_contracts.repo_scan import RepoScanReport
 from sbam_contracts.review import ReviewAnswer
 from sbam_contracts.runs import Run, RunAccepted
@@ -307,6 +308,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sandbox/runner_outputs", RunnerOutputs),
     ("repo/decision", RepoDecision),
     ("repo/catalog", RepoCatalog),
+    ("repo/overlay", RepoOverlay),
     ("repo/scan", RepoScanReport),
     ("repo/scout_answer", RepoScoutAnswer),
     ("budget/caps", BudgetCaps),
