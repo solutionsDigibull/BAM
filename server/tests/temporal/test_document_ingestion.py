@@ -72,6 +72,9 @@ class Fakes:
     failing_children: set[uuid.UUID] = field(default_factory=set)
     register_calls: list[uuid.UUID] = field(default_factory=list)
     finish_calls: int = 0
+    # #802: `score_relevance` calls, and whether it fails every attempt (advice only).
+    score_calls: list[uuid.UUID] = field(default_factory=list)
+    score_fails: bool = False
 
 
 def activities(fakes: Fakes) -> list[Callable[..., Any]]:
@@ -145,12 +148,20 @@ def activities(fakes: Fakes) -> list[Callable[..., Any]]:
             return IdsResult(ids=[])
         return IdsResult(ids=fakes.child_ids)
 
+    @activity.defn(name="score_relevance")
+    async def score_relevance(inp: StageRef) -> IdsResult:
+        fakes.score_calls.append(inp.ref_id)
+        if fakes.score_fails:
+            raise ConnectionError("Bifrost is down")
+        return IdsResult(ids=[inp.ref_id])
+
     @activity.defn(name="finish_attachments")
     async def finish_attachments(inp: StageRef) -> IdsResult:
         fakes.finish_calls += 1
         return IdsResult(ids=fakes.child_ids)
 
     return [
+        score_relevance,
         register_attachments,
         finish_attachments,
         scan_clamav,
@@ -555,3 +566,34 @@ def test_record_document_ingestion_with_attachments_history() -> None:  # pragma
 
     out = Path(__file__).parent / "histories" / "document_ingestion_with_attachments.json"
     out.write_text(json.dumps(asyncio.run(scenario()), indent=1) + "\n", encoding="utf-8")
+
+
+# --- #802: relevance to the goal, after a successful parse ---------------------------------------
+
+
+def test_802_a_parsed_document_is_scored_once_after_the_parse() -> None:
+    fakes, inp = Fakes(), stage_ref()
+    assert execute(fakes, inp) == [inp.ref_id]
+    assert fakes.score_calls == [inp.ref_id]
+
+
+def test_802_nothing_is_scored_when_the_parse_failed() -> None:
+    fakes = Fakes(parse="failed")
+    assert execute(fakes, stage_ref()) == []
+    assert fakes.score_calls == []
+
+
+def test_802_a_scoring_failure_never_fails_the_ingestion() -> None:
+    fakes, inp = Fakes(score_fails=True), stage_ref()
+    assert execute(fakes, inp) == [inp.ref_id]  # still handed on: relevance is advice only
+    assert len(fakes.score_calls) == 2  # tried, retried once, then left unscored
+
+
+def test_802_an_execution_started_before_scoring_existed_still_replays() -> None:
+    """The newest history recorded before #802: no scoring marker, so none is scheduled."""
+    history_json = (
+        Path(__file__).parent / "histories" / "document_ingestion_with_attachments.json"
+    ).read_text(encoding="utf-8")
+    history = WorkflowHistory.from_json("ingest-before-802", history_json)
+    replayer = Replayer(workflows=[DocumentIngestion], data_converter=pydantic_data_converter)
+    asyncio.run(replayer.replay_workflow(history))

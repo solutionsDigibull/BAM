@@ -70,6 +70,7 @@ export function toUploadRecord(d: DocumentOut): UploadRecord {
     scanError: failedScan ? "The scan did not finish." : undefined,
     released,
     parse: parseInfoOf(d),
+    relevance: d.relevance ?? undefined,
     clamavVerdict: rejected ? "threat" : released ? "clean" : "pending",
   };
 }

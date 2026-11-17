@@ -6,7 +6,7 @@ import { useSyncExternalStore } from 'react'
 
 import type { GoalIsatvonSection, ProjectGoalOut } from '@/contracts'
 
-import { ApiFailure, getJson, putJson } from '../http/http'
+import { ApiFailure, getJson, postJson, putJson } from '../http/http'
 
 export interface Goal { what: string; who: string; where: string }
 /** `saved` opens "+ Add files". `loaded` is false until the project's goal has been read (no redirect before that).
@@ -82,6 +82,7 @@ async function put(project: string, goal: string | null, retry = true): Promise<
   try {
     const headers: Record<string, string> = etag ? { 'if-match': etag } : {}
     const { body, etag: tag } = await putJson<ProjectGoalOut>(goalPath(project), { goal }, headers)
+    if (body.goal) rescore(project)
     if (loadedFor !== project) return
     etag = tag
     if (gs.text === (body.goal ?? '')) { gs = { ...gs, isatvon: body.isatvon ?? [] }; emit() } // still the goal on screen
@@ -94,6 +95,12 @@ async function put(project: string, goal: string | null, retry = true): Promise<
     }
     throw e
   }
+}
+
+/** #802: the project's files are scored against the goal; after a save they are scored again in the background.
+ *  Advice only: if the request fails, the goal is still saved and the files keep their earlier scores. */
+function rescore(project: string) {
+  void postJson(`projects/${project}/documents/relevance/rescore`).catch(() => undefined)
 }
 
 export const getGoal = (): GoalState => { sync(); return gs }

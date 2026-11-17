@@ -7,6 +7,9 @@ import { API_BASE } from "@/providers/data-provider";
 export interface FakeGoalApi {
   goals: Map<string, { goal: string | null; version: number }>;
   calls: { method: string; project: string; ifMatch: string | null; body?: unknown }[];
+  /** Projects a re-score was asked for (#802), in order; `rescoreStatus` makes that endpoint answer an error. */
+  rescores: string[];
+  rescoreStatus?: number;
   /** Answer every request to this project with this status (a server that refuses). */
   failing: Map<string, number>;
 }
@@ -27,11 +30,18 @@ export const fakeIsatvon = (goal: string | null) =>
     : [];
 
 export function installGoalApi(): FakeGoalApi {
-  const api: FakeGoalApi = { goals: new Map(), calls: [], failing: new Map() };
+  const api: FakeGoalApi = { goals: new Map(), calls: [], failing: new Map(), rescores: [] };
+  const rescore = new RegExp(`^${API_BASE}/projects/([^/]+)/documents/relevance/rescore$`);
   const route = new RegExp(`^${API_BASE}/projects/([^/]+)/goal$`);
   vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
-    const m = route.exec(String(url));
     const method = init.method ?? "GET";
+    const r = rescore.exec(String(url));
+    if (r && method === "POST") {
+      api.rescores.push(r[1]!);
+      if (api.rescoreStatus) return json(api.rescoreStatus, { status: api.rescoreStatus, code: "CONFLICT", title: "Refused" });
+      return json(202, { run: {} });
+    }
+    const m = route.exec(String(url));
     if (!m) return json(404, { status: 404, code: "NOT_FOUND", title: "Not found" });
     const project = m[1]!;
     const headers = new Headers(init.headers);

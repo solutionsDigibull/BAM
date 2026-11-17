@@ -30,6 +30,11 @@
     "primary": "openai/gpt-4o-mini",
     "fallback": "openai/gpt-4o"
   },
+  "sbam-relevance": {
+    "use": "How useful one parsed document is for the project's goal (RelevanceAnswer, #802)",
+    "primary": "openai/gpt-4o-mini",
+    "fallback": "openai/gpt-4o"
+  },
   "sbam-rubric": {
     "use": "Promptfoo llm-rubric grading of free-text outputs in the sbam-promptfoo sidecar (E13.6c)",
     "primary": "openai/gpt-4o-mini",

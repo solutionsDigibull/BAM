@@ -130,6 +130,23 @@
         "priority": 6
       },
       {
+        "id": "alias-sbam-relevance",
+        "name": "sbam-relevance",
+        "cel_expression": "model == \"sbam-relevance\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "openai/gpt-4o-mini",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/gpt-4o"
+        ],
+        "enabled": true,
+        "priority": 7
+      },
+      {
         "id": "alias-sbam-rubric",
         "name": "sbam-rubric",
         "cel_expression": "model == \"sbam-rubric\"",
@@ -144,7 +161,7 @@
           "openrouter/openai/gpt-4o"
         ],
         "enabled": true,
-        "priority": 7
+        "priority": 8
       },
       {
         "id": "alias-sbam-knowledge",
@@ -161,7 +178,7 @@
           "openrouter/anthropic/claude-haiku-5.5"
         ],
         "enabled": true,
-        "priority": 8
+        "priority": 9
       },
       {
         "id": "alias-sbam-embed",
@@ -178,7 +195,7 @@
           "openrouter/openai/text-embedding-3-small"
         ],
         "enabled": true,
-        "priority": 9
+        "priority": 10
       }
     ]
   },

@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUppyState } from '@uppy/react'
 import { api } from '../api/adapter'
-import { ACCEPTED_TYPES, MAX_BATCH_BYTES, type Snapshot } from '../api/types'
+import { ACCEPTED_TYPES, MAX_BATCH_BYTES, type Snapshot, type UploadRecord } from '../api/types'
 import { SYSTEM_FILE_LABEL, isReleased } from '../api/scanGate'
 import { LANES, detectKind, type Kind } from '../api/fileKind'
 import { archive, setUi, uppy, useUi } from '../lib/store'
@@ -17,6 +17,7 @@ import { fdeView } from './IngestionFlow'
 import { UploadIdle } from './UploadIdle'
 import { addFilesLocked, canAddFiles, resetGoal, useGoal } from '../lib/goal'
 import { useReviewFiles } from './Standardize'
+import { relevanceCell } from '../lib/relevance'
 
 // ---- entry points --------------------------------------------------------------------------------------------
 type Pick = (files: FileList, source: 'files' | 'folder' | 'zip' | 'drop') => void
@@ -55,7 +56,9 @@ export const dropTarget = (disabled?: boolean) => ({
 })
 
 // ---- the one upload store view -------------------------------------------------------------------------------
-export interface UpRow { id: string; name: string; size: number; state: 'uploading' | 'checking' | 'ready' | 'failed'; kind: Kind; reason?: string; retry?: () => void }
+export interface UpRow { id: string; name: string; size: number; state: 'uploading' | 'checking' | 'ready' | 'failed'; kind: Kind; reason?: string; retry?: () => void
+  /** #802: whether the backend has read the file, and how useful it is for the goal (absent until scored). */
+  parsed?: boolean; relevance?: UploadRecord['relevance'] }
 /** Added files (counted everywhere) vs failed ones (listed under Needs attention, never counted). */
 export const isAdded = (r: UpRow) => r.state !== 'failed'
 /** No file is skipped (29 Oct 2026, failed-files wireframes v2): every refused file is a failure with a reason and a
@@ -72,7 +75,7 @@ export function useUploadRows(snap: Snapshot): UpRow[] {
   const { busy, run } = useAction()
   const stored = snap.uploads.map<UpRow>(u => {
     const state: UpRow['state'] = isReleased(u) ? 'ready' : fdeView(u).pill === 'running' ? 'checking' : 'failed'
-    return { id: u.id, name: u.name, size: u.size, kind: detectKind(u.name), state,
+    return { id: u.id, name: u.name, size: u.size, kind: detectKind(u.name), state, parsed: u.parse?.state === 'PARSED', relevance: u.relevance,
       reason: state !== 'failed' ? undefined : u.scanError ? 'Failed - check did not finish' : u.status === 'failed' ? 'Failed - upload error' : 'Failed - cannot be used',
       retry: u.scanError && snap.steps[0]!.editable && !busy ? () => { void run('Retry check', () => api.retryScan(u.id), { step: 1 }) } : undefined }
   })
@@ -248,6 +251,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
   const all = useUploadRows(snap)
   const rows = all.filter(isAdded), failed = all.filter(r => r.state === 'failed')
   const review = useReviewFiles(snap).ids
+  const hasGoal = useGoal(s => !!s.text)
   const archived = useUi(s => s.archived)
   const { busy: acting, run } = useAction()
   const closed = !snap.steps[0]!.editable
@@ -295,17 +299,18 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
         <table className="table up-table">
           <colgroup><col style={{ width: '2.5em' }} /><col /><col className="up-col-type" /><col className="up-col-conf" /></colgroup>
           <thead><tr><th scope="col" className="up-num">#</th><th scope="col">File name</th><th scope="col">Type</th>
-            <th scope="col" className="up-conf"><Tip text="Extraction confidence"><span className="up-th-tip" tabIndex={0}>Confidence</span></Tip></th></tr></thead>
+            <th scope="col" className="up-conf"><Tip text="How useful each file is for the goal, judged by SBAM from the file's content"><span className="up-th-tip" tabIndex={0}>Confidence</span></Tip></th></tr></thead>
           <tbody>{rows.map((r, i) => {
-            const done = r.state === 'ready', held = review.has(r.id), c = r.kind.confidence
+            const held = review.has(r.id), cell = relevanceCell(r, hasGoal)
             const m = rowMenu(r)
             return <tr key={r.id} {...m} className={[held ? 'up-low' : '', m.className].filter(Boolean).join(' ') || undefined}>
               <td className="up-num">{i + 1}</td>
               <th scope="row" title={r.name}><span className="up-fname"><Icon name="tb-file" size={14} /><span>{r.name}</span></span>
                 {held && <span className="up-review" role="note" aria-label="Needs review before parse" title="Held for review before parse"><Icon name="alert" size={12} /><span aria-hidden>Needs review</span></span>}</th>
               <td><span className={`up-type${GENERIC.has(r.kind.type) ? ' plain' : ''}`}>{r.kind.type}</span></td>
-              <td className="up-conf" title={done ? 'Rule-based reading of the file name and type' : undefined}>
-                {done ? <span className={`up-cbar${c >= 90 ? ' hi' : ''}`}><i aria-hidden><i style={{ width: `${c}%` }} /></i><span>{c}%</span></span> : '-'}</td>
+              <td className="up-conf" title={cell ? (cell.kind === 'score' ? cell.reason : cell.title) : undefined}>
+                {!cell ? '-' : cell.kind === 'note' ? <span className="up-cnote">{cell.label}</span>
+                  : <span className={`up-cbar lvl-${cell.level.toLowerCase()}`} aria-label={`${cell.label} relevance: ${cell.reason}`}><i aria-hidden><i style={{ width: `${cell.score}%` }} /></i><span>{cell.label} · {cell.score}</span></span>}</td>
             </tr>
           })}
           </tbody>

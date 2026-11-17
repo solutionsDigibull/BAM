@@ -92,6 +92,12 @@
 .bam-wb .up-cbar > i { display: block; width: 32px; height: 4px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
 .bam-wb .up-cbar > i > i { display: block; height: 100%; border-radius: 99px; background: currentColor; }
 .bam-wb .up-cbar > span { min-width: 3ch; text-align: right; }
+/* #802: relevance to the goal (High / Medium / Low), the bar's width is the model's score; a note while there is none. */
+.bam-wb .up-cbar.lvl-high { color: var(--bl-blue); }
+.bam-wb .up-cbar.lvl-medium { color: var(--bl-orange); }
+.bam-wb .up-cbar.lvl-low { color: var(--muted); }
+.bam-wb .up-cbar > span { min-width: 9ch; white-space: nowrap; }
+.bam-wb .up-cnote { color: var(--muted); font-size: 12px; white-space: nowrap; }
 @container ws (max-width: 400px) { .bam-wb .up-cbar > i, .bam-wb .up-fname > .icon { display: none; } .bam-wb .up-col-type { width: 5.5rem; } .bam-wb .up-col-conf { width: 5.9rem; }
   .bam-wb .up-table thead th { letter-spacing: .02em; } .bam-wb .up-review { max-width: 100%; overflow: hidden; } }
 
