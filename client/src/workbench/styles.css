@@ -1637,3 +1637,27 @@
 .bam-wb .grid-wrap .ag-root:has(> .ag-body-horizontal-scroll:not(.ag-hidden, .ag-invisible)) .ag-grid-scrolling-rows { margin-top: var(--grid-hbar); }
 /* Font scale (4 Nov 2026): 12 captions / 14 body / 16 inputs / 20 section titles / 24 page headings. Login hero stays 34/40. */
 .bam-wb input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), .bam-wb textarea, .bam-wb select { font-size: 16px; }
+
+/* Translate: independently scrolling file explorer beside the existing editor. */
+.bam-wb .code-workspace { display: flex; gap: 14px; flex: 1; min-height: 460px; min-width: 0; }
+.bam-wb .code-workspace > .code-view { min-width: 0; flex: 1; }
+.bam-wb .code-explorer { flex: 0 0 20%; min-width: 140px; max-width: 260px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); display: flex; flex-direction: column; overflow: hidden; align-self: stretch; }
+.bam-wb .code-explorer h3 { margin: 0; padding: 14px 12px; font-size: 11px; letter-spacing: .06em; color: var(--muted); }
+.bam-wb .code-tree-scroll { overflow: auto; flex: 1; min-height: 0; height: 420px; max-height: 65vh; scrollbar-width: thin; }
+.bam-wb .code-tree-row { position: absolute; left: 0; right: 0; height: 28px; display: flex; align-items: center; gap: 5px; padding-right: 8px; cursor: pointer; font-size: 12px; white-space: nowrap; border-left: 3px solid transparent; }
+.bam-wb .code-tree-row:hover { background: var(--surface-2); }
+.bam-wb .code-tree-row.selected { border-left-color: var(--accent); background: var(--accent-soft); color: var(--accent-txt); font-weight: 600; }
+.bam-wb .code-tree-scroll:focus-visible .code-tree-row.active { outline: 1px solid var(--accent); outline-offset: -1px; }
+.bam-wb .code-tree-guide { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border); pointer-events: none; }
+.bam-wb .code-tree-chevron { flex: none; width: 11px; display: inline-flex; }
+.bam-wb .code-tree-chevron.open { transform: rotate(90deg); }
+.bam-wb .code-tree-row > .icon { flex: none; color: var(--muted); }
+.bam-wb .code-tree-row.selected > .icon { color: var(--accent); }
+.bam-wb .code-tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bam-wb .code-tree-mark { margin-left: auto; color: var(--warn); }
+.bam-wb .code-breadcrumb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.bam-wb .pane-body > .code-workspace { flex: 1 0 auto; }
+.bam-wb .code-workspace .monaco-box { min-height: 420px; }
+
+.bam-wb .code-file-type { flex: none; min-width: 16px; padding: 1px 2px; border-radius: 3px; background: var(--accent-soft); color: var(--bl-blue); font-size: 8px; font-weight: 700; text-align: center; }
+.bam-wb .code-tree-row.selected { border-left-color: var(--bl-blue); }

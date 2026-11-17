@@ -1,3 +1,4 @@
+import { PaneGrip, paneHeaderProps, usePaneSpot } from './PaneLayout'
 import { useEffect, useRef, useState } from 'react'
 import { useUppyState } from '@uppy/react'
 import type { Snapshot } from '../api/types'
@@ -115,7 +116,9 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
   const current = navScreen(path)
   const currentStage = current ? stageOf(current)?.id : undefined
   const statuses = useStatuses()
-  const collapsed = useUi(s => s.shell.nav)
+  const drawer = useUi(s => s.drawer)
+  // Narrow screens open the pane as an overlay drawer: always show the full rail there (17 Nov 2026).
+  const collapsed = useUi(s => s.shell.nav) && drawer !== 'nav'
   const [open, setOpen] = useState<Set<string>>(() => new Set(currentStage ? [currentStage] : []))
   const [query, setQuery] = useState('')
   // Navigating into another stage opens its group (never closes the ones the user opened).
@@ -134,30 +137,39 @@ export function NavRail({ snap }: { snap?: Snapshot }) {
   const onUpload = current === '1.1'
   // The stage the work is at: the first one not done (none once every stage is done).
   const active = TASKS.findIndex(t => taskStatus(t.id, statuses) !== 'done')
+  const navSpot = usePaneSpot('nav')
 
-  if (collapsed) return (
-    <nav className="shell-pane shell-rail" aria-label="Workflow navigation">
-      <div className="rail-head">
-        <button className="icon-btn sm" onClick={toggleRail} aria-expanded={false} aria-label="Expand navigation" title="Expand navigation"><Icon name="panel-right" size={14} /></button>
-      </div>
-      {/* Collapsed: each stage icon shows its name under it and in a tooltip (hover or focus), with the same marks as the open rail. */}
-      <ul className="nv-mini">{TASKS.map((t, i) => {
-        const st = taskStatus(t.id, statuses)
-        return <li key={t.id}><Tip text={t.label} note={i === active ? `Current stage · ${STAGE_TEXT[st]}` : STAGE_TEXT[st]}>
-          <button className={`nv-dot s-${st} ${currentStage === t.id ? 'on' : ''}`} onClick={() => { toggleRail(); setOpen(s => new Set(s).add(t.id)) }}
-            aria-label={`${t.label}: ${STAGE_TEXT[st]}${i === active ? ', current stage' : ''}`}>
-            <Icon name={st === 'done' ? 'check' : st === 'blocked' ? 'alert' : t.icon} size={15} />{i === active && st !== 'blocked' && <span className="nv-active" aria-hidden />}
+  // Collapsed (17 Nov 2026, per user): a slim icon rail - the stage icons on their dotted connector, active
+  // stage highlighted, names in tooltips; the top chevron expands again. Works at either edge (data-opens).
+  if (collapsed) {
+    const opens = navSpot === 2 ? 'left' : 'right'
+    return (
+      <nav className="shell-pane shell-rail" aria-label="Workflow navigation" data-opens={opens}>
+        <div className="rail-head">
+          <button className="icon-btn sm" onClick={toggleRail} aria-expanded={false} aria-label="Expand navigation" title="Expand navigation">
+            <Icon name={opens === 'left' ? 'panel-left' : 'panel-right'} size={14} />
           </button>
-        </Tip><span className="nv-mini-label" aria-hidden>{t.label}</span></li>
-      })}</ul>
-    </nav>
-  )
+        </div>
+        <ul className="nv-mini">{TASKS.map((t, i) => {
+          const st = taskStatus(t.id, statuses)
+          return <li key={t.id}><Tip text={t.label} note={i === active ? `Current stage · ${STAGE_TEXT[st]}` : STAGE_TEXT[st]}>
+            <button className={`nv-dot s-${st} ${currentStage === t.id ? 'on' : ''}`} onClick={() => { toggleRail(); setOpen(s => new Set(s).add(t.id)) }}
+              aria-label={`${t.label}: ${STAGE_TEXT[st]}${i === active ? ', current stage' : ''}`}>
+              <Icon name={st === 'done' ? 'check' : st === 'blocked' ? 'alert' : t.icon} size={15} />{i === active && st !== 'blocked' && <span className="nv-active" aria-hidden />}
+            </button>
+          </Tip><span className="nv-mini-label" aria-hidden>{t.label}</span></li>
+        })}</ul>
+      </nav>
+    )
+  }
 
   return (
     <nav className="shell-pane navrail" aria-labelledby="nav-title">
-      <header className="shell-head">
-        <h2 id="nav-title">{onUpload ? 'Workflow' : <><Icon name="layout" size={13} />Navigate</>}</h2>
+      {/* Collapse control at the pane's far-left edge, before the title (17 Nov 2026, approved wireframes change 1). */}
+      <header {...paneHeaderProps} className="shell-head">
         <button className="icon-btn sm" onClick={toggleRail} aria-expanded aria-label="Collapse navigation" title="Collapse"><Icon name="panel-left" size={14} /></button>
+        <h2 id="nav-title">{onUpload ? 'Workflow' : 'Navigate'}</h2>
+        <PaneGrip pane="nav" />
       </header>
       <div className="nv-body">
         {/* Upload swaps the search card for + Add files in the same slot; the card stays laid out (invisible) so the slot

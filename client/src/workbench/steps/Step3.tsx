@@ -13,6 +13,7 @@ import { goScreen, goStep } from '../lib/route'
 import { setCodeDraft, setDrafts, unsaved, useDrafts } from '../lib/drafts'
 import { certifiedBaseline, currentTests } from '../lib/certification'
 import { Banner, Copy, Empty, ErrorState, GateButton, Icon, Kpis, Pane, Section, Skeleton, StatusPill, Time, fmtDuration, fmtTime, shortHash } from '../components/ui'
+import { CodeFileTree } from '../components/CodeFileTree'
 import { tips } from '../lib/actionTips'
 import { approve, templateApproved, templateKey, useApprovals } from '../lib/approvals'
 
@@ -374,7 +375,7 @@ type Monaco = Parameters<OnMount>[1]
 
 /**
  * Editable Monaco view. With `showChanges` it is an inline diff against `original` (green added, red removed),
- * like the colour coding on the SOW and the grid; the right-hand (current) side is the one you edit.
+ * like the colour coding on the SOW and the grid. Only current-content line numbers are shown.
  */
 export function ReviewEditor({ path, language, original, value, editable, lockedReason, showChanges, onChange, onSave, onReady, startAtTop }: {
   path: string; language: string; original: string; value: string; editable: boolean; lockedReason: string; showChanges: boolean
@@ -408,6 +409,11 @@ export function ReviewEditor({ path, language, original, value, editable, locked
         // Models are reused by path; letting the wrapper dispose them on unmount races the diff widget.
         keepCurrentOriginalModel keepCurrentModifiedModel
         onMount={(d, m) => {
+          // Inline diff still reserves a second gutter for baseline line numbers by default.
+          // Keep the current gutter only; removed lines remain inline in red without old numbers.
+          d.getOriginalEditor().updateOptions({ lineNumbers: 'off', lineNumbersMinChars: 0, lineDecorationsWidth: 0 })
+          const baselineNode = d.getOriginalEditor().getDomNode()
+          if (baselineNode) baselineNode.style.visibility = 'hidden'
           bind(d.getModifiedEditor(), m)
           if (!startAtTop) return
           topOf(d.getModifiedEditor())
@@ -481,17 +487,11 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
   }
 
   return (
-    <div className="code-view">
+    <div className="code-workspace">
+      <CodeFileTree paths={files.map(f => f.path)} current={current?.path} onSelect={setPath} status={p => { const f = files.find(f => f.path === p); return f ? [isDirty(f) ? 'Unsaved changes' : f.edited ? 'Edited' : '', findings.some(x => x.file === p && !x.resolved) ? 'Findings' : ''].filter(Boolean).join(' · ') : '' }} />
+      <div className="code-view">
       <div className="code-bar">
-        <label className="field inline">File
-          <select value={current?.path} onChange={e => setPath(e.target.value)}>
-            {files.map(f => (
-              <option key={f.path} value={f.path}>
-                {f.path}{isDirty(f) ? ' • unsaved' : f.edited ? ' • edited' : ''}{findings.some(x => x.file === f.path && !x.resolved) ? ' • findings' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+        <nav className="code-breadcrumb" aria-label="Current file" title={current?.path}>{current?.path.split('/').map((part, i) => <span key={i}>{i > 0 && <span className="muted" aria-hidden> &gt; </span>}{part}</span>)}</nav>
         {current && <Copy value={current.path} display="" label="file path" />}
         {current?.edited && !dirty && <span className="mark-edited"><Icon name="edit" size={10} />Edited by you</span>}
         {dirty && <span className="mark-unsaved" role="status"><Icon name="dot" size={10} />Unsaved changes</span>}
@@ -516,6 +516,7 @@ function CodeView({ files, findings, editable, lockedReason, showChanges, cStatu
           <GateButton action="save" reason={dirty ? undefined : 'No changes to save'} busy={busy === 'Save code'} successKey={savedAt} onClick={save}>Save and re-validate</GateButton>
         </div>
       )}
+      </div>
     </div>
   )
 }

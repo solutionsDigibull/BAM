@@ -67,6 +67,9 @@
 .bam-wb .up-attn .up-sec { color: var(--bl-orange); }
 .bam-wb .up-sec-in { padding: 10px 12px 4px; }
 .bam-wb .up-attn { display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .up-attn-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bam-wb .up-attn-head .up-sec { margin: 0; }
+.bam-wb .up-attn-clear { min-height: 28px; gap: 4px; white-space: nowrap; }
 .bam-wb .up-attn-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--bl-orange) 30%, transparent);
   border-radius: 10px; background: var(--bl-orange-soft); }
 .bam-wb .up-attn-card > .icon { color: var(--bl-orange); margin-top: 2px; }
