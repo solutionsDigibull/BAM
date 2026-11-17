@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_v03/skills:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "skill_id": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Skill Id",
+      "type": "string"
+    },
+    "skill": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Skill",
+      "type": "string"
+    },
+    "instruction": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Instruction",
+      "type": "string"
+    },
+    "source_data": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Source Data",
+      "type": "string"
+    },
+    "automation": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Automation",
+      "type": "string"
+    },
+    "tech_stack": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Tech Stack",
+      "type": "string"
+    },
+    "variables": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Variables",
+      "type": "string"
+    },
+    "outcome": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Outcome",
+      "type": "string"
+    },
+    "next": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Next",
+      "type": "string"
+    },
+    "references": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "References",
+      "type": "string"
+    }
+  },
+  "structure_version": "Masters 0.3",
+  "title": "SkillsPayloadV03",
+  "type": "object"
+}

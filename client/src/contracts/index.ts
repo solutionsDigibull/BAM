@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:d950aa7fda0daa48a3ae73d478cb03ca796d5a876f30af52db32d569a9cebaaa
+// source-sha256:4ff0f81897651ecb91f19d14156f9867803a217ef8b425bd72787cb26e5ce3be
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -383,6 +383,11 @@ export type RouteSource = "DEFAULT_BY_FILETYPE" | "ADMIN_OVERRIDE" | "CLASSIFIER
 export type ParseStatus = "PENDING" | "PARSING" | "PARSED" | "FAILED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AgentKind".
+ */
+export type AgentKind = "Agent" | "Assistant";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "NotificationType".
  */
 export type NotificationType =
@@ -626,6 +631,14 @@ export interface SbamContracts {
   MasterDocumentPatch?: MasterDocumentPatch;
   MasterDocumentOut?: MasterDocumentOut;
   MasterDocumentList?: MasterDocumentList;
+  OrganizationPayloadV03?: OrganizationPayloadV03;
+  RulesPayloadV03?: RulesPayloadV03;
+  AgentsPayloadV03?: AgentsPayloadV03;
+  SkillsPayloadV03?: SkillsPayloadV03;
+  ToolingPayloadV03?: ToolingPayloadV03;
+  MasterList?: MasterList;
+  MasterBulkRequest?: MasterBulkRequest;
+  MasterBulkReport?: MasterBulkReport;
   DocumentOut?: DocumentOut;
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
@@ -3775,6 +3788,187 @@ export interface MasterDocumentOut {
  */
 export interface MasterDocumentList {
   items: MasterDocumentOut[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "OrganizationPayloadV03".
+ */
+export interface OrganizationPayloadV03 {
+  org_id?: string;
+  company_type?: string;
+  brand_properties?: string;
+  location?: string;
+  certifications?: string;
+  segment_offerings?: string;
+  customers_audience?: string;
+  employees_roles?: string;
+  data_sources?: string;
+  systems_tools?: string;
+  assets?: string;
+  fde_notes?: string;
+  documents?: string;
+  artifacts?: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RulesPayloadV03".
+ */
+export interface RulesPayloadV03 {
+  rule_id?: string;
+  rule_type_description?: string;
+  source_evidence?: string;
+  mapping_enforcement?: string;
+  stop_review_condition?: string;
+  owner_version?: string;
+  record_status?: string;
+  effective_expiry?: string;
+  skill_ref?: string;
+  applies_to?: string;
+  fde_use?: string;
+  client_use?: string;
+  acts_on?: string;
+  prompts?: RulePrompts;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RulePrompts".
+ */
+export interface RulePrompts {
+  system?: string;
+  /**
+   * @maxItems 50
+   */
+  micro?: MicroPrompt[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MicroPrompt".
+ */
+export interface MicroPrompt {
+  name?: string;
+  text?: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AgentsPayloadV03".
+ */
+export interface AgentsPayloadV03 {
+  agent_id?: string;
+  agent_name?: string;
+  kind?: AgentKind;
+  type?: string;
+  reference?: string;
+  source?: string;
+  tools?: string;
+  model?: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SkillsPayloadV03".
+ */
+export interface SkillsPayloadV03 {
+  skill_id?: string;
+  skill?: string;
+  instruction?: string;
+  source_data?: string;
+  automation?: string;
+  tech_stack?: string;
+  variables?: string;
+  outcome?: string;
+  next?: string;
+  references?: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ToolingPayloadV03".
+ */
+export interface ToolingPayloadV03 {
+  tooling_id?: string;
+  tool_name?: string;
+  category?: string;
+  links_path?: string;
+  owner_access?: string;
+  record_status?: string;
+  source_version_checked_at?: string;
+  refresh_frequency?: string;
+  record_type?: string;
+  source_tab?: string;
+  bullm_badge?: string;
+}
+/**
+ * A whole template list (`PUT /admin/master-lists/{key}` replaces it, #782).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterList".
+ */
+export interface MasterList {
+  /**
+   * @minItems 1
+   * @maxItems 64
+   *
+   * Items: Pattern: `\S`
+   */
+  headers: [string, ...string[]];
+  /**
+   * @maxItems 20000
+   */
+  rows?: string[][];
+}
+/**
+ * Rows the client already mapped onto one master's columns (`POST .../bulk`, #782).
+ *
+ * `validate-only` writes nothing. `upsert` adds new rows; an exact repeat is skipped and a row
+ * whose id exists with different values is reported, never overwritten.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterBulkRequest".
+ */
+export interface MasterBulkRequest {
+  mode: "validate-only" | "upsert";
+  /**
+   * @minItems 1
+   * @maxItems 5000
+   */
+  rows: [
+    {
+      [k: string]: string | undefined;
+    },
+    ...{
+      [k: string]: string | undefined;
+    }[]
+  ];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MasterBulkReport".
+ */
+export interface MasterBulkReport {
+  master_type: MasterType;
+  mode: "validate-only" | "upsert";
+  applied: boolean;
+  created: string[];
+  skipped_exact: number;
+  conflicts: BulkConflict[];
+  errors: BulkRowError[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BulkConflict".
+ */
+export interface BulkConflict {
+  row: number;
+  stable_id: string;
+  fields: string[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BulkRowError".
+ */
+export interface BulkRowError {
+  row: number;
+  field?: string | null;
+  code: string;
+  message: string;
 }
 /**
  * A document with the state of its stored file (`GET`, `POST .../restore`).

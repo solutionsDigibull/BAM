@@ -94,6 +94,16 @@ from sbam_contracts.masters_api import (
     MasterTypes,
     MasterVersionCreate,
 )
+from sbam_contracts.masters_v03 import (
+    AgentsPayloadV03,
+    MasterBulkReport,
+    MasterBulkRequest,
+    MasterList,
+    OrganizationPayloadV03,
+    RulesPayloadV03,
+    SkillsPayloadV03,
+    ToolingPayloadV03,
+)
 from sbam_contracts.mocks import MockDefinition, MockJournal, MockRunSetup
 from sbam_contracts.notifications import Notification
 from sbam_contracts.okf import (
@@ -243,6 +253,14 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/master_document_patch", MasterDocumentPatch),
     ("masters/master_document", MasterDocumentOut),
     ("masters/master_document_list", MasterDocumentList),
+    ("masters_v03/organization", OrganizationPayloadV03),
+    ("masters_v03/rules", RulesPayloadV03),
+    ("masters_v03/agents", AgentsPayloadV03),
+    ("masters_v03/skills", SkillsPayloadV03),
+    ("masters_v03/tooling", ToolingPayloadV03),
+    ("masters_v03/master_list", MasterList),
+    ("masters_v03/bulk_request", MasterBulkRequest),
+    ("masters_v03/bulk_report", MasterBulkReport),
     ("documents/document", DocumentOut),
     ("documents/purge_target", PurgeTarget),
     ("documents/purge_request", PurgeRequest),

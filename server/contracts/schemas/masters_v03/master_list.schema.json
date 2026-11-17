@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_v03/master_list:0.1.0",
+  "additionalProperties": false,
+  "description": "A whole template list (`PUT /admin/master-lists/{key}` replaces it, #782).",
+  "properties": {
+    "headers": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "pattern": "\\S",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Headers",
+      "type": "array"
+    },
+    "rows": {
+      "default": [],
+      "items": {
+        "items": {
+          "maxLength": 32767,
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "maxItems": 20000,
+      "title": "Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "headers"
+  ],
+  "title": "MasterList",
+  "type": "object"
+}

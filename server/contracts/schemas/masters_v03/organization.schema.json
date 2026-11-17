@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_v03/organization:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "org_id": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Org Id",
+      "type": "string"
+    },
+    "company_type": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Company Type",
+      "type": "string"
+    },
+    "brand_properties": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Brand Properties",
+      "type": "string"
+    },
+    "location": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Location",
+      "type": "string"
+    },
+    "certifications": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Certifications",
+      "type": "string"
+    },
+    "segment_offerings": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Segment Offerings",
+      "type": "string"
+    },
+    "customers_audience": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Customers Audience",
+      "type": "string"
+    },
+    "employees_roles": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Employees Roles",
+      "type": "string"
+    },
+    "data_sources": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Data Sources",
+      "type": "string"
+    },
+    "systems_tools": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Systems Tools",
+      "type": "string"
+    },
+    "assets": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Assets",
+      "type": "string"
+    },
+    "fde_notes": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Fde Notes",
+      "type": "string"
+    },
+    "documents": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Documents",
+      "type": "string"
+    },
+    "artifacts": {
+      "default": "",
+      "maxLength": 32767,
+      "title": "Artifacts",
+      "type": "string"
+    }
+  },
+  "structure_version": "Masters 0.3",
+  "title": "OrganizationPayloadV03",
+  "type": "object"
+}
