@@ -26,12 +26,13 @@ _OLD = (
     "'STAGE_COMPLETED', 'REMINDER'"
 )
 _NEW = _OLD + ", 'TOKEN_BUDGET_WARNING', 'TOKEN_BUDGET_LIMIT'"
-_NAME = op.f("ck_notifications_type_valid")
+_NAME = "ck_notifications_type_valid"  # op.f() needs a running migration, not an import
 
 
 def _set(values: str) -> None:
-    op.drop_constraint(_NAME, "notifications", schema="sbam", type_="check")
-    op.create_check_constraint(_NAME, "notifications", f"type IN ({values})", schema="sbam")
+    name = op.f(_NAME)
+    op.drop_constraint(name, "notifications", schema="sbam", type_="check")
+    op.create_check_constraint(name, "notifications", f"type IN ({values})", schema="sbam")
 
 
 def upgrade() -> None:

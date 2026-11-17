@@ -42,7 +42,10 @@ class CertificationRow(ProjectOwned, Base):
     __tablename__ = "certifications"
     __table_args__ = (
         status_check(CertificationLevel, "level"),
-        UniqueConstraint("tenant_id", "level", "subject_id", "content_sha256"),
+        # 0050 created it under this name; the "uq" convention would spell out all four columns.
+        UniqueConstraint(
+            "tenant_id", "level", "subject_id", "content_sha256", name="uq_certifications_tenant_id"
+        ),
         CheckConstraint("is_frozen", name="always_frozen"),
     )
 
