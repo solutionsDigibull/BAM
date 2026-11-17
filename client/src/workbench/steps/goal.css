@@ -159,7 +159,9 @@
 .bam-wb .goal-ghost { position: absolute; left: 18px; right: 64px; top: 14px; pointer-events: none; overflow: hidden; white-space: normal; }
 .bam-wb .goal-ghost-pre { visibility: hidden; }
 .bam-wb .goal-ghost-tail { color: var(--muted); }
-.bam-wb .goal-send { position: relative; z-index: 1; flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 10px; background: var(--bl-blue); color: #fff; cursor: pointer; }
+.bam-wb .goal-send { position: relative; z-index: 1; flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; color: #fff; cursor: pointer; }
+/* ReactDrops chromatic button (#823, UI team 16 Nov 2026): the material owns the face; this keeps the goal-box size. */
+.bam-wb .goal-send.chromatic-button { width: 36px; height: 36px; min-width: 0; min-height: 0; padding: 0; }
 .bam-wb .goal-send:disabled { opacity: .45; cursor: default; }
 .bam-wb .goal-hint { text-align: center; font-size: 12px; }
 .bam-wb .goal-flow { text-align: center; margin-top: 8px; }
@@ -200,7 +202,7 @@
 }
 .bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box:focus-within { border-color: var(--bl-blue); }
 .bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-ghost { left: 22px; top: 20px; }
-.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-send { width: 40px; height: 40px; border-radius: 12px; }
+.bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .goal-send { width: 40px; height: 40px; }
 .bam-wb[data-theme="dark"][data-upload-stage="1"] .shell[data-screen="1.1"] .goal-box {
   border-color: rgb(255 255 255 / .09); background: #101D2F;
   box-shadow: 0 24px 60px -18px rgb(0 0 0 / .6), 0 2px 8px rgb(0 0 0 / .35);
