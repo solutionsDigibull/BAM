@@ -17,9 +17,12 @@ export interface RelevanceRow {
   relevance?: DocumentRelevance
 }
 
-/** What the cell shows for a row; null for a row that is not ready yet (the cell shows a dash). */
+/** What the cell shows for a row: every step until the score arrives, then the score; null for a failed row (it is
+ *  listed under Needs attention with its reason, and the cell shows a dash). */
 export function relevanceCell(row: RelevanceRow, hasGoal: boolean): RelevanceCell | null {
-  if (row.state !== 'ready') return null
+  if (row.state === 'failed') return null
+  if (row.state === 'uploading') return { kind: 'note', label: 'Uploading…', title: 'The file is being uploaded.' }
+  if (row.state !== 'ready') return { kind: 'note', label: 'Checking…', title: 'The virus scan and the type check are running.' }
   const r = row.relevance
   if (r) return { kind: 'score', level: r.level, label: LEVEL_LABEL[r.level], score: r.score, reason: r.reason }
   if (!hasGoal) return { kind: 'note', label: 'Set a goal', title: 'Set the project goal to score how useful each file is for it.' }

@@ -23,10 +23,10 @@ describe("the Upload Confidence cell is the backend's relevance to the goal (#80
     });
   });
 
-  test("test_802_t41_a_file_that_is_not_ready_shows_nothing", () => {
-    for (const state of ["uploading", "checking", "failed"]) {
-      expect(relevanceCell({ state, relevance: scored }, true)).toBeNull();
-    }
+  test("test_802_t41_every_step_before_the_score_is_shown", () => {
+    expect(relevanceCell({ state: "uploading" }, true)).toMatchObject({ label: "Uploading…" });
+    expect(relevanceCell({ state: "checking" }, true)).toMatchObject({ label: "Checking…" });
+    expect(relevanceCell({ state: "failed", relevance: scored }, true)).toBeNull(); // listed under Needs attention
   });
 
   test("test_802_t42_without_an_answer_the_cell_says_why", () => {

@@ -310,7 +310,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
               <td><span className={`up-type${GENERIC.has(r.kind.type) ? ' plain' : ''}`}>{r.kind.type}</span></td>
               <td className="up-conf" title={cell ? (cell.kind === 'score' ? cell.reason : cell.title) : undefined}>
                 {!cell ? '-' : cell.kind === 'note' ? <span className="up-cnote">{cell.label}</span>
-                  : <span className={`up-cbar lvl-${cell.level.toLowerCase()}`} aria-label={`${cell.label} relevance: ${cell.reason}`}><i aria-hidden><i style={{ width: `${cell.score}%` }} /></i><span>{cell.label}</span></span>}</td>
+                  : <span className={`up-cbar lvl-${cell.level.toLowerCase()}`} aria-label={`${cell.label} relevance: ${cell.reason}`}><i aria-hidden><i style={{ width: `${cell.score}%` }} /></i><span>{cell.label} · {cell.score}</span></span>}</td>
             </tr>
           })}
           </tbody>
