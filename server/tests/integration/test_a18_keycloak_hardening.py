@@ -58,8 +58,11 @@ class Keycloak:
     def __init__(self, base: str, realm: dict[str, Any]) -> None:
         self.base, self.realm = base, realm
         self.http = httpx.Client(timeout=30)
+        self._login()
+
+    def _login(self) -> None:
         token = self.http.post(
-            f"{base}/realms/master/protocol/openid-connect/token",
+            f"{self.base}/realms/master/protocol/openid-connect/token",
             data={
                 "client_id": "admin-cli",
                 "grant_type": "password",
@@ -70,7 +73,12 @@ class Keycloak:
         self.http.headers["Authorization"] = f"Bearer {token}"
 
     def admin(self, method: str, path: str, **kw: Any) -> httpx.Response:
-        return self.http.request(method, f"{self.base}/admin/realms/bullm{path}", **kw)
+        url = f"{self.base}/admin/realms/bullm{path}"
+        res = self.http.request(method, url, **kw)
+        if res.status_code == 401:  # master admin tokens live 60 s; a slow run outlives one
+            self._login()
+            res = self.http.request(method, url, **kw)
+        return res
 
     def user(self, name: str, role: str, password: str = STRONG) -> str:
         made = self.admin(
