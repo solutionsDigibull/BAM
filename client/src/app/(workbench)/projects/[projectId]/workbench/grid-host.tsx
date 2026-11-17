@@ -14,6 +14,7 @@ import { ApiErrorState, EmptyState, LoadingState } from "@/components/ui-kit";
 import type { WorkflowSummary } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 import { useSlotElement } from "@/workbench/host/slots";
+import { guardPoll } from "@/lib/session-ended";
 
 import { HostTheme } from "./host-theme";
 
@@ -32,7 +33,9 @@ function Grid({ projectId }: { projectId: string }) {
     method: "get",
     // A workflow appears a moment after the SOW is approved: keep asking while there is none.
     queryOptions: {
-      refetchInterval: (q) => (currentWorkflow(q.state.data?.data?.items) ? false : 5_000),
+      refetchInterval: guardPoll((q) =>
+        currentWorkflow(q.state.data?.data?.items) ? false : 5_000,
+      ),
     },
   });
   if (list.query.isLoading) return <LoadingState />;

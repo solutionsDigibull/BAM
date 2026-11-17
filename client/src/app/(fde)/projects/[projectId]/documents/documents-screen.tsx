@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import { ApiErrorState, EmptyState, LoadingState } from "@/components/ui-kit";
 import type { DocumentOut, PipelineTimeline } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import { EMPTY_DOCUMENTS, documentsResource, pipelinePath } from "../../workspace-api";
 import { POLL_MS, countActive, inBin, inList, shouldPoll } from "./document-state";
@@ -30,7 +31,9 @@ export function DocumentsScreen({ projectId }: { projectId: string }) {
     url: pipelinePath(projectId),
     method: "get",
     queryOptions: {
-      refetchInterval: (q) => (q.state.data?.data.state === "INGESTING" ? POLL_MS : false),
+      refetchInterval: guardPoll((q) =>
+        q.state.data?.data.state === "INGESTING" ? POLL_MS : false,
+      ),
     },
   });
   const docs = useCustom<{ items: DocumentOut[] }, ApiError>({
@@ -38,8 +41,9 @@ export function DocumentsScreen({ projectId }: { projectId: string }) {
     method: "get",
     config: { query: { include_deleted: "true" } },
     queryOptions: {
-      refetchInterval: (q) =>
+      refetchInterval: guardPoll((q) =>
         shouldPoll(q.state.data?.data.items ?? [], timeline.result.data?.state) ? POLL_MS : false,
+      ),
     },
   });
   const all = docs.result.data?.items ?? [];

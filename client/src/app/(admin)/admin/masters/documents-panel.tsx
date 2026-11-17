@@ -32,6 +32,7 @@ import {
 } from "@/components/ui-kit";
 import type { FiletypeInfo, MasterDocumentOut, MasterEntry, MasterType } from "@/contracts";
 import { dataProvider, type ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import {
   DOCUMENT_POLL_MS,
@@ -177,8 +178,9 @@ export function DocumentsPanel() {
     method: "get",
     config: { query: filter === "ALL" ? undefined : { master_type: filter } },
     queryOptions: {
-      refetchInterval: (q) =>
+      refetchInterval: guardPoll((q) =>
         (q.state.data?.data.items ?? []).some((d) => isActive(d)) ? DOCUMENT_POLL_MS : false,
+      ),
     },
   });
   const filetypes = useCustom<FiletypeInfo[], ApiError>({ url: FILETYPES_URL, method: "get" });
