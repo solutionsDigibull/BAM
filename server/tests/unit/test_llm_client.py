@@ -432,6 +432,7 @@ def test_e6_1_shipped_prompts_match_their_manifest() -> None:
         "live-smoke",
         "ocr-page",
         "schema-ddl",
+        "score-relevance",
         "smoke",
         "sow-generate",
         "testgen",
