@@ -3,6 +3,7 @@
 
 import importlib.util
 import json
+import shutil
 import subprocess
 from pathlib import Path
 from types import ModuleType
@@ -92,9 +93,7 @@ def node(expression: str) -> Any:
     return json.loads(done.stdout)
 
 
-node_missing = (
-    subprocess.run(["node", "--version"], capture_output=True, check=False).returncode != 0
-)
+node_missing = shutil.which("node") is None  # run() would raise, not skip, without node
 
 
 @pytest.mark.skipif(node_missing, reason="node is not installed")
