@@ -135,10 +135,19 @@ export function GoalCapture() {
 export function GoalExpansion() {
   const text = useGoal(s => s.text)
   const error = useGoal(s => s.error)
+  const isatvon = useGoal(s => s.isatvon)
   if (!text) return null
   return <>
     <div className="as-urow"><div className="as-uline"><div className="as-msg as-user"><p>{text}</p></div></div></div>
-    <div className="as-arow"><span className="as-avatar" aria-hidden><img src={bull.src} alt="" /></span><div className="as-abody"><div className="as-msg as-bot">
+    <div className="as-arow"><span className="as-avatar" aria-hidden><img src={bull.src} alt="" /></span><div className="as-abody"><div className="as-msg as-bot goal-draft">
+      {isatvon.length > 0 && <>
+        {/* The ISATVON template under the goal (#798): fixed text from the server, read-only, display only. */}
+        <p className="goal-draft-title"><strong>ISATVON</strong><span>The template this agent works under</span></p>
+        <dl className="goal-rows" aria-label="ISATVON template">{isatvon.map(s => <div key={s.key} className="goal-row">
+          <dt><code>{s.key}</code>{s.label}</dt>
+          <dd style={{ whiteSpace: 'pre-line' }}>{s.text}</dd>
+        </div>)}</dl>
+      </>}
       {error
         ? <p role="alert">{error}</p>
         : <p>Saved on the project. The knowledge graph and the SOW use it as context. Add your files on the left to start.</p>}

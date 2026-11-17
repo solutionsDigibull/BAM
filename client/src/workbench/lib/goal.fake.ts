@@ -17,6 +17,15 @@ const json = (status: number, body: unknown, etag?: string) =>
     headers: { "content-type": status < 400 ? "application/json" : "application/problem+json", ...(etag ? { etag } : {}) },
   });
 
+/** What the server sends with a goal (#798): the fixed template, the goal in I. Two rows are enough for the client. */
+export const fakeIsatvon = (goal: string | null) =>
+  goal
+    ? [
+        { key: "I", label: "Instructions", text: `You are an FDE Agent operating under ISATVON constraints.\nGoal: ${goal}` },
+        { key: "N", label: "Notification", text: "Webhook/alert channels + trigger list" },
+      ]
+    : [];
+
 export function installGoalApi(): FakeGoalApi {
   const api: FakeGoalApi = { goals: new Map(), calls: [], failing: new Map() };
   const route = new RegExp(`^${API_BASE}/projects/([^/]+)/goal$`);
@@ -34,7 +43,7 @@ export function installGoalApi(): FakeGoalApi {
     const row = api.goals.get(project) ?? { goal: null, version: 1 };
     api.goals.set(project, row);
     const etag = `"${row.version}"`;
-    if (method === "GET") return json(200, { project_id: project, goal: row.goal }, etag);
+    if (method === "GET") return json(200, { project_id: project, goal: row.goal, isatvon: fakeIsatvon(row.goal) }, etag);
     if (!ifMatch) return json(428, { status: 428, code: "PRECONDITION_REQUIRED", title: "If-Match required" });
     if (ifMatch !== etag) return json(412, { status: 412, code: "PRECONDITION_FAILED", title: "Stale" });
     const goal = (body as { goal: string | null }).goal;
@@ -42,7 +51,7 @@ export function installGoalApi(): FakeGoalApi {
       row.goal = goal;
       row.version += 1;
     }
-    return json(200, { project_id: project, goal: row.goal }, `"${row.version}"`);
+    return json(200, { project_id: project, goal: row.goal, isatvon: fakeIsatvon(row.goal) }, `"${row.version}"`);
   });
   return api;
 }
