@@ -55,7 +55,15 @@ from sbam_workers.settings import WorkerSettings
 
 log = logging.getLogger("sbam_workers.llm")
 
-ALIASES = ("sbam-ocr", "sbam-sow", "sbam-isatvon", "sbam-codegen", "sbam-testgen", "sbam-corrector")
+ALIASES = (
+    "sbam-ocr",
+    "sbam-sow",
+    "sbam-isatvon",
+    "sbam-codegen",
+    "sbam-testgen",
+    "sbam-corrector",
+    "sbam-relevance",  # #802: how useful a parsed document is for the goal
+)
 _DATA_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 CHARS_PER_TOKEN = 4  # ponytail: a rough guard; the model's own count is in llm_calls after the call
 # Images (E4.8, a scanned page for `sbam-ocr`): carried to Bifrost as data URLs, never stored. The

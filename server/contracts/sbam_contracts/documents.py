@@ -301,6 +301,12 @@ class RelevanceLevel(StrEnum):
 
 
 RELEVANCE_REASON_MAX: Final = 200
+RELEVANCE_RESCORE: Final = "RelevanceRescore"  # workflow type of POST P/documents/relevance/rescore
+
+
+def relevance_workflow_id(project_id: UUID) -> str:
+    """One re-score per project at a time; a newer start replaces a running one (#802)."""
+    return f"relevance-{project_id}"
 
 
 class RelevanceAnswer(BaseModel):

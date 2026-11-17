@@ -32,7 +32,9 @@ WORKFLOW_ID_PATTERN: Final = (
     # knowledge-: KnowledgeRebuild (E5.2), sow-: SowRegenerate (E6.3), sow-export-: SowExport (E6.4)
     rf"|knowledge-{_UUID}|sow-{_UUID}|sow-export-{_UUID}-(?:pdf|docx|md)"
     # isatvon-regen-: IsatvonRegenerate (E8.4), one re-extraction per Macro Skill / Sub-Skill
-    rf"|isatvon-regen-{_UUID})$"
+    rf"|isatvon-regen-{_UUID}"
+    # relevance-: RelevanceRescore (#802), one re-score of a project's documents at a time
+    rf"|relevance-{_UUID})$"
 )
 WORKFLOW_ID: Final = re.compile(WORKFLOW_ID_PATTERN)
 

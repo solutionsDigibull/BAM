@@ -8,6 +8,10 @@ Documents (E4.9): `GET /projects/{id}/documents` lists them (`?include_deleted=t
 in the 90-day bin), `DELETE .../documents/{id}` soft-deletes one and `POST .../restore` brings it
 back. The rules live in `sbam_api.ingest.retention`.
 
+Relevance (#802): `POST .../documents/relevance/rescore` scores every parsed document against the
+project's current goal in the background (`RelevanceRescore`): 202 `{"run": Run}`, 409 without a
+goal, 503 when Temporal is down. A newer call replaces a running re-score.
+
 Retry (E4.13): `POST .../documents/{id}/retry` puts a document whose scan or parse failed back to
 SCANNING and starts `DocumentIngestion` for it again: 202 `{"run": Run}`. 409 when it has not failed
 (an infected file included), 404 unassigned / other tenant / deleted, 423 when a frozen version uses
@@ -34,7 +38,7 @@ from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.db.repository import TenantContext
-from sbam_api.ingest import retention, service, tusd
+from sbam_api.ingest import relevance, retention, service, tusd
 from sbam_api.ingest.ingestion import start_ingestion_run, start_waiting
 from sbam_api.ingest.rules import STAGING
 from sbam_api.projects.guard import active_project
@@ -150,6 +154,27 @@ def _restore(
 
 
 IdempotencyKey = Annotated[str | None, Header(min_length=1, max_length=128)]
+
+
+@router.post(
+    "/projects/{project_id}/documents/relevance/rescore",
+    status_code=202,
+    response_model=RunAccepted,
+)
+async def rescore_relevance(
+    project_id: Project, request: Request, user: User, sessions: Sessions
+) -> RunAccepted:
+    if not await asyncio.to_thread(relevance.has_goal, sessions, user, project_id):
+        raise relevance.no_goal()
+    settings: Settings = request.app.state.settings
+    run = await relevance.start_rescore(
+        sessions,
+        lambda: temporal_client(request),
+        user,
+        project_id,
+        with_search_attributes=settings.temporal_search_attributes,
+    )
+    return RunAccepted(run=run)
 
 
 @router.post(

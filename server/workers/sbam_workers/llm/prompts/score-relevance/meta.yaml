@@ -1,0 +1,2 @@
+alias: sbam-relevance
+description: How useful one parsed document is for the project goal (#802). Output RelevanceAnswer.
