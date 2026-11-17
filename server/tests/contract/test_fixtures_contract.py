@@ -120,12 +120,13 @@ def test_e0_8_t01_masters_workbook_loads_with_the_six_frozen_tabs() -> None:
         book.close()
 
 
-def test_e0_8_t01_masters_workbook_passes_the_masters_contract() -> None:
-    book = openpyxl.load_workbook(fixture_path("masters", WORKBOOK_NAME), data_only=False)
+def test_e0_8_t01_masters_0_3_workbook_passes_the_masters_contract() -> None:
+    """#781: the synthetic Masters 0.3 fixture (the 0.2 workbook is the migration's input now)."""
+    book = openpyxl.load_workbook(fixture_path("masters", "masters_0_3.xlsx"), data_only=False)
     sheets = {ws.title: [list(row) for row in ws.iter_rows(values_only=True)] for ws in book}
     report = parse_workbook(sheets)
     assert report.errors == []
-    assert len(report.rows) == 66
+    assert len(report.rows) == 13 + 43  # synthetic entries + the frozen Filetype rows
 
 
 # --- SOW fixture ---------------------------------------------------------------------------------

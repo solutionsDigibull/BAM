@@ -132,6 +132,22 @@
         "system": "",
         "micro": []
       }
+    },
+    "legacy_0_2": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "maxLength": 32767,
+            "type": "string"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Legacy 0 2"
     }
   },
   "structure_version": "Masters 0.3",

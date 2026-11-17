@@ -6,7 +6,6 @@ from it with openpyxl (or by rewriting its zip) in the test.
 
 import hashlib
 import io
-import json
 import zipfile
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -26,7 +25,7 @@ from sqlalchemy import func, select
 from test_auth import TENANT_A, problem
 from test_masters_api import MastersHarness, engine_with_masters
 
-WORKBOOK = fixture_path("masters", "BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx")
+WORKBOOK = fixture_path("masters", "masters_0_3.xlsx")  # Masters 0.3, synthetic (#781)
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -141,7 +140,7 @@ def test_e3_3_changed_row_is_a_new_version(h: ImportHarness) -> None:
     entries, versions = h.counts()
 
     def edit(book: Workbook) -> None:
-        cell = book["Rules"].cell(5, column(book, "Rules", "Components (BOM)"))
+        cell = book["Rules"].cell(5, column(book, "Rules", "Owner / version"))
         cell.value = f"{cell.value or ''} (revised)"
 
     report = h.upload(workbook(edit)).json()
@@ -155,37 +154,36 @@ def test_e3_3_rows_dropped_from_the_workbook_are_kept_and_counted(h: ImportHarne
 
     def drop(book: Workbook) -> None:
         ws = book["Rules"]
-        for c in ws[5][1:]:
-            c.value = None  # label only = a blank template row
+        for c in ws[5]:
+            c.value = None  # the whole row, id included: an empty row
 
     report = h.upload(workbook(drop)).json()
     assert tab(report, "Rules")["missing"] == 1 and h.counts()[0] == entries
 
 
-def reorder_rag(rename: dict[str, str] | None = None) -> Callable[[Workbook], None]:
-    """Skill #1's RAG Reference with its keys reversed (and optionally renamed)."""
-
-    def change(book: Workbook) -> None:
-        cell = book["Skills"].cell(4, column(book, "Skills", "RAG Reference"))
-        rag = json.loads(str(cell.value))
-        items = [((rename or {}).get(k, k), v) for k, v in reversed(rag.items())]
-        cell.value = json.dumps(dict(items))
-
-    return change
+def entry_id(h: ImportHarness, stable_id: str) -> str:
+    with h.sessions() as s:
+        entry = s.scalars(select(MasterEntry).where(MasterEntry.stable_id == stable_id)).one()
+    return str(entry.id)
 
 
-def test_e3_3_rag_key_order_is_not_a_change(h: ImportHarness) -> None:
+def test_mui_2_t05_reimport_keeps_the_rules_engine_fields(h: ImportHarness) -> None:
+    """The workbook holds the columns only: an import never wipes the editor fields."""
     assert h.upload(workbook()).status_code == 200
-    report = h.upload(workbook(reorder_rag())).json()
-    assert tab(report, "Skills")["updated"] == 0 and tab(report, "Skills")["errors"] == []
-
-
-def test_e3_3_renamed_rag_key_is_a_row_error(h: ImportHarness) -> None:
-    report = h.upload(workbook(reorder_rag({"ID Field": "Id"}))).json()
-    assert report["applied"] is False
-    assert [(e["row"], e["column"]) for e in tab(report, "Skills")["errors"]] == [
-        (4, "RAG Reference")
-    ]
+    rule_id = entry_id(h, "RULE-POLICY-BOM")
+    current = h.call("GET", f"/admin/masters/RULES/{rule_id}", h.admin_a())
+    payload = {
+        **current.json()["payload"],
+        "fde_use": "FDE runs the BOM check",
+        "prompts": {"system": "You are the BOM gate", "micro": [{"name": "a", "text": "b"}]},
+    }
+    entry = {"master_type": "RULES", "id": rule_id}
+    assert h.version(entry, payload, current.headers["etag"]).status_code == 201
+    report = h.upload(workbook()).json()
+    assert tab(report, "Rules")["updated"] == 0 and tab(report, "Rules")["errors"] == []
+    kept = h.call("GET", f"/admin/masters/RULES/{rule_id}", h.admin_a()).json()["payload"]
+    assert kept["fde_use"] == "FDE runs the BOM check"
+    assert kept["prompts"]["system"] == "You are the BOM gate"
 
 
 # --- T02 / T03 / T04 / T09: structure, rows and the frozen Filetype -----------------------------
@@ -193,13 +191,13 @@ def test_e3_3_renamed_rag_key_is_a_row_error(h: ImportHarness) -> None:
 
 def test_e3_3_t02_renamed_rules_column_is_422_with_a_diff(h: ImportHarness) -> None:
     def rename(book: Workbook) -> None:
-        book["Rules"].cell(2, column(book, "Rules", "Components (BOM)")).value = "BOM"
+        book["Rules"].cell(2, column(book, "Rules", "Owner / version")).value = "Owner"
 
     body = problem(h.upload(workbook(rename)), 422, "STRUCTURE_MISMATCH")
     assert body["errors"][0]["diff"] == {
         "tab": "Rules",
-        "expected": "Components (BOM)",
-        "actual": "BOM",
+        "expected": "Owner / version",
+        "actual": "Owner",
         "kind": "renamed",
     }
     assert h.counts() == (0, 0)
@@ -208,7 +206,7 @@ def test_e3_3_t02_renamed_rules_column_is_422_with_a_diff(h: ImportHarness) -> N
 def test_e3_3_t03_added_agents_column_is_422_added(h: ImportHarness) -> None:
     def add(book: Workbook) -> None:
         ws = book["Agents"]
-        ws.cell(2, column(book, "Agents", "Misc") + 1).value = "Priority"
+        ws.cell(2, column(book, "Agents", "Model") + 1).value = "Priority"
 
     body = problem(h.upload(workbook(add)), 422, "STRUCTURE_MISMATCH")
     assert [e["diff"]["kind"] for e in body["errors"]] == ["added"]
@@ -216,16 +214,16 @@ def test_e3_3_t03_added_agents_column_is_422_added(h: ImportHarness) -> None:
     assert h.counts() == (0, 0)
 
 
-def test_e3_3_t04_bad_rag_json_is_a_row_error_and_nothing_is_written(h: ImportHarness) -> None:
+def test_e3_3_t04_bad_agent_kind_is_a_row_error_and_nothing_is_written(h: ImportHarness) -> None:
     def bad(book: Workbook) -> None:
-        book["Skills"].cell(5, column(book, "Skills", "RAG Reference")).value = '{"source": '
+        book["Agents"].cell(5, column(book, "Agents", "Kind")).value = "Bot"
 
     res = h.upload(workbook(bad))
     assert res.status_code == 200, res.text
     report = res.json()
     assert report["applied"] is False
-    errors = tab(report, "Skills")["errors"]
-    assert {(e["tab"], e["row"], e["column"]) for e in errors} == {("Skills", 5, "RAG Reference")}
+    errors = tab(report, "Agents")["errors"]
+    assert {(e["tab"], e["row"], e["column"]) for e in errors} == {("Agents", 5, "Kind")}
     assert h.counts() == (0, 0)
 
 
@@ -364,7 +362,7 @@ def test_e3_3_concurrent_edit_during_apply_is_409(h: ImportHarness) -> None:
     assert h.upload(workbook()).status_code == 200
 
     def edit(book: Workbook) -> None:
-        cell = book["Rules"].cell(5, column(book, "Rules", "Components (BOM)"))
+        cell = book["Rules"].cell(5, column(book, "Rules", "Owner / version"))
         cell.value = f"{cell.value or ''} (revised)"
 
     # another edit bumps the row between our read and _apply's flush

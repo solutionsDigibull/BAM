@@ -36,7 +36,7 @@ TENANT = uuid.uuid4()
 ADMIN = CurrentUser(
     user_id=uuid.uuid4(), keycloak_sub="admin-a", tenant_id=TENANT, roles=frozenset()
 )
-RULE_BOM = {"domain_rule": "RULE-BOM: applies to BOM. Policy: compare", "misc": "Status: Proposed"}
+RULE_BOM = {"rule_id": "RULE-BOM", "rule_type_description": "Policy: compare"}  # Masters 0.3
 
 
 @pytest.fixture(scope="module")
@@ -73,7 +73,7 @@ def new_entry(sessions: sessionmaker[Session], payload: dict[str, str] = RULE_BO
 def test_e3_2_t03_versions_reject_update_delete_and_truncate(
     sessions: sessionmaker[Session],
 ) -> None:
-    entry_id = new_entry(sessions, {**RULE_BOM, "domain_rule": "RULE-T03: x"})
+    entry_id = new_entry(sessions, {**RULE_BOM, "rule_id": "RULE-T03"})
     with sessions() as s:  # a snapshot row, so the row triggers have something to refuse
         project = Project(tenant_id=TENANT, name="T03", status="ACTIVE", state="IDLE")
         s.add(project)
@@ -95,15 +95,15 @@ def test_e3_2_t03_versions_reject_update_delete_and_truncate(
         row = s.scalars(
             select(MasterEntryVersion).where(MasterEntryVersion.entry_id == entry_id)
         ).one()
-    assert row.payload["domain_rule"] == "RULE-T03: x"
+    assert row.payload["rule_id"] == "RULE-T03"
 
 
 def test_e3_2_t06_concurrent_versions_one_wins_one_409(sessions: sessionmaker[Session]) -> None:
-    entry_id = new_entry(sessions, {**RULE_BOM, "domain_rule": "RULE-T06: x"})
+    entry_id = new_entry(sessions, {**RULE_BOM, "rule_id": "RULE-T06"})
     results: list[int] = []
     gate = threading.Barrier(2)
 
-    def write(misc: str) -> None:
+    def write(owner: str) -> None:
         gate.wait()
         with sessions() as s:
             try:
@@ -112,7 +112,9 @@ def test_e3_2_t06_concurrent_versions_one_wins_one_409(sessions: sessionmaker[Se
                     ADMIN,
                     MasterType.RULES,
                     entry_id,
-                    MasterVersionCreate(payload={"domain_rule": "RULE-T06: x", "misc": misc}),
+                    MasterVersionCreate(
+                        payload={**RULE_BOM, "rule_id": "RULE-T06", "owner_version": owner}
+                    ),
                     '"1"',
                 )
                 results.append(201)
@@ -131,6 +133,43 @@ def test_e3_2_t06_concurrent_versions_one_wins_one_409(sessions: sessionmaker[Se
             select(MasterEntryVersion.version).where(MasterEntryVersion.entry_id == entry_id)
         ).all()
     assert sorted(versions) == [1, 2]
+
+
+def test_mui_2_t06_0054_migrates_0_2_rows_and_leaves_0_3_rows_alone(
+    sessions: sessionmaker[Session],
+) -> None:
+    native = new_entry(sessions, {**RULE_BOM, "rule_id": "RULE-NATIVE"})  # made in 0.3
+    command.downgrade(config(), "0053_project_goal")
+    old_id = uuid.uuid4()
+    with sessions() as s:  # a 0.2 row, as BAM stored it before #781
+        s.execute(
+            text(
+                "INSERT INTO sbam.master_entries (id, tenant_id, master_type, stable_id, row_label,"
+                " status, source_kind, current_version, row_version)"
+                " VALUES (:id, :t, 'RULES', 'RULE-OLD', 'Rule #9', 'APPROVED', 'ADMIN_ENTRY', 1, 1)"
+            ),
+            {"id": old_id, "t": TENANT},
+        )
+        s.execute(
+            text(
+                "INSERT INTO sbam.master_entry_versions (id, tenant_id, entry_id, version, payload)"
+                " VALUES (:id, :t, :e, 1, CAST(:p AS jsonb))"
+            ),
+            {"id": uuid.uuid4(), "t": TENANT, "e": old_id, "p": '{"domain_rule": "RULE-OLD: x"}'},
+        )
+        s.commit()
+    command.upgrade(config(), "head")
+    with sessions() as s:
+        old = service.get_entry(s, ADMIN, MasterType.RULES, old_id)
+        new = service.get_entry(s, ADMIN, MasterType.RULES, native)
+    assert (old[0].row_label, old[1].version, old[1].payload["rule_id"]) == (
+        "RULE-OLD",
+        2,
+        "RULE-OLD",
+    )
+    assert old[1].payload["rule_type_description"] == "RULE-OLD: x"
+    assert old[1].payload["legacy_0_2"]["_row_label"] == "Rule #9"
+    assert (new[1].version, new[1].payload["rule_id"]) == (1, "RULE-NATIVE")  # untouched
 
 
 def test_e3_2_migration_downgrades_and_upgrades_cleanly(

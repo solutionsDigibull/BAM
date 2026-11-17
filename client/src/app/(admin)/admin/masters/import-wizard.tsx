@@ -228,7 +228,7 @@ export function ImportWizard({
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
-            <p>Drop the BAM 0.2 masters workbook here, or click to choose it</p>
+            <p>Drop the Masters 0.3 workbook here, or click to choose it</p>
             <Typography.Text type="secondary">
               .xlsx · at most 15 MB · scanned for viruses
             </Typography.Text>

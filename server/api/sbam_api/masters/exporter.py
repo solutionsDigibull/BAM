@@ -35,6 +35,7 @@ from sbam_contracts.masters import (
     cell_text,
 )
 from sbam_contracts.masters_api import MasterColumn, MasterTypeInfo, MasterTypes
+from sbam_contracts.masters_v03 import COLUMNS as V03_COLUMNS
 from sbam_contracts.masters_workbook import (
     COLUMNS,
     HEADER_ROWS,
@@ -42,7 +43,6 @@ from sbam_contracts.masters_workbook import (
     README_TAB,
     ROW_LABEL_PREFIX,
     TABS,
-    TOOLING_TAB,
 )
 from sqlalchemy.orm import Session
 
@@ -58,9 +58,7 @@ TENANT_TYPES: Final = [t for t in TABS if t != MasterType.FILETYPE]
 
 
 def template() -> bytes:
-    book = _layout()
-    del book[TOOLING_TAB]
-    return _save(book)
+    return _save(_layout())
 
 
 def export(session: Session, user: CurrentUser, project_id: uuid.UUID | None) -> tuple[str, bytes]:
@@ -120,6 +118,9 @@ def master_types() -> MasterTypes:
             MasterColumn(header=header, field=field, description=descriptions[i])
             for i, (header, field) in enumerate(COLUMNS[master_type])
         ]
+        if master_type in V03_COLUMNS:  # Masters 0.3: column A is the id column, listed first
+            key, header, description = V03_COLUMNS[master_type][0]
+            columns.insert(0, MasterColumn(header=header, field=key, description=description))
         types.append(
             MasterTypeInfo(
                 master_type=master_type,

@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 import { guard, postFile, signedIn, USERS } from "./stack";
 
-// E03 (E15.1-T03): the consolidated masters workbook imports, exports and re-imports unchanged (an
+// E03 (E15.1-T03): the Masters 0.3 workbook (synthetic fixture, #781) imports, exports and re-imports unchanged (an
 // identical round-trip); a workbook whose structure changed is refused with the difference.
 const MASTERS = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -36,7 +36,7 @@ test("e15_1_t03 masters round-trip is identical; a changed structure is rejected
   const upsert = await postFile(
     admin,
     "/admin/masters/import",
-    workbook("BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx"),
+    workbook("masters_0_3.xlsx"),
     { mode: "upsert" },
   );
   expect(upsert.status, JSON.stringify(upsert.body)).toBe(200);
@@ -69,5 +69,5 @@ test("e15_1_t03 masters round-trip is identical; a changed structure is rejected
   expect(changed.status).toBe(422);
   const problem = changed.body as { code: string; errors: { diff?: Record<string, string> }[] };
   expect(problem.code).toBe("STRUCTURE_MISMATCH");
-  expect(problem.errors[0]?.diff).toMatchObject({ tab: "Rules", actual: "BOM", kind: "renamed" });
+  expect(problem.errors[0]?.diff).toMatchObject({ tab: "Rules", actual: "Owner", kind: "renamed" });
 });

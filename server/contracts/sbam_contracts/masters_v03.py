@@ -1,8 +1,9 @@
 """Admin masters contract, "Masters 0.3": the manager-approved Admin Masters UI (ADR 0029, #780).
 
 The column sets are the approved workbook's own (`Admin_Masters/src/workbook.json`), in its order,
-with its row-3 descriptions. This module is additive: BAM 0.2 (`sbam_contracts.masters`) stays the
-stored layout until #781 migrates the payloads and switches the importer, exporter and service.
+with its row-3 descriptions. Since #781 this is the stored layout; BAM 0.2
+(`sbam_contracts.masters`) stays only as the source of the data migration and for the frozen
+Filetype rows.
 
 Rules worth knowing
   * Payload keys are the approved headers in snake case. `COLUMNS` maps each key to its exact
@@ -15,7 +16,8 @@ Rules worth knowing
     (`rule_org_ids`, `rule_skill_refs`), exactly as the approved UI reads them, so there is one
     source of truth and nothing to keep in sync.
   * Status lives in a workbook column on Rules and Tools only (`record_status`); its leading word
-    maps onto `MasterStatus` (`status_of`). The other masters default to PROPOSED.
+    maps onto `MasterStatus` (`status_of`). The other masters keep their entry's status.
+  * `legacy_0_2` holds the BAM 0.2 values that have no 0.3 column, so the migration loses nothing.
   * Template lists (Employees, Customers, Assets, Systems) are not masters: a list is replaced as
     a whole by an upload and never lands in a master tab.
 """
@@ -59,6 +61,7 @@ class OrganizationPayloadV03(_Strict):
     fde_notes: Text = ""
     documents: Text = ""
     artifacts: Text = ""
+    legacy_0_2: dict[str, Text] | None = None  # BAM 0.2 values with no 0.3 column (#781)
 
 
 class MicroPrompt(_Strict):
@@ -87,6 +90,7 @@ class RulesPayloadV03(_Strict):
     client_use: Text = ""
     acts_on: Text = ""
     prompts: RulePrompts = RulePrompts()
+    legacy_0_2: dict[str, Text] | None = None  # BAM 0.2 values with no 0.3 column (#781)
 
 
 class AgentKind(StrEnum):
@@ -103,6 +107,7 @@ class AgentsPayloadV03(_Strict):
     source: Text = ""  # "Built in BuLLM" or "Imported · <path>"
     tools: Text = ""
     model: Text = ""
+    legacy_0_2: dict[str, Text] | None = None  # BAM 0.2 values with no 0.3 column (#781)
 
 
 class SkillsPayloadV03(_Strict):
@@ -116,6 +121,7 @@ class SkillsPayloadV03(_Strict):
     outcome: Text = ""
     next: Text = ""
     references: Text = ""
+    legacy_0_2: dict[str, Text] | None = None  # BAM 0.2 values with no 0.3 column (#781)
 
 
 class ToolingPayloadV03(_Strict):
@@ -130,6 +136,7 @@ class ToolingPayloadV03(_Strict):
     record_type: Text = ""
     source_tab: Text = ""
     bullm_badge: Text = ""
+    legacy_0_2: dict[str, Text] | None = None  # BAM 0.2 values with no 0.3 column (#781)
 
 
 MasterPayloadV03 = (
@@ -310,7 +317,7 @@ COLUMNS: Final[dict[MasterType, tuple[tuple[str, str, str], ...]]] = {
     ),
 }
 
-_ID_KEY: Final = {
+ID_KEY: Final = {
     MasterType.ORGANIZATION: "org_id",
     MasterType.RULES: "rule_id",
     MasterType.AGENTS: "agent_id",
@@ -321,7 +328,7 @@ _ID_KEY: Final = {
 
 def stable_id(master_type: MasterType, payload: MasterPayloadV03) -> str | None:
     """The id column, trimmed and upper-cased; None when blank (the server assigns one)."""
-    value = str(getattr(payload, _ID_KEY[master_type])).strip().upper()
+    value = str(getattr(payload, ID_KEY[master_type])).strip().upper()
     return value or None
 
 
@@ -347,15 +354,29 @@ _STATUS_WORDS: Final = {
 _LEADING_WORD: Final = re.compile(r"^\s*([A-Za-z]+)")
 
 
-def status_of(payload: MasterPayloadV03) -> MasterStatus:
-    """Rules and Tools: the Status column's leading word; anything else is PROPOSED."""
-    text = getattr(payload, "record_status", "")
-    match = _LEADING_WORD.match(text)
-    return (
-        _STATUS_WORDS.get(match.group(1).lower(), MasterStatus.PROPOSED)
-        if match
-        else (MasterStatus.PROPOSED)
-    )
+def status_of(payload: object) -> MasterStatus | None:
+    """Rules and Tools: the Status column's leading word (anything else is PROPOSED).
+
+    None for the masters without a Status column: the entry keeps the status it has.
+    """
+    if not isinstance(payload, RulesPayloadV03 | ToolingPayloadV03):
+        return None
+    match = _LEADING_WORD.match(payload.record_status)
+    word = match.group(1).lower() if match else ""
+    return _STATUS_WORDS.get(word, MasterStatus.PROPOSED)
+
+
+def is_restricted(payload: object) -> bool:
+    """Restricted entries never reach an authoritative snapshot (E3.2).
+
+    Tools: their Owner / access column. Any master: a BAM 0.2 `security_access_level` kept in
+    `legacy_0_2` by the migration, so an entry that was Restricted stays Restricted.
+    """
+    texts = [getattr(payload, "owner_access", "") if isinstance(payload, ToolingPayloadV03) else ""]
+    legacy = getattr(payload, "legacy_0_2", None)
+    if isinstance(legacy, dict):
+        texts.append(str(legacy.get("security_access_level", "")))
+    return any("restricted" in text.lower() for text in texts)
 
 
 def _refs(text: str) -> list[str]:

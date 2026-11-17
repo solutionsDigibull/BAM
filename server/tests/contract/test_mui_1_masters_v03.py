@@ -111,7 +111,7 @@ def test_mui_1_t06_stable_id_status_and_links() -> None:
     )
     assert status_of(RulesPayloadV03(record_status="Active")) == MasterStatus.APPROVED
     assert status_of(ToolingPayloadV03(record_status="Archived")) == MasterStatus.RETIRED
-    assert status_of(SkillsPayloadV03()) == MasterStatus.PROPOSED
+    assert status_of(SkillsPayloadV03()) is None  # no Status column: the entry keeps its own
 
     rule = RulesPayloadV03(
         mapping_enforcement="Org: ORG-BU-01/02; ORG-HQ. Skills: SK-01 gate",

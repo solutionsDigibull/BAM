@@ -4,8 +4,9 @@
   a 404 like a missing one.
 * Admins create ORGANIZATION / RULES / AGENTS / SKILLS / TOOLING entries. FILETYPE (and README) come
   only from the super-admin workbook import (E3.3): 403 here.
-* The payload is validated by the type's model (no extra keys; errors at `payload.<field>`).
-  `stable_id`, `status` and `source_kind` come from `masters.identify` and live on the entry.
+* The payload is validated by the type's Masters 0.3 model (no extra keys; errors at
+  `payload.<field>`). The id column (`Org ID`, `Rule ID`, ...) is the stable id and the row label;
+  `status` comes from the Status column on Rules and Tools, and the other masters keep theirs.
 * A version is never changed: a new payload is version n+1 (`If-Match` = the entry's ETag). A stale
   ETag, or losing the race on (entry, version), answers 409 VERSION_CONFLICT. The stable id can't
   change in a new version; a different id is a different entry.
@@ -20,7 +21,7 @@ from typing import Any
 
 from pydantic import ValidationError
 from sbam_contracts.api import ErrorCode, FieldError
-from sbam_contracts.masters import ADMIN_EDITABLE, MasterIdentity, MasterType, identify
+from sbam_contracts.masters import ADMIN_EDITABLE, MasterIdentity, MasterType
 from sbam_contracts.masters_api import (
     InclusionReport,
     MasterEntryCreate,
@@ -28,7 +29,8 @@ from sbam_contracts.masters_api import (
     SnapshotDocument,
     SnapshotEntry,
 )
-from sbam_contracts.masters_workbook import PAYLOAD_MODELS, ROW_LABEL_PREFIX, TOOLING_LABEL
+from sbam_contracts.masters_v03 import ID_KEY, status_of
+from sbam_contracts.masters_workbook import ID_HEADER, ID_LABEL, PAYLOAD_MODELS, row_identity
 from sbam_contracts.projects import ProjectStatus
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -85,9 +87,13 @@ def _editable(master_type: MasterType) -> None:
 
 
 def _identity(
-    master_type: MasterType, row_label: str, payload: dict[str, Any]
-) -> tuple[dict[str, Any], MasterIdentity]:
-    """Validate the payload with the type's model; derive the SBAM metadata from the row."""
+    master_type: MasterType, payload: dict[str, Any], row_label: str | None = None
+) -> tuple[dict[str, Any], MasterIdentity, bool]:
+    """Validate the payload with the type's model; derive the SBAM metadata from its id column.
+
+    Returns (payload, identity, has_status): `has_status` is False for the masters without a
+    Status column, whose entry keeps the status it has.
+    """
     try:
         model = PAYLOAD_MODELS[master_type].model_validate(payload)
     except ValidationError as exc:
@@ -99,31 +105,16 @@ def _identity(
                 for e in exc.errors()
             ]
         ) from None
-    try:
-        identity = identify(master_type, row_label, model)
-    except ValueError as exc:  # e.g. an unknown or doubled `Status:` fragment in Misc
-        raise _invalid([FieldError(path="payload", message=str(exc))]) from None
-    return model.model_dump(mode="json", by_alias=True), identity
-
-
-def _row_label(
-    repo: MasterEntryRepository,
-    master_type: MasterType,
-    project_id: uuid.UUID | None,
-    label: str | None,
-) -> str:
-    if master_type == MasterType.TOOLING:
-        if not label or not TOOLING_LABEL.fullmatch(label):
-            raise _invalid(
-                [FieldError(path="row_label", message="Tooling rows need an id like TOOL-MFG-12")]
-            )
-        return label
-    prefix = ROW_LABEL_PREFIX[master_type]
-    if label is None:
-        return f"{prefix} #{repo.next_label_number(master_type.value, project_id)}"
-    if not label.startswith(f"{prefix} #"):
-        raise _invalid([FieldError(path="row_label", message=f"use '{prefix} #n'")])
-    return label
+    key = ID_KEY[master_type]
+    label = str(getattr(model, key)).strip()
+    if not label or not ID_LABEL.fullmatch(label):  # #782 assigns the id of a blank row
+        message = f"{ID_HEADER[master_type]} is required: one line of at most 64 characters"
+        raise _invalid([FieldError(path=f"payload.{key}", message=message)])
+    if row_label is not None and row_label.strip() != label:
+        message = f"row_label must equal the {ID_HEADER[master_type]} ({label})"
+        raise _invalid([FieldError(path="row_label", message=message)])
+    identity = row_identity(master_type, label, model)
+    return model.model_dump(mode="json", by_alias=True), identity, status_of(model) is not None
 
 
 def _active_project(session: Session, user: CurrentUser, project_id: uuid.UUID) -> Project:
@@ -146,8 +137,8 @@ def create_entry(
     repo = _repo(session, user)
     if body.project_id is not None:
         _active_project(session, user, body.project_id)
-    label = _row_label(repo, master_type, body.project_id, body.row_label)
-    payload, identity = _identity(master_type, label, body.payload)
+    payload, identity, _ = _identity(master_type, body.payload, body.row_label)
+    label = payload[ID_KEY[master_type]].strip()
     entry = MasterEntry(
         project_id=body.project_id,
         master_type=master_type.value,
@@ -197,7 +188,7 @@ def new_version(
         )
     if if_match.strip().removeprefix("W/") != etag(entry.row_version):
         raise version_conflict()  # someone saved a version since this one was loaded
-    payload, identity = _identity(master_type, entry.row_label, body.payload)
+    payload, identity, has_status = _identity(master_type, body.payload)
     if identity.stable_id != entry.stable_id:
         raise _invalid(
             [
@@ -215,7 +206,8 @@ def new_version(
             )
         )
         entry.current_version = number
-        entry.status = identity.status.value
+        if has_status:
+            entry.status = identity.status.value
         repo.update(entry, entry.row_version)  # a concurrent writer since load -> stale
         _audit(session, user, "MASTER_VERSION_CREATED", entry, version)
         session.commit()
