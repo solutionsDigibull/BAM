@@ -36,6 +36,7 @@ def copy_dir(tmp_path: Path) -> Path:
         "correction.json",
         "correction-base.json",
         "codegen.json",
+        "review.json",
     ):
         (tmp_path / name).write_text(
             (GOLDEN_DIR / name).read_text(encoding="utf-8"), encoding="utf-8"
@@ -59,13 +60,14 @@ def test_e15_5_every_llm_task_is_listed_once_with_real_prompts() -> None:
         Task.CODEGEN: "sbam-codegen",
         Task.TESTGEN: "sbam-testgen",
         Task.CORRECTION: "sbam-corrector",
+        Task.REVIEW: "sbam-reviewer",
     }
 
 
 def test_e15_5_a_task_is_ready_only_with_at_least_the_minimum_items() -> None:
     ready = [t for t in load_tasks() if t.status == "ready"]
     assert sorted(t.task for t in ready) == sorted(
-        [Task.OCR, Task.TESTGEN, Task.CORRECTION, Task.CODEGEN]
+        [Task.OCR, Task.TESTGEN, Task.CORRECTION, Task.CODEGEN, Task.REVIEW]
     )
     assert len(load_ocr().items) >= MIN_ITEMS
 
@@ -163,7 +165,7 @@ def test_e15_5_an_unknown_prompt_or_a_missing_task_is_a_problem(tmp_path: Path) 
     directory = copy_dir(tmp_path)
     tasks = json.loads((directory / "tasks.json").read_text(encoding="utf-8"))
     tasks[0]["prompt_ids"] = ["no-such-prompt"]
-    del tasks[-1]  # correction
+    del tasks[-2]  # correction (review follows it)
     (directory / "tasks.json").write_text(json.dumps(tasks), encoding="utf-8")
     problems = check_golden(directory, prompt_ids())
     assert any("unknown prompt 'no-such-prompt'" in p for p in problems)

@@ -80,7 +80,9 @@ def test_e10_1_pipeline_workflows_and_stubs_on_their_queues() -> None:
     build = {"build_schema_sql", "build_manifest", "check_libraries", "render_skeleton", "assemble"}
     assert build | {"ast_gate", "static_gate"} <= served(TaskQueue.BUILD)[1]
     # SubSkillBuild stages (#107): LLM stages on the LLM queue, tests on the test queue
-    assert {"generate_bodies", "generate_tests", "correct"} <= served(TaskQueue.LLM)[1]
+    assert {"generate_bodies", "generate_tests", "correct", "review_code"} <= served(TaskQueue.LLM)[
+        1
+    ]
     assert {"build_promptfoo_suite", "run_sandbox_tests"} <= served(TaskQueue.TEST)[1]
     certify = {"certify_macros", "validate_workflow", "certify_workflow", "freeze_and_version"}
     assert "certify_sub_skill" in served(TaskQueue.CERTIFY)[1]

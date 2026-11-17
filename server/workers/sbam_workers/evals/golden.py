@@ -14,7 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sbam_contracts.isatvon14 import SubSkill
 
 EVALS_DIR: Final = Path(__file__).resolve().parents[3] / "evals"
@@ -30,6 +30,7 @@ class Task(StrEnum):
     CODEGEN = "codegen"
     TESTGEN = "testgen"
     CORRECTION = "correction"
+    REVIEW = "review"
 
 
 class _Strict(BaseModel):
@@ -160,6 +161,43 @@ class GoldenCorrectionSet(_Strict):
     task: Literal[Task.CORRECTION]
     version: int = Field(ge=1)
     items: list[GoldenCorrectionItem]
+
+
+class ReviewEdit(_Strict):
+    """One change to the clean bodies. With `find`, that text (which must occur exactly once in the
+    slot; in `state_queries`, exactly once across the queries) is replaced by `text`; without it,
+    `text` is put in front of the slot."""
+
+    slot: Literal["action_body", "check_body", "helpers", "state_queries"]
+    text: str
+    find: str | None = None
+
+
+class GoldenReviewItem(_Strict):
+    """A review case: the clean MS01.1 bodies with `edits` applied. A flawed item breaks the spec in
+    a way the code gates cannot see, in the files named by `files`; a clean item is the same
+    behaviour written differently, and must pass."""
+
+    id: Annotated[str, Field(pattern=r"^review-\d{2}$")]
+    description: str = Field(min_length=1)
+    synthetic: Literal[True]
+    flawed: bool
+    files: list[str]  # the bundle files the defect is in (empty for a clean item)
+    edits: list[ReviewEdit]
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "GoldenReviewItem":
+        if self.flawed and not (self.files and self.edits):
+            raise ValueError("a flawed item names its files and its edits")
+        if not self.flawed and self.files:
+            raise ValueError("a clean item has no planted files")
+        return self
+
+
+class GoldenReviewSet(_Strict):
+    task: Literal[Task.REVIEW]
+    version: int = Field(ge=1)
+    items: list[GoldenReviewItem]
 
 
 class GoldenCodegenItem(_Strict):
@@ -323,6 +361,11 @@ def apply_defect(item: GoldenCorrectionItem, bodies: dict[str, Any]) -> dict[str
     return out
 
 
+def load_review(golden_dir: Path = GOLDEN_DIR) -> GoldenReviewSet:
+    text = (golden_dir / "review.json").read_text(encoding="utf-8")
+    return GoldenReviewSet.model_validate_json(text)
+
+
 def load_codegen(golden_dir: Path = GOLDEN_DIR) -> GoldenCodegenSet:
     text = (golden_dir / "codegen.json").read_text(encoding="utf-8")
     return GoldenCodegenSet.model_validate_json(text)
@@ -361,6 +404,8 @@ def _check_ready(entry: TaskEntry, golden_dir: Path) -> list[str]:
         return _check_correction(entry, golden_dir)
     if entry.task is Task.CODEGEN:
         return _check_codegen(entry, golden_dir)
+    if entry.task is Task.REVIEW:
+        return _check_review(entry, golden_dir)
     return [f"{entry.task}: listed as ready, but no loader for its items exists yet"]
 
 
@@ -409,6 +454,18 @@ def _check_correction(entry: TaskEntry, golden_dir: Path) -> list[str]:
 
     try:
         loaded = load_correction(golden_dir)
+        base = correction_base(golden_dir)
+    except (OSError, ValidationError, ValueError) as exc:
+        return [f"{entry.task}: {type(exc).__name__}"]
+    problems = _check_count_and_ids(entry, [x.id for x in loaded.items])
+    return problems + verify_items(loaded.items, base)
+
+
+def _check_review(entry: TaskEntry, golden_dir: Path) -> list[str]:
+    from sbam_workers.evals.review_set import verify_items  # heavy: loads a template
+
+    try:
+        loaded = load_review(golden_dir)
         base = correction_base(golden_dir)
     except (OSError, ValidationError, ValueError) as exc:
         return [f"{entry.task}: {type(exc).__name__}"]

@@ -1,0 +1,2 @@
+alias: sbam-repo-scout
+description: Score the project's catalogued repositories against one Sub-Skill (#759). Output RepoScoutAnswer.

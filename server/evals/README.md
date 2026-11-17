@@ -1,6 +1,6 @@
 # LLM golden sets (E15.5)
 
-Golden sets for the six LLM tasks (TD §19.1). A set is synthetic data plus deterministic checks on a
+Golden sets for the LLM tasks (TD §19.1). A set is synthetic data plus deterministic checks on a
 model's answer. Nothing in this folder calls a model.
 
 | Path | What |
@@ -18,6 +18,7 @@ model's answer. Nothing in this folder calls a model.
 | `testgen` | **ready**, 20 items, baseline recorded |
 | `correction` | **ready**, 20 items, baseline recorded |
 | `codegen` | **ready**, 20 items, baseline recorded |
+| `review` | **ready**, 20 items, **no baseline yet** (needs a real call, see below) |
 | `sow`, `isatvon` | `todo`: each lands in its own change |
 
 ## Running the gate
@@ -28,6 +29,7 @@ uv run python -m sbam_workers.evals.gate --task ocr --record   # write a baselin
 uv run python -m sbam_workers.evals.gate --task testgen        # the same for test generation
 uv run python -m sbam_workers.evals.gate --task correction     # and for the corrector
 uv run python -m sbam_workers.evals.gate --task codegen        # and for code generation
+uv run python -m sbam_workers.evals.gate --task review         # and for the reviewer
 ```
 
 It sends each page (OCR), Sub-Skill (test generation), flawed code (correction) or Sub-Skill
@@ -109,6 +111,38 @@ and that `datetime`, `re`, `math` and `decimal` are not available; on identical 
 **0.983** and then **0.975** on the recording run, with the leave-request failures gone. The
 remaining misses are scattered (a different item each run, mostly a pre-check finding), so they are
 sampling noise at this size, not a pattern. The recorded baseline is **0.975** on 1.1.0.
+
+### Review
+
+The reviewer (`sbam-reviewer`, prompt `review-diff`, #759) runs once after the AST and static gates
+passed and judges the code against its spec. Twenty items, all the MS01.1 sample (an investor login
+with an OTP and a device limit) written out as code bodies:
+
+- **12 flawed**: one defect each, of a kind no gate can see: an output outside the allowed set, a
+  condition the wrong way round, a limit that is not enforced, a handoff field that records the
+  wrong value, a one-time code written into the record, a state query that reads the wrong column.
+- **8 clean**: the same behaviour written differently (a comment, a local variable, an equivalent
+  condition). A reviewer that flags one is wrong.
+
+The sample's recorded bodies are not a clean reference (they answer `DENIED`, which the spec does not
+allow, and read tables the spec does not name), so `review_set.CLEAN_EDITS` fix that once and every
+item starts from the fixed bodies. Building the set (`uv run python -m sbam_workers.evals.review_set`)
+checks that every item, flawed or clean, passes the body pre-check, the AST gates, Ruff, Black, MyPy
+and Bandit, so a flawed item is never one a gate would already have refused, and that a flawed
+item changes exactly the files it names. A test fails if `golden/review.json` and the module disagree.
+
+An item scores two checks: `verdict` (FAIL for a flawed item, PASS for a clean one) and `located`
+(for a flawed item there is a HIGH finding and every HIGH finding names a planted file; for a clean
+item there are no findings). So a reviewer that is right everywhere scores **1.0**, one that always
+passes scores the clean share, **0.4**, and one that always fails, in files no defect is in, scores
+**0.3**; the unit tests assert all three, and that flagging the planted file together with others is
+not precise.
+
+**No baseline is recorded.** It needs a real model call (120 calls over 20 items x 3 runs, a few
+cents on the reviewer's model), which no automated run may make. A person records it with
+`gate --task review --record`, reviews the score, and commits `baselines/review.json`; until then the
+gate exits **3** (NO_BASELINE). Offline, `tests/unit/test_wg11_review_golden.py` is the check: the set
+is sound, the prompt is the shipped one, and the scorer tells the three reviewers above apart.
 
 ## Rules
 

@@ -1,0 +1,314 @@
+{
+  "task": "review",
+  "version": 1,
+  "items": [
+    {
+      "id": "review-01",
+      "description": "the rejection answers DENIED, which is not an allowed auth_status",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "status = \"DENIED\"",
+          "find": "status = \"REJECTED\""
+        }
+      ]
+    },
+    {
+      "id": "review-02",
+      "description": "the clean bodies as they are",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": []
+    },
+    {
+      "id": "review-03",
+      "description": "a LOCKED profile is reported as REJECTED",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "if allowed:\n",
+          "find": "if current.user_status == \"LOCKED\":\n    status = \"LOCKED\"\nelif allowed:\n"
+        }
+      ]
+    },
+    {
+      "id": "review-04",
+      "description": "policy_violation is reported the wrong way round",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "check_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "check_body",
+          "text": "\"policy_violation\": _within_device_limit(current)",
+          "find": "\"policy_violation\": not _within_device_limit(current)"
+        }
+      ]
+    },
+    {
+      "id": "review-05",
+      "description": "a comment explains the access rule",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "# access needs a matching OTP and a device count within the limit\n",
+          "find": null
+        }
+      ]
+    },
+    {
+      "id": "review-06",
+      "description": "the check never reports a device-limit violation",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "check_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "check_body",
+          "text": "\"policy_violation\": False",
+          "find": "\"policy_violation\": not _within_device_limit(current)"
+        }
+      ]
+    },
+    {
+      "id": "review-07",
+      "description": "the check accepts the OTP of a profile that is not active",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "check_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "check_body",
+          "text": "otp_match = bool(otp_payload)",
+          "find": "otp_match = current.user_status == \"active\" and bool(otp_payload)"
+        }
+      ]
+    },
+    {
+      "id": "review-08",
+      "description": "access is granted past the device limit",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "allowed = otp_match",
+          "find": "allowed = otp_match and _within_device_limit(current)"
+        }
+      ]
+    },
+    {
+      "id": "review-09",
+      "description": "the failed-attempts count is read into a local variable",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "iteration_pass=attempts + 1,",
+          "find": "iteration_pass=int(current.failed_login_attempts or 0) + 1,"
+        },
+        {
+          "slot": "action_body",
+          "text": "attempts = int(current.failed_login_attempts or 0)\n",
+          "find": null
+        }
+      ]
+    },
+    {
+      "id": "review-10",
+      "description": "a rejected user is given the investor role",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "\"user_role\": \"investor\",",
+          "find": "\"user_role\": \"investor\" if allowed else None,"
+        }
+      ]
+    },
+    {
+      "id": "review-11",
+      "description": "the handoff records full access scope even when access was denied",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "access_scope=\"investor\",",
+          "find": "access_scope=\"investor\" if allowed else \"none\","
+        }
+      ]
+    },
+    {
+      "id": "review-12",
+      "description": "the check names the device-limit result before returning it",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": [
+        {
+          "slot": "check_body",
+          "text": "within_limit = _within_device_limit(current)\nreturn {\"otp_match\": otp_match, \"policy_violation\": not within_limit}",
+          "find": "return {\"otp_match\": otp_match, \"policy_violation\": not _within_device_limit(current)}"
+        }
+      ]
+    },
+    {
+      "id": "review-13",
+      "description": "the handoff records the OTP as matched whatever the result",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "otp_match=True,",
+          "find": "otp_match=otp_match,"
+        }
+      ]
+    },
+    {
+      "id": "review-14",
+      "description": "the handoff pass counter is always 1",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "iteration_pass=1,",
+          "find": "iteration_pass=int(current.failed_login_attempts or 0) + 1,"
+        }
+      ]
+    },
+    {
+      "id": "review-15",
+      "description": "the device limit is compared with a negated greater-than",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": [
+        {
+          "slot": "helpers",
+          "text": "return not int(current.active_devices or 0) > limit",
+          "find": "return int(current.active_devices or 0) <= limit"
+        }
+      ]
+    },
+    {
+      "id": "review-16",
+      "description": "the one-time code is written into the handoff record",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "action_tool.py"
+      ],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "device_fingerprint=f\"{device_fingerprint}:{otp_payload}\",",
+          "find": "device_fingerprint=device_fingerprint,"
+        }
+      ]
+    },
+    {
+      "id": "review-17",
+      "description": "the status is decided with the granted case first",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "if allowed:\n    status = \"AUTHENTICATED\"\nelif current.user_status == \"LOCKED\":\n    status = \"LOCKED\"\nelse:\n    status = \"REJECTED\"\n",
+          "find": "if current.user_status == \"LOCKED\":\n    status = \"LOCKED\"\nelif allowed:\n    status = \"AUTHENTICATED\"\nelse:\n    status = \"REJECTED\"\n"
+        }
+      ]
+    },
+    {
+      "id": "review-18",
+      "description": "the failed-attempts state reads the device count column",
+      "synthetic": true,
+      "flawed": true,
+      "files": [
+        "state.py"
+      ],
+      "edits": [
+        {
+          "slot": "state_queries",
+          "text": "SELECT active_devices FROM investor_profiles WHERE mobile_number = %s",
+          "find": "SELECT failed_login_attempts FROM investor_profiles WHERE mobile_number = %s"
+        }
+      ]
+    },
+    {
+      "id": "review-19",
+      "description": "the status query is written in lower case",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": [
+        {
+          "slot": "state_queries",
+          "text": "select user_status from investor_profiles where mobile_number = %s",
+          "find": "SELECT user_status FROM investor_profiles WHERE mobile_number = %s"
+        }
+      ]
+    },
+    {
+      "id": "review-20",
+      "description": "the access scope is named before the handoff",
+      "synthetic": true,
+      "flawed": false,
+      "files": [],
+      "edits": [
+        {
+          "slot": "action_body",
+          "text": "access_scope=scope,",
+          "find": "access_scope=\"investor\" if allowed else \"none\","
+        },
+        {
+          "slot": "action_body",
+          "text": "allowed = otp_match and _within_device_limit(current)\nscope = \"investor\" if allowed else \"none\"\n",
+          "find": "allowed = otp_match and _within_device_limit(current)\n"
+        }
+      ]
+    }
+  ]
+}
