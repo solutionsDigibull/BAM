@@ -134,3 +134,33 @@ def test_e14_1_bandit_high_blocks_but_medium_only_certifies() -> None:
 def test_e14_1_a_failing_test_run_blocks() -> None:
     test = replace(evidence().test, state=TestRunState.FAIL, passed=2, failed=1)  # type: ignore[type-var]
     assert "TESTS_FAILED" in evaluate(evidence(test=test)).reasons
+
+
+# --- #759: the review pass is optional evidence --------------------------------------------------
+
+
+def test_wg11_review_is_not_a_required_gate() -> None:
+    assert GateName.REVIEW not in REQUIRED_GATES
+
+
+def test_wg11_a_build_without_a_review_row_still_certifies() -> None:
+    """A build that predates the review pass (or replays without it) has no row."""
+    assert all(g.gate is not GateName.REVIEW for g in evidence().gates)
+    assert evaluate(evidence()).certified
+
+
+def test_wg11_a_passed_review_row_certifies() -> None:
+    gates = [*evidence().gates, gate(GateName.REVIEW)]
+    assert evaluate(evidence(gates=gates)).certified
+
+
+def test_wg11_a_failed_review_row_blocks_certification() -> None:
+    gates = [*evidence().gates, gate(GateName.REVIEW, status=GateStatus.FAILED)]
+    verdict = evaluate(evidence(gates=gates))
+    assert not verdict.certified
+    assert verdict.reasons == ("GATE_FAILED:REVIEW",)
+
+
+def test_wg11_a_review_of_another_bundle_is_rejected() -> None:
+    gates = [*evidence().gates, gate(GateName.REVIEW, bundle_sha256="c" * 64)]
+    assert not evaluate(evidence(gates=gates)).certified

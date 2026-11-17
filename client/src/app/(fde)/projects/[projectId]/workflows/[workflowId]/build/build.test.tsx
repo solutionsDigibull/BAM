@@ -44,8 +44,8 @@ const builds = (rows: unknown[], active = true): BuildsResponse =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("build dashboard rules (E12.6)", () => {
-  test("19 gate columns in contract order, AST ×8", () => {
-    expect(GATES).toHaveLength(19);
+  test("20 gate columns in contract order, AST ×8", () => {
+    expect(GATES).toHaveLength(20);
     expect(GATES.filter((g) => g.family === "AST")).toHaveLength(8);
     expect(GATES[0]!.name).toBe("ISATVON_CONTRACT");
     expect(GATES.at(-1)!.name).toBe("LOOP_TESTS");

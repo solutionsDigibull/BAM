@@ -128,8 +128,9 @@ from sbam_contracts.projects import (
     WorkflowSummary,
 )
 from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
-from sbam_contracts.repo_catalog import RepoCatalog
+from sbam_contracts.repo_catalog import RepoCatalog, RepoScoutAnswer
 from sbam_contracts.repo_decision import RepoDecision
+from sbam_contracts.review import ReviewAnswer
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
 from sbam_contracts.sandbox import (
@@ -178,6 +179,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/sub_skill_extraction", SubSkillExtraction),
     ("build/builds_response", BuildsResponse),
     ("build/gates_response", GatesResponse),
+    ("build/review_answer", ReviewAnswer),
     ("held_patch/held_patch_response", HeldPatchResponse),
     ("held_patch/patch_decision", PatchDecision),
     ("held_patch/patch_decided", PatchDecided),
@@ -304,6 +306,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("sandbox/runner_outputs", RunnerOutputs),
     ("repo/decision", RepoDecision),
     ("repo/catalog", RepoCatalog),
+    ("repo/scout_answer", RepoScoutAnswer),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
 )

@@ -46,6 +46,7 @@ class GateName(StrEnum):
     CLAMAV = "CLAMAV"
     BANDIT = "BANDIT"
     IMPORT_RESOLUTION = "IMPORT_RESOLUTION"
+    REVIEW = "REVIEW"  # #759: the model review after the AST and static gates
     LOOP_TESTS = "LOOP_TESTS"
 
 

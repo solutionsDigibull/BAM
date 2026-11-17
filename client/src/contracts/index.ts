@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:3a5a8e3d9f83f632203d5dcf7f72434b0bc6015dcf4b713d468d349d69817ac2
+// source-sha256:02c15251c4c39a2c89c565a38787cde872eb59c23f833107b506bc6557dc27da
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -170,6 +170,7 @@ export type BuildStage =
   | "assemble"
   | "ast_gate"
   | "static_gate"
+  | "review_code"
   | "generate_tests"
   | "build_promptfoo_suite"
   | "run_sandbox_tests"
@@ -213,6 +214,7 @@ export type GateName =
   | "CLAMAV"
   | "BANDIT"
   | "IMPORT_RESOLUTION"
+  | "REVIEW"
   | "LOOP_TESTS";
 /**
  * How serious a static-gate finding is (E12.4). A gate fails on a HIGH finding; LOW and MEDIUM
@@ -222,6 +224,19 @@ export type GateName =
  * via the `definition` "Severity".
  */
 export type Severity = "LOW" | "MEDIUM" | "HIGH";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewVerdict".
+ */
+export type ReviewVerdict = "PASS" | "FAIL";
+/**
+ * What kind of deviation a finding is; the finding code is `REVIEW_<category>`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewCategory".
+ */
+export type ReviewCategory =
+  "SPEC_MISMATCH" | "MISSING_REQUIREMENT" | "WRONG_OUTPUT" | "HANDOFF" | "STATE_WRITE" | "SAFETY" | "OTHER";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SchemaSource".
@@ -560,6 +575,7 @@ export interface SbamContracts {
   SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
+  ReviewAnswer?: ReviewAnswer;
   HeldPatchResponse?: HeldPatchResponse;
   PatchDecision?: PatchDecision;
   PatchDecided?: PatchDecided;
@@ -686,6 +702,7 @@ export interface SbamContracts {
   RunnerOutputs?: RunnerOutputs;
   RepoDecision?: RepoDecision;
   RepoCatalog?: RepoCatalog;
+  RepoScoutAnswer?: RepoScoutAnswer;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
 }
@@ -1363,6 +1380,245 @@ export interface Finding {
   actual?: string | null;
   package?: string | null;
   severity?: Severity | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewAnswer".
+ */
+export interface ReviewAnswer {
+  verdict: ReviewVerdict;
+  /**
+   * @maxItems 20
+   */
+  findings?:
+    | []
+    | [ReviewFinding]
+    | [ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewFinding".
+ */
+export interface ReviewFinding {
+  category: ReviewCategory;
+  severity: Severity;
+  message: string;
+  file?: string | null;
+  line?: number | null;
+  expected?: string | null;
 }
 /**
  * `held` is null when no patch is waiting (none was proposed, or it was already decided).
@@ -6079,6 +6335,42 @@ export interface CatalogRejection {
   source: RepoSource;
   master_entry_id: string;
   stable_id: string;
+}
+/**
+ * What the model answers when asked which candidates fit a Sub-Skill. Advice only: the
+ * chooser (#756) validates every id against the catalog and applies the ADR 0028 rules.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoScoutAnswer".
+ */
+export interface RepoScoutAnswer {
+  /**
+   * @maxItems 500
+   */
+  scores?: ScoutScore[];
+}
+/**
+ * How well one catalog candidate fits the Sub-Skill, as the repo scout judged it (#759).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ScoutScore".
+ */
+export interface ScoutScore {
+  candidate_id: string;
+  score: number;
+  /**
+   * @maxItems 8
+   */
+  reasons?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
 }
 /**
  * A project's caps.

@@ -139,6 +139,7 @@
         "CLAMAV",
         "BANDIT",
         "IMPORT_RESOLUTION",
+        "REVIEW",
         "LOOP_TESTS"
       ],
       "title": "GateName",
