@@ -9,6 +9,7 @@ import Link from "next/link";
 import { ApiErrorState, LoadingState, StatusBadge } from "@/components/ui-kit";
 import type { WorkflowSummary } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
+import { guardPoll } from "@/lib/session-ended";
 
 import { workflowsPath } from "../../../workspace-api";
 import { LIFECYCLE, isFailure, nextStep, stepIndex } from "./workflow-steps";
@@ -27,10 +28,11 @@ export function WorkflowOverview({
     url: workflowsPath(projectId),
     method: "get",
     queryOptions: {
-      refetchInterval: (q) =>
+      refetchInterval: guardPoll((q) =>
         q.state.data?.data.items.some((w) => w.id === workflowId && BUSY.has(w.state))
           ? REFRESH_MS
           : false,
+      ),
     },
   });
   if (list.query.isLoading) return <LoadingState />;
