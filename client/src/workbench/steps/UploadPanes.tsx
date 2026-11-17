@@ -12,14 +12,14 @@ import { LANES, detectKind, type Kind } from '../api/fileKind'
 import { archive, setUi, uppy, useUi } from '../lib/store'
 import { plural } from '../lib/bamUi'
 import { useAction } from '../lib/data'
-import { Confirm, Icon, Tip } from '../components/ui'
+import { Confirm, Dialog, Icon, Tip } from '../components/ui'
 import { fdeView } from './IngestionFlow'
 import { UploadIdle } from './UploadIdle'
 import { addFilesLocked, canAddFiles, resetGoal, useGoal } from '../lib/goal'
 import { useReviewFiles } from './Standardize'
 
 // ---- entry points --------------------------------------------------------------------------------------------
-type Pick = (files: FileList, source: 'files' | 'folder' | 'zip' | 'drop') => void
+type Pick = (files: ArrayLike<File>, source: 'files' | 'folder' | 'zip' | 'drop') => void
 let handler: Pick | null = null
 /** Intake registers its triage + review handler while Upload is open. */
 export const setPickHandler = (h: Pick | null) => { handler = h }
@@ -129,16 +129,19 @@ export function UploadFilesBlock({ snap }: { snap: Snapshot }) {
   return (
     <section className="up-left" aria-label="Add source files" {...dropTarget(closed)}>
       <AddFilesMenu closed={closed} cue={approved && !added && !closed} hint={!uploadsClosed && !open ? 'up-add-hint' : undefined} />
-      <p className="muted xs" id="up-add-hint">{uploadsClosed ? 'Uploads are closed while the SOW is approved. Reopen Scope to add documents.' : !open ? 'Send your goal first.' : HELPER}</p>
+      {(uploadsClosed || !open) && <p className="muted xs" id="up-add-hint">{uploadsClosed ? 'Uploads are closed while the SOW is approved. Reopen Scope to add documents.' : 'Send your goal first.'}</p>}
     </section>
   )
 }
 
 /** "+ Add files" opens a small menu anchored under it: Choose folder · Bulk upload · Upload zip. Arrow keys move,
- *  Enter/Space choose, Escape or a click outside closes and returns focus to the button. */
+ *  Enter/Space choose, Escape or a click outside closes and returns focus to the button. Each option opens the
+ *  upload modal (17 Nov 2026, per user): browse or drag-and-drop, with the allowed file types. */
 const OPTIONS = [{ mode: 'folder', icon: 'tb-folder', label: 'Choose folder' }, { mode: 'files', icon: 'tb-files', label: 'Bulk upload' }, { mode: 'zip', icon: 'tb-file-zip', label: 'Upload zip' }] as const
+type AddMode = (typeof OPTIONS)[number]['mode']
 function AddFilesMenu({ closed, cue, hint }: { closed: boolean; cue?: boolean; hint?: string }) {
   const [open, setOpen] = useState(false)
+  const [modal, setModal] = useState<AddMode | null>(null)
   const btn = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null)
   const close = (focus = true) => { setOpen(false); if (focus) btn.current?.focus() }
   useEffect(() => {
@@ -160,9 +163,41 @@ function AddFilesMenu({ closed, cue, hint }: { closed: boolean; cue?: boolean; h
       <button ref={btn} className={`btn ${cue ? 'btn-primary up-add-cue' : 'btn-outline'} up-add`} aria-haspopup="menu" aria-expanded={open} aria-controls="up-add-menu"
         aria-disabled={closed || undefined} aria-describedby={hint} disabled={closed} onClick={() => setOpen(o => !o)}><Icon name="plus" size={14} />Add files</button>
       {open && <div ref={menu} id="up-add-menu" className="up-add-menu" role="menu" aria-label="Add files" onKeyDown={onKey}>
-        {OPTIONS.map(o => <button key={o.mode} role="menuitem" className="up-add-item" onClick={() => { close(); openPicker(o.mode) }}><Icon name={o.icon} size={16} />{o.label}</button>)}
+        {OPTIONS.map(o => <button key={o.mode} role="menuitem" className="up-add-item" onClick={() => { close(); setModal(o.mode) }}><Icon name={o.icon} size={16} />{o.label}</button>)}
       </div>}
+      <UploadModal mode={modal ?? 'files'} open={modal !== null} onClose={() => setModal(null)} />
     </div>
+  )
+}
+
+/** The upload modal every Add files option opens (per user, 17 Nov 2026): drop files onto the zone or browse, with
+ *  the allowed types stated inside the modal (they no longer sit under the button). Browse opens the same picker as
+ *  before (folder / multi-file / zip-only); a zip drop keeps only the .zip files, anything else still goes through
+ *  Intake's triage from the other modes. */
+function UploadModal({ mode, open, onClose }: { mode: AddMode; open: boolean; onClose: () => void }) {
+  const [over, setOver] = useState(false)
+  const opt = OPTIONS.find(o => o.mode === mode) ?? OPTIONS[1]
+  const browse = () => { onClose(); openPicker(mode) }
+  const drop = (files: FileList) => {
+    const list = mode === 'zip' ? Array.from(files).filter(f => /\.zip$/i.test(f.name)) : files
+    if (list.length) { onClose(); pickFiles(list, 'drop') }
+  }
+  return (
+    <Dialog open={open} title={opt.label} onClose={onClose} footer={<>
+      <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+      <button className="btn btn-primary" onClick={browse}><Icon name={opt.icon} size={14} />{mode === 'folder' ? 'Browse folders' : 'Browse files'}</button>
+    </>}>
+      <div className={`up-drop up-modal-drop${over ? ' on' : ''}`} role="button" tabIndex={0}
+        aria-label="Drag and drop files here, or browse"
+        onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
+        onDrop={e => { e.preventDefault(); setOver(false); drop(e.dataTransfer.files) }}
+        onClick={browse} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); browse() } }}>
+        <Icon name="cloud-up" size={20} />
+        <strong>{over ? 'Release to add files' : 'Drag and drop files here'}</strong>
+        <span className="muted xs">or click to browse</span>
+      </div>
+      <p className="muted xs">Allowed file types: {mode === 'zip' ? 'ZIP archives' : HELPER}</p>
+    </Dialog>
   )
 }
 
@@ -278,7 +313,16 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
       {leaving && <UploadIdle leaving />}
       {/* Failures first, each with its reason always visible and its fix (29 Oct 2026). */}
       {failed.length > 0 && <section className="up-attn" aria-labelledby="up-attn-h">
-        <h3 id="up-attn-h" className="up-sec">Needs attention</h3>
+        <div className="up-attn-head">
+          <h3 id="up-attn-h" className="up-sec">Needs attention</h3>
+          {/* Bulk Discard (17 Nov 2026, per user): discards every listed file, same as each card's Discard.
+              Refused rows are dropped by list index, so they go highest-index-first to keep indices valid. */}
+          {failed.length > 1 && <button className="btn btn-ghost sm up-attn-clear" disabled={!!acting}
+            onClick={() => void run('Discard all', async () => {
+              const ordered = [...failed].sort((a, b) => (b.id.startsWith('refused-') ? Number(b.id.slice(8)) : -1) - (a.id.startsWith('refused-') ? Number(a.id.slice(8)) : -1))
+              for (const r of ordered) await discard(snap, r)
+            }, { step: 1 })}><Icon name="tb-trash" size={14} />Discard all ({failed.length})</button>}
+        </div>
         {failed.map(r => { const f = fixOf(r), m = rowMenu(r)
           return <div key={r.id} {...m} className={`up-attn-card${m.className ? ` ${m.className}` : ''}`}>
             <Icon name="tb-alert-triangle" size={16} />

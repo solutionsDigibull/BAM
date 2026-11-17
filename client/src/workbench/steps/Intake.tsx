@@ -409,7 +409,7 @@ export function Intake({ snap, info, view }: StepProps & { view: 'upload' | 'sca
       for (let i = 0; i < batchCount; i++) uploadFiles(files.slice(i * MAX_BATCH_FILES, (i + 1) * MAX_BATCH_FILES), `batch-${i + 1}`)
     } else uploadFiles(files)
   }
-  const take = (list: FileList, source: Source) => {
+  const take = (list: ArrayLike<File>, source: Source) => {
     const all = triage(list)
     // A file already in this intake (same name and size) is skipped, not uploaded twice.
     const have = new Set([...snap.uploads.map(u => `${u.name}|${u.size}`), ...Object.values(uppyFiles).map(f => `${f.name}|${f.size}`)])

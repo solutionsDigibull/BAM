@@ -288,3 +288,4 @@
 .bam-wb .up-ctx-item:hover:not(:disabled), .bam-wb .up-ctx-item:focus-visible { background: var(--err-soft); outline: none; }
 .bam-wb .up-ctx-item:disabled { opacity: .5; cursor: not-allowed; }
 .bam-wb .up-ctx > p { margin: 2px 12px 6px; }
+.bam-wb .up-modal-drop { padding: 26px 18px; }

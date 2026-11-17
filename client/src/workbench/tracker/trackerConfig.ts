@@ -64,7 +64,7 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   stage('2', 'Context', 'tb-git-branch', 'Sync Admin Masters, index the context graph, review the schema and verify answers.'),
   screen('2.5', '2', 'Sync', 'tb-refresh', '/context/sync', 'Sync Admin Masters for context extraction.', { mode: 'hitl' }),
   screen('2.1', '2', 'Index', 'tb-search', '/rag/graph', 'Graph nodes · current graph explorer.', { mode: 'automated' }),
-  screen('2.2', '2', 'Schema', 'tb-schema', '/rag/schemas', 'Schema drafts from the context graph.', { hidden: true, mode: 'automated' }),
+  screen('2.2', '2', 'Placeholder', 'tb-schema', '/rag/schemas', 'Reserved screen. The editor is in Workbench > Template.', { hidden: true, mode: 'automated', optional: true }),
   screen('2.3', '2', 'Verify', 'tb-shield-check', '/rag/quality', 'Context testing · Questions only.', { hidden: true, mode: 'hitl' }),
   screen('2.4', '2', 'Context readiness', 'doccheck', '/rag/review', 'Graph, schema and retrieval readiness, the knowledge bundle and provenance.', { hidden: true, navAs: '2.3' }),
 
