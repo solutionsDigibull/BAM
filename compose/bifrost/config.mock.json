@@ -23,6 +23,10 @@
             "sbam-testgen-fallback",
             "sbam-corrector-primary",
             "sbam-corrector-fallback",
+            "sbam-reviewer-primary",
+            "sbam-reviewer-fallback",
+            "sbam-repo-scout-primary",
+            "sbam-repo-scout-fallback",
             "sbam-relevance-primary",
             "sbam-relevance-fallback",
             "sbam-rubric-primary",
@@ -147,6 +151,40 @@
         "priority": 6
       },
       {
+        "id": "alias-sbam-reviewer",
+        "name": "sbam-reviewer",
+        "cel_expression": "model == \"sbam-reviewer\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-reviewer-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-reviewer-fallback"
+        ],
+        "enabled": true,
+        "priority": 7
+      },
+      {
+        "id": "alias-sbam-repo-scout",
+        "name": "sbam-repo-scout",
+        "cel_expression": "model == \"sbam-repo-scout\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "sbam-repo-scout-primary",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/sbam-repo-scout-fallback"
+        ],
+        "enabled": true,
+        "priority": 8
+      },
+      {
         "id": "alias-sbam-relevance",
         "name": "sbam-relevance",
         "cel_expression": "model == \"sbam-relevance\"",
@@ -161,7 +199,7 @@
           "openrouter/sbam-relevance-fallback"
         ],
         "enabled": true,
-        "priority": 7
+        "priority": 9
       },
       {
         "id": "alias-sbam-rubric",
@@ -178,7 +216,7 @@
           "openrouter/sbam-rubric-fallback"
         ],
         "enabled": true,
-        "priority": 8
+        "priority": 10
       },
       {
         "id": "alias-sbam-knowledge",
@@ -195,7 +233,7 @@
           "openrouter/sbam-knowledge-fallback"
         ],
         "enabled": true,
-        "priority": 9
+        "priority": 11
       },
       {
         "id": "alias-sbam-embed",
@@ -212,7 +250,7 @@
           "openrouter/sbam-embed-fallback"
         ],
         "enabled": true,
-        "priority": 10
+        "priority": 12
       }
     ]
   },

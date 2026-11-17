@@ -130,6 +130,40 @@
         "priority": 6
       },
       {
+        "id": "alias-sbam-reviewer",
+        "name": "sbam-reviewer",
+        "cel_expression": "model == \"sbam-reviewer\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "openai/gpt-4o-mini",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/gpt-4o"
+        ],
+        "enabled": true,
+        "priority": 7
+      },
+      {
+        "id": "alias-sbam-repo-scout",
+        "name": "sbam-repo-scout",
+        "cel_expression": "model == \"sbam-repo-scout\"",
+        "targets": [
+          {
+            "provider": "openrouter",
+            "model": "openai/gpt-4o-mini",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openrouter/openai/gpt-4o"
+        ],
+        "enabled": true,
+        "priority": 8
+      },
+      {
         "id": "alias-sbam-relevance",
         "name": "sbam-relevance",
         "cel_expression": "model == \"sbam-relevance\"",
@@ -144,7 +178,7 @@
           "openrouter/openai/gpt-4o"
         ],
         "enabled": true,
-        "priority": 7
+        "priority": 9
       },
       {
         "id": "alias-sbam-rubric",
@@ -161,7 +195,7 @@
           "openrouter/openai/gpt-4o"
         ],
         "enabled": true,
-        "priority": 8
+        "priority": 10
       },
       {
         "id": "alias-sbam-knowledge",
@@ -178,7 +212,7 @@
           "openrouter/anthropic/claude-haiku-5.5"
         ],
         "enabled": true,
-        "priority": 9
+        "priority": 11
       },
       {
         "id": "alias-sbam-embed",
@@ -195,7 +229,7 @@
           "openrouter/openai/text-embedding-3-small"
         ],
         "enabled": true,
-        "priority": 10
+        "priority": 12
       }
     ]
   },

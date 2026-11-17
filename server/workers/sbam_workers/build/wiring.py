@@ -79,6 +79,8 @@ from sbam_workers.build.gates.ast_gate import AstGate
 from sbam_workers.build.gates.static_gate import StaticGate
 from sbam_workers.build.gates.static_tools import make_tools
 from sbam_workers.build.gates.toolchain import Executor, LocalExecutor, SidecarExecutor
+from sbam_workers.build.review import STAGE as REVIEW_STAGE
+from sbam_workers.build.review import Review, ReviewInputs
 from sbam_workers.isatvon.loop_spec import LoopSpecError, compile_definition
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.registry import PromptRegistry
@@ -278,6 +280,21 @@ class SqlBuildInputs:
                 manifest_id=loaded.manifest_id,
             )
 
+    def _review(self, inp: BuildStageInput) -> ReviewInputs:
+        with self.sessions() as session:
+            attempt = CodeAttemptRepository(session, self._ctx(inp)).find(
+                inp.sub_skill_id, inp.build_no, inp.cycle, inp.attempt
+            )
+            if attempt is None:  # the gates ran on this attempt; a missing row is a wiring bug
+                raise _mismatch(
+                    f"no code_attempts row for {inp.sub_skill_id} attempt {inp.attempt}"
+                )
+            loaded = self._load(session, inp, attempt.manifest_id)
+            return ReviewInputs(
+                sub_skill=loaded.sub_skill,
+                skeleton=render_manifest(loaded.template, loaded.manifest),
+            )
+
     def _tests_sub_skill(self, inp: BuildStageInput) -> dict[str, Any]:
         with self.sessions() as session:
             return self._sub_skill(session, inp)
@@ -291,6 +308,9 @@ class SqlBuildInputs:
 
     async def assemble(self, inp: BuildStageInput) -> AssembleInputs:
         return await asyncio.to_thread(self._assemble, inp)
+
+    async def review(self, inp: BuildStageInput) -> ReviewInputs:
+        return await asyncio.to_thread(self._review, inp)
 
     async def correction(self, inp: CorrectionInput) -> CorrectionInputs:
         return await asyncio.to_thread(self._correction, inp)
@@ -336,6 +356,15 @@ def _correct() -> Correct:
 def _ast_gate() -> AstGate:
     settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
     return AstGate(SqlBuildInputs(sessions).assemble, make_backend(settings), sessions)
+
+
+@lru_cache(maxsize=1)
+def _review_stage() -> Review:
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    storage = make_backend(settings)
+    return Review(
+        SqlBuildInputs(sessions).review, storage, sessions, _llm(settings, sessions)
+    )
 
 
 @activity_for(TaskQueue.LLM)
@@ -422,3 +451,12 @@ async def build_promptfoo_suite_stage_activity(inp: BuildStageInput) -> IdResult
 async def correct_stage_activity(inp: CorrectionInput) -> CorrectionResult:
     """The correction written as the next attempt (E11.4)."""
     return await _correct().run(inp)
+
+
+@activity_for(TaskQueue.LLM)
+@activity.defn(name=REVIEW_STAGE)
+async def review_code_stage_activity(inp: BuildStageInput) -> IdResult:
+    """One model review of the stored bundle after the AST and static gates passed (#759); a FAIL
+    is GateFailed with the attempt id, the verdict and findings in `gate_results`. Not called by
+    `SubSkillBuild` yet."""
+    return await _review_stage().run(inp)

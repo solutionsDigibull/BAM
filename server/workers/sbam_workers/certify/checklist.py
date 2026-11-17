@@ -22,8 +22,12 @@ from sbam_contracts.testgen import MIN_CASES, REQUIRED_KINDS, CaseKind
 # Every gate that must have passed on the bundle. BANDIT is not here: it passes unless a HIGH
 # finding is on record (MEDIUM and LOW are reported, never blocking). CODEGEN and LOOP_TESTS are
 # the dashboard's columns for generation and the sandbox loop, which have their own evidence.
+# REVIEW (#759) is optional evidence: a build that predates the review pass has no row and still
+# certifies, but a row that is on record must have PASSED (see `_gate_reasons`).
 REQUIRED_GATES: Final = tuple(
-    g for g in GateName if g not in {GateName.CODEGEN, GateName.BANDIT, GateName.LOOP_TESTS}
+    g
+    for g in GateName
+    if g not in {GateName.CODEGEN, GateName.BANDIT, GateName.LOOP_TESTS, GateName.REVIEW}
 )
 
 
@@ -110,6 +114,9 @@ def _gate_reasons(evidence: Evidence) -> list[str]:
         reasons.append(_missing(GateName.BANDIT))
     elif Severity.HIGH in bandit.severities or bandit.status is GateStatus.FAILED:
         reasons.append(Reason.BANDIT_HIGH.value)
+    review = by_gate.get(GateName.REVIEW)
+    if review is not None and review.status is not GateStatus.PASSED:
+        reasons.append(f"{Reason.GATE_FAILED}:{GateName.REVIEW}")
     return reasons
 
 

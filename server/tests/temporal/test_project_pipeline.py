@@ -201,6 +201,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "assemble": build_stubs.assemble,
     "ast_gate": build_stubs.ast_gate,
     "static_gate": build_stubs.static_gate,
+    "review_code": build_stubs.review_code,
     "generate_tests": test_stubs.generate_tests,
     "build_promptfoo_suite": test_stubs.build_promptfoo_suite,
     "run_sandbox_tests": test_stubs.run_sandbox_tests,  # the real one (E13.2) needs a sandbox

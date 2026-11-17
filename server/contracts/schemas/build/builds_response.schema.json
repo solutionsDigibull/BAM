@@ -74,6 +74,7 @@
         "assemble",
         "ast_gate",
         "static_gate",
+        "review_code",
         "generate_tests",
         "build_promptfoo_suite",
         "run_sandbox_tests",
@@ -106,6 +107,7 @@
         "CLAMAV",
         "BANDIT",
         "IMPORT_RESOLUTION",
+        "REVIEW",
         "LOOP_TESTS"
       ],
       "title": "GateName",

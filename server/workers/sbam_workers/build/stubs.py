@@ -52,6 +52,13 @@ async def static_gate(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "static_gate"))
 
 
+@activity.defn(name="review_code")  # registered by `wiring.py`; the workflow's typed handle
+async def review_code(inp: BuildStageInput) -> IdResult:
+    """Real (#759): one model review of the stored bundle after the AST and static gates passed;
+    a FAIL raises GateFailed with the attempt id (the verdict is in `gate_results`)."""
+    return IdResult(id=stage_stub_id(inp, "review"))
+
+
 @activity.defn(name="correct")  # registered by `wiring.py`; the workflow's typed handle
 async def correct(inp: CorrectionInput) -> CorrectionResult:
     """Real: LLM (`sbam-corrector`) rewrites the failing bodies from the findings; stores them

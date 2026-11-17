@@ -1,0 +1,2 @@
+alias: sbam-reviewer
+description: One review of a generated Sub-Skill's code against its spec, after the gates passed (#759). Output ReviewAnswer.

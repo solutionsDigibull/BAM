@@ -63,6 +63,8 @@ ALIASES = (
     "sbam-testgen",
     "sbam-corrector",
     "sbam-relevance",  # #802: how useful a parsed document is for the goal
+    "sbam-reviewer",  # WG-11: reviews the diff against the spec after all gates pass
+    "sbam-repo-scout",  # WG-11: scores repo candidates on close calls
 )
 _DATA_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 CHARS_PER_TOKEN = 4  # ponytail: a rough guard; the model's own count is in llm_calls after the call

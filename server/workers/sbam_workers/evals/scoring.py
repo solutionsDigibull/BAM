@@ -9,13 +9,16 @@ over its runs so one unlucky sample does not decide the gate (the model is not d
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 from sbam_contracts.build import IsatvonPatchClass
+from sbam_contracts.build_dashboard import Severity
+from sbam_contracts.review import ReviewAnswer, ReviewVerdict
 from sbam_contracts.testgen import TestgenOutput
 
 from sbam_workers.build.codegen.bodies import GeneratedBodies
 from sbam_workers.build.codegen.correction import Correction
-from sbam_workers.evals.golden import OcrItem
+from sbam_workers.evals.golden import GoldenReviewItem, OcrItem
 
 
 @dataclass(frozen=True)
@@ -144,3 +147,32 @@ def score_codegen(
     }
     missing = tuple(name for name in CODEGEN_CHECKS if not passed[name])
     return ItemResult(item_id, len(CODEGEN_CHECKS) - len(missing), len(CODEGEN_CHECKS), missing)
+
+
+REVIEW_CHECKS = ("verdict", "located")
+
+
+def score_review(item: GoldenReviewItem, answer: ReviewAnswer | None) -> ItemResult:
+    """Two checks, half each, both about the answer on one case. `verdict`: FAIL for a flawed case,
+    PASS for a clean one. `located`: for a flawed case there is a HIGH finding and every HIGH
+    finding names a planted file (a reviewer that flags the wrong files, or flags everything, is
+    not precise); for a clean case there are no findings at all. No answer scores nothing.
+
+    A reviewer that always passes therefore scores the share of clean cases, and one that always
+    fails with findings in files the defect is not in scores half of the flawed cases and none of
+    the clean ones."""
+    if answer is None:
+        return ItemResult(item.id, 0, len(REVIEW_CHECKS), REVIEW_CHECKS)
+    high = [f for f in answer.findings if f.severity is Severity.HIGH]
+    if item.flawed:
+        planted = {PurePosixPath(name).name for name in item.files}
+        located = bool(high) and all(
+            f.file is not None and PurePosixPath(f.file).name in planted for f in high
+        )
+        verdict = answer.verdict is ReviewVerdict.FAIL
+    else:
+        located = not answer.findings
+        verdict = answer.verdict is ReviewVerdict.PASS
+    passed = {"verdict": verdict, "located": located}
+    missing = tuple(name for name in REVIEW_CHECKS if not passed[name])
+    return ItemResult(item.id, len(REVIEW_CHECKS) - len(missing), len(REVIEW_CHECKS), missing)

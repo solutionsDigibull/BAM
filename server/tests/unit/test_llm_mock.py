@@ -22,10 +22,11 @@ REPO = Path(__file__).resolve().parents[3]
 BIFROST_DIR = REPO / "compose/bifrost"
 FIXTURES = REPO / "server/tests/llm-mock"
 ALIASES = ["sbam-ocr", "sbam-sow", "sbam-isatvon", "sbam-codegen", "sbam-testgen", "sbam-corrector"]
+REVIEWER_ALIASES = ["sbam-reviewer", "sbam-repo-scout"]  # WG-11: diff review and repo scout
 RELEVANCE_ALIASES = ["sbam-relevance"]  # #802: scores a document's relevance to the FDE's goal
 RUBRIC_ALIASES = ["sbam-rubric"]  # E13.6c: the promptfoo sidecar grades through Bifrost
 COGNEE_ALIASES = ["sbam-knowledge", "sbam-embed"]  # E5.7: generated answers, no recorded fixtures
-EXPECTED_ALIASES = ALIASES + RELEVANCE_ALIASES + RUBRIC_ALIASES + COGNEE_ALIASES
+EXPECTED_ALIASES = ALIASES + REVIEWER_ALIASES + RELEVANCE_ALIASES + RUBRIC_ALIASES + COGNEE_ALIASES
 
 
 def load(name: str, path: Path) -> ModuleType:

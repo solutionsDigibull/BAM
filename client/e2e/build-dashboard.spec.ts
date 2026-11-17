@@ -215,7 +215,7 @@ test("e12_6_t05 markup in a finding is shown as text", async ({ page, baseURL })
   expect(dialogs).toBe(0);
 });
 
-test("e12_6_t06 50 Sub-Skills × 19 gates render within 1 s", async ({ page, baseURL }) => {
+test("e12_6_t06 50 Sub-Skills × 20 gates render within 1 s", async ({ page, baseURL }) => {
   const rows = Array.from({ length: 50 }, (_, i) =>
     row(i + 1, {
       gates: { ISATVON_CONTRACT: "PASSED", RUFF: i % 7 === 0 ? "FAILED" : "PASSED" },
