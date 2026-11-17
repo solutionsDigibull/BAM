@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:80cf43ab77485bdbe4d7ebf9bf0c6950c82e2c1346f8e26dffd87d117020c723
+// source-sha256:bbf5d6e8e661431f921d1255f080775169256251ec57f0b2e7904b57e649d097
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -575,6 +575,11 @@ export type LicenceVerdict = "ALLOWED" | "REFUSED" | "UNKNOWN";
 export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegistryStatus".
+ */
+export type RegistryStatus = "REGISTERED" | "SUPERSEDED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "BudgetScope".
  */
 export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
@@ -739,6 +744,7 @@ export interface SbamContracts {
   RepoOverlay?: RepoOverlay;
   RepoScanReport?: RepoScanReport;
   RepoScoutAnswer?: RepoScoutAnswer;
+  RegisteredWorkflow?: RegisteredWorkflow;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
 }
@@ -6985,6 +6991,40 @@ export interface ScoutScore {
     | [string, string, string, string, string, string]
     | [string, string, string, string, string, string, string]
     | [string, string, string, string, string, string, string, string];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegisteredWorkflow".
+ */
+export interface RegisteredWorkflow {
+  workflow_id: string;
+  /**
+   * Pattern: `^\d+\.0\.\d+$`
+   */
+  version: string;
+  /**
+   * Pattern: `^wf_[a-z0-9]+(_[a-z0-9]+)*$`
+   */
+  registry_name: string;
+  registry_id: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  image_digest: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  manifest_hash: string;
+  certification_id: string;
+  owner: string;
+  /**
+   * @minItems 2
+   */
+  tools: [McpToolEntry, McpToolEntry, ...McpToolEntry[]];
+  status: RegistryStatus;
+  registered_at: string;
+  superseded_at?: string | null;
+  superseded_by?: string | null;
 }
 /**
  * A project's caps.

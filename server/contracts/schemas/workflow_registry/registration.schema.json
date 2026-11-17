@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow_registry/registration:0.1.0",
+  "$defs": {
+    "JsonValue": {},
+    "McpToolEntry": {
+      "additionalProperties": false,
+      "description": "One tool of the Workflow server: the Action or the Fixed Check tool of one Sub-Skill.",
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "pattern": "^MS\\d{2}_\\d+__(action|check)$",
+          "title": "Name",
+          "type": "string"
+        },
+        "skill_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "action",
+            "check"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "input_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Input Schema",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Output Schema",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "skill_id",
+        "role",
+        "input_schema",
+        "output_schema"
+      ],
+      "title": "McpToolEntry",
+      "type": "object"
+    },
+    "RegistryStatus": {
+      "enum": [
+        "REGISTERED",
+        "SUPERSEDED"
+      ],
+      "title": "RegistryStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "version": {
+      "pattern": "^\\d+\\.0\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "registry_name": {
+      "maxLength": 64,
+      "pattern": "^wf_[a-z0-9]+(_[a-z0-9]+)*$",
+      "title": "Registry Name",
+      "type": "string"
+    },
+    "registry_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Registry Id",
+      "type": "string"
+    },
+    "image_digest": {
+      "pattern": "^(sha256:)?[0-9a-f]{64}$",
+      "title": "Image Digest",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "pattern": "^(sha256:)?[0-9a-f]{64}$",
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "certification_id": {
+      "format": "uuid",
+      "title": "Certification Id",
+      "type": "string"
+    },
+    "owner": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "tools": {
+      "items": {
+        "$ref": "#/$defs/McpToolEntry"
+      },
+      "minItems": 2,
+      "title": "Tools",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/RegistryStatus"
+    },
+    "registered_at": {
+      "format": "date-time",
+      "title": "Registered At",
+      "type": "string"
+    },
+    "superseded_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Superseded At"
+    },
+    "superseded_by": {
+      "anyOf": [
+        {
+          "pattern": "^\\d+\\.0\\.\\d+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Superseded By"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "version",
+    "registry_name",
+    "registry_id",
+    "image_digest",
+    "manifest_hash",
+    "certification_id",
+    "owner",
+    "tools",
+    "status",
+    "registered_at"
+  ],
+  "title": "RegisteredWorkflow",
+  "type": "object"
+}
