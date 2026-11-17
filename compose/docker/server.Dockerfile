@@ -62,11 +62,16 @@ RUN mkdir -p /home/sbam \
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 CMD ["sbam-healthcheck"]
 
 # --- dev: dev tools installed; compose.override.yaml mounts server/ over /app/server ----------------
+# Order matters (#804). The dev dependencies come first and are rebuilt only when the lockfile changes. The
+# source copy and the install of the workspace packages (a few files) come last, so a code change rebuilds in
+# seconds. The environment stays root-owned and readable: the old `chown -R /opt/venv` copied all of it into a
+# new 2 GB layer and took 8 to 24 minutes. Nothing writes there at run time (no bytecode, no sync).
 FROM base AS dev
-COPY server/ ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --package "${PACKAGE}" \
- && chown -R sbam:sbam /opt/venv
+    uv sync --locked --no-install-workspace --package "${PACKAGE}"
+COPY --chown=10001:10001 server/ ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --package "${PACKAGE}"
 USER 10001:10001
 CMD ["sh", "-c", "if [ \"$SBAM_ROLE\" = api ]; then exec uvicorn sbam_api.main:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-dir /app/server; else exec python -m sbam_workers.bootstrap; fi"]
 
