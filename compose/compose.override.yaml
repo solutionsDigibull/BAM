@@ -77,11 +77,26 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Docker fills the named volume web_node_modules only when it is created, so a later lockfile change never
+  # reached it (d3-force was missing in a running container, #817). This one-shot service runs the freshly built
+  # image and, when the image's pnpm-lock.yaml differs from the hash recorded in the volume, copies the image's
+  # node_modules into the volume. An unchanged lockfile costs a second.
+  web-deps:
+    image: sbam-web:local
+    user: "0:0"
+    entrypoint: ["sh", "/refresh-node-modules.sh"]
+    volumes:
+      - ./docker/web/refresh-node-modules.sh:/refresh-node-modules.sh:ro
+      - web_node_modules:/nm
+    network_mode: none
+    restart: "no"
+
   sbam-web:
     build:
       target: dev # next dev
     depends_on:
       keycloak-seed: { condition: service_completed_successfully }
+      web-deps: { condition: service_completed_successfully }
     environment:
       WATCHPACK_POLLING: "true" # file events don't cross Docker Desktop bind mounts on Windows
       # The upload URL the API hands out (compose.yaml); the dev CSP allows its origin (#568).
