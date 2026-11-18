@@ -5,7 +5,7 @@ import type { BamApi } from "../api/adapter";
 import type { IngestionRun } from "../api/types";
 import { ragPipeline, setRagActions } from "../rag/ragPipeline";
 import { API_BASE } from "@/providers/data-provider";
-import type { WorkflowCodeTree, WorkflowFileView } from "@/contracts";
+import type { WorkflowCodeTree, WorkflowFileView, WorkflowRepositories } from "@/contracts";
 import { ApiFailure, deleteJson, getJson, idempotencyKey, postJson } from "./http";
 import { buildSnapshot, resetSnapshotCache } from "./snapshot";
 import { uploadOne } from "./upload";
@@ -64,6 +64,9 @@ export function createSbamApi(projectId: string): BamApi {
       const qs = new URLSearchParams({ group, path });
       return (await getJson<WorkflowFileView>(`projects/${projectId}/workflows/${workflowId}/code/files?${qs}`)).body;
     },
+    // Read-only repositories of the workflow (#843): patches, the scan report found by URL and commit, components.
+    getWorkflowRepositories: async (workflowId) =>
+      (await getJson<WorkflowRepositories>(`projects/${projectId}/workflows/${workflowId}/repositories`)).body,
     uploadFile: (file, onProgress) => uploadOne(projectId, file, onProgress),
     removeUpload: async (id) => {
       try {

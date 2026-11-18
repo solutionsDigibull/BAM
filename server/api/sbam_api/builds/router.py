@@ -20,9 +20,10 @@ from sbam_contracts.code_view import (
     WorkflowFileView,
 )
 from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
+from sbam_contracts.workflow_repos import WorkflowRepositories
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.builds import code_view, dashboard, patch_decision, workflow_code
+from sbam_api.builds import code_view, dashboard, patch_decision, workflow_code, workflow_repos
 from sbam_api.builds.service import ensure_waiting, retry_build
 from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import validate_idempotency_key
@@ -88,6 +89,15 @@ def workflow_code_file(
         return workflow_code.file_view(
             session, backend(request), user, project_id, workflow_id, group, path
         )
+
+
+@router.get("/projects/{project_id}/workflows/{workflow_id}/repositories")
+def workflow_repositories(
+    project_id: Project, workflow_id: UUID, request: Request, user: User, sessions: Sessions
+) -> WorkflowRepositories:
+    """The repositories the Workflow starts from: patches, scan report, components (read only)."""
+    with sessions() as session:
+        return workflow_repos.repositories(session, backend(request), user, project_id, workflow_id)
 
 
 @router.get(f"{CODE}/attempts")

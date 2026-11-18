@@ -1,0 +1,672 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow/repositories:0.1.0",
+  "$defs": {
+    "ClamFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "signature": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Signature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "signature"
+      ],
+      "title": "ClamFinding",
+      "type": "object"
+    },
+    "DependencyLicence": {
+      "additionalProperties": false,
+      "properties": {
+        "ecosystem": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Ecosystem",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "spdx": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spdx"
+        },
+        "verdict": {
+          "$ref": "#/$defs/LicenceVerdict"
+        }
+      },
+      "required": [
+        "ecosystem",
+        "name",
+        "version",
+        "verdict"
+      ],
+      "title": "DependencyLicence",
+      "type": "object"
+    },
+    "FetchDecision": {
+      "enum": [
+        "VENDORED",
+        "REFUSED"
+      ],
+      "title": "FetchDecision",
+      "type": "string"
+    },
+    "Health": {
+      "additionalProperties": false,
+      "properties": {
+        "last_commit_at": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Commit At"
+        },
+        "last_release_at": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Release At"
+        },
+        "archived": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Archived"
+        },
+        "flags": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Flags",
+          "type": "array"
+        }
+      },
+      "title": "Health",
+      "type": "object"
+    },
+    "LicenceFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "spdx": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spdx"
+        },
+        "source": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/LicenceVerdict"
+        },
+        "override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LicenceOverride"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "source",
+        "verdict"
+      ],
+      "title": "LicenceFinding",
+      "type": "object"
+    },
+    "LicenceOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "by": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "By",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "by"
+      ],
+      "title": "LicenceOverride",
+      "type": "object"
+    },
+    "LicenceVerdict": {
+      "enum": [
+        "ALLOWED",
+        "REFUSED",
+        "UNKNOWN"
+      ],
+      "title": "LicenceVerdict",
+      "type": "string"
+    },
+    "PatchRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "reason",
+        "files"
+      ],
+      "title": "PatchRecord",
+      "type": "object"
+    },
+    "RefusalReason": {
+      "enum": [
+        "HOST_NOT_APPROVED",
+        "CLONE_FAILED",
+        "LICENCE",
+        "MALWARE",
+        "UNSAFE_TREE",
+        "TOO_LARGE"
+      ],
+      "title": "RefusalReason",
+      "type": "string"
+    },
+    "RepoScanReport": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "title": "Url",
+          "type": "string"
+        },
+        "host": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Host",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Commit"
+        },
+        "decision": {
+          "$ref": "#/$defs/FetchDecision"
+        },
+        "refusals": {
+          "items": {
+            "$ref": "#/$defs/RefusalReason"
+          },
+          "maxItems": 10,
+          "title": "Refusals",
+          "type": "array"
+        },
+        "licence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LicenceFinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dependency_licences": {
+          "items": {
+            "$ref": "#/$defs/DependencyLicence"
+          },
+          "maxItems": 500,
+          "title": "Dependency Licences",
+          "type": "array"
+        },
+        "vulnerabilities": {
+          "items": {
+            "$ref": "#/$defs/VulnFinding"
+          },
+          "maxItems": 500,
+          "title": "Vulnerabilities",
+          "type": "array"
+        },
+        "static_findings": {
+          "items": {
+            "$ref": "#/$defs/StaticFinding"
+          },
+          "maxItems": 500,
+          "title": "Static Findings",
+          "type": "array"
+        },
+        "clam_findings": {
+          "items": {
+            "$ref": "#/$defs/ClamFinding"
+          },
+          "maxItems": 100,
+          "title": "Clam Findings",
+          "type": "array"
+        },
+        "files_scanned": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Files Scanned",
+          "type": "integer"
+        },
+        "unsafe_paths": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Unsafe Paths",
+          "type": "array"
+        },
+        "health": {
+          "$ref": "#/$defs/Health"
+        },
+        "bundle_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bundle Sha256"
+        },
+        "bundle_files": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Bundle Files",
+          "type": "integer"
+        },
+        "notes": {
+          "items": {
+            "maxLength": 300,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Notes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "url",
+        "host",
+        "decision"
+      ],
+      "title": "RepoScanReport",
+      "type": "object"
+    },
+    "SbomComponent": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SbomKind"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "ecosystem": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ecosystem"
+        },
+        "licence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licence"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "version"
+      ],
+      "title": "SbomComponent",
+      "type": "object"
+    },
+    "SbomKind": {
+      "enum": [
+        "repository",
+        "dependency"
+      ],
+      "title": "SbomKind",
+      "type": "string"
+    },
+    "Severity": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL",
+        "UNKNOWN"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "StaticFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Tool",
+          "type": "string"
+        },
+        "rule": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Rule",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "line": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Line",
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "UNKNOWN"
+        },
+        "message": {
+          "default": "",
+          "maxLength": 300,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "rule",
+        "path"
+      ],
+      "title": "StaticFinding",
+      "type": "object"
+    },
+    "VulnFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "ecosystem": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Ecosystem",
+          "type": "string"
+        },
+        "package": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Package",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "maxLength": 300,
+          "title": "Summary",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity",
+          "default": "UNKNOWN"
+        }
+      },
+      "required": [
+        "ecosystem",
+        "package",
+        "version",
+        "id"
+      ],
+      "title": "VulnFinding",
+      "type": "object"
+    },
+    "WorkflowRepository": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "commit": {
+          "title": "Commit",
+          "type": "string"
+        },
+        "licence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licence"
+        },
+        "repo_dir": {
+          "title": "Repo Dir",
+          "type": "string"
+        },
+        "sub_skills": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sub Skills",
+          "type": "array"
+        },
+        "patches": {
+          "items": {
+            "$ref": "#/$defs/PatchRecord"
+          },
+          "title": "Patches",
+          "type": "array"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RepoScanReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sbom": {
+          "items": {
+            "$ref": "#/$defs/SbomComponent"
+          },
+          "title": "Sbom",
+          "type": "array"
+        }
+      },
+      "required": [
+        "url",
+        "commit",
+        "repo_dir",
+        "sub_skills",
+        "patches",
+        "sbom"
+      ],
+      "title": "WorkflowRepository",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "workflow_id": {
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "repositories": {
+      "items": {
+        "$ref": "#/$defs/WorkflowRepository"
+      },
+      "title": "Repositories",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "repositories"
+  ],
+  "title": "WorkflowRepositories",
+  "type": "object"
+}
