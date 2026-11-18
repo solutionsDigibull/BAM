@@ -35,7 +35,9 @@ _ACTIVITIES: dict[TaskQueue, list[Callable[..., Any]]] = {q: [] for q in TaskQue
 _STARTUP: dict[TaskQueue, list[Callable[[Client], Awaitable[None]]]] = {q: [] for q in TaskQueue}
 _PREFLIGHT: dict[TaskQueue, list[Callable[[], None]]] = {q: [] for q in TaskQueue}
 log = logging.getLogger("sbam_workers.registry")
-_SKIP = {"bootstrap", "registry", "settings", "queues", "telemetry"}
+# isolated_child is the parse subprocess entry point (POSIX-only `resource`; it also stubs the
+# loaders package in sys.modules), never a module of activities.
+_SKIP = {"bootstrap", "registry", "settings", "queues", "telemetry", "isolated_child"}
 
 
 def _queues(queues: tuple[TaskQueue, ...]) -> tuple[TaskQueue, ...]:

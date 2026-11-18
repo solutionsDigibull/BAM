@@ -22,7 +22,7 @@ down_revision: str | Sequence[str] | None = "0054_document_relevance"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_NAME = op.f("ck_gate_results_gate_valid")  # op.f: already the full name, no convention prefix
+_NAME = "ck_gate_results_gate_valid"  # op.f() in _set: needs a running migration
 _OLD = (
     "'ISATVON_CONTRACT', 'LIBRARIES', 'SCHEMA_SQL', 'CODEGEN', 'AST_SYNTAX', 'AST_SKELETON', "
     "'AST_CONFORMANCE', 'AST_DECOUPLING', 'AST_NO_MANUAL_LOOP', 'AST_HANDOFF', "
@@ -38,8 +38,9 @@ _NEW = (
 
 
 def _set(values: str) -> None:
-    op.drop_constraint(_NAME, "gate_results", schema="sbam", type_="check")
-    op.create_check_constraint(_NAME, "gate_results", f"gate IN ({values})", schema="sbam")
+    name = op.f(_NAME)  # already the full name, no convention prefix
+    op.drop_constraint(name, "gate_results", schema="sbam", type_="check")
+    op.create_check_constraint(name, "gate_results", f"gate IN ({values})", schema="sbam")
 
 
 def upgrade() -> None:

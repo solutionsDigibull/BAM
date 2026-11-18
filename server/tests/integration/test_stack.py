@@ -86,6 +86,7 @@ def test_e1_10_t09_api_ready_inside_the_stack() -> None:
     assert body == {
         "status": "ok",
         "checks": {"db": "ok", "storage": "ok", "temporal": "ok", "keycloak_jwks": "ok"},
+        "bulkheads": {"clamd": "ok", "keycloak_admin": "ok", "keycloak_jwks": "ok"},  # N02
     }
 
 
