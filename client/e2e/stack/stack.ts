@@ -42,7 +42,8 @@ export function guard(baseURL: string | undefined): void {
 /** The real login: the portal's sign-in button, then Keycloak's identity-first pages. */
 export async function keycloakLogin(page: Page, portal: Portal, username: string, query = "") {
   await page.goto(`/login-${portal}${query}`);
-  await page.getByRole("button", { name: "Sign in with Keycloak" }).click();
+  // The FDE page labels it "Sign in with Keycloak"; the admin page (#733) just "Sign in".
+  await page.getByRole("button", { name: /^Sign in( with Keycloak)?$/ }).click();
   await page.waitForURL(/\/realms\/bullm\//);
   // Organizations make the login identity-first: username page, then password page.
   await page.locator("#username").fill(username);

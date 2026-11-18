@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:b6170407a93233a05c5d960664c62df038f8b1929a1edc5d8b6cda0e7d9ab329
+// source-sha256:c5ce8c928c131c4f8e4d8a63cc8abd032ef22e5e2904deeb62cd699539b90924
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -4403,6 +4403,9 @@ export interface OrganizationPayloadV03 {
   fde_notes?: string;
   documents?: string;
   artifacts?: string;
+  legacy_0_2?: {
+    [k: string]: string | undefined;
+  } | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -4423,6 +4426,9 @@ export interface RulesPayloadV03 {
   client_use?: string;
   acts_on?: string;
   prompts?: RulePrompts;
+  legacy_0_2?: {
+    [k: string]: string | undefined;
+  } | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -4456,6 +4462,9 @@ export interface AgentsPayloadV03 {
   source?: string;
   tools?: string;
   model?: string;
+  legacy_0_2?: {
+    [k: string]: string | undefined;
+  } | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -4472,6 +4481,9 @@ export interface SkillsPayloadV03 {
   outcome?: string;
   next?: string;
   references?: string;
+  legacy_0_2?: {
+    [k: string]: string | undefined;
+  } | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -4489,6 +4501,9 @@ export interface ToolingPayloadV03 {
   record_type?: string;
   source_tab?: string;
   bullm_badge?: string;
+  legacy_0_2?: {
+    [k: string]: string | undefined;
+  } | null;
 }
 /**
  * A whole template list (`PUT /admin/master-lists/{key}` replaces it, #782).

@@ -10,8 +10,9 @@ Pure and deterministic: no I/O, no clock (the caller passes `now`), sorted outpu
     parent_id = the node named by Parent Entity; Organization rows are roots (None); an unknown
                 parent also attaches to the root, with a warning.
 * `Links / Path` stays text inside the payload: nothing is ever fetched or dereferenced.
-* Refresh Frequency (Daily / Weekly / Monthly / Quarterly / Yearly) elapsed since the version was
-  written -> `refresh_due`. Nothing is rebuilt automatically.
+* Refresh Frequency (the Tools column, or a RAG Reference key: Daily / Weekly / Monthly /
+  Quarterly / Yearly) elapsed since the version was written -> `refresh_due`. Nothing is rebuilt
+  automatically.
 """
 
 import json
@@ -60,7 +61,15 @@ class MasterContext:
 
 
 def _rag(payload: Mapping[str, Any], key: str) -> str:
+    """A RAG Reference key: BAM 0.2's own cell, or the one the 0.3 migration kept (#781)."""
     rag = payload.get(_RAG)
+    if rag is None:
+        legacy = payload.get("legacy_0_2")
+        text = legacy.get(_RAG, "") if isinstance(legacy, Mapping) else ""
+        try:
+            rag = json.loads(text) if text else None
+        except json.JSONDecodeError:
+            rag = None
     value = rag.get(key, "") if isinstance(rag, Mapping) else ""
     return str(value).strip()
 
@@ -76,7 +85,9 @@ def _excluded(entry: SnapshotEntry, allow_restricted: bool) -> ExclusionReason |
 
 
 def _refresh_due(payload: Mapping[str, Any], written: datetime, now: datetime) -> bool:
-    period = REFRESH.get(_rag(payload, "Refresh Frequency").lower())
+    # Masters 0.3 Tools carry their own column; BAM 0.2 entries had it in the RAG Reference.
+    text = str(payload.get("refresh_frequency") or "").strip() or _rag(payload, "Refresh Frequency")
+    period = REFRESH.get(text.lower())
     return period is not None and now - written >= period
 
 

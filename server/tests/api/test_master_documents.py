@@ -278,7 +278,7 @@ def test_e3_8_an_entry_of_another_tenant_is_not_an_entry(h: DocsHarness) -> None
         "POST",
         "/admin/masters/RULES",
         h.admin_b(),
-        json={"payload": {"domain_rule": "RULE-BOM: applies to BOM. Policy: x"}},
+        json={"payload": {"rule_id": "RULE-BOM", "rule_type_description": "Policy: x"}},
     ).json()["id"]
     res = h.patch(doc["id"], {"master_type": "RULES", "master_entry_id": other}, h.etag(doc["id"]))
     assert res.status_code == 422

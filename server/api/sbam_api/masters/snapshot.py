@@ -16,8 +16,9 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from sbam_contracts.canonical import sha256_of
-from sbam_contracts.masters import MasterStatus, MasterType, is_restricted
+from sbam_contracts.masters import MasterStatus, MasterType
 from sbam_contracts.masters_api import SnapshotDocument, SnapshotEntry, snapshot_document
+from sbam_contracts.masters_v03 import is_restricted
 from sbam_contracts.masters_workbook import PAYLOAD_MODELS
 
 # Never part of an authoritative context, whoever consumes the snapshot (O-24).

@@ -8,7 +8,8 @@ from typing import Any
 import pytest
 import test_projects
 from sbam_api.masters.models import MasterEntry
-from sbam_contracts.masters import STRUCTURE_VERSION, MasterType
+from sbam_contracts.masters import MasterType
+from sbam_contracts.masters_v03 import STRUCTURE_VERSION
 from sbam_contracts.masters_workbook import PAYLOAD_MODELS
 from test_auth import FDE_A2, TENANT_B, problem
 from test_masters_api import engine_with_masters
@@ -35,15 +36,16 @@ def seed(h: Harness) -> dict[str, dict[str, Any]]:
         h,
         "AGENTS",
         {
+            "agent_id": "AG-INTAKE",
             "agent_name": "Intake",
-            "description": "AG-INTAKE. Reads the RFQ.",
-            "repo": "https://github.com/acme/intake, http://old.example.com/intake",
+            "reference": "https://github.com/acme/intake, http://old.example.com/intake",
         },
     )
     tool = add(
         h,
         "TOOLING",
         {
+            "tooling_id": "TOOL-MFG-12",
             "category": "Costing",
             "links_path": "https://gitlab.com/acme/costing#v2 and s3://bucket/x",
         },
@@ -115,7 +117,7 @@ def test_wg6_retired_rows_are_never_offered(h: Harness) -> None:
     assert urls == {"https://gitlab.com/acme/costing"}
 
 
-def test_wg6_t04_the_masters_structure_version_is_unchanged() -> None:
-    assert STRUCTURE_VERSION == "BAM 0.2"
-    assert "repo" in PAYLOAD_MODELS[MasterType.AGENTS].model_fields
+def test_wg6_t04_the_catalog_reads_the_masters_0_3_columns() -> None:
+    assert STRUCTURE_VERSION == "Masters 0.3"  # #781: Agents "Reference", Tooling "Links / Path"
+    assert "reference" in PAYLOAD_MODELS[MasterType.AGENTS].model_fields
     assert "links_path" in PAYLOAD_MODELS[MasterType.TOOLING].model_fields

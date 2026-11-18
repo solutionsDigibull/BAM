@@ -104,7 +104,7 @@ export function MastersScreen() {
             Masters
           </Typography.Title>
           <Typography.Text style={{ color: MUTED }}>
-            The tenant&apos;s BAM 0.2 masters: one tab per workbook sheet, columns frozen
+            The tenant&apos;s Masters 0.3: one tab per workbook sheet, columns frozen
           </Typography.Text>
         </div>
         <Flex gap={8} wrap>

@@ -1,4 +1,4 @@
-"""E3.2 masters engine through the real app and auth chain (#48), on SQLite.
+"""E3.2 masters engine through the real app and auth chain (#48), on SQLite. Masters 0.3 (#781).
 
 The projects harness (test_projects) gives tenants A/B, admin tokens and project creation; the
 masters tables are added to its database, with the SQLite version of the append-only guard.
@@ -22,8 +22,9 @@ from test_auth import ADMIN_A, TENANT_A, problem
 from test_projects import Harness
 
 RULE_BOM = {
-    "domain_rule": "RULE-BOM: applies to BOM. Policy: compare source and costed BOM",
-    "misc": "Status: Proposed",
+    "rule_id": "RULE-BOM",
+    "rule_type_description": "Policy: compare source and costed BOM",
+    "record_status": "Proposed",
 }
 
 
@@ -84,8 +85,8 @@ def test_e3_2_t01_create_rules_entry(h: MastersHarness) -> None:
     assert res.status_code == 201, res.text
     body = res.json()
     assert (body["stable_id"], body["status"], body["version"]) == ("RULE-BOM", "PROPOSED", 1)
-    assert body["source_kind"] == "TEMPLATE_ROW" and body["row_label"] == "Rule #2"
-    assert body["payload"]["domain_rule"].startswith("RULE-BOM:")
+    assert body["source_kind"] == "TEMPLATE_ROW" and body["row_label"] == "RULE-BOM"
+    assert body["payload"]["rule_type_description"].startswith("Policy:")
     assert "stable_id" not in body["payload"] and "status" not in body["payload"]
     assert res.headers["etag"] == '"1"'
     with h.sessions() as s:
@@ -119,12 +120,17 @@ def test_e3_2_filetype_is_read_only_for_admins(h: MastersHarness) -> None:
     problem(h.post("FILETYPE", {"payload": payload}), 403, "FILETYPE_FROZEN")  # E3.7
 
 
-def test_e3_2_labels_count_up_per_type(h: MastersHarness) -> None:
+def test_e3_2_the_id_column_is_the_row_label_and_the_stable_id(h: MastersHarness) -> None:
     h.entry()
-    second = h.entry(payload={"domain_rule": "RULE-OFFER: offers"})
-    assert second["row_label"] == "Rule #3"
-    agent = h.entry("AGENTS", payload={"agent_name": "Intake", "description": "AG-INTAKE. x"})
-    assert (agent["row_label"], agent["stable_id"]) == ("Agent #2", "AG-INTAKE")
+    second = h.entry(payload={"rule_id": "rule-offer", "rule_type_description": "offers"})
+    assert (second["row_label"], second["stable_id"]) == ("rule-offer", "RULE-OFFER")
+    agent = h.entry("AGENTS", payload={"agent_id": "AG-INTAKE", "agent_name": "Intake"})
+    assert (agent["row_label"], agent["stable_id"]) == ("AG-INTAKE", "AG-INTAKE")
+    assert agent["payload"]["kind"] == "Agent"  # the default kind
+    res = h.post("SKILLS", {"payload": {"skill": "no id yet"}})  # #782 assigns ids
+    assert [e["path"] for e in problem(res, 422, "VALIDATION_ERROR")["errors"]] == [
+        "payload.skill_id"
+    ]
 
 
 def test_e3_2_duplicate_stable_id_in_the_same_scope_is_409(h: MastersHarness) -> None:
@@ -133,14 +139,19 @@ def test_e3_2_duplicate_stable_id_in_the_same_scope_is_409(h: MastersHarness) ->
 
 
 def test_e3_2_tooling_entry_is_labelled_with_its_id(h: MastersHarness) -> None:
-    tool = {"category": "MCP", "examples": "WebMCP", "record_status": "Category recorded"}
+    tool = {
+        "tooling_id": "TOOL-MFG-12",
+        "category": "MCP",
+        "tool_name": "WebMCP",
+        "record_status": "Category recorded",
+    }
     body = h.entry("TOOLING", payload=tool, row_label="TOOL-MFG-12")
     assert (body["stable_id"], body["status"], body["source_kind"]) == (
         "TOOL-MFG-12",
         "PROPOSED",
         "TEMPLATE_ROW",
     )
-    res = h.post("TOOLING", {"payload": tool})  # no id
+    res = h.post("TOOLING", {"payload": tool, "row_label": "TOOL-OTHER"})  # not its id
     assert [e["path"] for e in problem(res, 422, "VALIDATION_ERROR")["errors"]] == ["row_label"]
 
 
@@ -149,7 +160,7 @@ def test_e3_2_tooling_entry_is_labelled_with_its_id(h: MastersHarness) -> None:
 
 def test_e3_2_new_version_is_n_plus_one_and_old_versions_stay(h: MastersHarness) -> None:
     entry = h.entry()
-    approved = {**RULE_BOM, "misc": "Reviewed. Status: Approved"}
+    approved = {**RULE_BOM, "record_status": "Active"}
     res = h.version(entry, approved, '"1"')
     assert res.status_code == 201, res.text
     body = res.json()
@@ -157,9 +168,9 @@ def test_e3_2_new_version_is_n_plus_one_and_old_versions_stay(h: MastersHarness)
     assert res.headers["etag"] == '"2"'
     with h.sessions() as s:
         versions = s.scalars(select(MasterEntryVersion).order_by(MasterEntryVersion.version)).all()
-    assert [(v.version, v.payload["misc"]) for v in versions] == [
-        (1, "Status: Proposed"),
-        (2, "Reviewed. Status: Approved"),
+    assert [(v.version, v.payload["record_status"]) for v in versions] == [
+        (1, "Proposed"),
+        (2, "Active"),
     ]
     got = h.call("GET", f"/admin/masters/RULES/{entry['id']}", h.admin_a()).json()
     assert got["version"] == 2
@@ -169,8 +180,8 @@ def test_e3_2_t06_second_version_on_the_same_etag_is_409_version_conflict(
     h: MastersHarness,
 ) -> None:
     entry = h.entry()
-    assert h.version(entry, {**RULE_BOM, "misc": "a"}, '"1"').status_code == 201
-    problem(h.version(entry, {**RULE_BOM, "misc": "b"}, '"1"'), 409, "VERSION_CONFLICT")
+    assert h.version(entry, {**RULE_BOM, "owner_version": "a"}, '"1"').status_code == 201
+    problem(h.version(entry, {**RULE_BOM, "owner_version": "b"}, '"1"'), 409, "VERSION_CONFLICT")
 
 
 def test_e3_2_t06_losing_the_race_on_version_n_plus_one_is_409(h: MastersHarness) -> None:
@@ -183,7 +194,7 @@ def test_e3_2_t06_losing_the_race_on_version_n_plus_one_is_409(h: MastersHarness
             )
         )
         s.commit()
-    problem(h.version(entry, {**RULE_BOM, "misc": "late"}, '"1"'), 409, "VERSION_CONFLICT")
+    problem(h.version(entry, {**RULE_BOM, "owner_version": "late"}, '"1"'), 409, "VERSION_CONFLICT")
 
 
 def test_e3_2_version_needs_if_match(h: MastersHarness) -> None:
@@ -195,7 +206,7 @@ def test_e3_2_version_needs_if_match(h: MastersHarness) -> None:
 
 def test_e3_2_stable_id_cannot_change_in_a_version(h: MastersHarness) -> None:
     entry = h.entry()
-    res = h.version(entry, {"domain_rule": "RULE-OFFER: other"}, '"1"')
+    res = h.version(entry, {**RULE_BOM, "rule_id": "RULE-OFFER"}, '"1"')
     problem(res, 422, "VALIDATION_ERROR")
 
 
@@ -250,7 +261,7 @@ def test_e3_2_fde_cannot_reach_the_masters_api(h: MastersHarness) -> None:
 def test_e3_2_t05_snapshot_pins_the_project_entry_over_the_tenant_entry(h: MastersHarness) -> None:
     project = h.create("EMS RFQ costing")
     tenant = h.entry()
-    h.version(tenant, {**RULE_BOM, "misc": "v2"}, '"1"')  # tenant RULE-BOM v2
+    h.version(tenant, {**RULE_BOM, "owner_version": "v2"}, '"1"')  # tenant RULE-BOM v2
     own = h.entry(project_id=project["id"])  # project-bound RULE-BOM v1
     with h.sessions() as s:
         snap = service.create_snapshot(s, h.user(), uuid.UUID(project["id"]))
@@ -283,12 +294,12 @@ def test_e3_2_t07_new_version_marks_the_context_outdated_without_starting_anythi
     h: MastersHarness,
 ) -> None:
     project = h.create("Knowledge")
-    skill = h.entry("SKILLS", payload={"skill": "SK-INTAKE: RFQ intake"})
+    skill = h.entry("SKILLS", payload={"skill_id": "SK-INTAKE", "skill": "RFQ intake"})
     with h.sessions() as s:
         snap = service.create_snapshot(s, h.user(), uuid.UUID(project["id"]))
         assert service.context_outdated(s, h.user(), snap.id) is False
     with mock.patch("sbam_api.temporal.service.start_run") as start_run:
-        h.version(skill, {"skill": "SK-INTAKE: RFQ intake, revision 2"}, '"1"')
+        h.version(skill, {"skill_id": "SK-INTAKE", "skill": "RFQ intake, revision 2"}, '"1"')
         with h.sessions() as s:
             assert service.context_outdated(s, h.user(), snap.id) is True
     start_run.assert_not_called()

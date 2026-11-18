@@ -10,8 +10,8 @@ import pytest
 import yaml
 from sbam_api.filetypes import config as ft
 from sbam_api.ingest.rules import ALLOWED_EXTENSIONS, is_allowed
-from sbam_contracts.masters import MasterType
-from sbam_contracts.masters_workbook import parse_workbook
+from sbam_contracts.masters import FiletypePayload
+from sbam_contracts.masters_workbook import _tier
 
 REPO = Path(__file__).resolve().parents[3]
 WORKBOOK = REPO / "docs/reference/BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx"
@@ -66,17 +66,25 @@ def test_e3_7_api_specs_are_recognised_by_content_not_extension() -> None:
 
 
 def test_e3_7_frozen_rows_equal_the_bam_0_2_workbook() -> None:
+    """The BAM 0.2 workbook's own Filetype tab (label + the payload columns in order). The masters
+    parser reads Masters 0.3 now, which rejects the 0.2 tabs around it, so this reads the tab."""
     book = openpyxl.load_workbook(WORKBOOK, read_only=True)
     try:
-        sheets = {
-            ws.title: [list(r) for r in ws.iter_rows(values_only=True)] for ws in book.worksheets
-        }
+        cells = [list(r) for r in book["Filetype"].iter_rows(values_only=True)]
     finally:
         book.close()
-    rows = [r for r in parse_workbook(sheets).rows if r.master_type == MasterType.FILETYPE]
+    fields = list(FiletypePayload.model_fields)
     expected = [
-        {"row_label": r.row_label.strip(), **r.payload.model_dump(mode="json")} for r in rows
+        {
+            "row_label": r[0].strip(),
+            **FiletypePayload.model_validate(
+                dict(zip(fields, [r[1], _tier(r[2]), *r[3:]], strict=False))
+            ).model_dump(mode="json"),
+        }
+        for r in cells
+        if isinstance(r[0], str) and r[0].strip().startswith("Filetype #")
     ]
+    assert len(expected) == 43
     assert json.loads(ft.FROZEN_FILE.read_text(encoding="utf-8")) == expected
 
 

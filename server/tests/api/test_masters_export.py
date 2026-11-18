@@ -16,13 +16,13 @@ from clamd_fake import FakeClamd
 from fixtures import fixture_path
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion
 from sbam_contracts.masters import cell_text
-from sbam_contracts.masters_workbook import HEADER_ROWS, TAB_ORDER
+from sbam_contracts.masters_workbook import HEADER_ROWS, TAB_ORDER_WITH_TOOLING
 from sqlalchemy import select
 from test_auth import FDE_A1, problem
 from test_masters_import import ImportHarness, harness, tab, workbook
 
-REFERENCE = fixture_path("masters", "BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx")
-TENANT_TABS = ("Organization", "Rules", "Agents", "Skills")
+REFERENCE = fixture_path("masters", "masters_0_3.xlsx")  # Masters 0.3, synthetic (#781)
+TENANT_TABS = ("Organization", "Rules", "Agents", "Skills", "Tooling")
 
 
 @pytest.fixture
@@ -41,10 +41,10 @@ def book(res: Any) -> openpyxl.Workbook:
 
 
 def data_rows(sheet: Any) -> list[list[str]]:
-    """Entry rows: a label and at least one value (label-only rows are blank template rows)."""
+    """Entry rows: any filled row (in Masters 0.3 an id alone is an entry)."""
     rows = sheet.iter_rows(min_row=HEADER_ROWS + 1, values_only=True)
     texts = [[cell_text(v) for v in r] for r in rows]
-    return [r for r in texts if any(r[1:])]
+    return [r for r in texts if any(r)]
 
 
 def header_rows(sheet: Any) -> list[list[Any]]:
@@ -79,19 +79,12 @@ def test_e3_4_t01_round_trip_is_cell_identical(h: ImportHarness) -> None:
     assert payloads(h) == stored
 
     exported, original = book(res), openpyxl.load_workbook(REFERENCE)
-    assert exported.sheetnames == list(TAB_ORDER)  # no Tooling entries, no Tooling tab
-    for name in TAB_ORDER:
+    assert exported.sheetnames == list(TAB_ORDER_WITH_TOOLING)
+    for name in TAB_ORDER_WITH_TOOLING:
         assert header_rows(exported[name]) == header_rows(original[name]), name
     for name in TENANT_TABS:
         want, got = data_rows(original[name]), data_rows(exported[name])
-        assert len(got) == len(want), name
-        for w, g in zip(want, got, strict=True):
-            assert g[0] == w[0].strip()  # the label, without the reference's trailing spaces
-            texts = [(a, b) for a, b in zip(w[1:], g[1:], strict=False) if not a.startswith("{")]
-            assert all(a == b for a, b in texts), (
-                name,
-                w[0],
-            )  # RAG JSON: same payload, above
+        assert sorted(got) == sorted(want), name  # every cell, rows ordered by id
 
 
 def test_e3_4_export_is_audited_and_named_after_the_tenant(h: ImportHarness) -> None:
@@ -111,7 +104,8 @@ def test_e3_4_export_is_audited_and_named_after_the_tenant(h: ImportHarness) -> 
 
 def test_e3_4_tenant_with_only_filetype_rows(h: ImportHarness) -> None:
     exported = book(export(h))
-    assert all(data_rows(exported[name]) == [] for name in TENANT_TABS)
+    assert "Tooling" not in exported.sheetnames  # no Tooling entries, no Tooling tab
+    assert all(data_rows(exported[name]) == [] for name in TENANT_TABS[:4])
     filetype = data_rows(exported["Filetype"])
     assert [r[0].strip() for r in filetype[:43]] == [f"Filetype #{n}" for n in range(1, 44)]
 
@@ -122,11 +116,11 @@ def test_e3_4_tenant_with_only_filetype_rows(h: ImportHarness) -> None:
 def test_e3_4_t02_template(h: ImportHarness) -> None:
     res = h.call("GET", "/admin/masters/template", h.admin_a())
     template, original = book(res), openpyxl.load_workbook(REFERENCE)
-    assert template.sheetnames == list(TAB_ORDER)
+    assert template.sheetnames == list(TAB_ORDER_WITH_TOOLING)
     assert [list(r) for r in template["README"].values] == [
         list(r) for r in original["README"].values
     ]
-    for name in TAB_ORDER[1:]:
+    for name in TAB_ORDER_WITH_TOOLING[1:]:
         assert header_rows(template[name]) == header_rows(original[name]), name
         assert template[name].freeze_panes == "A4"
     for name in TENANT_TABS:
@@ -152,13 +146,10 @@ def test_e3_4_t03_project_export_has_tenant_and_that_projects_entries(
     tenant_rules = tab(h.upload(workbook(), mode="upsert").json(), "Rules")["created"]
     mine, other = h.create("Mine"), h.create("Other")
     for project, rule in ((mine, "RULE-MINE"), (other, "RULE-OTHER")):
-        payload = {
-            "domain_rule": f"{rule}: project rule. Policy: x",
-            "misc": "Status: Proposed",
-        }
+        payload = {"rule_id": rule, "rule_type_description": "project rule"}
         body = {"payload": payload, "project_id": project["id"]}
         assert h.call("POST", "/admin/masters/RULES", h.admin_a(), json=body).status_code == 201
-    rules = [r[1] for r in data_rows(book(export(h, project_id=mine["id"]))["Rules"])]
+    rules = [r[0] for r in data_rows(book(export(h, project_id=mine["id"]))["Rules"])]
     assert any(r.startswith("RULE-MINE") for r in rules)
     assert not any(r.startswith("RULE-OTHER") for r in rules)
     assert len(rules) == tenant_rules + 1  # the tenant's rules + this project's one
@@ -175,7 +166,7 @@ def test_e3_4_t04_another_tenants_project_is_404(h: ImportHarness) -> None:
 def test_e3_4_another_tenant_never_sees_my_entries(h: ImportHarness) -> None:
     h.upload(workbook(), mode="upsert")
     exported = book(export(h, h.admin_b()))
-    assert all(data_rows(exported[name]) == [] for name in TENANT_TABS)
+    assert all(data_rows(exported[n]) == [] for n in TENANT_TABS if n in exported.sheetnames)
 
 
 # --- T05: formula text --------------------------------------------------------------------------
@@ -183,11 +174,7 @@ def test_e3_4_another_tenant_never_sees_my_entries(h: ImportHarness) -> None:
 
 @pytest.mark.parametrize("text", ['=HYPERLINK("http://x")', "+1+1", "-2", "@SUM(A1)"])
 def test_e3_4_t05_formula_text_is_a_string_cell(h: ImportHarness, text: str) -> None:
-    payload = {
-        "domain_rule": "RULE-FX: formulas. Policy: none",
-        "pcb_panelization": text,
-        "misc": "Status: Proposed",
-    }
+    payload = {"rule_id": "RULE-FX", "rule_type_description": "formulas", "source_evidence": text}
     assert (
         h.call("POST", "/admin/masters/RULES", h.admin_a(), json={"payload": payload}).status_code
         == 201
@@ -211,34 +198,26 @@ def test_e3_4_t06_fde_cannot_export(h: ImportHarness) -> None:
     problem(h.call("GET", "/admin/masters/template", fde), 403, "WRONG_PORTAL")
 
 
-def test_e3_4_too_long_cell_is_422_naming_the_row(h: ImportHarness) -> None:
-    long = "x" * 5_000
-    rag = {
-        k: long
-        for k in (
-            "Example",
-            "Links / Path",
-            "Entity / Node Type",
-            "Security / Access Level",
-            "Refresh Frequency",
-            "ID Field",
-            "Parent Entity",
-        )
-    }
-    payload = {
-        "domain_rule": "RULE-BIG: big. Policy: x",
-        "misc": "Status: Proposed",
-        "rag_reference": rag,
-    }
+def test_e3_4_a_value_at_the_excel_cell_limit_round_trips(h: ImportHarness) -> None:
+    """Masters 0.3 cells are capped at Excel's 32 767 characters by the contract, so a stored
+    value always fits its cell (BAM 0.2's RAG JSON could outgrow one; that 422 is gone)."""
+    payload = {"rule_id": "RULE-BIG", "rule_type_description": "x" * 32_767}
     res = h.call("POST", "/admin/masters/RULES", h.admin_a(), json={"payload": payload})
     assert res.status_code == 201, res.text
-    body = problem(export(h), 422, "VALIDATION_ERROR")
-    assert body["errors"][0]["path"] == "Rules!row4:col12"  # the RAG Reference column
-    assert body["errors"][0]["message"].startswith(f"{res.json()['row_label']} has a value")
+    exported = export(h)
+    value = book(exported)["Rules"].cell(4, 2).value
+    assert isinstance(value, str) and len(value) == 32_767
+    report = h.upload(exported.content, mode="validate-only").json()
+    assert tab(report, "Rules")["unchanged"] == 1
 
 
 def test_e3_4_tooling_tab_only_when_there_are_tooling_entries(h: ImportHarness) -> None:
-    payload = {"category": "MCP", "examples": "WebMCP", "record_status": "Proposed"}
+    payload = {
+        "tooling_id": "TOOL-MFG-01",
+        "tool_name": "WebMCP",
+        "category": "MCP",
+        "record_status": "Proposed",
+    }
     body = {"payload": payload, "row_label": "TOOL-MFG-01"}
     res = h.call("POST", "/admin/masters/TOOLING", h.admin_a(), json=body)
     assert res.status_code == 201, res.text
@@ -252,7 +231,7 @@ def test_e3_4_tooling_tab_only_when_there_are_tooling_entries(h: ImportHarness) 
         "Tooling",
         "Filetype",
     ]
-    assert data_rows(exported["Tooling"])[0][:3] == ["TOOL-MFG-01", "MCP", "WebMCP"]
+    assert data_rows(exported["Tooling"])[0][:3] == ["TOOL-MFG-01", "WebMCP", "MCP"]
     report = h.upload(_bytes(exported), mode="validate-only").json()
     assert tab(report, "Tooling")["unchanged"] == 1 and tab(report, "Tooling")["errors"] == []
 
