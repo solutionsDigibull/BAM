@@ -247,6 +247,14 @@ class SrimRuntimeDefaults(_Strict):
         blocks["persistence"]["table"] = table
         return SrimRuntimeDefinition.model_validate(blocks)
 
+    def with_fixed_router(self) -> "SrimRuntimeDefaults":
+        """The same values with the router set to `TEMPORAL_ROUTER`, the only router BAM writes
+        (ADR 0031). A tenant row that still holds another router (the legacy Dify value) is read as
+        before, but its router is never copied into a manifest."""
+        blocks = self.model_dump(mode="json")
+        blocks["orchestration"]["router"] = TEMPORAL_ROUTER
+        return SrimRuntimeDefaults.model_validate(blocks)
+
 
 class SrimDefaultsView(_Strict):
     """`GET/PUT /admin/srim-defaults`: the tenant's values (ISA14's until it sets its own)."""
@@ -255,7 +263,9 @@ class SrimDefaultsView(_Strict):
     is_default: bool = Field(description="true while the tenant has not set its own values")
 
 
-# The ISA14 sample values (TD §11.1): what a tenant that never set its own gets.
+# The ISA14 sample values (TD §11.1), kept verbatim as the legacy reference: frozen manifests and
+# the ISA14 fixtures carry them. They are NOT what a tenant without its own values gets any more
+# (see `SBAM_SRIM_DEFAULTS`).
 ISA14_SRIM_DEFAULTS: Final = SrimRuntimeDefaults.model_validate(
     {
         "orchestration": {
@@ -274,14 +284,21 @@ ISA14_SRIM_DEFAULTS: Final = SrimRuntimeDefaults.model_validate(
 )
 
 # The gateway value of a manifest whose server is registered in the Bifrost MCP gateway (ADR 0028,
-# decision 4). `Gateway.route_via` is free text, so any manifest already accepts it.
-# `SBAM_SRIM_DEFAULTS` is `ISA14_SRIM_DEFAULTS` with that one value changed. It is NOT yet what a
-# tenant without its own values gets: manifests claim a gateway only once registration exists
-# (WG-12 switches the default), and a frozen manifest keeps the value it was built with.
+# decision 4) and the router value of the Temporal orchestrator that walks the Workflow DAG at run
+# time (ADR 0031). `TEMPORAL_ROUTER` is the ONLY router value BAM writes: the router is fixed, not
+# configurable. `Gateway.route_via` and `Orchestration.router` are free text, so any manifest
+# already accepts them. `SBAM_SRIM_DEFAULTS` is `ISA14_SRIM_DEFAULTS` with those two values
+# changed: it is what a tenant without its own values gets, and what new manifests carry. A frozen
+# manifest keeps the values it was built with, so no frozen hash changes.
 BIFROST_GATEWAY: Final = "Bifrost_MCP_Gateway"
+TEMPORAL_ROUTER: Final = "Temporal_Workflow_Orchestrator"
 SBAM_SRIM_DEFAULTS: Final = SrimRuntimeDefaults.model_validate(
     {
         **ISA14_SRIM_DEFAULTS.model_dump(mode="json"),
+        "orchestration": {
+            "router": TEMPORAL_ROUTER,
+            "trigger": ISA14_SRIM_DEFAULTS.orchestration.trigger,
+        },
         "gateway": {"route_via": BIFROST_GATEWAY},
     }
 )

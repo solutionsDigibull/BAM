@@ -10,13 +10,19 @@
 
 from typing import Any
 
-from sbam_contracts.manifest import ISA14_SRIM_DEFAULTS, SrimDefaultsView, SrimRuntimeDefaults
+from sbam_contracts.api import ErrorCode, FieldError
+from sbam_contracts.manifest import (
+    SBAM_SRIM_DEFAULTS,
+    TEMPORAL_ROUTER,
+    SrimDefaultsView,
+    SrimRuntimeDefaults,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser
-from sbam_api.core.conventions import check_if_match
+from sbam_api.core.conventions import ApiError, check_if_match
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.srim_defaults.models import TenantSrimDefaults
@@ -36,6 +42,18 @@ def get(session: Session, user: CurrentUser) -> tuple[SrimDefaultsView, int]:
 def put(
     session: Session, user: CurrentUser, body: SrimRuntimeDefaults, if_match: str | None
 ) -> tuple[SrimDefaultsView, int]:
+    if body.orchestration.router != TEMPORAL_ROUTER:  # the router is fixed (ADR 0031)
+        raise ApiError(
+            422,
+            ErrorCode.VALIDATION_ERROR,
+            "Invalid request",
+            errors=[
+                FieldError(
+                    path="orchestration.router",
+                    message=f"The router is fixed to {TEMPORAL_ROUTER}",
+                )
+            ],
+        )
     repo = SrimDefaultsRepository(session, user.context())
     row = repo.row(for_update=True)  # two admins saving at once take turns
     check_if_match(if_match, 0 if row is None else row.row_version)
@@ -89,4 +107,4 @@ def reset(
         )
         session.delete(row)
         session.commit()
-    return SrimDefaultsView(defaults=ISA14_SRIM_DEFAULTS, is_default=True), 0
+    return SrimDefaultsView(defaults=SBAM_SRIM_DEFAULTS, is_default=True), 0

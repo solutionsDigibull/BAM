@@ -28,6 +28,7 @@ from sbam_contracts.manifest import (
     BIFROST_GATEWAY,
     ISA14_SRIM_DEFAULTS,
     SBAM_SRIM_DEFAULTS,
+    TEMPORAL_ROUTER,
     Isa14Manifest,
     McpServerEntry,
     SkillManifest,
@@ -141,14 +142,28 @@ def test_wg4_a_sha256_commit_is_accepted_and_the_list_is_bounded() -> None:
 # --- the gateway value ----------------------------------------------------------------------------
 
 
-def test_wg4_the_isa14_defaults_are_untouched_and_bifrost_differs_only_in_the_gateway() -> None:
+def test_wg4_isa14_defaults_untouched_sbam_differs_in_router_and_gateway() -> None:
     assert ISA14_SRIM_DEFAULTS.gateway.route_via == "MCP_Jungle_Gateway_Reverse_Proxy"
+    # the legacy sample, verbatim: frozen manifests keep it
+    assert ISA14_SRIM_DEFAULTS.orchestration.router == "Dify_Dynamic_Master_Router"
     assert SBAM_SRIM_DEFAULTS.gateway.route_via == BIFROST_GATEWAY == "Bifrost_MCP_Gateway"
+    assert SBAM_SRIM_DEFAULTS.orchestration.router == TEMPORAL_ROUTER
+    assert TEMPORAL_ROUTER == "Temporal_Workflow_Orchestrator"
     old = ISA14_SRIM_DEFAULTS.model_dump(mode="json")
     new = SBAM_SRIM_DEFAULTS.model_dump(mode="json")
-    assert {k: v for k, v in new.items() if k != "gateway"} == {
-        k: v for k, v in old.items() if k != "gateway"
+    assert {k: v for k, v in new.items() if k not in ("gateway", "orchestration")} == {
+        k: v for k, v in old.items() if k not in ("gateway", "orchestration")
     }
+    assert new["orchestration"]["trigger"] == old["orchestration"]["trigger"]  # only router moves
+
+
+def test_adr0031_no_default_names_dify() -> None:
+    assert "dify" not in SBAM_SRIM_DEFAULTS.model_dump_json().lower()
+
+
+def test_adr0031_the_isa14_sample_with_dify_still_validates() -> None:
+    sample = isa14_sample()
+    assert Isa14Manifest.model_validate(sample)  # legacy and frozen manifests keep validating
 
 
 def test_wg4_a_manifest_with_the_bifrost_gateway_validates() -> None:

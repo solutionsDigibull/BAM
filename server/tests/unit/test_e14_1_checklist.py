@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from sbam_contracts.build_dashboard import GateName, GateStatus, Severity
+from sbam_contracts.manifest import TEMPORAL_ROUTER
 from sbam_contracts.promptfoo import TestRunState
 from sbam_contracts.sandbox import SandboxMode
 from sbam_contracts.testgen import CaseKind
@@ -164,3 +165,34 @@ def test_wg11_a_failed_review_row_blocks_certification() -> None:
 def test_wg11_a_review_of_another_bundle_is_rejected() -> None:
     gates = [*evidence().gates, gate(GateName.REVIEW, bundle_sha256="c" * 64)]
     assert not evaluate(evidence(gates=gates)).certified
+
+
+# --- ADR 0031: the router is fixed to Temporal for manifests SBAM builds --------------------------
+
+
+def test_adr0031_a_new_sbam_built_manifest_with_the_temporal_router_certifies() -> None:
+    assert evaluate(evidence(router=TEMPORAL_ROUTER)).certified
+
+
+def test_adr0031_a_new_sbam_built_manifest_with_another_router_is_refused() -> None:
+    for router in ("Dify_Dynamic_Master_Router", "Acme_Router", ""):
+        verdict = evaluate(evidence(router=router))
+        assert not verdict.certified
+        assert verdict.reasons == ("ROUTER_NOT_TEMPORAL",)
+
+
+def test_adr0031_a_legacy_manifest_without_a_build_record_is_not_judged() -> None:
+    assert evaluate(evidence(router=None)).certified  # None = not built by SBAM (legacy, frozen)
+
+
+def test_adr0031_the_router_of_a_built_manifest_is_read_and_a_legacy_one_is_not_judged() -> None:
+    from sbam_workers.certify.subskill import _built_router
+
+    def block(router: str) -> dict[str, object]:
+        return {"srim_runtime_definition": {"orchestration": {"router": router}}}
+
+    assert _built_router(block("Dify_Dynamic_Master_Router")) is None  # legacy: no build record
+    built = {**block("Dify_Dynamic_Master_Router"), "sbam_build_record": {}}
+    assert _built_router(built) == "Dify_Dynamic_Master_Router"
+    assert _built_router({**block(TEMPORAL_ROUTER), "sbam_build_record": {}}) == TEMPORAL_ROUTER
+    assert _built_router({"sbam_build_record": {}}) == ""  # built, but no router at all: refused

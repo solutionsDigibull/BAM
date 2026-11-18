@@ -1,6 +1,6 @@
 """Tenant-scoped access to `tenant_srim_defaults` (E9.1b)."""
 
-from sbam_contracts.manifest import ISA14_SRIM_DEFAULTS, SrimRuntimeDefaults
+from sbam_contracts.manifest import SBAM_SRIM_DEFAULTS, SrimRuntimeDefaults
 
 from sbam_api.db.repository import TenantScopedRepository
 from sbam_api.srim_defaults.models import TenantSrimDefaults
@@ -14,8 +14,8 @@ class SrimDefaultsRepository(TenantScopedRepository[TenantSrimDefaults]):
         return self.session.scalars(query.with_for_update() if for_update else query).first()
 
     def current(self) -> tuple[SrimRuntimeDefaults, bool]:
-        """The tenant's values and whether they are the ISA14 ones (no row yet)."""
+        """The tenant's values and whether they are the SBAM defaults (no row yet)."""
         row = self.row()
         if row is None:
-            return ISA14_SRIM_DEFAULTS, True
+            return SBAM_SRIM_DEFAULTS, True
         return SrimRuntimeDefaults.model_validate(row.defaults), False

@@ -22,7 +22,7 @@ from sbam_api.testruns.models import TestRunRow
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.build_dashboard import GateName
 from sbam_contracts.canonical import deterministic_hash
-from sbam_contracts.manifest import SkillManifest
+from sbam_contracts.manifest import TEMPORAL_ROUTER, SkillManifest
 from sbam_contracts.promptfoo import suite_sha256
 from sbam_workers.certify.checklist import REQUIRED_GATES
 from sbam_workers.certify.subskill import BLOCKED, CertifySubSkill
@@ -107,6 +107,8 @@ class Build(World):
             "immutable_after_approval": False,
         }
         data["sbam_build_record"]["provenance"]["sow_version_id"] = str(self.sow_version)
+        # a manifest SBAM builds now names the Temporal router (ADR 0031)
+        data["srim_runtime_definition"]["orchestration"]["router"] = TEMPORAL_ROUTER
         data["sbam_build_record"].pop("evidence", None)
         data["sbam_build_record"].pop("certification", None)
         return SkillManifest.sealed(data).dump()
@@ -281,6 +283,19 @@ def test_e14_1_t02_a_missing_gate_blocks_and_writes_nothing() -> None:
     assert "MISSING_EVIDENCE:MYPY" in b.blocked_with()
     assert b.certificates() == [] and not b.manifest_row().is_frozen
     assert b.manifest_row().manifest["skill_metadata"]["status"] == "DRAFT"
+
+
+def test_adr0031_a_new_sbam_built_manifest_with_another_router_is_refused() -> None:
+    b = Build()
+    with b.sessions() as s:
+        row = s.get(SubSkillManifest, b.manifest_id)
+        assert row is not None
+        data = copy.deepcopy(row.manifest)
+        data["srim_runtime_definition"]["orchestration"]["router"] = "Dify_Dynamic_Master_Router"
+        row.manifest = SkillManifest.sealed(data).dump()
+        s.commit()
+    assert "ROUTER_NOT_TEMPORAL" in b.blocked_with()
+    assert b.certificates() == [] and not b.manifest_row().is_frozen
 
 
 def test_e14_1_t03_a_local_docker_run_cannot_certify() -> None:

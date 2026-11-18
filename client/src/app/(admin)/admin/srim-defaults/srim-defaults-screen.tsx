@@ -1,7 +1,7 @@
 "use client";
 
 // SRIM runtime defaults (E9.1b, O-19): the six runtime blocks every manifest of this tenant carries. Admin
-// only. Save sends the whole set with If-Match; "Reset" returns the tenant to the ISA14 values.
+// only. Save sends the whole set with If-Match; "Reset" returns the tenant to the SBAM defaults.
 
 import { useCustomMutation, useOne } from "@refinedev/core";
 import { Alert, Button, Card, Flex, Form, Input, Popconfirm, Typography, message } from "antd";
@@ -21,9 +21,17 @@ import {
   NOTE,
   PATH,
   RESOURCE,
+  FIXED_ROUTER,
   STALE_MESSAGE,
   blockTitle,
+  isFixed,
 } from "./srim-api";
+
+// The router is fixed (ADR 0031): a stored legacy value is shown as Temporal and never sent back.
+const withFixedRouter = (d: SrimRuntimeDefaults): SrimRuntimeDefaults => ({
+  ...d,
+  orchestration: { ...d.orchestration, router: FIXED_ROUTER },
+});
 
 export function SrimDefaultsScreen() {
   const [form] = Form.useForm<SrimRuntimeDefaults>();
@@ -35,7 +43,7 @@ export function SrimDefaultsScreen() {
 
   // A reload (after a save, a reset or a stale write) puts the server's values in the form.
   useEffect(() => {
-    if (view) form.setFieldsValue(view.defaults);
+    if (view) form.setFieldsValue(withFixedRouter(view.defaults));
   }, [view, form]);
 
   if (query.isLoading) return <LoadingState />;
@@ -55,7 +63,7 @@ export function SrimDefaultsScreen() {
         errorNotification: false,
       });
       await query.refetch(); // renews the ETag too
-      messages.success(method === "put" ? "Saved" : "Reset to the ISA14 defaults");
+      messages.success(method === "put" ? "Saved" : "Reset to the SBAM defaults");
     } catch (e) {
       const error = e as ApiError;
       setSaveError(error);
@@ -108,8 +116,8 @@ export function SrimDefaultsScreen() {
         form={form}
         layout="vertical"
         requiredMark={false}
-        initialValues={view.defaults}
-        onFinish={(values) => void send("put", values)}
+        initialValues={withFixedRouter(view.defaults)}
+        onFinish={(values) => void send("put", withFixedRouter(values))}
       >
         <Flex vertical gap={16}>
           {BLOCKS.map((block) => (
@@ -126,20 +134,22 @@ export function SrimDefaultsScreen() {
                   ]}
                   normalize={(v: string) => v}
                 >
-                  <Input maxLength={MAX_LEN + 1} />
+                  <Input maxLength={MAX_LEN + 1} disabled={isFixed(f)} />
                 </Form.Item>
               ))}
             </Card>
           ))}
           <Flex gap={8} justify="flex-end">
             <Popconfirm
-              title="Reset to the ISA14 defaults?"
-              description="Future manifests use the ISA14 values again. Built manifests are not changed."
+              title="Reset to the SBAM defaults?"
+              description="Future manifests use the SBAM defaults again. Built manifests are not changed."
               okText="Reset"
               onConfirm={() => void send("delete")}
               disabled={view.is_default}
             >
-              <Button disabled={view.is_default || mutation.isPending}>Reset to ISA14</Button>
+              <Button disabled={view.is_default || mutation.isPending}>
+                Reset to SBAM defaults
+              </Button>
             </Popconfirm>
             <Button type="primary" htmlType="submit" loading={mutation.isPending}>
               Save

@@ -15,6 +15,7 @@ from enum import StrEnum
 from typing import Final
 
 from sbam_contracts.build_dashboard import GateName, GateStatus, Severity
+from sbam_contracts.manifest import TEMPORAL_ROUTER
 from sbam_contracts.promptfoo import TestRunState
 from sbam_contracts.sandbox import SandboxMode
 from sbam_contracts.testgen import MIN_CASES, REQUIRED_KINDS, CaseKind
@@ -41,6 +42,7 @@ class Reason(StrEnum):
     DATASET_CHANGED = "DATASET_CHANGED"
     SUITE_CHANGED = "SUITE_CHANGED"
     RUNTIME_CHANGED = "RUNTIME_CHANGED"
+    ROUTER_NOT_TEMPORAL = "ROUTER_NOT_TEMPORAL"
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,9 @@ class Evidence:
     current_dataset_sha256: str  # the dataset as it is now (the FDE may have edited it)
     current_suite_sha256: str
     current_runtime_digest: str
+    # The router of the manifest's srim_runtime_definition when SBAM built it (ADR 0031); None for a
+    # manifest without an sbam_build_record, which is a legacy one and is not judged by this rule.
+    router: str | None = None
 
 
 @dataclass(frozen=True)
@@ -161,9 +166,16 @@ def _test_reasons(evidence: Evidence) -> list[str]:
     return reasons
 
 
+def _router_reasons(evidence: Evidence) -> list[str]:
+    """A new SBAM-built manifest must name the Temporal router (ADR 0031)."""
+    if evidence.router is None or evidence.router == TEMPORAL_ROUTER:
+        return []
+    return [Reason.ROUTER_NOT_TEMPORAL.value]
+
+
 def evaluate(evidence: Evidence) -> Verdict:
     """Certify only when every item is present, green and about the same bundle."""
     if not _same_bundle(evidence):
         return Verdict(False, (Reason.EVIDENCE_HASH_MISMATCH.value,))
-    reasons = _gate_reasons(evidence) + _test_reasons(evidence)
+    reasons = _gate_reasons(evidence) + _test_reasons(evidence) + _router_reasons(evidence)
     return Verdict(not reasons, tuple(reasons))

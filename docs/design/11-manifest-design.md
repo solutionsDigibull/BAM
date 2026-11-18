@@ -33,9 +33,9 @@ The contract has two layers (`server/contracts/sbam_contracts/manifest.py`): `Is
     "n_notification": { "ui_updates": [], "database_updates": [], "alerts": [], "next": "MS01.2_<Name> | MS02_<Name> | null" }
   },
   "srim_runtime_definition": {
-    "orchestration": { "router": "Dify_Dynamic_Master_Router", "trigger": "HTTP_POST_Payload_plus_Variables" },
+    "orchestration": { "router": "Temporal_Workflow_Orchestrator", "trigger": "HTTP_POST_Payload_plus_Variables" },
     "execution": { "engine": "FastMCP_Execution_Engine" },
-    "gateway": { "route_via": "MCP_Jungle_Gateway_Reverse_Proxy" },
+    "gateway": { "route_via": "Bifrost_MCP_Gateway" },
     "persistence": { "database": "PostgreSQL_Database_State_Config", "table": "", "action": "Execute_SQL_Queries_via_Postgres_MCP" },
     "audit": { "telemetry": "PostgreSQL_Audit_Logs" },
     "ui": { "target": "SRIM_UI_Canvas", "method": "Embedded_iFrames_Widgets" }
@@ -70,7 +70,7 @@ The contract has two layers (`server/contracts/sbam_contracts/manifest.py`): `Is
 | `skill_metadata.reusable`, `owner`                          | Platform default; FDE may toggle`reusable`                                                                       | Yes                           | Immutable                                             |
 | `skill_metadata.version`, `status`, timestamps              | Platform                                                                                                           | —                            | Immutable                                             |
 | `isatvon_definition.*`                                        | LLM extraction + FDE edits + correction patches                                                                    | Yes (grid)                    | Immutable                                             |
-| `srim_runtime_definition.*`                                   | Platform defaults from tenant configuration (values from ISA14 sample);`persistence.table` derived from V.tables. Until per-tenant configuration exists (O-19), every tenant gets the ISA14 values (`build/manifest.py` `PLATFORM_SRIM`, E9.1) | Admin config only             | Immutable                                             |
+| `srim_runtime_definition.*`                                   | Platform defaults from tenant configuration (SBAM defaults of ADR 0031: Temporal router, Bifrost gateway; the ISA14 sample values stay in frozen manifests);`persistence.table` derived from V.tables. Until per-tenant configuration exists (O-19), every tenant gets the SBAM defaults (`build/manifest.py` `PLATFORM_SRIM`, E9.1) | Admin config only             | Immutable                                             |
 | `contracts.input_schema` / `output_schema`                  | Platform-derived from S and O (+`state_handoff_id`)                                                              | Recomputed                    | Immutable                                             |
 | `governance.deterministic_hash`                               | Platform ([§11.5](11-manifest-design.md))                                                                                                  | Recomputed                    | Immutable                                             |
 | `governance.lifecycle.state`                                  | Platform:`DRAFT` → `VALIDATING` → `APPROVED` (= SBAM certified) → `SUPERSEDED`                          | —                            | Immutable (except SUPERSEDED marker in a new version) |
