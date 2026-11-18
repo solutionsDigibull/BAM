@@ -38,7 +38,9 @@ from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.db.repository import TenantContext
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.manifests.repository import SubSkillManifestRepository
+from sbam_api.projects.repository import ProjectRepository
 from sbam_api.registry.repository import registry_for_digest
+from sbam_api.repo_catalog.service import build_for as repo_catalog
 from sbam_api.scan.clamd import ClamdClient
 from sbam_api.schema_sql.repository import WorkflowSchemaRepository
 from sbam_api.storage.base import StorageBackend
@@ -48,6 +50,7 @@ from sbam_contracts.build_dashboard import GateStatus
 from sbam_contracts.isatvon14 import SubSkill
 from sbam_contracts.manifest import SkillManifest
 from sbam_contracts.pipeline import IdResult
+from sbam_contracts.repo_choice import ChooseRepoInput, ChooseRepoResult
 from sbam_contracts.runs import TaskQueue
 from sbam_contracts.sandbox import normalize_digest
 from sqlalchemy.orm import Session, sessionmaker
@@ -86,6 +89,8 @@ from sbam_workers.build.gates.sandbox_import_runner import SandboxImportRunner
 from sbam_workers.build.gates.static_gate import StaticGate
 from sbam_workers.build.gates.static_tools import make_tools
 from sbam_workers.build.gates.toolchain import Executor, LocalExecutor, SidecarExecutor
+from sbam_workers.build.repo_choice import STAGE as CHOOSE_REPO_STAGE
+from sbam_workers.build.repo_choice import ChoiceInputs, ChooseRepo, SqlChoiceStore
 from sbam_workers.build.review import STAGE as REVIEW_STAGE
 from sbam_workers.build.review import Review, ReviewInputs
 from sbam_workers.isatvon.loop_spec import LoopSpecError, compile_definition
@@ -308,6 +313,19 @@ class SqlBuildInputs:
         with self.sessions() as session:
             return self._sub_skill(session, inp)
 
+    def _choice(self, inp: BuildStageInput) -> ChoiceInputs:
+        """The goal, the Sub-Skill as the corrections left it and the project's catalogue (#756)."""
+        with self.sessions() as session:
+            project = ProjectRepository(session, self._ctx(inp)).get(inp.project_id)
+            return ChoiceInputs(
+                goal=(project.goal if project is not None else None) or "",
+                sub_skill=self._sub_skill(session, inp),
+                catalog=repo_catalog(session, self._ctx(inp), inp.project_id).candidates,
+            )
+
+    async def choice(self, inp: BuildStageInput) -> ChoiceInputs:
+        return await asyncio.to_thread(self._choice, inp)
+
     async def tests_sub_skill(self, inp: BuildStageInput) -> dict[str, Any]:
         """The Sub-Skill as the corrections left it, for `generate_tests` (E13.4)."""
         return await asyncio.to_thread(self._tests_sub_skill, inp)
@@ -368,12 +386,18 @@ def _ast_gate() -> AstGate:
 
 
 @lru_cache(maxsize=1)
+def _choose_repo() -> ChooseRepo:
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    return ChooseRepo(
+        SqlBuildInputs(sessions).choice, SqlChoiceStore(sessions), _llm(settings, sessions)
+    )
+
+
+@lru_cache(maxsize=1)
 def _review_stage() -> Review:
     settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
     storage = make_backend(settings)
-    return Review(
-        SqlBuildInputs(sessions).review, storage, sessions, _llm(settings, sessions)
-    )
+    return Review(SqlBuildInputs(sessions).review, storage, sessions, _llm(settings, sessions))
 
 
 @activity_for(TaskQueue.LLM)
@@ -526,3 +550,11 @@ async def review_code_stage_activity(inp: BuildStageInput) -> IdResult:
     is GateFailed with the attempt id, the verdict and findings in `gate_results`. Not called by
     `SubSkillBuild` yet."""
     return await _review_stage().run(inp)
+
+
+@activity_for(TaskQueue.LLM)
+@activity.defn(name=CHOOSE_REPO_STAGE)
+async def choose_repo_stage_activity(inp: ChooseRepoInput) -> ChooseRepoResult:
+    """Score the Admin catalogue and decide, or record the question for the FDE (#756). Called by
+    `SubSkillBuild` first without an answer and again with the FDE's answer after the wait."""
+    return await _choose_repo().run(inp)

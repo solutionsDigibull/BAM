@@ -125,6 +125,7 @@ class RetryAccepted(_Dto):
 class BuildStage(StrEnum):
     """Where a build is, for the `build_status` query (the activities' names, TD §13.2)."""
 
+    CHOOSE_REPO = "choose_repo"  # #756: pick the repository the code starts from, or ask the FDE
     BUILD_MANIFEST = "build_manifest"
     CHECK_LIBRARIES = "check_libraries"
     RENDER_SKELETON = "render_skeleton"
@@ -141,6 +142,7 @@ class BuildStage(StrEnum):
     CERTIFY = "certify_sub_skill"
     CORRECT = "correct"
     WAIT_RETRY = "wait_retry"  # NEEDS_FDE_REVIEW / DEPENDENCY_FAILED / TESTING_BLOCKED
+    WAIT_REPO = "wait_repo_choice"  # #756: the FDE is asked which repository to start from
     DONE = "done"
 
 
@@ -161,3 +163,5 @@ class SubSkillBuildStatus(_Dto):
     waiting_for_retry: bool = False
     finding_ids: list[UUID] = Field(default_factory=list)
     retry_keys: list[str] = Field(default_factory=list)  # Idempotency-Keys already signalled
+    waiting_for_repo_choice: bool = False  # #756: waits for the FDE's repository answer
+    repo_answer_keys: list[str] = Field(default_factory=list)  # answers already taken (#756)

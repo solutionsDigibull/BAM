@@ -3,14 +3,20 @@
 Started by ProjectPipeline with id `build-<sub_skill_id>-<build_no>` on sbam-build. One *cycle* is
 a first pass (attempt 0) plus at most MAX_CORRECTIONS correction passes:
 
-    build_manifest → check_libraries → render_skeleton → generate_bodies* → assemble → ast_gate →
+    [choose_repo††, first pass of the build only] build_manifest → check_libraries →
+    render_skeleton → generate_bodies* → assemble → ast_gate →
     static_gate → import_gate → compliance_gates → review_code† → generate_tests →
     build_promptfoo_suite → [tests_started] → run_sandbox_tests → certify_sub_skill →
     [tests_passed: CERTIFIED]
     (* first pass of a cycle only: a correction supplies the bodies. † #759: one model review once
     every gate has passed. The Sub-Skill is still BUILDING, so a FAIL is a `gate_failed` (the
     corrector reads its findings from `gate_results` like a gate's) and a model that cannot answer
-    is a `generation_failed`. It runs once per attempt, never on the TESTING_BLOCKED retry path.)
+    is a `generation_failed`. It runs once per attempt, never on the TESTING_BLOCKED retry path.
+    †† #756: pick the repository the code starts from. A clear winner or a repository named in the
+    ISATVON is decided inside the activity; several close candidates, a weak match or no candidate
+    make the build wait for the FDE's `repo_answer` signal (stage WAIT_REPO, no timeout, a
+    reminder notification every 3 days), then the activity records the answer. It runs once per
+    build: a retry that opens a new cycle finds the decision and skips it.)
 
 A gate or test failure runs `correct` and starts the next pass from the manifest (every gate runs
 again; a corrector that changed the ISATVON is picked up by the re-manifest). After MAX_CORRECTIONS
@@ -70,6 +76,16 @@ with workflow.unsafe.imports_passed_through():
         SubSkillBuildResult,
         TransitionRequest,
     )
+    from sbam_contracts.repo_choice import (
+        ANSWER_INVALID,
+        QUESTION_MISSING,
+        REMINDER_NOTIFICATION,
+        REPO_ANSWER_SIGNAL,
+        ChooseRepoInput,
+        ChooseRepoResult,
+        ChooseRepoStatus,
+        RepoAnswerSignal,
+    )
     from sbam_contracts.runs import TaskQueue
     from sbam_contracts.state_machines import Actor, MachineName, SubSkillState
 
@@ -85,6 +101,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_workers.build.stubs import (
         assemble,
         ast_gate,
+        choose_repo,
         compliance_gates,
         correct,
         generate_bodies,
@@ -118,7 +135,14 @@ _LLM_ERRORS = ("SchemaInvalidAfterRetries",)
 # #483: stages whose activity asks a model, and the ways the model side can fail once the activity's
 # own retries are spent (the error type names; a wrong alias, a missing prompt or a wiring mismatch
 # are platform defects and still fail the workflow loudly). `correct` has its own handling.
-MODEL_STAGES = frozenset({BuildStage.GENERATE_BODIES, BuildStage.GENERATE_TESTS, BuildStage.REVIEW})
+MODEL_STAGES = frozenset(
+    {
+        BuildStage.GENERATE_BODIES,
+        BuildStage.GENERATE_TESTS,
+        BuildStage.REVIEW,
+        BuildStage.CHOOSE_REPO,  # #756: the repo scout asks a model
+    }
+)
 MODEL_FAILURES = frozenset(
     {
         "SchemaInvalidAfterRetries",  # the model never returned valid output
@@ -138,6 +162,8 @@ PLATFORM_PATCH = "e12-2-gate-platform-defect"
 RETRY_TESTS_PATCH = "704-retry-regenerates-tests"
 REVIEWER_PATCH = "wg11-reviewer-pass"  # #759: the review pass after the gates
 IMPORT_GATES_PATCH = "wg13-import-and-compliance-gates"  # #761: import gate, then licence/vuln/MCP
+REPO_CHOICE_PATCH = "wg8-choose-repo"  # #756: pick the repository, or ask the FDE, before building
+REPO_REMINDER_AFTER = timedelta(days=3)  # #756: how long the FDE may leave the question alone
 # #117: an integrity or wiring defect in a gate is a platform defect (BUILD_ERROR, an admin fixes
 # it), not a crashed workflow nobody hears about. The other stages' wiring errors still fail loudly.
 # #119: a static tool or clamd that still gives no verdict after the activity's retries is the
@@ -158,6 +184,11 @@ PLATFORM_DEFECTS = frozenset(
 )
 MAX_SUMMARY_PATHS = 10
 SPECS: dict[BuildStage, _Spec] = {
+    # #756: scoring is one model call; an answer the API should have refused is a defect, so it
+    # is never retried
+    BuildStage.CHOOSE_REPO: _Spec(
+        TaskQueue.LLM, 5 * _MIN, 3, (*_LLM_ERRORS, ANSWER_INVALID, QUESTION_MISSING)
+    ),
     BuildStage.BUILD_MANIFEST: _Spec(TaskQueue.BUILD, 2 * _MIN, 3),
     BuildStage.CHECK_LIBRARIES: _Spec(TaskQueue.BUILD, 5 * _MIN, 3),
     BuildStage.RENDER_SKELETON: _Spec(TaskQueue.BUILD, 2 * _MIN, 2, (TEMPLATE_ERROR,)),
@@ -274,6 +305,10 @@ class SubSkillBuild:
         self.blocked_retries = 0  # retries from TESTING_BLOCKED, for the per-retry patch id
         self.retry_keys: list[str] = []
         self.cancel_request: Cancel | None = None
+        self.repo_decided = False  # #756: the repository decision of this build is recorded
+        self.waiting_repo = False  # #756: the FDE is asked which repository to start from
+        self.pending_answer: RepoAnswerSignal | None = None
+        self.repo_answer_keys: list[str] = []
         self.sequence = 0  # makes every transition / notification key unique and replay-stable
 
     # --- signals (never authorization: the API checks the FDE and project first) -----------------
@@ -292,6 +327,16 @@ class SubSkillBuild:
         if self.cancel_request is None:
             self.cancel_request = signal
             self.waiting = False
+            self.waiting_repo = False
+
+    @workflow.signal(name=REPO_ANSWER_SIGNAL)
+    def on_repo_answer(self, signal: RepoAnswerSignal) -> None:
+        # Only while the question is open; a repeated Idempotency-Key is the same request.
+        if not self.waiting_repo or signal.idempotency_key in self.repo_answer_keys:
+            return
+        self.repo_answer_keys.append(signal.idempotency_key)
+        self.pending_answer = signal
+        self.waiting_repo = False
 
     # --- query -----------------------------------------------------------------------------------
 
@@ -312,6 +357,8 @@ class SubSkillBuild:
             waiting_for_retry=self.waiting,
             finding_ids=list(self.findings),
             retry_keys=list(self.retry_keys),
+            waiting_for_repo_choice=self.waiting_repo,
+            repo_answer_keys=list(self.repo_answer_keys),
         )
 
     # --- run -------------------------------------------------------------------------------------
@@ -379,6 +426,8 @@ class SubSkillBuild:
 
     async def _attempt(self) -> None:
         ref = self._stage_input()
+        if not self.repo_decided and workflow.patched(REPO_CHOICE_PATCH):
+            await self._choose_repo()
         await self._call(BuildStage.BUILD_MANIFEST, build_manifest, ref)
         libraries: LibraryCheckResult = await self._call(
             BuildStage.CHECK_LIBRARIES, check_libraries, ref
@@ -403,6 +452,46 @@ class SubSkillBuild:
         await self._call(BuildStage.CERTIFY, certify_sub_skill, ref)
         await self._apply("tests_passed")
         await self._notify("sub_skill.certified")
+
+    async def _choose_repo(self) -> None:
+        """#756: decide the repository, or wait for the FDE's answer and record it. The activity
+        keeps one decision per build, so a retried or replayed call answers from what it stored."""
+        ref = self._ref()
+        first: ChooseRepoResult = await self._call(
+            BuildStage.CHOOSE_REPO,
+            choose_repo,
+            ChooseRepoInput(**ref, cycle=self.cycle, attempt=self.attempt),
+        )
+        if first.status is ChooseRepoStatus.ASKED:
+            answer = await self._wait_repo_answer()
+            await self._call(
+                BuildStage.CHOOSE_REPO,
+                choose_repo,
+                ChooseRepoInput(**ref, cycle=self.cycle, attempt=self.attempt, answer=answer),
+            )
+        self.repo_decided = True
+
+    async def _wait_repo_answer(self) -> RepoAnswerSignal:
+        """Wait for the FDE's `repo_answer` (or `cancel`). There is no deadline: the build waits as
+        long as it takes, and the FDE is reminded every REPO_REMINDER_AFTER."""
+        self.stage = BuildStage.WAIT_REPO
+        self.pending_answer = None
+        self.waiting_repo = True
+        await self._notify("sub_skill.repo_question")
+        while True:
+            try:
+                await workflow.wait_condition(
+                    lambda: self.pending_answer is not None or self.cancel_request is not None,
+                    timeout=REPO_REMINDER_AFTER,
+                )
+                break
+            except TimeoutError:
+                await self._notify(REMINDER_NOTIFICATION)
+        self._checkpoint()
+        answer = self.pending_answer
+        if answer is None:  # unreachable: the condition above holds only with one of the two
+            raise _CancelRequested
+        return answer
 
     async def _sandbox_tests(self, ref: BuildStageInput) -> None:
         """Sandbox infrastructure trouble (after Temporal's retries) blocks the Sub-Skill and waits
@@ -506,6 +595,7 @@ class SubSkillBuild:
         stage = {
             BuildStage.GENERATE_TESTS: "test generation",
             BuildStage.REVIEW: "review",
+            BuildStage.CHOOSE_REPO: "repository choice",
         }.get(failure.gate, "body generation")
         await self._notify("sub_skill.generation_error", error=failure.cause, stage=stage)
         await self._wait_retry()

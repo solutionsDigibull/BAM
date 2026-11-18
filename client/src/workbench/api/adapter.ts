@@ -1,5 +1,7 @@
 import type { DataProvider } from '@refinedev/core'
-import type { RegisteredWorkflow, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories } from '@/contracts'
+import type {
+  RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
+} from '@/contracts'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
 
 export type ScanOutcome = 'clean' | 'threat' | 'error'
@@ -19,6 +21,10 @@ export interface BamApi {
   getWorkflowRepositories(workflowId: string): Promise<WorkflowRepositories>
   /** The workflow's registry entry: the newest enabled one, or `version` (read only, #849). Rejects with 404 when none. */
   getWorkflowRegistration(workflowId: string, version?: string): Promise<RegisteredWorkflow>
+  /** The builds of the workflow that wait for the FDE to choose a repository, and the decisions taken (#756). */
+  getRepoQuestions(workflowId: string): Promise<RepoQuestions>
+  /** The FDE's answer to one waiting build: a repository of the short list, or none (the code is generated). `key` is its Idempotency-Key. */
+  answerRepoQuestion(workflowId: string, subSkillId: string, body: RepoAnswerRequest, key: string): Promise<RepoAnswered>
   /** stageUpload: stores the file in private quarantine staging and starts an async virus scan (ClamAV in production). */
   uploadFile(file: { name: string; size: number; type?: string; data: Blob; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
   /** Removes a file from the active intake batch once the service confirms. A blocked object stays in quarantine (audit). Refused while scanning. */
@@ -86,6 +92,7 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'workflow-code': q => api.getWorkflowCode(q.workflowId ?? ''),
   'workflow-file': q => api.getWorkflowFile(q.workflowId ?? '', q.group ?? '', q.path ?? ''),
   'workflow-repos': q => api.getWorkflowRepositories(q.workflowId ?? ''),
+  'repo-questions': q => api.getRepoQuestions(q.workflowId ?? ''),
   'workflow-registration': q => api.getWorkflowRegistration(q.workflowId ?? '', q.version),
 }
 

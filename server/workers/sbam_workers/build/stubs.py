@@ -13,11 +13,20 @@ from sbam_contracts.build import (
     CorrectionResult,
 )
 from sbam_contracts.pipeline import IdResult
+from sbam_contracts.repo_choice import ChooseRepoInput, ChooseRepoResult, ChooseRepoStatus
+from sbam_contracts.repo_decision import RepoOutcome
 from sbam_contracts.runs import TaskQueue
 from temporalio import activity
 
 from sbam_workers.registry import activity_for
 from sbam_workers.stub_ids import stage_stub_id, stub_activity
+
+
+@activity.defn(name="choose_repo")  # registered by `wiring.py`; the workflow's typed handle
+async def choose_repo(inp: ChooseRepoInput) -> ChooseRepoResult:
+    """Real (#756): scores the Admin catalogue and decides or asks the FDE; the stub decides
+    "no repository", which is what every build did before the step existed."""
+    return ChooseRepoResult(status=ChooseRepoStatus.DECIDED, outcome=RepoOutcome.GENERATED)
 
 
 @activity_for(TaskQueue.BUILD)

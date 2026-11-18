@@ -81,7 +81,7 @@ ORIGINALS: dict[str, Callable[..., Any]] = {
 } | {
     name: getattr(module, name)
     for module, names in (
-        (build_stubs, [*STAGES[2:9], "review_code", "correct"]),
+        (build_stubs, [*STAGES[2:9], "review_code", "choose_repo", "correct"]),
         (test_stubs, ["generate_tests", "build_promptfoo_suite", "run_sandbox_tests"]),
         (certify_stubs, ["certify_sub_skill"]),
     )

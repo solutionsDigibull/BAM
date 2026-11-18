@@ -58,6 +58,9 @@ KINDS: dict[str, Kind] = {
     # what was assembled, a gate given the wrong inputs); an admin fixes it and retries. The
     # cause is the `error` parameter. FDEs and Admins both see it.
     "sub_skill.build_error": Kind(T.GENERATION_FAILED, "code build"),
+    # #756: the build asks the FDE which repository to start from, and reminds every 3 days.
+    "sub_skill.repo_question": Kind(T.SUBSKILL_NEEDS_REVIEW),
+    "sub_skill.repo_choice_reminder": Kind(T.SUBSKILL_NEEDS_REVIEW),
     "document_version.malware_detected": Kind(T.DOCUMENT_REJECTED),
     "document_version.type_rejected": Kind(T.DOCUMENT_REJECTED),  # E4.4; the reason is on screen
     "document_version.parse_failed": Kind(T.DOCUMENT_REJECTED),

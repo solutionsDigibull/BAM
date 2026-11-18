@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:repo_choice/answer_request:0.1.0",
+  "$defs": {
+    "RepoAnswerAction": {
+      "enum": [
+        "CHOOSE",
+        "NO_REPO"
+      ],
+      "title": "RepoAnswerAction",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Body of the answer. `url` is required to choose and absent for \"no repository\".",
+  "properties": {
+    "action": {
+      "$ref": "#/$defs/RepoAnswerAction"
+    },
+    "url": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Url"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "RepoAnswerRequest",
+  "type": "object"
+}

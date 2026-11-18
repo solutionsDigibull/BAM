@@ -67,6 +67,7 @@
     "BuildStage": {
       "description": "Where a build is, for the `build_status` query (the activities' names, TD §13.2).",
       "enum": [
+        "choose_repo",
         "build_manifest",
         "check_libraries",
         "render_skeleton",
@@ -83,6 +84,7 @@
         "certify_sub_skill",
         "correct",
         "wait_retry",
+        "wait_repo_choice",
         "done"
       ],
       "title": "BuildStage",
