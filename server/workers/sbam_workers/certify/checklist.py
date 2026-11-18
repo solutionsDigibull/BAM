@@ -23,12 +23,21 @@ from sbam_contracts.testgen import MIN_CASES, REQUIRED_KINDS, CaseKind
 # Every gate that must have passed on the bundle. BANDIT is not here: it passes unless a HIGH
 # finding is on record (MEDIUM and LOW are reported, never blocking). CODEGEN and LOOP_TESTS are
 # the dashboard's columns for generation and the sandbox loop, which have their own evidence.
-# REVIEW (#759) is optional evidence: a build that predates the review pass has no row and still
-# certifies, but a row that is on record must have PASSED (see `_gate_reasons`).
+# UI_BUNDLE (#857) is evidence of the Workflow, not of a Sub-Skill: `certification_reasons` of
+# `sbam_api.manifests.ui_bundle` requires it at Workflow level. REVIEW (#759) is optional evidence:
+# a build that predates the review pass has no row and still certifies, but a row that is on record
+# must have PASSED (see `_gate_reasons`).
 REQUIRED_GATES: Final = tuple(
     g
     for g in GateName
-    if g not in {GateName.CODEGEN, GateName.BANDIT, GateName.LOOP_TESTS, GateName.REVIEW}
+    if g
+    not in {
+        GateName.CODEGEN,
+        GateName.BANDIT,
+        GateName.LOOP_TESTS,
+        GateName.REVIEW,
+        GateName.UI_BUNDLE,
+    }
 )
 
 

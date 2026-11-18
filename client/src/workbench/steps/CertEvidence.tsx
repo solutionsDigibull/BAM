@@ -1,5 +1,5 @@
-// Certification evidence (#842): the import gate, repository licence, dependency vulnerability and MCP compliance
-// results #761 records on each Sub-Skill's bundle hash, read from the build. Read-only; a result that is not a pass
+// Certification evidence (#842, #857): the import gate, repository licence, dependency vulnerability and MCP compliance
+// results #761 records on each Sub-Skill's bundle hash, and the workflow's UI bundle result, read from the build. Read-only; a result that is not a pass
 // says so and that it blocks certification. Shown in the Check and Certify screens while the rest of those screens is
 // not wired to the backend yet.
 import { useQuery } from '@tanstack/react-query'
@@ -51,10 +51,14 @@ function Row({ row, projectId, workflowId }: { row: EvidenceRow; projectId: stri
       <div className="cert-main">
         <span className="cert-label">{row.label}</span>
         <span className="cert-detail">{row.detail}</span>
-        {row.state === 'pass' && <span className="cert-detail">Passed for all {row.total} Sub-Skills.</span>}
-        {row.state === 'running' && <span className="cert-detail">Running: {row.passed} of {row.total} Sub-Skills have passed so far.</span>}
-        {row.state === 'missing' && <span className="cert-detail">{row.total ? <>No result yet for <Names subs={row.missing} />. Certification is blocked until it passes.</> : 'No Sub-Skill has been built yet. Certification is blocked.'}</span>}
-        {row.state === 'fail' && <ul className="ce-subs">{row.failing.slice(0, SHOWN).map(s => <Why key={s.subSkillId} projectId={projectId} workflowId={workflowId} sub={s} row={row} />)}
+        {row.workflow && row.state === 'pass' && <span className="cert-detail">Passed for this workflow.</span>}
+        {row.workflow && row.state === 'running' && <span className="cert-detail">Running.</span>}
+        {row.workflow && row.state === 'missing' && <span className="cert-detail">No result yet. Certification is blocked until the UI bundle is checked and passes.</span>}
+        {row.workflow && row.state === 'fail' && <span className="cert-detail">The UI bundle is missing, does not match the manifest, or declares an invalid host. Certification is blocked.</span>}
+        {!row.workflow && row.state === 'pass' && <span className="cert-detail">Passed for all {row.total} Sub-Skills.</span>}
+        {!row.workflow && row.state === 'running' && <span className="cert-detail">Running: {row.passed} of {row.total} Sub-Skills have passed so far.</span>}
+        {!row.workflow && row.state === 'missing' && <span className="cert-detail">{row.total ? <>No result yet for <Names subs={row.missing} />. Certification is blocked until it passes.</> : 'No Sub-Skill has been built yet. Certification is blocked.'}</span>}
+        {!row.workflow && row.state === 'fail' && <ul className="ce-subs">{row.failing.slice(0, SHOWN).map(s => <Why key={s.subSkillId} projectId={projectId} workflowId={workflowId} sub={s} row={row} />)}
           {row.failing.length > SHOWN && <li className="muted xs">and {row.failing.length - SHOWN} more Sub-Skills</li>}</ul>}
       </div>
     </li>
@@ -70,7 +74,7 @@ export function CertEvidence({ projectId, workflowId }: { projectId: string; wor
   })
   const status = (q.error as ApiFailure | null)?.statusCode
   const subs = q.data?.sub_skills ?? []
-  const rows = evidenceRows(subs)
+  const rows = evidenceRows(subs, q.data?.workflow_gates)
   const blocked = certificationBlocked(rows)
   let body
   if (q.isLoading) body = <Skeleton rows={4} label="Loading the certification evidence" />
@@ -79,7 +83,7 @@ export function CertEvidence({ projectId, workflowId }: { projectId: string; wor
   else if (!subs.length) body = <Empty icon="tb-certificate" title="No evidence yet">No Sub-Skill has been built for this workflow yet, so there is nothing to certify.</Empty>
   else body = <>
     <ol className="cert-list">{rows.map(r => <Row key={r.gate} row={r} projectId={projectId} workflowId={workflowId} />)}</ol>
-    <p className="muted sm ce-note"><Icon name={blocked ? 'lock' : 'check'} size={13} /> {blocked ? 'Certification is blocked until all four results pass for every Sub-Skill, on the same bundle hash.' : 'All four results pass for every Sub-Skill. Certification can be recorded.'}</p>
+    <p className="muted sm ce-note"><Icon name={blocked ? 'lock' : 'check'} size={13} /> {blocked ? 'Certification is blocked until all five results pass (the first four for every Sub-Skill, on the same bundle hash).' : 'All five results pass. Certification can be recorded.'}</p>
   </>
   const aside = subs.length && !q.error ? <StatusPill status={blocked ? 'fail' : 'pass'} text={blocked ? 'Blocks certification' : 'Ready'} /> : undefined
   return <div className="cert-evidence"><Section title="Certification evidence" aside={aside}>{body}</Section></div>

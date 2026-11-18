@@ -175,3 +175,24 @@ class GateResultRepository(TenantScopedRepository[GateResultRow]):
         if found is not None:
             return found
         return self.add(GateResultRow(**values))
+
+    def workflow_rows(self, workflow_id: uuid.UUID, gate: str) -> list[GateResultRow]:
+        """The Workflow-level results of `gate` (no Sub-Skill, e.g. UI_BUNDLE), oldest first."""
+        query = self._scoped().where(
+            GateResultRow.workflow_id == workflow_id,
+            GateResultRow.sub_skill_id.is_(None),
+            GateResultRow.gate == gate,
+        )
+        return list(self.session.scalars(query.order_by(GateResultRow.created_at)))
+
+    def latest_workflow_gate(self, workflow_id: uuid.UUID, gate: str) -> GateResultRow | None:
+        rows = self.workflow_rows(workflow_id, gate)
+        return rows[-1] if rows else None
+
+    def record_workflow_gate(self, values: dict[str, Any]) -> GateResultRow:
+        """Insert a Workflow-level result; the same verdict on the same bundle hash is not written
+        twice, so a retried activity gets the row it already wrote."""
+        for row in reversed(self.workflow_rows(values["workflow_id"], values["gate"])):
+            if row.bundle_sha256 == values["bundle_sha256"] and row.status == values["status"]:
+                return row
+        return self.add(GateResultRow(**values))

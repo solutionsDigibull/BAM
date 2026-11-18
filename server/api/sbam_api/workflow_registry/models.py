@@ -40,6 +40,9 @@ class RegisteredWorkflowRow(ProjectOwned, Base):
     )
     owner: Mapped[str] = mapped_column(String(160))
     tools: Mapped[list[dict[str, Any]]] = mapped_column(Json)  # McpToolEntry dumps, with schemas
+    # The certified UI bundle entry (#857), copied from the frozen manifest; null on an entry
+    # registered before the UI bundle existed.
+    ui_bundle: Mapped[dict[str, Any] | None] = mapped_column(Json)
     status: Mapped[str] = mapped_column(String(20), default=RegistryStatus.REGISTERED.value)
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -8,13 +8,24 @@ const ALL_PASS = { IMPORT_RESOLUTION: 'PASSED', REPO_LICENCE: 'PASSED', DEPENDEN
 const state = (rows: BuildRow[], gate: string) => evidenceRows(rows).find(r => r.gate === gate)!
 
 describe('certification evidence rules (#842)', () => {
-  test('test_842_the_four_results_are_listed_in_order', () => {
-    expect(evidenceRows([row('a', ALL_PASS)]).map(r => r.gate)).toEqual(['IMPORT_RESOLUTION', 'REPO_LICENCE', 'DEPENDENCY_VULN', 'MCP_COMPLIANCE'])
+  test('test_842_the_results_are_listed_in_order', () => {
+    expect(evidenceRows([row('a', ALL_PASS)]).map(r => r.gate)).toEqual(['IMPORT_RESOLUTION', 'REPO_LICENCE', 'DEPENDENCY_VULN', 'MCP_COMPLIANCE', 'UI_BUNDLE'])
+  })
+
+  test('test_857_the_ui_bundle_is_one_result_of_the_workflow_and_blocks_until_it_passes', () => {
+    const ui = (g?: Record<string, string>) => evidenceRows([row('a', ALL_PASS)], g as never).find(r => r.gate === 'UI_BUNDLE')!
+    expect(ui()).toMatchObject({ state: 'missing', workflow: true, blocking: true, total: 1 })
+    expect(ui({ UI_BUNDLE: 'PENDING' }).state).toBe('missing')
+    expect(ui({ UI_BUNDLE: 'RUNNING' }).state).toBe('running')
+    expect(ui({ UI_BUNDLE: 'FAILED' })).toMatchObject({ state: 'fail', blocking: true })
+    expect(ui({ UI_BUNDLE: 'PASSED' })).toMatchObject({ state: 'pass', passed: 1, blocking: false })
+    expect(certificationBlocked(evidenceRows([row('a', ALL_PASS)]))).toBe(true)
+    expect(certificationBlocked(evidenceRows([row('a', ALL_PASS)], { UI_BUNDLE: 'PASSED' }))).toBe(false)
   })
 
   test('test_842_all_passed_for_every_sub_skill_does_not_block_certification', () => {
-    const rows = evidenceRows([row('a', ALL_PASS), row('b', ALL_PASS)])
-    expect(rows.every(r => r.state === 'pass' && r.passed === 2 && r.total === 2)).toBe(true)
+    const rows = evidenceRows([row('a', ALL_PASS), row('b', ALL_PASS)], { UI_BUNDLE: 'PASSED' })
+    expect(rows.filter(r => !r.workflow).every(r => r.state === 'pass' && r.passed === 2 && r.total === 2)).toBe(true)
     expect(certificationBlocked(rows)).toBe(false)
   })
 
@@ -49,7 +60,7 @@ describe('certification evidence rules (#842)', () => {
 
   test('test_842_no_sub_skill_built_yet_blocks_every_result', () => {
     const rows = evidenceRows([])
-    expect(rows.every(r => r.state === 'missing' && r.total === 0)).toBe(true)
+    expect(rows.filter(r => !r.workflow).every(r => r.state === 'missing' && r.total === 0)).toBe(true)
     expect(certificationBlocked(rows)).toBe(true)
   })
 

@@ -105,12 +105,16 @@ def builds(
         if newest[sub_id] == (build_no, cycle, attempt):
             gates[sub_id][GateName(gate)] = GateStatus(status)
     runs = TemporalRunRepository(session, ctx)
+    ui_bundle = GateResultRepository(session, ctx).latest_workflow_gate(
+        workflow_id, GateName.UI_BUNDLE.value
+    )
     rows = [_row(s, newest.get(s.id), gates[s.id], runs) for s in subs]
     return BuildsResponse(
         workflow_id=workflow_id,
         workflow_state=WorkflowState(workflow.state),
         active=any(row.state in ACTIVE for row in rows),
         sub_skills=rows,
+        workflow_gates={GateName.UI_BUNDLE: GateStatus(ui_bundle.status)} if ui_bundle else {},
     )
 
 

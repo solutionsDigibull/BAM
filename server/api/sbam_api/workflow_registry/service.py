@@ -26,7 +26,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sbam_contracts.api import ErrorCode
-from sbam_contracts.manifest import MCP_SERVER_NAME, McpToolEntry, WorkflowManifest
+from sbam_contracts.build_dashboard import GateName
+from sbam_contracts.manifest import (
+    MCP_SERVER_NAME,
+    McpToolEntry,
+    UiBundleEntry,
+    WorkflowManifest,
+)
 from sbam_contracts.state_machines import WorkflowState
 from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryStatus
 from sqlalchemy.orm import Session
@@ -35,7 +41,8 @@ from sbam_api.certifications.models import CertificationLevel
 from sbam_api.certifications.repository import CertificationRepository
 from sbam_api.core.conventions import ApiError, not_found
 from sbam_api.db.repository import TenantContext
-from sbam_api.manifests.repository import WorkflowManifestRepository
+from sbam_api.manifests import ui_bundle
+from sbam_api.manifests.repository import GateResultRepository, WorkflowManifestRepository
 from sbam_api.workflow_registry.bifrost import BifrostRegistry, RegistryUnavailable
 from sbam_api.workflow_registry.models import RegisteredWorkflowRow
 from sbam_api.workflow_registry.repository import RegisteredWorkflowRepository, version_key
@@ -93,6 +100,7 @@ def to_model(row: RegisteredWorkflowRow) -> RegisteredWorkflow:
         certification_id=row.certification_id,
         owner=row.owner,
         tools=[McpToolEntry.model_validate(tool) for tool in row.tools],
+        ui_bundle=UiBundleEntry.model_validate(row.ui_bundle) if row.ui_bundle else None,
         status=RegistryStatus(row.status),
         registered_at=row.registered_at,
         superseded_at=row.superseded_at,
@@ -138,6 +146,16 @@ def register(
     if server is None:
         raise NotRegistrable("the manifest has no MCP server: it was not built into an image")
 
+    if manifest.requires_ui_bundle and manifest.ui_bundle is None:
+        raise NotRegistrable("the manifest has no UI bundle: SRIM shows only BAM's bundle")
+    if manifest.requires_ui_bundle:
+        gates = GateResultRepository(session, ctx)
+        reasons = ui_bundle.certification_reasons(
+            manifest, gates.workflow_rows(workflow_id, GateName.UI_BUNDLE.value)
+        )
+        if reasons:
+            raise NotRegistrable(f"the UI bundle is not certified ({reasons[0]})")
+
     repo = RegisteredWorkflowRepository(session, ctx)
     existing = repo.of_version(workflow_id, server.version)
     if existing is not None:
@@ -169,6 +187,7 @@ def register(
         certification_id=certificate.id,
         owner=owner,
         tools=[tool.model_dump(mode="json") for tool in server.tools],
+        ui_bundle=manifest.ui_bundle.dump() if manifest.ui_bundle else None,
         status=RegistryStatus.REGISTERED.value,
         registered_at=stamp,
     )

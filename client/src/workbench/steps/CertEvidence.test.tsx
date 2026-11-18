@@ -7,6 +7,7 @@ const P = 'p-1'
 const W = 'w-1'
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': status >= 400 ? 'application/problem+json' : 'application/json' } })
 const sub = (id: string, gates: Record<string, string>) => ({ sub_skill_id: id, skill_id: `skill-${id}`, skill_name: `Skill ${id}`, state: 'BUILDING', stage: 'GATES', gates })
+const UI_PASS = { UI_BUNDLE: 'PASSED' }
 const PASS = { IMPORT_RESOLUTION: 'PASSED', REPO_LICENCE: 'PASSED', DEPENDENCY_VULN: 'PASSED', MCP_COMPLIANCE: 'PASSED' }
 
 // The component reads through the proxy with fetch; each test gives one answer per URL.
@@ -28,12 +29,12 @@ describe('Certification evidence panel (#842)', () => {
     expect(screen.getByText(/Loading the certification evidence/i)).toBeTruthy()
   })
 
-  test('test_842_all_four_results_pass_and_certification_can_be_recorded', async () => {
-    serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'CERTIFYING', active: false, sub_skills: [sub('a', PASS), sub('b', PASS)] }) })
+  test('test_842_all_five_results_pass_and_certification_can_be_recorded', async () => {
+    serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'CERTIFYING', active: false, sub_skills: [sub('a', PASS), sub('b', PASS)], workflow_gates: UI_PASS }) })
     view()
     expect(await screen.findByText('Import gate')).toBeTruthy()
-    for (const label of ['Import gate', 'Repository licence', 'Dependency vulnerabilities', 'MCP compliance']) expect(screen.getByText(label)).toBeTruthy()
-    expect(screen.getAllByText('Pass')).toHaveLength(4)
+    for (const label of ['Import gate', 'Repository licence', 'Dependency vulnerabilities', 'MCP compliance', 'UI bundle']) expect(screen.getByText(label)).toBeTruthy()
+    expect(screen.getAllByText('Pass')).toHaveLength(5)
     expect(screen.getByText('Ready')).toBeTruthy()
     expect(screen.getByText(/Certification can be recorded/)).toBeTruthy()
   })
@@ -57,6 +58,21 @@ describe('Certification evidence panel (#842)', () => {
     expect(within(licence).getByText('Fail')).toBeTruthy()
     expect(within(licence).getByText('Skill b')).toBeTruthy()
     await waitFor(() => expect(within(licence).getByText('GPL-3.0 is not on the allowlist')).toBeTruthy())
+  })
+
+  test('test_857_the_ui_bundle_row_is_missing_failed_or_passed_from_the_workflow_gate', async () => {
+    for (const [gates, label, text] of [
+      [undefined, 'Missing', /No result yet. Certification is blocked until the UI bundle/],
+      [{ UI_BUNDLE: 'FAILED' }, 'Fail', /does not match the manifest/],
+      [{ UI_BUNDLE: 'PASSED' }, 'Pass', /Passed for this workflow/],
+    ] as const) {
+      serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'CERTIFYING', active: false, sub_skills: [sub('a', PASS)], ...(gates ? { workflow_gates: gates } : {}) }) })
+      view()
+      const ui = (await screen.findByText('UI bundle')).closest('li')!
+      expect(within(ui).getByText(label)).toBeTruthy()
+      expect(within(ui).getByText(text)).toBeTruthy()
+      cleanup()
+    }
   })
 
   test('test_842_no_sub_skill_built_yet_is_an_empty_state_not_an_error', async () => {

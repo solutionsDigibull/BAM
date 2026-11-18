@@ -112,6 +112,7 @@
         "REPO_LICENCE",
         "DEPENDENCY_VULN",
         "MCP_COMPLIANCE",
+        "UI_BUNDLE",
         "REVIEW",
         "LOOP_TESTS"
       ],
@@ -224,6 +225,16 @@
       },
       "title": "Sub Skills",
       "type": "array"
+    },
+    "workflow_gates": {
+      "additionalProperties": {
+        "$ref": "#/$defs/GateStatus"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/GateName"
+      },
+      "title": "Workflow Gates",
+      "type": "object"
     }
   },
   "required": [

@@ -17,11 +17,13 @@ import httpx
 import pytest
 from pipeline_db import pipeline_sessions
 from pydantic import AnyHttpUrl, JsonValue
+from sbam_api.builds.models import CodeAttempt
 from sbam_api.certifications.models import CertificationLevel, CertificationRow
 from sbam_api.core.conventions import ApiError
 from sbam_api.core.settings import Settings
 from sbam_api.db.repository import TenantContext
-from sbam_api.manifests.models import WorkflowManifestRow
+from sbam_api.manifests.models import GateResultRow, WorkflowManifestRow
+from sbam_api.manifests.ui_bundle import record_ui_bundle_gate
 from sbam_api.workflow_registry import health, service
 from sbam_api.workflow_registry.bifrost import (
     HttpBifrostRegistry,
@@ -32,7 +34,7 @@ from sbam_api.workflow_registry.bifrost import (
 from sbam_api.workflow_registry.models import RegisteredWorkflowRow
 from sbam_api.workflow_registry.repository import RegisteredWorkflowRepository, version_key
 from sbam_api.workflows.models import Workflow
-from sbam_contracts.manifest import McpServerEntry, McpToolEntry, WorkflowManifest
+from sbam_contracts.manifest import McpServerEntry, McpToolEntry, UiBundleEntry, WorkflowManifest
 from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryStatus
 from sbam_workers.build.workflow_server import with_server
 from sqlalchemy.orm import Session, sessionmaker
@@ -47,6 +49,7 @@ SKILL = "MS01.1_Investor_Auth_Manager"
 TOOLS = ("MS01_1__action", "MS01_1__check")
 DIGEST = "sha256:" + "a" * 64
 NEW_DIGEST = "sha256:" + "b" * 64
+UI_DIGEST = "sha256:" + "c" * 64  # the UI bundle (#857)
 NOW = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
 LATER = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
 V1_0 = "wf_investor_onboarding_v1_0"
@@ -75,11 +78,27 @@ def server_entry(version: str = "1.0.0", digest: str = DIGEST) -> McpServerEntry
     )
 
 
-def sealed(version: str, digest: str, with_entry: bool = True) -> WorkflowManifest:
+def ui_entry(version: str = "1.0.0", digest: str = UI_DIGEST) -> UiBundleEntry:
+    return UiBundleEntry(
+        version=version,
+        digest=digest,
+        entry_file="index.html",
+        allowed_hosts=["api.example.com"],
+        workflow_server="wf_investor_onboarding",
+    )
+
+
+def sealed(
+    version: str, digest: str, with_entry: bool = True, ui: UiBundleEntry | None = None
+) -> WorkflowManifest:
     base = workflow()
     base["version"] = version
     plain = WorkflowManifest.sealed(base)
-    return with_server(plain, server_entry(version, digest)) if with_entry else plain
+    if not with_entry:
+        return plain
+    built = with_server(plain, server_entry(version, digest))
+    bundle = ui if ui is not None else ui_entry(version)
+    return WorkflowManifest.sealed({**built.dump(), "ui_bundle": bundle.dump()})
 
 
 class FakeBifrost:
@@ -123,7 +142,14 @@ class World:
     def __init__(self, state: str = "FROZEN") -> None:
         self.sessions: sessionmaker[Session] = pipeline_sessions()
         bind = self.sessions.kw["bind"]
-        for model in (Workflow, WorkflowManifestRow, CertificationRow, RegisteredWorkflowRow):
+        for model in (
+            Workflow,
+            WorkflowManifestRow,
+            CertificationRow,
+            RegisteredWorkflowRow,
+            CodeAttempt,  # the foreign key of a gate result
+            GateResultRow,
+        ):
             model.metadata.create_all(bind, tables=[model.__table__])  # type: ignore[list-item]
         with self.sessions() as session:
             session.add(
@@ -149,8 +175,10 @@ class World:
         certify: bool = True,
         frozen: bool = True,
         server: bool = True,
+        ui: UiBundleEntry | None = None,
+        ui_gate: bool = True,
     ) -> WorkflowManifest:
-        manifest = sealed(version, digest, with_entry=server)
+        manifest = sealed(version, digest, with_entry=server, ui=ui)
         sha = manifest.integrity.content_sha256
         with self.sessions() as session:
             session.add(
@@ -166,6 +194,11 @@ class World:
             )
             if certify:
                 session.add(certificate(sha))
+            if server and ui_gate and manifest.ui_bundle is not None:
+                # the UI_BUNDLE evidence of #857: the packaged bundle is what the manifest says
+                record_ui_bundle_gate(
+                    session, CTX, WORKFLOW_ID, manifest, manifest.ui_bundle.digest
+                )
             session.commit()
         return manifest
 

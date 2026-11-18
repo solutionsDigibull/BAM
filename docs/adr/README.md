@@ -38,6 +38,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0030](0030-project-connections-and-secrets.md) | Project connections and secrets: an encrypted, write-only store with AES-256-GCM, SSRF-guarded Test connection, one audited injection point, a Commit gate (#764) | Accepted | refines 0028 |
 | [0031](0031-srim-walks-the-workflow-dag-with-temporal.md) | SRIM walks the Workflow DAG with a Temporal orchestrator; Dify is not used (new default router) | Accepted | refines 0010 (O-19), 0012 (O-17), 0028 |
 | [0032](0032-staging-replaces-the-pre-commit-preview.md) | Staging replaces the pre-commit preview: FDE mode builds, Staging mode runs the complete workflow in the same FDE login (#859) | Accepted | refines 0028 (decision 7), 0023 |
+| [0033](0033-ui-bundle-is-part-of-the-certified-workflow.md) | The UI bundle is part of the certified Workflow: BAM delivers it, SRIM shows only it; manifest entry, `UI_BUNDLE` evidence, registry lookup (#857) | Accepted | refines 0028 (decisions 3, 4), 0031, 0032 |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 
