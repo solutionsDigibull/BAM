@@ -46,7 +46,7 @@ def feedback(bifrost: FakeBifrost, n: int) -> str:
 
 def test_wg37_t01_the_prompt_states_both_kinds_of_rule_id_with_examples() -> None:
     newest = PromptRegistry().get("sow-generate")
-    assert newest.version == "1.3.0"
+    assert newest.version == "1.4.0"
     text = newest.text
     assert "`RULE-<NAME>`" in text and "`masters`" in text
     assert "`R-01`" in text and "never rewrite one into a `RULE-*` id" in text

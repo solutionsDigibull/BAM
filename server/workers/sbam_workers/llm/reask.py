@@ -121,6 +121,19 @@ def _path(loc: tuple[int | str, ...], names: frozenset[str]) -> str:
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
 
+# Fixed text for a contract rule's code: a bare code ("ACTION_CHECK_OVERLAP") told the model
+# nothing, so it repeated the mistake on every re-ask. Static strings only, never data (E1.21).
+CODE_HINTS: dict[str, str] = {
+    "ACTION_CHECK_OVERLAP": (
+        "a tool is in both action and check; check must list other tools that verify the result"
+    ),
+}
+
+
+def _explained(line: str, code: str) -> str:
+    hint = CODE_HINTS.get(code)
+    return f"{line} ({hint})" if hint else line
+
 
 # Fixed text for a document-level rule's code: a bare code told the model nothing, so it repeated
 # the mistake on every re-ask (#924). Static strings only, never data (E1.21).
@@ -173,7 +186,8 @@ def error_lines(exc: ValidationError, names: frozenset[str]) -> tuple[str, ...]:
             for key in _CONSTRAINT_CTX
             if key in (err.get("ctx") or {}) and isinstance(err["ctx"][key], int | float | str)
         )
-        lines.append(f"{_path(err['loc'], names)}: {err['type']}" + (f" ({hint})" if hint else ""))
+        line = f"{_path(err['loc'], names)}: {err['type']}" + (f" ({hint})" if hint else "")
+        lines.append(_explained(line, err["type"]))
     return tuple(lines)
 
 
