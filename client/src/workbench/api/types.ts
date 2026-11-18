@@ -287,6 +287,8 @@ export interface Persist {
 export interface Snapshot {
   serverTime: string
   workflowName: string
+  /** The Workflow's id once its build has started (real backend only); the evidence panels read the build from it. */
+  workflowId?: string
   activeStep: StepId
   steps: StepInfo[]
   uploads: UploadRecord[]

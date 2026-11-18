@@ -214,6 +214,7 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
   return {
     serverTime: new Date().toISOString(),
     workflowName: workflow?.name ?? "Workflow",
+    workflowId: buildStarted(workflow) ? workflow!.id : undefined,
     activeStep: workflow && workflow.state !== "CANCELLED" ? 2 : 1,
     steps,
     uploads,

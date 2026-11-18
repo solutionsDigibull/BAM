@@ -32,6 +32,8 @@ import { useApprovals } from './lib/approvals'
 import { setTracker } from './tracker/useTrackerStore'
 import { prerequisite } from './lib/prereq'
 import { getDrafts } from './lib/drafts'
+import { projectIdOfPath } from './lib/evidence'
+import { CertEvidence } from './steps/CertEvidence'
 
 export interface StepProps { snap: Snapshot; info: StepInfo }
 
@@ -248,6 +250,9 @@ function UploadStage({ snap, on }: { snap: Snapshot; on: boolean }) {
 function LockedScreen({ id, info, snap }: { id: string; info: StepInfo; snap: Snapshot }) {
   const rag = useRag(s => s)
   const b = prerequisite(snap, rag, info.id)
+  // Check and Certify are not wired to the backend yet, but the build's certification evidence is real data (#842).
+  const projectId = typeof window === 'undefined' ? undefined : projectIdOfPath(window.location.pathname)
+  const evidenceFor = (id === '4.4' || id === '4.5') && snap.workflowId && projectId ? { projectId, workflowId: snap.workflowId } : undefined
   return (
     <main className="locked-screen">
       <Empty icon="lock" title={`${screenLabel(id)} is locked`}
@@ -255,6 +260,7 @@ function LockedScreen({ id, info, snap }: { id: string; info: StepInfo; snap: Sn
           : <button className="btn btn-primary" onClick={() => goScreen(activeScreen(snap))}>Go to {screenLabel(activeScreen(snap))}</button>}>
         {b?.reason ?? `${info.reason}.`}
       </Empty>
+      {evidenceFor && <CertEvidence projectId={evidenceFor.projectId} workflowId={evidenceFor.workflowId} />}
     </main>
   )
 }

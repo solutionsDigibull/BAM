@@ -1,0 +1,6 @@
+/* Certification evidence in the locked Check and Certify screens (#842): the .cert list look of the BAM_UI checklist. */
+.bam-wb .cert-evidence { margin-top: 20px; text-align: left; }
+.bam-wb .cert-evidence .ce-subs { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.bam-wb .cert-evidence .ce-subs li { font-size: 12px; }
+.bam-wb .cert-evidence .ce-why { margin: 2px 0 0 14px; padding: 0; list-style: disc; color: var(--muted, #667); }
+.bam-wb .cert-evidence .ce-note { margin-top: 10px; }
