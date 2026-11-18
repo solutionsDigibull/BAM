@@ -219,12 +219,27 @@ describe("the grid step follows the project's Workflow (#714)", () => {
     expect(snap.workflowName).toBe("Onboarding");
   });
 
-  test("test_714_steps_3_and_4_stay_locked_and_say_so_once_the_build_has_started", async () => {
+  test("test_714_step_4_stays_locked_and_says_so_once_the_build_has_started", async () => {
     api({ state: "WORKFLOW_CREATED", workflows: [workflow("BUILDING")] });
     const snap = await buildSnapshot(PROJECT);
     expect(buildStarted(workflow("BUILDING"))).toBe(true);
+    expect(snap.steps[3]).toMatchObject({ state: "locked", editable: false });
+    expect(snap.steps[3]?.reason).toMatch(/not available in the workbench yet/);
+  });
+
+  test("test_841_step_3_opens_read_only_with_the_workflow_id_once_the_build_has_started", async () => {
+    api({ state: "WORKFLOW_CREATED", workflows: [workflow("BUILDING")] });
+    const snap = await buildSnapshot(PROJECT);
+    expect(snap.steps[2]).toMatchObject({ state: "active", editable: false });
+    expect(snap.steps[2]?.reason).toMatch(/shown read-only/);
+    expect(snap.workflowId).toBe((workflow("BUILDING") as unknown as { id: string }).id);
+  });
+
+  test("test_841_step_3_stays_locked_and_there_is_no_workflow_id_before_the_build", async () => {
+    api({ state: "WORKFLOW_CREATED", workflows: [workflow("ISATVON_REVIEW")] });
+    const snap = await buildSnapshot(PROJECT);
     expect(snap.steps[2]).toMatchObject({ state: "locked", editable: false });
-    expect(snap.steps[2]?.reason).toMatch(/not available in the workbench yet/);
+    expect(snap.workflowId).toBeUndefined();
   });
 
   test("test_842_the_workflow_id_is_given_only_once_the_build_has_started", async () => {

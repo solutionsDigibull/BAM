@@ -1,0 +1,46 @@
+/* Translate (4.3): the whole workflow's stored code, read only (#841). Tokens come from the workbench theme. */
+.bam-wb .wcp { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; container-type: inline-size; }
+.bam-wb .wcp-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+/* The workbench shows three panes, so the results pane is narrow: files above, the file below. Two columns only when there is room. */
+.bam-wb .wcp-body { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+.bam-wb .wcp-side { display: flex; flex-direction: column; gap: 12px; overflow: auto; max-height: 320px; flex: none; padding-right: 4px; }
+@container (min-width: 780px) {
+  .bam-wb .wcp-body { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; }
+  .bam-wb .wcp-side { max-height: none; }
+}
+.bam-wb .wcp-group { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 8px; }
+.bam-wb .wcp-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+.bam-wb .wcp-group-head h4 { margin: 0; font-size: 13px; flex: 1 1 100%; }
+.bam-wb .wcp-gates { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.bam-wb .wcp-none { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.bam-wb .wcp-loose { list-style: none; margin: 0 0 6px; padding: 0; font-size: 12px; color: var(--err); }
+.bam-wb .wcp-loose li { display: flex; gap: 6px; align-items: flex-start; }
+.bam-wb .wcp-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.bam-wb .wcp-file { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 4px 6px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; font-size: 12.5px; }
+.bam-wb .wcp-file:hover { border-color: var(--border-strong); }
+.bam-wb .wcp-file.on { border-color: var(--subtask); background: color-mix(in srgb, var(--subtask) 12%, var(--surface)); }
+.bam-wb .wcp-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', monospace; }
+.bam-wb .wcp-dir { color: var(--faint); }
+.bam-wb .wcp-count { font-size: 11px; font-weight: 700; min-width: 16px; text-align: center; border-radius: 99px; background: var(--err-soft); padding: 0 5px; }
+.bam-wb .wcp-tag { flex: none; font-size: 11px; padding: 0 7px; }
+/* The theme's info colour is near white in the light theme, so the tags use their own. */
+.bam-wb .wcp-tag-reused { color: var(--subtask); border-color: var(--subtask-border); background: var(--subtask-bg); }
+.bam-wb .wcp-tag-customized { color: var(--warn); }
+.bam-wb .wcp-tag-generated { color: var(--muted); border-color: var(--border-strong); }
+.bam-wb .wcp-viewer { min-height: 280px; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 8px; overflow: hidden; }
+.bam-wb .wcp-view-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .wcp-view-head h4 { margin: 0; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bam-wb .wcp-readonly { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.bam-wb .wcp-findings { list-style: none; margin: 0; padding: 6px 8px; border-radius: 8px; background: var(--err-soft); font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+.bam-wb .wcp-findings li { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.bam-wb .wcp-faint { color: var(--faint); }
+.bam-wb .wcp-code { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; min-height: 120px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.55; background: var(--bg, var(--surface)); border-radius: 8px; }
+.bam-wb .wcp-code li { display: flex; gap: 8px; content-visibility: auto; contain-intrinsic-size: auto 20px; }
+.bam-wb .wcp-code li.flag { background: var(--err-soft); }
+.bam-wb .wcp-code li.focus { outline: 1px solid var(--err); outline-offset: -1px; }
+.bam-wb .wcp-gutter { width: 16px; flex: none; color: var(--err); display: inline-flex; align-items: center; justify-content: center; }
+.bam-wb .wcp-ln { width: 40px; flex: none; text-align: right; color: var(--faint); user-select: none; }
+.bam-wb .wcp-code code { white-space: pre; flex: 1; }
+.bam-wb .wcp-switch { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 99px; overflow: hidden; }
+.bam-wb .wcp-switch button { border: 0; background: transparent; color: var(--muted); padding: 3px 12px; font-size: 12.5px; cursor: pointer; }
+.bam-wb .wcp-switch button[aria-pressed='true'] { background: color-mix(in srgb, var(--subtask) 18%, var(--surface)); color: inherit; font-weight: 600; }

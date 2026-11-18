@@ -14,6 +14,7 @@ import { setCodeDraft, setDrafts, unsaved, useDrafts } from '../lib/drafts'
 import { certifiedBaseline, currentTests } from '../lib/certification'
 import { Banner, Copy, Empty, ErrorState, GateButton, Icon, Kpis, Pane, Section, Skeleton, StatusPill, Time, fmtDuration, fmtTime, shortHash } from '../components/ui'
 import { CodeFileTree } from '../components/CodeFileTree'
+import { CodeViewSwitch, WorkflowCodePreview, WorkflowFilesCenter, type CodeView } from '../components/WorkflowCodePreview'
 import { tips } from '../lib/actionTips'
 import { approve, templateApproved, templateKey, useApprovals } from '../lib/approvals'
 
@@ -279,12 +280,16 @@ export function ActivitiesCenter({ snap, info }: StepProps) {
 export function CodeCenter({ snap, info }: StepProps) {
   const r = useReview(snap, info)
   const [showChanges, setShowChanges] = useState(true)
-  if (!r.wf) return <NoRun kicker="Translation" title="Translate" />
+  const [view, setView] = useState<CodeView>('run')
+  const workflowId = snap.workflowId
+  // No validation run of its own yet, but the build stored code: show the whole workflow's files, read only (#841).
+  if (!r.wf) return workflowId ? <WorkflowFilesCenter workflowId={workflowId} /> : <NoRun kicker="Translation" title="Translate" />
   const findings = r.wf.activities.flatMap(a => a.findings)
   return (
     <Pane id="center-title" kicker="Translation" title="Translate" className="center"
-      actions={<span className="row"><ChangesSwitch on={showChanges} set={setShowChanges} title="Colour-code edits against the generated code" /><RunPill r={r} /></span>}>
-      {r.error ? <ErrorState title="Could not load generated code" action={<button className="btn btn-primary" onClick={() => r.refetch()}>Retry</button>}>{r.error.message}</ErrorState>
+      actions={<span className="row">{workflowId && <CodeViewSwitch view={view} set={setView} />}<ChangesSwitch on={showChanges} set={setShowChanges} title="Colour-code edits against the generated code" /><RunPill r={r} /></span>}>
+      {view === 'files' && workflowId ? <WorkflowCodePreview workflowId={workflowId} />
+        : r.error ? <ErrorState title="Could not load generated code" action={<button className="btn btn-primary" onClick={() => r.refetch()}>Retry</button>}>{r.error.message}</ErrorState>
         : r.isLoading && !r.files ? <Skeleton rows={8} label="Loading generated code" />
         : !r.files?.length ? <Empty icon="file" title="No generated code yet">Activity C translates each skill and checks the result.</Empty>
         : <CodeView files={r.files} findings={findings} editable={r.editable} lockedReason={r.lockedReason} showChanges={showChanges} cStatus={r.wf.activities[2]!.status} />}
