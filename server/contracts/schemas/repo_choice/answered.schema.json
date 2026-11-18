@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:repo_choice/answered:0.1.0",
+  "additionalProperties": false,
+  "description": "202 body: the build that was told the FDE's answer.",
+  "properties": {
+    "sub_skill_id": {
+      "format": "uuid",
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "build_no": {
+      "title": "Build No",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "sub_skill_id",
+    "build_no"
+  ],
+  "title": "RepoAnswered",
+  "type": "object"
+}

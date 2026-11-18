@@ -388,6 +388,7 @@ def test_e11_2b_t05_a_loop_spec_that_does_not_compile_is_not_retried() -> None:
         ("generate_bodies", TaskQueue.LLM),
         ("correct", TaskQueue.LLM),
         ("review_code", TaskQueue.LLM),
+        ("choose_repo", TaskQueue.LLM),
         ("assemble", TaskQueue.BUILD),
         ("ast_gate", TaskQueue.BUILD),
         ("static_gate", TaskQueue.BUILD),

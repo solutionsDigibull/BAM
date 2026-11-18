@@ -118,6 +118,19 @@ A different answer from the owner becomes a new ADR that supersedes this one for
   preview (#763), WG-16 secrets (#764), WG-17 preview environment (#765), WG-18 Commit (#766), WG-19 change
   note (#767), WG-20 UI (#768).
 
+## Implementation notes
+
+- **Choose-a-repo step (#756).** The `choose_repo` activity of `SubSkillBuild` (behind `workflow.patched("wg8-choose-repo")`,
+  once per build) applies decision 1 step 3. A repository named in the ISATVON is used without scoring. Otherwise the
+  catalogue is scored by the repo scout and the bands of its prompt apply: a clear winner scores at least 0.8 and leads
+  the runner-up by 0.15; a best score below 0.8 is a weak match, a closer runner-up is a tie, and an empty catalogue is
+  "no candidate". A winner is recorded as an AUTO `RepoDecision`. A question pauses the build in the stage
+  `wait_repo_choice` until the `repo_answer` signal, with no timeout and a reminder notification every 3 days. The
+  question is the audit row `repo_question_asked` and the decision (who, when, the candidates) is the audit row
+  `repo_decided`, so no table was added. The FDE answers in the workbench, the API checks the choice against the stored
+  short list (an own repository is allowed only when the catalogue had none, and only after the catalogue's URL rules),
+  and "no repository" is a GENERATED decision. Fetching and using the chosen repository is the next steps (#755, #862).
+
 ## Sources
 
 - The design document of revision 2 (15 November 2026), issues #748 to #768, and the owner's confirmations in

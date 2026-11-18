@@ -3,6 +3,7 @@ import type { CodeFinding, FileTag, WorkflowCodeGroup } from '@/contracts'
 import { fileCount, findingText, firstFile, groupHasProblem, isForbidden, placeFindings, splitLines, statusTone, tagCounts, TAG_HINT, TAG_LABEL, TAGS, useWorkflowCode, useWorkflowFile } from '../lib/workflowCode'
 import { RegistryPanel } from './RegistryPanel'
 import { RepositoryPanel } from './RepositoryPanel'
+import { RepoQuestionCard } from './RepoQuestionCard'
 import { Banner, Copy, Empty, ErrorState, Icon, Pane, Skeleton } from './ui'
 import './workflowCode.css'
 
@@ -161,6 +162,7 @@ export function WorkflowFilesCenter({ workflowId }: { workflowId?: string }) {
   return (
     <Pane id="center-title" kicker="Translation" title="Translate" className="center"
       actions={<CodeViewSwitch view={view} set={v => setView(v === 'repos' || v === 'registry' ? v : 'files')} runless />}>
+      {workflowId && <RepoQuestionCard workflowId={workflowId} quiet={view !== 'repos'} />}
       {view === 'repos' ? <RepositoryPanel workflowId={workflowId} />
         : view === 'registry' ? <RegistryPanel workflowId={workflowId} />
         : <WorkflowCodePreview workflowId={workflowId} />}

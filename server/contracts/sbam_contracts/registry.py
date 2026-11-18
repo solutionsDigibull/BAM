@@ -144,6 +144,7 @@ from sbam_contracts.projects import (
 )
 from sbam_contracts.promptfoo import Suite, TestRunOut, TestRunsResponse
 from sbam_contracts.repo_catalog import RepoCatalog, RepoScoutAnswer
+from sbam_contracts.repo_choice import RepoAnswered, RepoAnswerRequest, RepoQuestion, RepoQuestions
 from sbam_contracts.repo_decision import RepoDecision
 from sbam_contracts.repo_overlay import RepoOverlay
 from sbam_contracts.repo_scan import RepoScanReport
@@ -330,6 +331,10 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("repo/overlay", RepoOverlay),
     ("repo/scan", RepoScanReport),
     ("repo/scout_answer", RepoScoutAnswer),
+    ("repo_choice/question", RepoQuestion),
+    ("repo_choice/answer_request", RepoAnswerRequest),
+    ("repo_choice/answered", RepoAnswered),
+    ("repo_choice/questions", RepoQuestions),
     ("workflow_registry/registration", RegisteredWorkflow),
     ("workflow/repositories", WorkflowRepositories),
     ("budget/caps", BudgetCaps),

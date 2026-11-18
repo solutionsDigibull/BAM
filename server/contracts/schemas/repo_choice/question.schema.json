@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:repo_choice/question:0.1.0",
+  "$defs": {
+    "RepoCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "maxLength": 200,
+          "pattern": "^https://[A-Za-z0-9.-]+(:\\d{1,5})?(/[^\\s?#@]*)?$",
+          "title": "Url",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RepoSource"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "licence": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Licence"
+        },
+        "reasons": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "url",
+        "source",
+        "score"
+      ],
+      "title": "RepoCandidate",
+      "type": "object"
+    },
+    "RepoQuestionKind": {
+      "enum": [
+        "CLOSE_CANDIDATES",
+        "WEAK_MATCH",
+        "NO_CANDIDATE"
+      ],
+      "title": "RepoQuestionKind",
+      "type": "string"
+    },
+    "RepoSource": {
+      "description": "Where a candidate came from: the priority order of ADR 0028, in the order it is tried.",
+      "enum": [
+        "ISATVON",
+        "ADMIN_AGENTS",
+        "ADMIN_TOOLING",
+        "FDE"
+      ],
+      "title": "RepoSource",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "sub_skill_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/RepoQuestionKind"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/RepoCandidate"
+      },
+      "maxItems": 5,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "asked_at": {
+      "format": "date-time",
+      "title": "Asked At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sub_skill_id",
+    "kind",
+    "asked_at"
+  ],
+  "title": "RepoQuestion",
+  "type": "object"
+}

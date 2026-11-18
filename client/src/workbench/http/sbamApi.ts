@@ -5,7 +5,14 @@ import type { BamApi } from "../api/adapter";
 import type { IngestionRun } from "../api/types";
 import { ragPipeline, setRagActions } from "../rag/ragPipeline";
 import { API_BASE } from "@/providers/data-provider";
-import type { RegisteredWorkflow, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories } from "@/contracts";
+import type {
+  RegisteredWorkflow,
+  RepoAnswered,
+  RepoQuestions,
+  WorkflowCodeTree,
+  WorkflowFileView,
+  WorkflowRepositories,
+} from "@/contracts";
 import { ApiFailure, deleteJson, getJson, idempotencyKey, postJson } from "./http";
 import { buildSnapshot, resetSnapshotCache } from "./snapshot";
 import { uploadOne } from "./upload";
@@ -72,6 +79,11 @@ export function createSbamApi(projectId: string): BamApi {
       (await getJson<RegisteredWorkflow>(
         `projects/${projectId}/workflows/${workflowId}/registration${version ? `?version=${encodeURIComponent(version)}` : ""}`,
       )).body,
+    // The choose-a-repository question of the builds and the FDE's answer (#756). The server validates the answer.
+    getRepoQuestions: async (workflowId) =>
+      (await getJson<RepoQuestions>(`projects/${projectId}/workflows/${workflowId}/repo-questions`)).body,
+    answerRepoQuestion: async (workflowId, subSkillId, body, key) =>
+      (await postJson<RepoAnswered>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subSkillId}/repo-answer`, body, { "Idempotency-Key": key })).body,
     uploadFile: (file, onProgress) => uploadOne(projectId, file, onProgress),
     removeUpload: async (id) => {
       try {

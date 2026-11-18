@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.conventions import not_found
+from sbam_api.db.repository import TenantContext
 from sbam_api.masters import snapshot
 from sbam_api.masters.models import MasterEntry
 from sbam_api.masters.repository import MasterEntryRepository
@@ -40,7 +41,12 @@ COLUMNS: tuple[tuple[MasterType, str, RepoSource], ...] = (
 
 
 def build(session: Session, user: CurrentUser, project_id: uuid.UUID) -> RepoCatalog:
-    ctx = user.context()
+    return build_for(session, user.context(), project_id)
+
+
+def build_for(session: Session, ctx: TenantContext, project_id: uuid.UUID) -> RepoCatalog:
+    """The catalogue for a tenant context: the API's `build`, and the build's choose-a-repo step
+    (#756), which runs in a worker and has no signed-in user."""
     project = ProjectRepository(session, ctx).get(project_id)
     if project is None:
         raise not_found()

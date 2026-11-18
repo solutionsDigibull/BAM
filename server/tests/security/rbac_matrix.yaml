@@ -1211,6 +1211,29 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # #756: the choose-a-repository question of a Workflow's builds, and the FDE's answer. The seeded
+  # Workflow has no Sub-Skill, so the list is empty (200) and an answer for the unknown Sub-Skill is
+  # 404; the other roles are refused before either handler runs.
+  repo_questions_api_v1_projects__project_id__workflows__workflow_id__repo_questions_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/repo-questions
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  repo_answer_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__repo_answer_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/repo-answer
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_id: "@sub_a"}
+      headers: {Idempotency-Key: "repo-answer-rbac-0001"}
+      json: {action: "NO_REPO"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.

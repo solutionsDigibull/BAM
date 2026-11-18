@@ -204,6 +204,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "import_gate": build_stubs.import_gate,
     "compliance_gates": build_stubs.compliance_gates,
     "review_code": build_stubs.review_code,
+    "choose_repo": build_stubs.choose_repo,  # #756: the real one asks a model and a database
     "generate_tests": test_stubs.generate_tests,
     "build_promptfoo_suite": test_stubs.build_promptfoo_suite,
     "run_sandbox_tests": test_stubs.run_sandbox_tests,  # the real one (E13.2) needs a sandbox
