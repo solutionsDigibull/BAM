@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { RegisteredWorkflow } from "@/contracts";
 
 import {
-  isForbidden, isNotRegistered, isSuperseded, isValidVersion, shortDigest, STATUS_LABEL, statusTone, toolCounts,
+  isForbidden, isNotRegistered, isSuperseded, isValidVersion, KIND_LABEL, kindTone, shortDigest, STATUS_LABEL, statusTone, toolCounts,
 } from "./workflowRegistry";
 
 const tool = (name: string, role: "action" | "check") => ({ name, skill_id: "MS01.1", role, input_schema: {}, output_schema: {} });
@@ -43,5 +43,12 @@ describe("the registry entry helpers (#849)", () => {
   test("test_849_tools_are_counted_by_role", () => {
     const tools = [tool("MS01_1__action", "action"), tool("MS01_1__check", "check"), tool("MS01_2__action", "action"), tool("MS01_2__check", "check")];
     expect(toolCounts(tools as unknown as RegisteredWorkflow["tools"])).toEqual({ action: 2, check: 2 });
+  });
+
+  test("test_860_the_kind_is_staging_or_production_and_staging_is_the_warm_tone", () => {
+    expect(KIND_LABEL.staging).toBe("Staging");
+    expect(KIND_LABEL.production).toBe("Production");
+    expect(kindTone("staging")).toBe("warn");
+    expect(kindTone("production")).toBe("ok");
   });
 });

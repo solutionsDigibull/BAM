@@ -52,6 +52,14 @@
       "title": "McpToolEntry",
       "type": "object"
     },
+    "RegistryKind": {
+      "enum": [
+        "staging",
+        "production"
+      ],
+      "title": "RegistryKind",
+      "type": "string"
+    },
     "RegistryStatus": {
       "enum": [
         "REGISTERED",
@@ -171,6 +179,9 @@
       ],
       "default": null
     },
+    "kind": {
+      "$ref": "#/$defs/RegistryKind"
+    },
     "status": {
       "$ref": "#/$defs/RegistryStatus"
     },
@@ -216,6 +227,7 @@
     "certification_id",
     "owner",
     "tools",
+    "kind",
     "status",
     "registered_at"
   ],

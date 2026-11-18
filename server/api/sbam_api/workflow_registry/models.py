@@ -4,13 +4,16 @@ This table is the source of truth. Bifrost is where SRIM fetches from, and SBAM 
 Bifrost entry from here, so a lost Bifrost database is a recoverable fault. A row is inserted when
 a certified, frozen Workflow is registered and changes once: REGISTERED becomes SUPERSEDED when a
 later version replaces it. Rows are never deleted (no revocation, C-31).
+
+Every row has a kind (ADR 0032, #860): `staging` (Commit; the assigned FDE only) or `production`
+(promotion, #148; the only kind SRIM's key may see). A Workflow version has one row per kind.
 """
 
 import uuid
 from datetime import datetime
 from typing import Any
 
-from sbam_contracts.workflow_registry import RegistryStatus
+from sbam_contracts.workflow_registry import RegistryKind, RegistryStatus
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,8 +26,13 @@ class RegisteredWorkflowRow(ProjectOwned, Base):
     __tablename__ = "registered_workflows"
     __table_args__ = (
         status_check(RegistryStatus),
+        status_check(RegistryKind, "kind"),
         UniqueConstraint(
-            "tenant_id", "workflow_id", "version", name="uq_registered_workflows_version"
+            "tenant_id",
+            "workflow_id",
+            "version",
+            "kind",
+            name="uq_registered_workflows_version",
         ),
         UniqueConstraint("tenant_id", "registry_name", name="uq_registered_workflows_name"),
     )
@@ -43,6 +51,9 @@ class RegisteredWorkflowRow(ProjectOwned, Base):
     # The certified UI bundle entry (#857), copied from the frozen manifest; null on an entry
     # registered before the UI bundle existed.
     ui_bundle: Mapped[dict[str, Any] | None] = mapped_column(Json)
+    kind: Mapped[str] = mapped_column(
+        String(20), default=RegistryKind.PRODUCTION.value, server_default=RegistryKind.PRODUCTION.value
+    )
     status: Mapped[str] = mapped_column(String(20), default=RegistryStatus.REGISTERED.value)
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

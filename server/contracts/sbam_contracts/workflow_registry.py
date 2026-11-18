@@ -7,6 +7,11 @@ manifest and its WORKFLOW certificate, never computed again.
 
 A new version is a new entry. The entry it replaces is marked SUPERSEDED and disabled in Bifrost,
 and is never deleted (no revocation, C-31): a running SRIM can still look its version up.
+
+Every entry has a KIND (ADR 0032, #860). Commit registers a STAGING entry: reachable only by the
+assigned FDE, and SRIM's production key cannot see it. PRODUCTION is the kind promotion (#148)
+will register later, on the same certified digest. A newer version supersedes the older entry
+of the SAME kind only; one STAGING entry exists per Workflow version.
 """
 
 import uuid
@@ -32,6 +37,11 @@ class RegistryStatus(StrEnum):
     SUPERSEDED = "SUPERSEDED"  # a later version replaced it: disabled in Bifrost, still listed
 
 
+class RegistryKind(StrEnum):
+    STAGING = "staging"  # registered by Commit (#766): the assigned FDE only, never SRIM's key
+    PRODUCTION = "production"  # registered by promotion (#148): the entry SRIM's key may see
+
+
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
@@ -53,6 +63,7 @@ class RegisteredWorkflow(_Strict):
     owner: ShortText  # who the entry belongs to: the registering user or service
     tools: list[McpToolEntry] = Field(min_length=2)  # with their input and output schemas
     ui_bundle: UiBundleEntry | None = None  # the certified bundle: version, digest, entry, hosts
+    kind: RegistryKind  # staging (FDE only) or production (SRIM)
     status: RegistryStatus
     registered_at: datetime
     superseded_at: datetime | None = None

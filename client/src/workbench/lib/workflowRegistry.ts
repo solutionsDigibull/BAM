@@ -22,6 +22,9 @@ export const isForbidden = (e: unknown): boolean => code(e) === 403
 
 export const STATUS_LABEL: Record<RegisteredWorkflow['status'], string> = { REGISTERED: 'Current', SUPERSEDED: 'Superseded' }
 export const statusTone = (s: RegisteredWorkflow['status']): Tone => (s === 'REGISTERED' ? 'ok' : 'muted')
+/** The entry kind (ADR 0032, #860): Commit registers a Staging entry that only the assigned FDE reaches; SRIM's key sees Production. */
+export const KIND_LABEL: Record<RegisteredWorkflow['kind'], string> = { staging: 'Staging', production: 'Production' }
+export const kindTone = (k: RegisteredWorkflow['kind']): Tone => (k === 'staging' ? 'warn' : 'ok')
 export const isSuperseded = (r: Pick<RegisteredWorkflow, 'status'>): boolean => r.status === 'SUPERSEDED'
 
 /** `sha256:` plus the first 12 hex digits; the whole value stays in the copy button. */

@@ -35,7 +35,7 @@ from sbam_api.workflow_registry.models import RegisteredWorkflowRow
 from sbam_api.workflow_registry.repository import RegisteredWorkflowRepository, version_key
 from sbam_api.workflows.models import Workflow
 from sbam_contracts.manifest import McpServerEntry, McpToolEntry, UiBundleEntry, WorkflowManifest
-from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryStatus
+from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryKind, RegistryStatus
 from sbam_workers.build.workflow_server import with_server
 from sqlalchemy.orm import Session, sessionmaker
 from test_manifest import workflow
@@ -204,6 +204,7 @@ class World:
 
     def register(self, fake: FakeBifrost, **kwargs: Any) -> RegisteredWorkflow:
         stamp = kwargs.pop("now", NOW)
+        kwargs.setdefault("kind", RegistryKind.PRODUCTION)  # WG-26 tests pass STAGING themselves
         with self.sessions() as session:
             done = service.register(
                 session, CTX, WORKFLOW_ID, fake, owner="fde-a1", now=stamp, **kwargs
@@ -298,7 +299,9 @@ def test_wg12_another_tenant_cannot_register_a_workflow_it_does_not_own() -> Non
     world.freeze()
     other = TenantContext(OTHER_TENANT, PROJECT)
     with world.sessions() as session, pytest.raises(ApiError) as caught:
-        service.register(session, other, WORKFLOW_ID, fake, owner="x")
+        service.register(
+            session, other, WORKFLOW_ID, fake, kind=RegistryKind.PRODUCTION, owner="x"
+        )
     assert caught.value.status == 404 and fake.calls == []
 
 

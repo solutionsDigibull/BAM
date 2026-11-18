@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:09d253ca24998b522f83e92d3fac90acc15c75b13349f0175bf9c73e6dbd78c9
+// source-sha256:1a975110dffe81de761c9a8d0cea1c714a943db79be9230e0daadfea7e69de60
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -579,6 +579,11 @@ export type LicenceVerdict = "ALLOWED" | "REFUSED" | "UNKNOWN";
  * via the `definition` "sbam_contracts__repo_scan__Severity".
  */
 export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegistryKind".
+ */
+export type RegistryKind = "staging" | "production";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "RegistryStatus".
@@ -7139,6 +7144,7 @@ export interface RegisteredWorkflow {
    */
   tools: [McpToolEntry, McpToolEntry, ...McpToolEntry[]];
   ui_bundle?: UiBundleEntry | null;
+  kind: RegistryKind;
   status: RegistryStatus;
   registered_at: string;
   superseded_at?: string | null;

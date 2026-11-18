@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { RegisteredWorkflow } from '@/contracts'
 import {
-  isForbidden, isNotRegistered, isSuperseded, isValidVersion, shortDigest, STATUS_LABEL, statusTone, toolCounts,
+  isForbidden, isNotRegistered, isSuperseded, isValidVersion, KIND_LABEL, kindTone, shortDigest, STATUS_LABEL, statusTone, toolCounts,
   useWorkflowRegistration,
 } from '../lib/workflowRegistry'
 import { Banner, Copy, Empty, ErrorState, Section, Skeleton, Time } from './ui'
@@ -22,6 +22,7 @@ function Entry({ r, open }: { r: RegisteredWorkflow; open: (version: string) => 
     <section className="reg-card" aria-label={`Registry entry ${r.registry_name}`}>
       <header className="reg-head">
         <h4>{r.registry_name}</h4>
+        <span className={`pill tone-${kindTone(r.kind)}`}>{KIND_LABEL[r.kind]}</span>
         <span className={`pill tone-${statusTone(r.status)}`}>{STATUS_LABEL[r.status]}</span>
         <span className="mono xs">v{r.version}</span>
       </header>
@@ -33,6 +34,7 @@ function Entry({ r, open }: { r: RegisteredWorkflow; open: (version: string) => 
         </Banner>
       )}
       <dl className="kv">
+        <div><dt>Kind</dt><dd>{KIND_LABEL[r.kind]}{r.kind === 'staging' && <span className="muted xs"> (the assigned FDE only; SRIM cannot see it)</span>}</dd></div>
         <div><dt>Version</dt><dd className="mono">{r.version}</dd></div>
         <div><dt>Registered</dt><dd><Time iso={r.registered_at} /></dd></div>
         <div><dt>Registered by</dt><dd>{r.owner}</dd></div>

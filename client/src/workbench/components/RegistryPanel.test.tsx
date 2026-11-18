@@ -13,7 +13,7 @@ const tool = (name: string, role: "action" | "check") => ({ name, skill_id: "MS0
 const ENTRY = {
   workflow_id: "w1", version: "1.0.2", registry_name: "wf_onboarding_v1_2", registry_id: "reg-123", image_digest: DIGEST,
   manifest_hash: MANIFEST, certification_id: "0190f3a2-7b1c-7d4e-8f00-0000000000c9", owner: "fde-a1",
-  tools: [tool("MS01_1__action", "action"), tool("MS01_1__check", "check")], status: "REGISTERED", registered_at: "2026-11-17T10:00:00Z",
+  tools: [tool("MS01_1__action", "action"), tool("MS01_1__check", "check")], kind: "staging", status: "REGISTERED", registered_at: "2026-11-17T10:00:00Z",
 } as unknown as RegisteredWorkflow;
 const OLD = { ...ENTRY, version: "1.0.1", registry_name: "wf_onboarding_v1_1", status: "SUPERSEDED", superseded_at: "2026-11-17T12:00:00Z", superseded_by: "1.0.2" } as unknown as RegisteredWorkflow;
 const missing = () => Promise.reject(Object.assign(new Error("Not found"), { statusCode: 404 }));
@@ -39,6 +39,8 @@ describe("Translate shows the workflow's registry entry, read only (#849)", () =
     renderPanel();
     const card = await screen.findByRole("region", { name: "Registry entry wf_onboarding_v1_2" });
     expect(card.textContent).toContain("Current");
+    expect(card.textContent).toContain("Staging"); // the kind (#860)
+    expect(card.textContent).toContain("SRIM cannot see it");
     expect(card.textContent).toContain("1.0.2");
     expect(card.textContent).toContain("sha256:abababababab"); // the short image digest
     expect(card.textContent).toContain("sha256:cdcdcdcdcdcd"); // the short manifest hash
