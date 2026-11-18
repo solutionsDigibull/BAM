@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { setUi } from '../lib/store'
 import { GOAL_MAX, goalSpans, saveGoal, useGoal, type GoalSpan } from '../lib/goal'
 import { Icon } from '../components/ui'
+import { ChromaticButton } from '../components/chromatic/chromatic-button'
 import bull from '../assets/login/bull-head-transparent.png'
 
 export const GOAL_PREFIX = 'Build an AI agent that automates '
@@ -136,7 +137,7 @@ export function GoalCapture() {
           if (e.key === 'Backspace' && t.selectionStart <= PLEN && t.selectionEnd <= PLEN) { e.preventDefault(); return }
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
         }} />
-      <button type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></button>
+      <ChromaticButton type="button" className="goal-send" aria-label="Send goal" aria-disabled={empty || undefined} disabled={empty} onClick={send}><Icon name="tb-arrow-right" size={18} /></ChromaticButton>
     </div>
     <div className="goal-parts" role="group" aria-label="What, who and where in your goal">
       {GOAL_PARTS.map((p, i) => {
