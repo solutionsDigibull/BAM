@@ -82,6 +82,15 @@ def _passed_kinds(
     return frozenset(kind for name, kind in kinds.items() if name not in failed)
 
 
+def _built_router(manifest: Mapping[str, Any]) -> str | None:
+    """The router of a manifest SBAM built (it has an `sbam_build_record`); None if legacy."""
+    if "sbam_build_record" not in manifest:
+        return None
+    block = manifest.get("srim_runtime_definition", {}).get("orchestration", {})
+    router = block.get("router") if isinstance(block, Mapping) else None
+    return router if isinstance(router, str) else ""
+
+
 def approved_manifest(
     manifest: Mapping[str, Any], evidence: Mapping[str, Any], certified_at: datetime
 ) -> SkillManifest:
@@ -194,6 +203,7 @@ class CertifySubSkill:
             current_dataset_sha256="" if dataset is None else dataset.sha256,
             current_suite_sha256=current_suite,
             current_runtime_digest=manifest_row.runtime_digest,
+            router=_built_router(manifest_row.manifest),
         )
         return (
             evidence,

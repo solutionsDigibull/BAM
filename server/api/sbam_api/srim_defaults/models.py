@@ -1,8 +1,9 @@
 """`tenant_srim_defaults` (E9.1b): one row per tenant that set its own SRIM runtime values.
 
-A tenant without a row gets the ISA14 defaults (`sbam_contracts.manifest.ISA14_SRIM_DEFAULTS`), so
-nothing is seeded and a new tenant needs no setup. `defaults` is a `SrimRuntimeDefaults` as JSON,
-validated before it is written and again when it is read.
+A tenant without a row gets the SBAM defaults (`sbam_contracts.manifest.SBAM_SRIM_DEFAULTS`: the
+Temporal router of ADR 0031 and the Bifrost gateway of ADR 0028), not the legacy ISA14 sample
+values, so nothing is seeded and a new tenant needs no setup. `defaults` is a
+`SrimRuntimeDefaults` as JSON, validated before it is written and again when it is read.
 """
 
 from typing import Any

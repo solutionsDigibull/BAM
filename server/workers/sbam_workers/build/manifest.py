@@ -8,8 +8,9 @@ and the build context it writes the six TD §11.1 blocks:
     wall clock, so a rebuild of the same ISATVON hashes the same.
   * isatvon_definition: ISA14's flat shape (`to_flat`); the structured form goes to
     `sbam_build_record.isatvon_detail`.
-  * srim_runtime_definition: the tenant's defaults (`BuildContext.srim`, ISA14's until it sets its
-    own, O-19), with `persistence.table` from V.tables.
+  * srim_runtime_definition: the tenant's defaults (`BuildContext.srim`, the SBAM defaults until it
+    sets its own, O-19) but always the Temporal router (ADR 0031), with `persistence.table` from
+    V.tables.
   * contracts: `build_contracts` (S.required_inputs; O.json_schema + `state_handoff_id`).
   * governance: lifecycle from the Sub-Skill's state, versioning 1.0.0, and the deterministic hash
     (RFC 8785, `canonical.deterministic_hash`), set by `SkillManifest.sealed`.
@@ -68,7 +69,7 @@ from sbam_contracts.isatvon14 import (
 )
 from sbam_contracts.manifest import (
     HASH_PLACEHOLDER,
-    ISA14_SRIM_DEFAULTS,
+    SBAM_SRIM_DEFAULTS,
     SkillManifest,
     SrimRuntimeDefaults,
     TemplateRef,
@@ -92,9 +93,11 @@ TEMPLATE: Final = ("fastmcp-loopy", "1.0.1")
 SKILL_TYPE: Final = "Deterministic_Loopy_MCP"  # O-15
 PLATFORM_OWNER: Final = "SBAM Platform"
 FIRST_VERSION: Final = (1, 0, 0)  # C-32; MAJOR / PATCH bumps come with re-certification (E14)
-# The ISA14 defaults (TD §11.1) are `ISA14_SRIM_DEFAULTS`; a tenant's own values (O-19, E9.1b) come
-# in through `BuildContext.srim`. `persistence.table` is filled from the Sub-Skill's V.tables.
-PLATFORM_SRIM: Final[Mapping[str, Mapping[str, str]]] = ISA14_SRIM_DEFAULTS.model_dump(mode="json")
+# The SBAM defaults (Temporal router of ADR 0031, Bifrost gateway of ADR 0028) are
+# `SBAM_SRIM_DEFAULTS`; the legacy ISA14 sample values stay in `ISA14_SRIM_DEFAULTS`. A tenant's own
+# values (O-19, E9.1b) come in through `BuildContext.srim`. `persistence.table` is filled from the
+# Sub-Skill's V.tables.
+PLATFORM_SRIM: Final[Mapping[str, Mapping[str, str]]] = SBAM_SRIM_DEFAULTS.model_dump(mode="json")
 # The hash of the Workflow's latest PASSED schema.sql (E9.4, `build_schema_sql`); a Workflow that
 # never built one records the empty script's, which is also what a Workflow without tables builds.
 EMPTY_SCHEMA_SQL_SHA256: Final = hashlib.sha256(b"").hexdigest()
@@ -124,7 +127,8 @@ class BuildContext:
     template: TemplateRef
     runtime_digest: str
     schema_sql_sha256: str = EMPTY_SCHEMA_SQL_SHA256
-    srim: SrimRuntimeDefaults = ISA14_SRIM_DEFAULTS  # the tenant's, or ISA14's if it set none
+    # the tenant's values, or the SBAM defaults if it set none (the router is always Temporal)
+    srim: SrimRuntimeDefaults = SBAM_SRIM_DEFAULTS
 
 
 def _utc(moment: datetime) -> str:
@@ -171,7 +175,9 @@ def build_skill_manifest(
     status = MANIFEST_STATUS[ctx.state]
     stamp = _utc(ctx.validated_at)
     major, minor, patch = FIRST_VERSION
-    srim = ctx.srim.runtime_definition(", ".join(definition.v_variables.tables))
+    # The router is fixed (ADR 0031): whatever a tenant row holds, the manifest gets Temporal.
+    tables = ", ".join(definition.v_variables.tables)
+    srim = ctx.srim.with_fixed_router().runtime_definition(tables)
     manifest = {
         "skill_metadata": {
             "macro_category": meta.macro_category,

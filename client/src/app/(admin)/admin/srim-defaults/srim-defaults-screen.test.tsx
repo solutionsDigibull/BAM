@@ -5,7 +5,7 @@ import type { SrimDefaultsView, SrimRuntimeDefaults } from "@/contracts";
 
 import { fakeApi, problem, renderWithRefine } from "../projects/test-harness";
 
-import { DEFAULTS_MESSAGE, STALE_MESSAGE } from "./srim-api";
+import { DEFAULTS_MESSAGE, FIXED_ROUTER, STALE_MESSAGE } from "./srim-api";
 import { SrimDefaultsScreen } from "./srim-defaults-screen";
 
 const ISA14: SrimRuntimeDefaults = {
@@ -23,6 +23,11 @@ const ISA14: SrimRuntimeDefaults = {
   ui: { target: "SRIM_UI_Canvas", method: "Embedded_iFrames_Widgets" },
 };
 const ACME: SrimRuntimeDefaults = { ...ISA14, gateway: { route_via: "Acme_Gateway" } };
+// The router is fixed (ADR 0031): whatever a stored row holds, the screen sends the Temporal value.
+const fixed = (d: SrimRuntimeDefaults): SrimRuntimeDefaults => ({
+  ...d,
+  orchestration: { ...d.orchestration, router: FIXED_ROUTER },
+});
 
 const view = (defaults: SrimRuntimeDefaults, is_default: boolean): SrimDefaultsView => ({
   defaults,
@@ -44,7 +49,8 @@ describe("SRIM runtime defaults screen (E9.1b)", { timeout: 20_000 }, () => {
     expect(await screen.findByText(DEFAULTS_MESSAGE)).toBeDefined();
     expect((await field("Route via")).value).toBe("MCP_Jungle_Gateway_Reverse_Proxy");
     expect(
-      (screen.getByRole("button", { name: "Reset to ISA14" }) as HTMLButtonElement).disabled,
+      (screen.getByRole("button", { name: "Reset to SBAM defaults" }) as HTMLButtonElement)
+        .disabled,
     ).toBe(true);
   });
 
@@ -62,9 +68,25 @@ describe("SRIM runtime defaults screen (E9.1b)", { timeout: 20_000 }, () => {
     await waitFor(() => expect(api.calls.some((c) => c.method === "PUT")).toBe(true));
     const put = api.calls.find((c) => c.method === "PUT")!;
     expect(new Headers(put.init.headers).get("if-match")).toBe('"0"');
-    expect(JSON.parse(String(put.init.body))).toEqual(ACME);
+    expect(JSON.parse(String(put.init.body))).toEqual(fixed(ACME));
     await waitFor(() => expect(screen.queryByText(DEFAULTS_MESSAGE)).toBeNull());
     expect((await field("Route via")).value).toBe("Acme_Gateway");
+  });
+
+  test("adr0031_ui the router is read-only and shows Temporal even when a legacy row holds Dify", async () => {
+    const api = fakeApi({
+      [GET]: [{ body: view(ISA14, false), etag: '"3"' }],
+      [PUT]: { body: view(fixed(ISA14), false), etag: '"4"' },
+    });
+    renderWithRefine(<SrimDefaultsScreen />);
+    const router = await field("Router");
+    expect(router.value).toBe(FIXED_ROUTER);
+    expect(router.disabled).toBe(true);
+    expect((await field("Route via")).disabled).toBe(false); // the other blocks stay editable
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(api.calls.some((c) => c.method === "PUT")).toBe(true));
+    const sent = JSON.parse(String(api.calls.find((c) => c.method === "PUT")!.init.body));
+    expect(sent.orchestration.router).toBe(FIXED_ROUTER);
   });
 
   test("e9_1b_ui_t03 an empty field is flagged and nothing is sent", async () => {
@@ -118,7 +140,7 @@ describe("SRIM runtime defaults screen (E9.1b)", { timeout: 20_000 }, () => {
     });
     renderWithRefine(<SrimDefaultsScreen />);
     expect((await field("Route via")).value).toBe("Acme_Gateway");
-    fireEvent.click(screen.getByRole("button", { name: "Reset to ISA14" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset to SBAM defaults" }));
     expect(api.calls.filter((c) => c.method === "DELETE")).toHaveLength(0); // not yet: it asks
     fireEvent.click(await screen.findByRole("button", { name: "Reset" }));
     await waitFor(() => expect(api.calls.some((c) => c.method === "DELETE")).toBe(true));

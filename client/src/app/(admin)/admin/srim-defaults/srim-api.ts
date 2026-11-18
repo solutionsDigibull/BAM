@@ -13,7 +13,12 @@ export type FieldSpec = { block: Block; name: string; label: string; hint: strin
 
 // Order and wording follow TD §11.1. `persistence.table` is not here: it is derived per Sub-Skill.
 export const FIELDS: FieldSpec[] = [
-  { block: "orchestration", name: "router", label: "Router", hint: "Dynamic master router" },
+  {
+    block: "orchestration",
+    name: "router",
+    label: "Router",
+    hint: "Fixed: SRIM walks every workflow with Temporal (ADR 0031)",
+  },
   { block: "orchestration", name: "trigger", label: "Trigger", hint: "How a skill is started" },
   { block: "execution", name: "engine", label: "Engine", hint: "Execution engine" },
   { block: "gateway", name: "route_via", label: "Route via", hint: "Gateway or reverse proxy" },
@@ -33,9 +38,13 @@ export const BLOCKS: Block[] = [
 ];
 export const blockTitle = (b: Block) => b.charAt(0).toUpperCase() + b.slice(1);
 
-export const DEFAULTS_MESSAGE = "Using the ISA14 defaults";
+// The only router BAM writes (`TEMPORAL_ROUTER` in the contract, ADR 0031): shown read-only and always sent.
+export const FIXED_ROUTER = "Temporal_Workflow_Orchestrator";
+export const isFixed = (f: FieldSpec) => f.block === "orchestration" && f.name === "router";
+
+export const DEFAULTS_MESSAGE = "Using the SBAM defaults";
 export const DEFAULTS_HELP =
-  "This tenant has not set its own values, so every manifest uses the ISA14 sample values.";
+  "This tenant has not set its own values, so every manifest uses the SBAM defaults (Temporal router, Bifrost gateway).";
 export const STALE_MESSAGE = "These values were changed by someone else";
 export const NOTE =
   "Applies to manifests built from now on. A manifest that is already built keeps the values it was built with. The persistence table is not set here: it comes from each Sub-Skill's own tables.";

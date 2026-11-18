@@ -27,7 +27,7 @@ from sbam_api.sow.models import SowVersion
 from sbam_api.srim_defaults.models import TenantSrimDefaults
 from sbam_contracts.build import BuildStageInput
 from sbam_contracts.canonical import deterministic_hash
-from sbam_contracts.manifest import ISA14_SRIM_DEFAULTS, SkillManifest
+from sbam_contracts.manifest import SBAM_SRIM_DEFAULTS, TEMPORAL_ROUTER, SkillManifest
 from sbam_workers.build.manifest import (
     IDS_MISMATCH,
     MANIFEST_INVALID,
@@ -253,13 +253,13 @@ def srim(row: SubSkillManifest) -> dict[str, object]:
     return block
 
 
-def test_e9_1b_t05_a_tenant_without_its_own_defaults_gets_the_isa14_ones(b: Build) -> None:
+def test_e9_1b_t05_a_tenant_without_its_own_defaults_gets_the_sbam_ones(b: Build) -> None:
     build_for(b.store, b.inp())
     [row] = b.manifests()
     block = srim(row)
-    assert block["orchestration"] == ISA14_SRIM_DEFAULTS.model_dump(mode="json")["orchestration"]
+    assert block["orchestration"] == SBAM_SRIM_DEFAULTS.model_dump(mode="json")["orchestration"]
     assert block["persistence"] == {
-        **ISA14_SRIM_DEFAULTS.model_dump(mode="json")["persistence"],
+        **SBAM_SRIM_DEFAULTS.model_dump(mode="json")["persistence"],
         "table": "investor_profiles, auth_event_audit_handoff",
     }
 
@@ -276,6 +276,11 @@ def test_e9_1b_t06_later_builds_use_the_tenants_values_and_earlier_manifests_sta
     assert rows[1].manifest == stored and rows[1].sha256 == first.sha256  # not rewritten
     second = srim(rows[2])
     assert second["gateway"] == CUSTOM["gateway"] and second["audit"] == CUSTOM["audit"]
+    # the router is fixed (ADR 0031): the row holds Acme_Router, the manifest gets the Temporal one
+    assert second["orchestration"] == {
+        "router": TEMPORAL_ROUTER,
+        "trigger": CUSTOM["orchestration"]["trigger"],
+    }
     assert second["persistence"] == {
         **CUSTOM["persistence"],
         "table": "investor_profiles, auth_event_audit_handoff",  # still derived from V.tables
@@ -288,4 +293,4 @@ def test_e9_1b_t07_another_tenants_values_are_never_used(b: Build) -> None:
     set_defaults(b, uuid.uuid4(), CUSTOM)
     build_for(b.store, b.inp())
     [row] = b.manifests()
-    assert srim(row)["gateway"] == ISA14_SRIM_DEFAULTS.model_dump(mode="json")["gateway"]
+    assert srim(row)["gateway"] == SBAM_SRIM_DEFAULTS.model_dump(mode="json")["gateway"]

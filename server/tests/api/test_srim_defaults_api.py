@@ -9,16 +9,16 @@ import pytest
 from sbam_api.audit.models import AuditLog
 from sbam_api.srim_defaults.models import TenantSrimDefaults
 from sbam_api.srim_defaults.repository import SrimDefaultsRepository
-from sbam_contracts.manifest import ISA14_SRIM_DEFAULTS
+from sbam_contracts.manifest import SBAM_SRIM_DEFAULTS, TEMPORAL_ROUTER
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from test_auth import FDE_A1, TENANT_A, problem
 from test_projects import Harness as Base
 
 URL = "/admin/srim-defaults"
-ISA14 = ISA14_SRIM_DEFAULTS.model_dump(mode="json")
+ISA14 = SBAM_SRIM_DEFAULTS.model_dump(mode="json")  # a tenant's default (ADR 0031); name kept
 CUSTOM: dict[str, Any] = {
-    "orchestration": {"router": "Acme_Router", "trigger": "Acme_Trigger"},
+    "orchestration": {"router": TEMPORAL_ROUTER, "trigger": "Acme_Trigger"},
     "execution": {"engine": "Acme_Engine"},
     "gateway": {"route_via": "Acme_Gateway"},
     "persistence": {"database": "Acme_DB", "action": "Acme_SQL"},
@@ -55,6 +55,24 @@ def test_e9_1b_t01_a_tenant_that_set_nothing_reads_the_isa14_defaults(h: Harness
     assert res.status_code == 200, res.text
     assert res.json() == {"defaults": ISA14, "is_default": True}
     assert res.headers["etag"] == '"0"'
+
+
+def test_adr0031_a_write_with_another_router_is_422_and_stores_nothing(h: Harness) -> None:
+    legacy = {**CUSTOM, "orchestration": {"router": "Dify_Dynamic_Master_Router", "trigger": "T"}}
+    res = h.put(legacy)
+    problem(res, 422, "VALIDATION_ERROR")
+    assert any(e["path"] == "orchestration.router" for e in res.json()["errors"])
+    assert h.srim_audit() == []
+    assert h.call("GET", URL, h.admin_a()).json()["is_default"] is True
+
+
+def test_adr0031_a_tenant_without_values_gets_the_temporal_router_and_the_bifrost_gateway(
+    h: Harness,
+) -> None:
+    got = h.call("GET", URL, h.admin_a()).json()["defaults"]
+    assert got["orchestration"]["router"] == TEMPORAL_ROUTER
+    assert got["gateway"]["route_via"] == "Bifrost_MCP_Gateway"
+    assert "dify" not in str(got).lower()
 
 
 def test_e9_1b_t02_a_write_needs_if_match_and_a_stale_one_is_412(h: Harness) -> None:
