@@ -50,6 +50,10 @@ def _redact(value: Any, *, log_content: bool) -> Any:
     }
 
 
+class LangfuseRejected(Exception):  # noqa: N818 - reads as the event it reports
+    """Langfuse answered 207 and refused some events of the batch."""
+
+
 @dataclass(frozen=True)
 class Generation:
     """One model call attempt, as the trace sees it."""
@@ -168,6 +172,11 @@ class LangfuseTracer:
                 timeout=EXPORT_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
+            # 207: the batch was taken but events can still be refused one by one (e.g. a
+            # naive datetime). Treat that as a failed export, not as delivered.
+            refused = response.json().get("errors") if response.status_code == 207 else None
+            if refused:
+                raise LangfuseRejected(f"{len(refused)} event(s) refused")
         finally:
             if owns:
                 await client.aclose()

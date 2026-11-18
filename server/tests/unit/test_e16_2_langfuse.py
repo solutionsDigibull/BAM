@@ -149,3 +149,28 @@ def test_e16_2_a_generation_carries_sbams_cost_for_langfuse() -> None:
     )
     [_, generation] = LangfuseTracer(conf("development"))._events(g)
     assert generation["body"]["costDetails"] == {"total": 0.0282}
+
+
+def test_e16_2_events_langfuse_refuses_in_a_207_count_as_a_failed_export() -> None:
+    """Langfuse takes the batch (207) but can refuse events one by one: that is not delivered."""
+    import asyncio
+    from datetime import UTC, datetime
+
+    from sbam_workers.llm.trace import Generation, LangfuseTracer
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(207, json={"successes": [], "errors": [{"status": 400}]})
+
+    tracer = LangfuseTracer(
+        conf(
+            "development",
+            langfuse_host="http://langfuse-web:3000",
+            langfuse_public_key="pk",
+            langfuse_secret_key="sk",  # noqa: S106 - a fake key for a mocked Langfuse
+        ),
+        client=httpx.AsyncClient(transport=httpx.MockTransport(reply)),
+    )
+    now = datetime.now(UTC)
+    g = Generation("t", "sbam-sow", "m", "p", "1", "tn", "pj", 1, "SUCCEEDED", now, now)
+    asyncio.run(tracer.record(g))
+    assert tracer.failures == 1 and len(tracer._buffer) == 2  # kept for the next export

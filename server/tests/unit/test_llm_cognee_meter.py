@@ -316,3 +316,5 @@ def test_420_t20_every_cognee_call_is_a_langfuse_generation(
     )
     assert (g.tenant_id, g.project_id) == (str(TENANT), str(PROJECT))
     assert (g.tokens_in, g.tokens_out) == (row.tokens_in, row.tokens_out)
+    # LiteLLM's naive times would be refused by Langfuse (207 invalid datetime)
+    assert g.started_at.tzinfo is not None and g.ended_at.tzinfo is not None

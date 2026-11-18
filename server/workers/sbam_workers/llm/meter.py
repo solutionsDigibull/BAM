@@ -19,7 +19,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -165,8 +165,9 @@ def install(store: CallStore, settings: WorkerSettings) -> Budget:
                     reported_cost=_cost(getattr(usage, "cost", None))
                     or kwargs.get("response_cost")
                     or detail.get("response_cost"),
-                    started=start_time,
-                    ended=end_time,
+                    # LiteLLM's times are naive local datetimes; Langfuse refuses those
+                    started=start_time.astimezone(UTC),
+                    ended=end_time.astimezone(UTC),
                     tracer=tracer,
                 )
             except Exception:
