@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:1a975110dffe81de761c9a8d0cea1c714a943db79be9230e0daadfea7e69de60
+// source-sha256:a6aea38e8c0dd86f46e577e85a427222f93eb95f6d356bd68a406e46512e89d7
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -163,6 +163,7 @@ export type AgentState = "PENDING" | "BUILDING" | "CERTIFIED" | "FROZEN";
  * via the `definition` "BuildStage".
  */
 export type BuildStage =
+  | "choose_repo"
   | "build_manifest"
   | "check_libraries"
   | "render_skeleton"
@@ -179,6 +180,7 @@ export type BuildStage =
   | "certify_sub_skill"
   | "correct"
   | "wait_retry"
+  | "wait_repo_choice"
   | "done";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -581,6 +583,16 @@ export type LicenceVerdict = "ALLOWED" | "REFUSED" | "UNKNOWN";
 export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoQuestionKind".
+ */
+export type RepoQuestionKind = "CLOSE_CANDIDATES" | "WEAK_MATCH" | "NO_CANDIDATE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoAnswerAction".
+ */
+export type RepoAnswerAction = "CHOOSE" | "NO_REPO";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "RegistryKind".
  */
 export type RegistryKind = "staging" | "production";
@@ -810,6 +822,10 @@ export interface SbamContracts {
   RepoOverlay?: RepoOverlay;
   RepoScanReport?: RepoScanReport;
   RepoScoutAnswer?: RepoScoutAnswer;
+  RepoQuestion?: RepoQuestion;
+  RepoAnswerRequest?: RepoAnswerRequest;
+  RepoAnswered?: RepoAnswered;
+  RepoQuestions?: RepoQuestions;
   RegisteredWorkflow?: RegisteredWorkflow;
   WorkflowRepositories?: WorkflowRepositories;
   BudgetCaps?: BudgetCaps;
@@ -7113,6 +7129,72 @@ export interface ScoutScore {
     | [string, string, string, string, string, string]
     | [string, string, string, string, string, string, string]
     | [string, string, string, string, string, string, string, string];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoQuestion".
+ */
+export interface RepoQuestion {
+  sub_skill_id: string;
+  kind: RepoQuestionKind;
+  /**
+   * @maxItems 5
+   */
+  candidates?:
+    | []
+    | [RepoCandidate]
+    | [RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate]
+    | [RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate, RepoCandidate];
+  asked_at: string;
+}
+/**
+ * Body of the answer. `url` is required to choose and absent for "no repository".
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoAnswerRequest".
+ */
+export interface RepoAnswerRequest {
+  action: RepoAnswerAction;
+  url?: string | null;
+}
+/**
+ * 202 body: the build that was told the FDE's answer.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoAnswered".
+ */
+export interface RepoAnswered {
+  sub_skill_id: string;
+  build_no: number;
+}
+/**
+ * `questions`: builds waiting for the FDE (empty: nothing to decide). `decisions`: the
+ * repository decisions already recorded for the Workflow's Sub-Skills, newest per Sub-Skill.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoQuestions".
+ */
+export interface RepoQuestions {
+  workflow_id: string;
+  /**
+   * @maxItems 200
+   */
+  questions?: PendingRepoQuestion[];
+  /**
+   * @maxItems 200
+   */
+  decisions?: RepoDecision[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PendingRepoQuestion".
+ */
+export interface PendingRepoQuestion {
+  question: RepoQuestion;
+  sub_skill_name?: string | null;
+  build_no?: number | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
