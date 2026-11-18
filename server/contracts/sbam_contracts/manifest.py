@@ -575,6 +575,56 @@ class McpServerEntry(_Strict):
         return self
 
 
+# --- The UI bundle of a Workflow (ADR 0033, issue #857) -------------------------------------------
+
+UI_HOST = re.compile(
+    r"^(\*\.)?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$"
+)  # a DNS name with a dot, or `*.` and one; never a scheme, a port, a path or an IP literal
+UI_HOSTS_MAX: Final = 50
+UI_ENTRY_FILE = re.compile(r"^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*\.html$")
+_IP_LITERAL = re.compile(r"^[0-9.]+$")
+
+
+def host_problem(host: str) -> str | None:
+    """Why `host` cannot be in a UI bundle's allowlist, or None when it can."""
+    if len(host) > 253 or UI_HOST.match(host) is None:
+        return "is not a DNS name or `*.` and a DNS name"
+    if _IP_LITERAL.match(host.removeprefix("*.")):
+        return "is an IP address"
+    return None
+
+
+class UiBundleEntry(_Strict):
+    """The UI bundle BAM generated for the Workflow, packaged and certified with it. SRIM hosts and
+    shows this bundle and nothing else (ADR 0033). `digest` covers the packaged files, `entry_file`
+    is the page that loads first, `allowed_hosts` are the only hosts the UI may reach (it may be
+    empty: the UI then talks to its own workflow server only), and `workflow_server` is the name of
+    the `mcp_server` it belongs to."""
+
+    version: ShortText
+    digest: Annotated[str, Field(strict=True, pattern=HASH_PATTERN.pattern)]
+    entry_file: Annotated[str, Field(strict=True, max_length=200, pattern=UI_ENTRY_FILE.pattern)]
+    allowed_hosts: list[Annotated[str, Field(strict=True, max_length=253)]] = Field(
+        default_factory=list, max_length=UI_HOSTS_MAX
+    )
+    workflow_server: Annotated[
+        str, Field(strict=True, max_length=64, pattern=MCP_SERVER_NAME.pattern)
+    ]
+
+    @model_validator(mode="after")
+    def _a_sound_bundle(self) -> Self:
+        if VERSION.match(self.version) is None:
+            raise ValueError(f"version {self.version!r} is not MAJOR.0.PATCH")
+        if ".." in self.entry_file.split("/"):
+            raise ValueError("entry_file must stay inside the bundle")
+        if len(set(self.allowed_hosts)) != len(self.allowed_hosts):
+            raise ValueError("allowed_hosts must be unique")
+        for host in self.allowed_hosts:
+            if (problem := host_problem(host)) is not None:
+                raise ValueError(f"host {host!r} {problem}")
+        return self
+
+
 class WorkflowManifest(_Strict):
     """The final SBAM output for one Workflow (TD §11.3). Without `certification` it is the build's
     draft (E9.5): bundle and certification ids may still be null. Once certified, none may be."""
@@ -594,6 +644,9 @@ class WorkflowManifest(_Strict):
     # Unset until the Workflow server is assembled (WG-10) and on every manifest built before
     # ADR 0028; dump() leaves it out then, so those manifests keep their hash.
     mcp_server: McpServerEntry | None = None
+    # Same rule (#857): unset on every manifest built before the UI bundle, which keeps its hash;
+    # certification requires it on a manifest SBAM built (`requires_ui_bundle`).
+    ui_bundle: UiBundleEntry | None = None
     evidence_index: list[EvidenceEntry] = Field(default_factory=list)
     certification: WorkflowCertification | None = None
     integrity: Integrity
@@ -607,6 +660,21 @@ class WorkflowManifest(_Strict):
             if version is not None and VERSION.match(version) is None:
                 raise ValueError(f"{where} {version!r} is not MAJOR.0.PATCH")
         return self
+
+    @model_validator(mode="after")
+    def _the_bundle_belongs_to_the_server(self) -> Self:
+        if self.ui_bundle is None:
+            return self
+        if self.mcp_server is None:
+            raise ValueError("a UI bundle needs the workflow server it belongs to")
+        if self.ui_bundle.workflow_server != self.mcp_server.name:
+            raise ValueError("ui_bundle.workflow_server is not the manifest's mcp_server")
+        return self
+
+    @property
+    def requires_ui_bundle(self) -> bool:
+        """True for a manifest SBAM built into a server image (ADR 0028); a legacy one is not."""
+        return self.mcp_server is not None
 
     @model_validator(mode="after")
     def _certified_is_complete(self) -> Self:

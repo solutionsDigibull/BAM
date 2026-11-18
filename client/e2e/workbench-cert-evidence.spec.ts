@@ -132,6 +132,8 @@ test("e842_t01 loaded: pass, fail with the reason, and a missing result that blo
   await expect(mcp.getByText("Missing")).toBeVisible();
   await expect(mcp.getByText(/Certification is blocked until it passes/)).toBeVisible();
   await expect(panel(page).getByText("Blocks certification")).toBeVisible();
+  const uiBundle = panel(page).locator('[data-gate="UI_BUNDLE"]');
+  await expect(uiBundle.getByText("Missing")).toBeVisible();
   expect(await panel(page).getByRole("button").count()).toBe(0);
   await shot(page, "loaded");
   await full(page, "loaded");
@@ -147,11 +149,12 @@ test("e842_t02 ready: every result passes for every Sub-Skill", async ({ page, b
         workflow_state: "CERTIFYING",
         active: false,
         sub_skills: [row(1, PASS), row(2, PASS)],
+        workflow_gates: { UI_BUNDLE: "PASSED" },
       }),
     "results",
   );
   await expect(panel(page).getByText("Ready")).toBeVisible();
-  await expect(panel(page).getByText("Pass", { exact: true })).toHaveCount(4);
+  await expect(panel(page).getByText("Pass", { exact: true })).toHaveCount(5);
   await shot(page, "ready");
 });
 

@@ -142,6 +142,7 @@
         "REPO_LICENCE",
         "DEPENDENCY_VULN",
         "MCP_COMPLIANCE",
+        "UI_BUNDLE",
         "REVIEW",
         "LOOP_TESTS"
       ],

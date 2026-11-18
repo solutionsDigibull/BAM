@@ -18,7 +18,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.isatvon14 import ShortText
-from sbam_contracts.manifest import MCP_SERVER_NAME, VERSION_PATTERN, Digest, McpToolEntry
+from sbam_contracts.manifest import (
+    MCP_SERVER_NAME,
+    VERSION_PATTERN,
+    Digest,
+    McpToolEntry,
+    UiBundleEntry,
+)
 
 
 class RegistryStatus(StrEnum):
@@ -46,6 +52,7 @@ class RegisteredWorkflow(_Strict):
     certification_id: uuid.UUID  # the WORKFLOW certificate
     owner: ShortText  # who the entry belongs to: the registering user or service
     tools: list[McpToolEntry] = Field(min_length=2)  # with their input and output schemas
+    ui_bundle: UiBundleEntry | None = None  # the certified bundle: version, digest, entry, hosts
     status: RegistryStatus
     registered_at: datetime
     superseded_at: datetime | None = None

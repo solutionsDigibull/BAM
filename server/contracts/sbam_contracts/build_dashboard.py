@@ -49,6 +49,7 @@ class GateName(StrEnum):
     REPO_LICENCE = "REPO_LICENCE"  # #761: the licence of the repository and its dependencies
     DEPENDENCY_VULN = "DEPENDENCY_VULN"  # #761: known vulnerabilities in what the code depends on
     MCP_COMPLIANCE = "MCP_COMPLIANCE"  # #761: the Sub-Skill's two tools are legal MCP tools
+    UI_BUNDLE = "UI_BUNDLE"  # #857: the Workflow's UI bundle is present, hashed and its hosts valid
     REVIEW = "REVIEW"  # #759: the model review after the AST and static gates
     LOOP_TESTS = "LOOP_TESTS"
 
@@ -117,6 +118,8 @@ class BuildsResponse(BaseModel):
     workflow_state: WorkflowState
     active: bool
     sub_skills: list[BuildRow]
+    # Workflow-level results (#857: UI_BUNDLE), not tied to a Sub-Skill; a missing one is PENDING.
+    workflow_gates: dict[GateName, GateStatus] = Field(default_factory=dict)
 
 
 class GateResult(BaseModel):

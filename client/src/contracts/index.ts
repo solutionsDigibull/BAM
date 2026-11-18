@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:7e252a15dd01b560df86f3e5ceba2d61dfa6c8888ef5f000dbc5c3d7fa72d4cf
+// source-sha256:09d253ca24998b522f83e92d3fac90acc15c75b13349f0175bf9c73e6dbd78c9
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -219,6 +219,7 @@ export type GateName =
   | "REPO_LICENCE"
   | "DEPENDENCY_VULN"
   | "MCP_COMPLIANCE"
+  | "UI_BUNDLE"
   | "REVIEW"
   | "LOOP_TESTS";
 /**
@@ -1418,6 +1419,9 @@ export interface BuildsResponse {
   workflow_state: WorkflowState;
   active: boolean;
   sub_skills: BuildRow[];
+  workflow_gates?: {
+    [k: string]: GateStatus | undefined;
+  };
 }
 /**
  * One Sub-Skill's latest build: where it is, which attempt, and every gate's status.
@@ -2453,6 +2457,7 @@ export interface WorkflowManifest {
    */
   runtime_image_digest: string;
   mcp_server?: McpServerEntry | null;
+  ui_bundle?: UiBundleEntry | null;
   evidence_index?: EvidenceEntry[];
   certification?: WorkflowCertification | null;
   integrity: Integrity;
@@ -2565,6 +2570,35 @@ export interface McpToolEntry {
   output_schema: {
     [k: string]: JsonValue | undefined;
   };
+}
+/**
+ * The UI bundle BAM generated for the Workflow, packaged and certified with it. SRIM hosts and
+ * shows this bundle and nothing else (ADR 0033). `digest` covers the packaged files, `entry_file`
+ * is the page that loads first, `allowed_hosts` are the only hosts the UI may reach (it may be
+ * empty: the UI then talks to its own workflow server only), and `workflow_server` is the name of
+ * the `mcp_server` it belongs to.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "UiBundleEntry".
+ */
+export interface UiBundleEntry {
+  version: string;
+  /**
+   * Pattern: `^sha256:[0-9a-f]{64}$`
+   */
+  digest: string;
+  /**
+   * Pattern: `^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*\.html$`
+   */
+  entry_file: string;
+  /**
+   * @maxItems 50
+   */
+  allowed_hosts?: string[];
+  /**
+   * Pattern: `^wf_[a-z0-9]+(_[a-z0-9]+)*$`
+   */
+  workflow_server: string;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -7104,6 +7138,7 @@ export interface RegisteredWorkflow {
    * @minItems 2
    */
   tools: [McpToolEntry, McpToolEntry, ...McpToolEntry[]];
+  ui_bundle?: UiBundleEntry | null;
   status: RegistryStatus;
   registered_at: string;
   superseded_at?: string | null;

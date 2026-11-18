@@ -59,6 +59,52 @@
       ],
       "title": "RegistryStatus",
       "type": "string"
+    },
+    "UiBundleEntry": {
+      "additionalProperties": false,
+      "description": "The UI bundle BAM generated for the Workflow, packaged and certified with it. SRIM hosts and\nshows this bundle and nothing else (ADR 0033). `digest` covers the packaged files, `entry_file`\nis the page that loads first, `allowed_hosts` are the only hosts the UI may reach (it may be\nempty: the UI then talks to its own workflow server only), and `workflow_server` is the name of\nthe `mcp_server` it belongs to.",
+      "properties": {
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "entry_file": {
+          "maxLength": 200,
+          "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*\\.html$",
+          "title": "Entry File",
+          "type": "string"
+        },
+        "allowed_hosts": {
+          "items": {
+            "maxLength": 253,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Allowed Hosts",
+          "type": "array"
+        },
+        "workflow_server": {
+          "maxLength": 64,
+          "pattern": "^wf_[a-z0-9]+(_[a-z0-9]+)*$",
+          "title": "Workflow Server",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "digest",
+        "entry_file",
+        "workflow_server"
+      ],
+      "title": "UiBundleEntry",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -113,6 +159,17 @@
       "minItems": 2,
       "title": "Tools",
       "type": "array"
+    },
+    "ui_bundle": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UiBundleEntry"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "status": {
       "$ref": "#/$defs/RegistryStatus"
