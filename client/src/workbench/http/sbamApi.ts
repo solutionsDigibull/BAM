@@ -5,7 +5,8 @@ import type { BamApi } from "../api/adapter";
 import type { IngestionRun } from "../api/types";
 import { ragPipeline, setRagActions } from "../rag/ragPipeline";
 import { API_BASE } from "@/providers/data-provider";
-import { ApiFailure, deleteJson, idempotencyKey, postJson } from "./http";
+import type { WorkflowCodeTree, WorkflowFileView } from "@/contracts";
+import { ApiFailure, deleteJson, getJson, idempotencyKey, postJson } from "./http";
 import { buildSnapshot, resetSnapshotCache } from "./snapshot";
 import { uploadOne } from "./upload";
 
@@ -56,6 +57,13 @@ export function createSbamApi(projectId: string): BamApi {
     getSnapshot: () => buildSnapshot(projectId),
     getSkills: notWired("The skills grid"),
     getCode: notWired("The generated code"),
+    // Read-only whole-workflow code (#763): the stored files with their tags, and one file at a time.
+    getWorkflowCode: async (workflowId) =>
+      (await getJson<WorkflowCodeTree>(`projects/${projectId}/workflows/${workflowId}/code`)).body,
+    getWorkflowFile: async (workflowId, group, path) => {
+      const qs = new URLSearchParams({ group, path });
+      return (await getJson<WorkflowFileView>(`projects/${projectId}/workflows/${workflowId}/code/files?${qs}`)).body;
+    },
     uploadFile: (file, onProgress) => uploadOne(projectId, file, onProgress),
     removeUpload: async (id) => {
       try {

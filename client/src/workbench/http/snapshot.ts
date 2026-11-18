@@ -53,6 +53,9 @@ export function gridStep(w: WorkflowSummary | undefined, pipeline: ProjectPipeli
 }
 export const buildStarted = (w: WorkflowSummary | undefined): boolean => !!w && BUILD_STARTED.has(w.state);
 const NOT_WIRED = "The build has started. Its screens are not available in the workbench yet.";
+/** Step 3 opens read-only once the build has started: Translate shows the workflow's stored code (#841). Testing,
+ *  persisting and deploying (step 4) stay locked until those screens are wired. */
+const STEP_3_READ_ONLY = { state: "active" as const, reason: "The build has started. The generated code is shown read-only", editable: false };
 
 const FAILED: ProjectPipelineState[] = ["INGESTION_FAILED", "KNOWLEDGE_FAILED", "SOW_GENERATION_FAILED"];
 
@@ -201,7 +204,9 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
         ? { ...one, editable: one.state !== "locked" }
         : n === 2
           ? gridStep(workflow, state)
-          : { state: "locked" as const, reason: buildStarted(workflow) ? NOT_WIRED : LOCKED[n - 1]!, editable: false };
+          : n === 3 && buildStarted(workflow)
+            ? STEP_3_READ_ONLY
+            : { state: "locked" as const, reason: buildStarted(workflow) ? NOT_WIRED : LOCKED[n - 1]!, editable: false };
     return {
       id: n,
       title: TITLES[n - 1]!,
@@ -214,6 +219,7 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
   return {
     serverTime: new Date().toISOString(),
     workflowName: workflow?.name ?? "Workflow",
+    workflowId: buildStarted(workflow) ? workflow!.id : undefined,
     activeStep: workflow && workflow.state !== "CANCELLED" ? 2 : 1,
     steps,
     uploads,

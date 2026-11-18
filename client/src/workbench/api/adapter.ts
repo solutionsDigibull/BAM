@@ -1,4 +1,5 @@
 import type { DataProvider } from '@refinedev/core'
+import type { WorkflowCodeTree, WorkflowFileView } from '@/contracts'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
 
 export type ScanOutcome = 'clean' | 'threat' | 'error'
@@ -10,6 +11,10 @@ export interface BamApi {
   getSnapshot(): Promise<Snapshot>
   getSkills(): Promise<SkillRow[]>
   getCode(): Promise<CodeFile[]>
+  /** The whole workflow's code as stored, a tag per file (read only, #763). */
+  getWorkflowCode(workflowId: string): Promise<WorkflowCodeTree>
+  /** One file of that tree: `group` is a sub-skill id or `workflow`. */
+  getWorkflowFile(workflowId: string, group: string, path: string): Promise<WorkflowFileView>
   /** stageUpload: stores the file in private quarantine staging and starts an async virus scan (ClamAV in production). */
   uploadFile(file: { name: string; size: number; type?: string; data: Blob; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
   /** Removes a file from the active intake batch once the service confirms. A blocked object stays in quarantine (audit). Refused while scanning. */
@@ -69,10 +74,13 @@ export const api: BamApi = new Proxy({} as BamApi, {
 })
 
 // Refine reads go through `custom`; resource CRUD is unused by this workbench.
-const reads: Record<string, () => Promise<unknown>> = {
+type Query = Record<string, string | undefined>
+const reads: Record<string, (q: Query) => Promise<unknown>> = {
   snapshot: () => api.getSnapshot(),
   skills: async () => ({ rows: await api.getSkills() }),
   code: async () => ({ files: await api.getCode() }),
+  'workflow-code': q => api.getWorkflowCode(q.workflowId ?? ''),
+  'workflow-file': q => api.getWorkflowFile(q.workflowId ?? '', q.group ?? '', q.path ?? ''),
 }
 
 const unsupported = () => Promise.reject(new Error('Not used by the BAM workbench'))
@@ -84,9 +92,9 @@ export const dataProvider: DataProvider = {
   create: unsupported,
   update: unsupported,
   deleteOne: unsupported,
-  custom: async ({ url }) => {
+  custom: async ({ url, query }) => {
     const read = reads[url]
     if (!read) throw new Error(`Unknown read: ${url}`)
-    return { data: (await read()) as never }
+    return { data: (await read((query ?? {}) as Query)) as never }
   },
 }
