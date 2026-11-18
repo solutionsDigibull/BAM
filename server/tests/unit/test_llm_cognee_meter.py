@@ -255,3 +255,64 @@ def test_420_t18_cognify_search_and_add_run_inside_the_projects_metered_block(
         "search": (tenant, project),
     }
     assert meter._scope.get() is None  # nothing leaks past the call
+
+
+def _bifrost_reply(cost: float) -> litellm.ModelResponse:
+    """What Bifrost answers: OpenAI's shape plus its own `usage.cost` (LiteLLM keeps the field)."""
+    return litellm.ModelResponse(
+        model="openai/gpt-4o",
+        choices=[
+            {"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": "ok"}}
+        ],
+        usage={
+            "prompt_tokens": 10,
+            "completion_tokens": 2,
+            "total_tokens": 12,
+            "cost": {"total_cost": cost},
+        },
+    )
+
+
+def test_420_t19_bifrosts_reported_cost_is_used_so_the_budget_still_sees_cognee(
+    world: Callable[..., World],
+) -> None:
+    """LiteLLM cannot price `sbam-knowledge` (no response_cost): Bifrost's `usage.cost` is the
+    figure, as LlmClient reads it, instead of $0 and a refused alias."""
+    w = world(llm_project_budget_usd="50")
+
+    async def call() -> None:
+        with meter.metered(TENANT, PROJECT, "cognify"):
+            await litellm.acompletion(
+                messages=[{"role": "user", "content": "hi"}],
+                mock_response=_bifrost_reply(0.00042),
+                **CHAT,
+            )
+
+    [row] = asyncio.run(with_rows(w, 1, call()))
+    assert row.cost_usd == Decimal("0.00042")
+    assert "sbam-knowledge" not in w.budget.blind
+
+
+def test_420_t20_every_cognee_call_is_a_langfuse_generation(
+    world: Callable[..., World], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sent: list[Any] = []
+
+    async def record(self: Any, generation: Any) -> None:
+        sent.append(generation)
+
+    monkeypatch.setattr(meter.LangfuseTracer, "record", record)
+    w = world()
+    [row] = asyncio.run(with_rows(w, 1, chat()))
+    deadline = time.monotonic() + 5
+    while not sent and time.monotonic() < deadline:
+        time.sleep(0.05)
+    [g] = sent
+    assert (g.trace_id, g.alias, g.prompt_id, g.status) == (
+        row.trace_id,
+        "sbam-knowledge",
+        "cognee.acompletion",
+        "SUCCEEDED",
+    )
+    assert (g.tenant_id, g.project_id) == (str(TENANT), str(PROJECT))
+    assert (g.tokens_in, g.tokens_out) == (row.tokens_in, row.tokens_out)

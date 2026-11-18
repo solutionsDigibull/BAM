@@ -121,3 +121,31 @@ def test_e16_2_preflight_runs_on_the_llm_queues(monkeypatch: pytest.MonkeyPatch)
         monkeypatch.setenv(name, "")
     with pytest.raises(PreflightError, match=MISCONFIGURED):
         registry.run_preflight([TaskQueue.LLM])
+
+
+def test_e16_2_a_generation_carries_sbams_cost_for_langfuse() -> None:
+    """Langfuse has no price for gateway names like `openai/gpt-4o`: the generation sends SBAM's own
+    figure in `costDetails`, or every call shows $0 there."""
+    from datetime import UTC, datetime
+
+    from sbam_workers.llm.trace import Generation, LangfuseTracer
+
+    now = datetime.now(UTC)
+    g = Generation(
+        trace_id="t",
+        alias="sbam-sow",
+        model="openai/gpt-4o",
+        prompt_id="sow-generate",
+        prompt_version="1.3.0",
+        tenant_id="tn",
+        project_id="pj",
+        attempt=1,
+        status="SUCCEEDED",
+        started_at=now,
+        ended_at=now,
+        tokens_in=10,
+        tokens_out=2,
+        cost_usd=0.0282,
+    )
+    [_, generation] = LangfuseTracer(conf("development"))._events(g)
+    assert generation["body"]["costDetails"] == {"total": 0.0282}

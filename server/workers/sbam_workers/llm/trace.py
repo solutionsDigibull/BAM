@@ -120,6 +120,9 @@ class LangfuseTracer:
                 "input": _redact(g.input, log_content=keep),
                 "output": _redact(g.output, log_content=keep),
                 "usage": {"input": g.tokens_in, "output": g.tokens_out, "unit": "TOKENS"},
+                # SBAM's own figure (Bifrost's, else the configured price): Langfuse has no price
+                # for gateway model names like `openai/gpt-4o` and showed $0 for every call.
+                "costDetails": {"total": g.cost_usd},
                 "metadata": {
                     "alias": g.alias,
                     "prompt_id": g.prompt_id,
