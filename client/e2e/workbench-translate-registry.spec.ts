@@ -57,6 +57,7 @@ const ENTRY = {
     tool("MS01_2__action", "action", "MS01.2_Costing"),
     tool("MS01_2__check", "check", "MS01.2_Costing"),
   ],
+  kind: "staging",
   status: "REGISTERED",
   registered_at: "2026-11-17T10:00:00Z",
   superseded_at: null,
@@ -110,6 +111,7 @@ test("e849_loaded the registered entry shows its name, digests, certification an
   await open(page, baseURL!, answer);
   const card = page.getByRole("region", { name: "Registry entry wf_onboarding_v1_2" });
   await expect(card).toBeVisible();
+  await expect(card).toContainText("Staging");
   await expect(card).toContainText("Current");
   await expect(card).toContainText("sha256:abababababab"); // the short image digest
   await expect(card).toContainText("sha256:cdcdcdcdcdcd"); // the short manifest hash

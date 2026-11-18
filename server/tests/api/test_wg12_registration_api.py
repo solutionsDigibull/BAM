@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 from sbam_api.workflow_registry.models import RegisteredWorkflowRow
-from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryStatus
+from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryKind, RegistryStatus
 from test_auth import FDE_A2, TENANT_A, TENANT_B, problem
 from test_project_workspace import Harness
 
@@ -46,23 +46,28 @@ def add(h: Harness, version: str, status: str = "REGISTERED", **over: Any) -> No
                 project_id=uuid.UUID(h.project),
                 workflow_id=WORKFLOW,
                 version=version,
-                registry_name=f"wf_investor_onboarding_v{major}_{patch}",
-                registry_id=f"id-{version}",
-                image_digest=DIGEST,
-                manifest_hash="sha256:" + "c" * 64,
-                certification_id=uuid.uuid4(),
-                owner="fde-a1",
-                tools=TOOLS,
-                status=status,
-                registered_at=datetime(2026, 11, 17, tzinfo=UTC),
-                **over,
+                **{
+                    "registry_name": f"wf_investor_onboarding_v{major}_{patch}",
+                    "registry_id": f"id-{version}",
+                    "image_digest": DIGEST,
+                    "manifest_hash": "sha256:" + "c" * 64,
+                    "certification_id": uuid.uuid4(),
+                    "owner": "fde-a1",
+                    "tools": TOOLS,
+                    "status": status,
+                    "registered_at": datetime(2026, 11, 17, tzinfo=UTC),
+                    **over,
+                },
             )
         )
         session.commit()
 
 
-def get(h: Harness, token: str | None = None, version: str | None = None) -> Any:
-    query = f"?version={version}" if version else ""
+def get(
+    h: Harness, token: str | None = None, version: str | None = None, kind: str | None = None
+) -> Any:
+    params = [f"{k}={v}" for k, v in (("version", version), ("kind", kind)) if v]
+    query = "?" + "&".join(params) if params else ""
     path = f"/projects/{h.project}/workflows/{WORKFLOW}/registration{query}"
     return h.call("GET", path, token or h.fde())
 
@@ -106,3 +111,41 @@ def test_wg12_there_is_no_route_that_writes_a_registration(h: Harness) -> None:
     path = f"/projects/{h.project}/workflows/{WORKFLOW}/registration"
     for method in ("POST", "PUT", "PATCH", "DELETE"):
         assert h.call(method, path, h.fde(), json={}).status_code in (404, 405)
+
+
+# --- WG-26 (#860): the entry kind ----------------------------------------------------------------
+
+
+def add_staging(h: Harness, version: str, **over: Any) -> None:
+    major, _, patch = version.split(".")
+    name = f"wf_investor_onboarding_v{major}_{patch}_stg"
+    add(h, version, kind="staging", **{"registry_name": name, **over})
+
+
+def test_wg26_t12_lookup_shows_the_kind_and_filters_by_it(h: Harness) -> None:
+    add(h, "1.0.0")
+    add_staging(h, "1.0.0")
+    assert RegisteredWorkflow.model_validate_json(get(h).text).kind is RegistryKind.STAGING
+    staging = RegisteredWorkflow.model_validate_json(get(h, kind="staging").text)
+    assert staging.kind is RegistryKind.STAGING and staging.registry_name.endswith("_stg")
+    production = RegisteredWorkflow.model_validate_json(get(h, kind="production").text)
+    assert production.kind is RegistryKind.PRODUCTION
+    assert not production.registry_name.endswith("_stg")
+    assert get(h, kind="preview").status_code == 422
+
+
+def test_wg26_t13_a_production_lookup_cannot_see_a_staging_only_entry(h: Harness) -> None:
+    add_staging(h, "1.0.0")
+    problem(get(h, kind="production"), 404, "NOT_FOUND")
+    problem(get(h, kind="production", version="1.0.0"), 404, "NOT_FOUND")
+    assert get(h, kind="staging").status_code == 200
+
+
+def test_wg26_t14_another_tenant_and_an_unassigned_fde_get_404_for_a_staging_entry(
+    h: Harness,
+) -> None:
+    add_staging(h, "1.0.0")
+    other_tenant = h.realm.token(uuid.uuid4(), tenant_id=[str(TENANT_B)])
+    for kind in ("staging", "production", None):
+        problem(get(h, other_tenant, kind=kind), 404, "NOT_FOUND")
+        problem(get(h, h.realm.token(FDE_A2), kind=kind), 404, "NOT_FOUND")

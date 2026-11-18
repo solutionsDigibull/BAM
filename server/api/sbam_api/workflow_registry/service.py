@@ -8,9 +8,13 @@ Rules (ADR 0028, decision 4; ADR 0013):
   certified.
 - Registering is idempotent: the same version with the same digest is a no-op and does not call
   Bifrost at all. The same version with another digest is refused (a frozen version never changes).
-- A new version supersedes the older one: its Bifrost entry is disabled and its row is marked
-  SUPERSEDED. Nothing is deleted (no revocation, C-31). An older version cannot be registered over
-  a newer one.
+- A new version supersedes the older one OF THE SAME KIND: its Bifrost entry is disabled and its
+  row is marked SUPERSEDED. Nothing is deleted (no revocation, C-31). An older version cannot be
+  registered over a newer one.
+- Every entry has a kind (ADR 0032, #860). Commit registers `staging`: its own Bifrost entry, named
+  `<production name>_stg`, that only the assigned FDE can reach. SRIM's key sees `production`
+  entries only (`lookup(..., kind=PRODUCTION)`, `names_for_key`). Both kinds carry the digest that
+  was certified: nothing is rebuilt.
 - SBAM's table is the source of truth. `reconcile` rebuilds a lost Bifrost entry from it and
   finishes a disable that did not go through.
 
@@ -34,7 +38,7 @@ from sbam_contracts.manifest import (
     WorkflowManifest,
 )
 from sbam_contracts.state_machines import WorkflowState
-from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryStatus
+from sbam_contracts.workflow_registry import RegisteredWorkflow, RegistryKind, RegistryStatus
 from sqlalchemy.orm import Session
 
 from sbam_api.certifications.models import CertificationLevel
@@ -50,6 +54,7 @@ from sbam_api.workflows.repository import WorkflowRepository
 
 SERVER_PORT = 8000
 NAME_MAX = 64
+STAGING_SUFFIX = "_stg"
 
 AddressFor = Callable[[str], str]
 
@@ -79,10 +84,15 @@ def default_address(registry_name: str) -> str:
     return f"http://{registry_name}:{SERVER_PORT}/mcp"
 
 
-def registry_name_for(server_name: str, version: str) -> str:
-    """`wf_<workflow>_v<major>_<patch>`: underscores only (Bifrost forbids hyphens), at most 64."""
+def registry_name_for(
+    server_name: str, version: str, kind: RegistryKind = RegistryKind.PRODUCTION
+) -> str:
+    """`wf_<workflow>_v<major>_<patch>`: underscores only (Bifrost forbids hyphens), at most 64.
+
+    A staging entry is a separate Bifrost entry, so its name ends in `_stg`.
+    """
     major, patch = version_key(version)
-    suffix = f"_v{major}_{patch}"
+    suffix = f"_v{major}_{patch}" + (STAGING_SUFFIX if kind is RegistryKind.STAGING else "")
     name = server_name[: NAME_MAX - len(suffix)].rstrip("_") + suffix
     if MCP_SERVER_NAME.match(name) is None:
         raise NotRegistrable(f"{name!r} is not a valid registry name")
@@ -101,6 +111,7 @@ def to_model(row: RegisteredWorkflowRow) -> RegisteredWorkflow:
         owner=row.owner,
         tools=[McpToolEntry.model_validate(tool) for tool in row.tools],
         ui_bundle=UiBundleEntry.model_validate(row.ui_bundle) if row.ui_bundle else None,
+        kind=RegistryKind(row.kind),
         status=RegistryStatus(row.status),
         registered_at=row.registered_at,
         superseded_at=row.superseded_at,
@@ -114,12 +125,16 @@ def register(
     workflow_id: uuid.UUID,
     client: BifrostRegistry,
     *,
+    kind: RegistryKind,
     owner: str,
     version: str | None = None,
     address_for: AddressFor = default_address,
     now: datetime | None = None,
 ) -> RegisteredWorkflow:
-    """Register the frozen, certified manifest of a Workflow (the newest, or `version`)."""
+    """Register the frozen, certified manifest of a Workflow (the newest, or `version`) as `kind`.
+
+    `kind` has no default on purpose: Commit (#766) passes STAGING, promotion (#148) PRODUCTION.
+    """
     stamp = now or datetime.now(UTC)
     workflow = WorkflowRepository(session, ctx).get(workflow_id)
     if workflow is None:
@@ -157,17 +172,17 @@ def register(
             raise NotRegistrable(f"the UI bundle is not certified ({reasons[0]})")
 
     repo = RegisteredWorkflowRepository(session, ctx)
-    existing = repo.of_version(workflow_id, server.version)
+    existing = repo.of_version(workflow_id, server.version, kind)
     if existing is not None:
         if existing.image_digest == server.image_digest and existing.manifest_hash == row.sha256:
             return to_model(existing)  # idempotent: Bifrost is not called
         raise RegistrationConflict(server.version)
     wanted = version_key(server.version)
-    newer = [r for r in repo.of_workflow(workflow_id) if version_key(r.version) > wanted]
+    newer = [r for r in repo.of_workflow(workflow_id, kind) if version_key(r.version) > wanted]
     if newer:
         raise NotRegistrable(f"a newer version ({newer[0].version}) is already registered")
 
-    name = registry_name_for(server.name, server.version)
+    name = registry_name_for(server.name, server.version, kind)
     entry = client.register(name, address_for(name))
     missing = sorted({tool.name for tool in server.tools} - set(entry.tools))
     if missing:  # the image is not what the manifest says: nothing uncertified may stay visible
@@ -180,6 +195,7 @@ def register(
         project_id=workflow.project_id,
         workflow_id=workflow_id,
         version=server.version,
+        kind=kind.value,
         registry_name=name,
         registry_id=entry.id,
         image_digest=server.image_digest,
@@ -202,13 +218,13 @@ def supersede_older(
     current: RegisteredWorkflowRow,
     stamp: datetime,
 ) -> list[str]:
-    """Disable and mark every older enabled version of the same Workflow.
+    """Disable and mark every older enabled version of the same Workflow and the same kind.
 
     A disable that fails leaves that row REGISTERED (it still is enabled) for `reconcile`; the new
     entry is already registered. Returns the versions whose disable failed.
     """
     failed: list[str] = []
-    for old in repo.of_workflow(current.workflow_id):
+    for old in repo.of_workflow(current.workflow_id, RegistryKind(current.kind)):
         if old.id == current.id or old.status != RegistryStatus.REGISTERED.value:
             continue
         if version_key(old.version) >= version_key(current.version):
@@ -225,18 +241,41 @@ def supersede_older(
 
 
 def lookup(
-    session: Session, ctx: TenantContext, workflow_id: uuid.UUID, version: str | None = None
+    session: Session,
+    ctx: TenantContext,
+    workflow_id: uuid.UUID,
+    version: str | None = None,
+    kind: RegistryKind | None = None,
 ) -> RegisteredWorkflow:
-    """The entry of one version, or the newest enabled one.
+    """The entry of one version, or the newest enabled one, of `kind`.
 
-    A superseded version is still found, with its status, so a running SRIM can look its own
-    version up. Anything else, and anything of another tenant, is a 404.
+    With no kind the assigned FDE sees both, staging before production. A consumer that holds a
+    production key passes PRODUCTION and never sees a staging entry: that is a 404. A superseded
+    version is still found, with its status, so a running consumer can look its own version up.
+    Anything else, and anything of another tenant, is a 404.
     """
     repo = RegisteredWorkflowRepository(session, ctx)
-    row = repo.of_version(workflow_id, version) if version else repo.current(workflow_id)
+    row = (
+        repo.of_version(workflow_id, version, kind) if version else repo.current(workflow_id, kind)
+    )
     if row is None:
         raise not_found()
     return to_model(row)
+
+
+def names_for_key(session: Session, ctx: TenantContext, key: RegistryKind) -> list[str]:
+    """The registry names a virtual key of `key` may be granted in Bifrost (runbook, item 3).
+
+    SRIM's key is a PRODUCTION key: it is granted enabled production entries and never a staging
+    one. The FDE's staging key is granted the enabled staging entries. The grant is by exact name
+    from SBAM's table, never by a pattern, so a staging entry cannot leak into SRIM's key.
+    """
+    rows = RegisteredWorkflowRepository(session, ctx).all_rows()
+    return sorted(
+        row.registry_name
+        for row in rows
+        if row.kind == key.value and row.status == RegistryStatus.REGISTERED.value
+    )
 
 
 @dataclass
