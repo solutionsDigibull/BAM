@@ -1,0 +1,20 @@
+/* Translate (4.3): the repositories the workflow starts from, read only (#843). Tokens come from the workbench theme. */
+.bam-wb .rp { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; overflow: auto; container-type: inline-size; }
+.bam-wb .rp-summary { margin: 0; font-size: 13px; }
+.bam-wb .rp-card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .rp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .rp-head h4 { margin: 0; font-size: 14px; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.bam-wb .rp-block { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--border); padding-top: 8px; }
+.bam-wb .rp-block h5 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.bam-wb .rp-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.bam-wb .rp-counts { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.bam-wb .rp-none { margin: 0; font-size: 12px; color: var(--muted); }
+.bam-wb .rp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.bam-wb .rp-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.bam-wb ol.rp-list { counter-reset: patch; }
+.bam-wb ol.rp-list li::before { counter-increment: patch; content: counter(patch) "."; color: var(--faint); min-width: 14px; }
+.bam-wb .rp-path { font-family: 'JetBrains Mono', monospace; overflow-wrap: anywhere; }
+.bam-wb .rp-kind { font-size: 11px; color: var(--muted); min-width: 52px; }
+.bam-wb .rp-sbom summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); }
+.bam-wb .rp-sbom[open] summary { margin-bottom: 4px; }
+.bam-wb .rp-foot { margin: 0; }

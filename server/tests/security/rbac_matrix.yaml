@@ -965,6 +965,17 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # #843: the Workflow's repositories for the workbench panel, read only. The seeded Workflow has no
+  # Sub-Skill, so the list is empty (200).
+  workflow_repositories_api_v1_projects__project_id__workflows__workflow_id__repositories_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/repositories
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   code_attempts_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__code_attempts_get:
     request:
       method: GET

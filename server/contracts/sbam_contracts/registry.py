@@ -167,6 +167,7 @@ from sbam_contracts.sow_api import (
 from sbam_contracts.state_machines import StateMachineStates
 from sbam_contracts.testgen import CasePost, CasePut, TestgenOutput, TestsResponse
 from sbam_contracts.workflow_registry import RegisteredWorkflow
+from sbam_contracts.workflow_repos import WorkflowRepositories
 
 ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("problem_detail", ProblemDetail),
@@ -321,6 +322,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("repo/scan", RepoScanReport),
     ("repo/scout_answer", RepoScoutAnswer),
     ("workflow_registry/registration", RegisteredWorkflow),
+    ("workflow/repositories", WorkflowRepositories),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
 )

@@ -56,6 +56,7 @@ from sbam_contracts import (
     state_machines,
     testgen,
     workflow_registry,
+    workflow_repos,
 )
 from sbam_contracts._jsonschema import DRAFT, contract_schema
 from sbam_contracts.canonical import sha256_of
@@ -268,6 +269,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("repo", repo_overlay),
             ("repo", repo_scan),
             ("workflow_registry", workflow_registry),
+            ("workflow", workflow_repos),
             ("build", review),
         )
         for stem in module.schemas()
