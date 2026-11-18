@@ -7,5 +7,6 @@ Operational procedures, written by issue E16.6. Planned runbooks: stuck Temporal
 - [Sandbox: the CubeSandbox host and the local runner](sandbox-host.md) (E13.2): configuring the test worker's sandbox, what the host must provide, why testing is blocked, the orphan reaper.
 - [Backups and restore](backup-restore.md) (E16.5): nightly encrypted, append-only backups, the backup host, failed backups, the restore drill.
 - [An API dependency bulkhead is saturated](bulkhead-saturated.md) (N-02b): the alert, what fails fast, how to tell which dependency, why readiness does not change.
+- [The Workflow registry in Bifrost](workflow-registry.md) (WG-12): what is registered and when, supersede, lookup, reconcile, and what production needs (TLS, token, health check).
 
 Runbook structure: **Symptoms** · **Impact** · **Diagnosis** (commands, dashboards) · **Fix** · **Verification** · **Escalation**.

@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:code/workflow_tree:0.1.0",
+  "$defs": {
+    "CodeFinding": {
+      "additionalProperties": false,
+      "description": "One gate finding (the shape E11.3 / E12.2 write into `code_attempts.findings`).",
+      "properties": {
+        "gate": {
+          "title": "Gate",
+          "type": "string"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "col": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Col"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gate",
+        "code",
+        "message"
+      ],
+      "title": "CodeFinding",
+      "type": "object"
+    },
+    "FileTag": {
+      "description": "Where a file of the Workflow's code comes from (ADR 0028, WG-15).",
+      "enum": [
+        "reused",
+        "customized",
+        "generated"
+      ],
+      "title": "FileTag",
+      "type": "string"
+    },
+    "GateStatusRow": {
+      "additionalProperties": false,
+      "properties": {
+        "gate": {
+          "title": "Gate",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gate",
+        "status"
+      ],
+      "title": "GateStatusRow",
+      "type": "object"
+    },
+    "GroupKind": {
+      "enum": [
+        "sub_skill",
+        "workflow"
+      ],
+      "title": "GroupKind",
+      "type": "string"
+    },
+    "WorkflowCodeFile": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "tag": {
+          "$ref": "#/$defs/FileTag"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/CodeFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "tag",
+        "findings"
+      ],
+      "title": "WorkflowCodeFile",
+      "type": "object"
+    },
+    "WorkflowCodeGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/GroupKind"
+        },
+        "group_id": {
+          "title": "Group Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "build_no": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build No"
+        },
+        "cycle": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cycle"
+        },
+        "attempt": {
+          "anyOf": [
+            {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attempt"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/WorkflowCodeFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/$defs/GateStatusRow"
+          },
+          "title": "Gates",
+          "type": "array"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/CodeFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "group_id",
+        "label",
+        "files",
+        "gates",
+        "findings"
+      ],
+      "title": "WorkflowCodeGroup",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "GET W/code: the Workflow's code as stored: a group per Sub-Skill, plus the Workflow's own.",
+  "properties": {
+    "workflow_id": {
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "groups": {
+      "items": {
+        "$ref": "#/$defs/WorkflowCodeGroup"
+      },
+      "title": "Groups",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "groups"
+  ],
+  "title": "WorkflowCodeTree",
+  "type": "object"
+}

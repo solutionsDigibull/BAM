@@ -139,7 +139,7 @@ def test_mui_2_t06_0054_migrates_0_2_rows_and_leaves_0_3_rows_alone(
     sessions: sessionmaker[Session],
 ) -> None:
     native = new_entry(sessions, {**RULE_BOM, "rule_id": "RULE-NATIVE"})  # made in 0.3
-    command.downgrade(config(), "0055_gate_result_review")
+    command.downgrade(config(), "0057_gate_result_compliance")
     old_id = uuid.uuid4()
     with sessions() as s:  # a 0.2 row, as BAM stored it before #781
         s.execute(

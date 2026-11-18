@@ -21,9 +21,9 @@ raised, or the interpreter died), `IMPORT_SIDE_EFFECT`, `IMPORT_TIMEOUT`. They g
 like any gate failure. A container that cannot be started is `IMPORT_GATE_INFRA`: retryable, never a
 correction, recorded as nothing.
 
-Not registered yet: `SubSkillBuild` has no import stage, and the worker needs a containment backend
-(the sandbox adapter, E13.2) before it may run this. Whoever wires it registers
-`ImportGate(...).run`.
+`SubSkillBuild` runs it after `static_gate` (#761). Its containment backend is the sandbox adapter
+(`SandboxImportRunner`, ADR 0023): a VM of the pinned runtime, no network, destroyed afterwards.
+`DockerImportRunner` stays for a host that has Docker and no sandbox.
 """
 
 import asyncio
@@ -75,7 +75,7 @@ PROBE: Final = r"""
 import importlib, json, os, sys
 nonce, module = sys.argv[1], sys.argv[2]
 del sys.argv[1:]
-sys.path.insert(0, os.getcwd())
+sys.path.insert(0, os.environ.get("SBAM_IMPORT_ROOT") or os.getcwd())
 events = []
 WATCH = {"socket.connect", "socket.bind", "socket.getaddrinfo", "subprocess.Popen", "os.system",
          "os.exec", "os.fork", "os.forkpty", "os.posix_spawn", "os.spawn", "os.remove",

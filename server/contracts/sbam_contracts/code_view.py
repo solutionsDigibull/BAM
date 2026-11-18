@@ -6,6 +6,7 @@ newest unless `build_no` / `cycle` say otherwise), `.../attempts/{n}/files` the 
 only ever matched against the attempt's stored file map, never used to open anything.
 """
 
+from enum import StrEnum
 from typing import Annotated, Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -79,11 +80,71 @@ class CodeDiff(_Out):
     truncated: bool
 
 
+class FileTag(StrEnum):
+    """Where a file of the Workflow's code comes from (ADR 0028, WG-15)."""
+
+    REUSED = "reused"  # upstream repository code, untouched
+    CUSTOMIZED = "customized"  # a patch file, or a repository file a patch changed
+    GENERATED = "generated"  # written by SBAM's generator
+
+
+class GroupKind(StrEnum):
+    SUB_SKILL = "sub_skill"
+    WORKFLOW = "workflow"  # files that belong to the Workflow, not to one Sub-Skill
+
+
+WORKFLOW_GROUP: Final = "workflow"  # the `group_id` of the Workflow-level files
+
+
+class WorkflowCodeFile(_Out):
+    path: str
+    sha256: str
+    tag: FileTag
+    findings: list[CodeFinding]  # the newest attempt's findings on this file; `line` links into it
+
+
+class GateStatusRow(_Out):
+    gate: str
+    status: str
+
+
+class WorkflowCodeGroup(_Out):
+    kind: GroupKind
+    group_id: str  # the Sub-Skill id, or `workflow`
+    label: str
+    build_no: int | None = None
+    cycle: int | None = None
+    attempt: Annotated[int, Field(ge=0, le=2)] | None = None
+    status: str | None = None  # the attempt's status; null for the Workflow group
+    files: list[WorkflowCodeFile]  # every file once, in path order; empty when nothing was stored
+    gates: list[GateStatusRow]
+    findings: list[CodeFinding]  # findings that name no file
+
+
+class WorkflowCodeTree(_Out):
+    """GET W/code: the Workflow's code as stored: a group per Sub-Skill, plus the Workflow's own."""
+
+    workflow_id: str
+    groups: list[WorkflowCodeGroup]
+
+
+class WorkflowFileView(_Out):
+    group_id: str
+    path: str
+    tag: FileTag
+    sha256: str
+    content: str
+    truncated: bool  # `content` was cut at MAX_VIEW_BYTES
+    findings: list[CodeFinding]
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/code/`."""
     models: dict[str, type[BaseModel]] = {
         "attempt_list": CodeAttemptList,
         "file_view": CodeFileView,
         "diff": CodeDiff,
+        "workflow_tree": WorkflowCodeTree,
+        "workflow_file": WorkflowFileView,
     }
     return {stem: contract_schema(model, f"code/{stem}") for stem, model in models.items()}

@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:960a0d5f1557058fa250741be7c1be0b6bf52597aeda2b8b233f75c2f8e243f1
+// source-sha256:c5ce8c928c131c4f8e4d8a63cc8abd032ef22e5e2904deeb62cd699539b90924
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -170,6 +170,8 @@ export type BuildStage =
   | "assemble"
   | "ast_gate"
   | "static_gate"
+  | "import_gate"
+  | "compliance_gates"
   | "review_code"
   | "generate_tests"
   | "build_promptfoo_suite"
@@ -214,6 +216,9 @@ export type GateName =
   | "CLAMAV"
   | "BANDIT"
   | "IMPORT_RESOLUTION"
+  | "REPO_LICENCE"
+  | "DEPENDENCY_VULN"
+  | "MCP_COMPLIANCE"
   | "REVIEW"
   | "LOOP_TESTS";
 /**
@@ -267,6 +272,18 @@ export type SowVersionSource = "GENERATED" | "EDITED";
  * via the `definition` "SectionChange".
  */
 export type SectionChange = "ADDED" | "REMOVED" | "MODIFIED" | "UNCHANGED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GroupKind".
+ */
+export type GroupKind = "sub_skill" | "workflow";
+/**
+ * Where a file of the Workflow's code comes from (ADR 0028, WG-15).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FileTag".
+ */
+export type FileTag = "reused" | "customized" | "generated";
 /**
  * What a run works on; `subject_id` is that entity's id.
  *
@@ -563,6 +580,11 @@ export type LicenceVerdict = "ALLOWED" | "REFUSED" | "UNKNOWN";
 export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegistryStatus".
+ */
+export type RegistryStatus = "REGISTERED" | "SUPERSEDED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "BudgetScope".
  */
 export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
@@ -630,6 +652,8 @@ export interface SbamContracts {
   CodeAttemptList?: CodeAttemptList;
   CodeFileView?: CodeFileView;
   CodeDiff?: CodeDiff;
+  WorkflowCodeTree?: WorkflowCodeTree;
+  WorkflowFileView?: WorkflowFileView;
   SowNewVersionRequest?: SowNewVersionRequest;
   SowImpact?: SowImpact;
   Run?: Run;
@@ -725,6 +749,7 @@ export interface SbamContracts {
   RepoOverlay?: RepoOverlay;
   RepoScanReport?: RepoScanReport;
   RepoScoutAnswer?: RepoScoutAnswer;
+  RegisteredWorkflow?: RegisteredWorkflow;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
 }
@@ -3265,6 +3290,63 @@ export interface CodeDiff {
   changed: boolean;
   unified: string;
   truncated: boolean;
+}
+/**
+ * GET W/code: the Workflow's code as stored: a group per Sub-Skill, plus the Workflow's own.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeTree".
+ */
+export interface WorkflowCodeTree {
+  workflow_id: string;
+  groups: WorkflowCodeGroup[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeGroup".
+ */
+export interface WorkflowCodeGroup {
+  kind: GroupKind;
+  group_id: string;
+  label: string;
+  build_no?: number | null;
+  cycle?: number | null;
+  attempt?: number | null;
+  status?: string | null;
+  files: WorkflowCodeFile[];
+  gates: GateStatusRow[];
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeFile".
+ */
+export interface WorkflowCodeFile {
+  path: string;
+  sha256: string;
+  tag: FileTag;
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GateStatusRow".
+ */
+export interface GateStatusRow {
+  gate: string;
+  status: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowFileView".
+ */
+export interface WorkflowFileView {
+  group_id: string;
+  path: string;
+  tag: FileTag;
+  sha256: string;
+  content: string;
+  truncated: boolean;
+  findings: CodeFinding[];
 }
 /**
  * `POST P/sow/new-version` (E7.2): start a scope change from the approved version. The
@@ -6929,6 +7011,40 @@ export interface ScoutScore {
     | [string, string, string, string, string, string]
     | [string, string, string, string, string, string, string]
     | [string, string, string, string, string, string, string, string];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegisteredWorkflow".
+ */
+export interface RegisteredWorkflow {
+  workflow_id: string;
+  /**
+   * Pattern: `^\d+\.0\.\d+$`
+   */
+  version: string;
+  /**
+   * Pattern: `^wf_[a-z0-9]+(_[a-z0-9]+)*$`
+   */
+  registry_name: string;
+  registry_id: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  image_digest: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  manifest_hash: string;
+  certification_id: string;
+  owner: string;
+  /**
+   * @minItems 2
+   */
+  tools: [McpToolEntry, McpToolEntry, ...McpToolEntry[]];
+  status: RegistryStatus;
+  registered_at: string;
+  superseded_at?: string | null;
+  superseded_by?: string | null;
 }
 /**
  * A project's caps.

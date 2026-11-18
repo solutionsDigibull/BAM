@@ -545,6 +545,18 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # ---- Workflow registry (WG-12) ----------------------------------------------------------
+  # Nothing is registered for this Workflow, so the assigned FDE gets 404 too; the 200 is in
+  # tests/api/test_wg12_registration_api.py.
+  workflow_registration_api_v1_projects__project_id__workflows__workflow_id__registration_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/registration
+      params: {project_id: "@project_a", workflow_id: "0190f3a2-7b1c-7d4e-8f00-0000000000a1"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- SOW (E6.3) -------------------------------------------------------------------------
   sow_api_v1_projects__project_id__sow_get:
     request:
@@ -932,6 +944,27 @@ routes:
 
   # The world seeds no Sub-Skill, so an assigned FDE gets 404 for the unknown id (it was 200 with an
   # empty list for any id until A-33).
+  # WG-15 (#763): the whole Workflow's code, read only. The seeded Workflow has no build, so the
+  # tree is the Workflow group only (200); a file the stored maps do not hold is 404.
+  workflow_code_tree_api_v1_projects__project_id__workflows__workflow_id__code_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/code
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  workflow_code_file_api_v1_projects__project_id__workflows__workflow_id__code_files_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/code/files
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      query: {group: workflow, path: manifest.json}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   code_attempts_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__code_attempts_get:
     request:
       method: GET

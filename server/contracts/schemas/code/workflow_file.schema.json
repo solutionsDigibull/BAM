@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:code/workflow_file:0.1.0",
+  "$defs": {
+    "CodeFinding": {
+      "additionalProperties": false,
+      "description": "One gate finding (the shape E11.3 / E12.2 write into `code_attempts.findings`).",
+      "properties": {
+        "gate": {
+          "title": "Gate",
+          "type": "string"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "col": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Col"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gate",
+        "code",
+        "message"
+      ],
+      "title": "CodeFinding",
+      "type": "object"
+    },
+    "FileTag": {
+      "description": "Where a file of the Workflow's code comes from (ADR 0028, WG-15).",
+      "enum": [
+        "reused",
+        "customized",
+        "generated"
+      ],
+      "title": "FileTag",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "group_id": {
+      "title": "Group Id",
+      "type": "string"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "tag": {
+      "$ref": "#/$defs/FileTag"
+    },
+    "sha256": {
+      "title": "Sha256",
+      "type": "string"
+    },
+    "content": {
+      "title": "Content",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/CodeFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "group_id",
+    "path",
+    "tag",
+    "sha256",
+    "content",
+    "truncated",
+    "findings"
+  ],
+  "title": "WorkflowFileView",
+  "type": "object"
+}

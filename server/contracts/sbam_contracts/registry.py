@@ -13,7 +13,13 @@ from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
 from sbam_contracts.budget import BudgetCaps, BudgetState
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
-from sbam_contracts.code_view import CodeAttemptList, CodeDiff, CodeFileView
+from sbam_contracts.code_view import (
+    CodeAttemptList,
+    CodeDiff,
+    CodeFileView,
+    WorkflowCodeTree,
+    WorkflowFileView,
+)
 from sbam_contracts.documents import (
     CleanupResult,
     DocumentOut,
@@ -160,6 +166,7 @@ from sbam_contracts.sow_api import (
 )
 from sbam_contracts.state_machines import StateMachineStates
 from sbam_contracts.testgen import CasePost, CasePut, TestgenOutput, TestsResponse
+from sbam_contracts.workflow_registry import RegisteredWorkflow
 
 ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("problem_detail", ProblemDetail),
@@ -216,6 +223,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("code/attempt_list", CodeAttemptList),
     ("code/file_view", CodeFileView),
     ("code/diff", CodeDiff),
+    ("code/workflow_tree", WorkflowCodeTree),
+    ("code/workflow_file", WorkflowFileView),
     ("sow/new_version_request", SowNewVersionRequest),
     ("sow/impact", SowImpact),
     ("runs/run", Run),
@@ -311,6 +320,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("repo/overlay", RepoOverlay),
     ("repo/scan", RepoScanReport),
     ("repo/scout_answer", RepoScoutAnswer),
+    ("workflow_registry/registration", RegisteredWorkflow),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
 )
