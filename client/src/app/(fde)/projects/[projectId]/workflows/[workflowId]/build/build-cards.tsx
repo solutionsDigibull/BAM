@@ -39,6 +39,7 @@ const FAMILIES: { family: GateFamily; label: string }[] = [
   { family: "Contract", label: "Contract" },
   { family: "AST", label: "Code structure" },
   { family: "Static", label: "Static checks" },
+  { family: "Compliance", label: "Compliance" },
   { family: "Tests", label: "Loop tests" },
 ];
 

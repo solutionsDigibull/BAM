@@ -132,6 +132,8 @@ class BuildStage(StrEnum):
     ASSEMBLE = "assemble"
     AST_GATE = "ast_gate"
     STATIC_GATE = "static_gate"
+    IMPORT_GATE = "import_gate"  # #761: the code imports cleanly, run in the sandbox
+    COMPLIANCE_GATES = "compliance_gates"  # #761: licence, vulnerability and MCP compliance rows
     REVIEW = "review_code"  # #759: one model review of the code after every gate passed
     GENERATE_TESTS = "generate_tests"
     BUILD_PROMPTFOO_SUITE = "build_promptfoo_suite"

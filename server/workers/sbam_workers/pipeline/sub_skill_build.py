@@ -4,8 +4,9 @@ Started by ProjectPipeline with id `build-<sub_skill_id>-<build_no>` on sbam-bui
 a first pass (attempt 0) plus at most MAX_CORRECTIONS correction passes:
 
     build_manifest → check_libraries → render_skeleton → generate_bodies* → assemble → ast_gate →
-    static_gate → review_code† → generate_tests → build_promptfoo_suite → [tests_started] →
-    run_sandbox_tests → certify_sub_skill → [tests_passed: CERTIFIED]
+    static_gate → import_gate → compliance_gates → review_code† → generate_tests →
+    build_promptfoo_suite → [tests_started] → run_sandbox_tests → certify_sub_skill →
+    [tests_passed: CERTIFIED]
     (* first pass of a cycle only: a correction supplies the bodies. † #759: one model review once
     every gate has passed. The Sub-Skill is still BUILDING, so a FAIL is a `gate_failed` (the
     corrector reads its findings from `gate_results` like a gate's) and a model that cannot answer
@@ -75,6 +76,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_workers.build.gates.errors import (
         BUNDLE_TAMPERED,
         GATE_INPUT_MISMATCH,
+        IMPORT_GATE_INFRA,
         STATIC_GATE_INFRA,
         SUITE_INVALID,
     )
@@ -83,8 +85,10 @@ with workflow.unsafe.imports_passed_through():
     from sbam_workers.build.stubs import (
         assemble,
         ast_gate,
+        compliance_gates,
         correct,
         generate_bodies,
+        import_gate,
         render_skeleton,
         review_code,
         static_gate,
@@ -133,6 +137,7 @@ REVIEW_PATCH = "a20-isatvon-patch-review"
 PLATFORM_PATCH = "e12-2-gate-platform-defect"
 RETRY_TESTS_PATCH = "704-retry-regenerates-tests"
 REVIEWER_PATCH = "wg11-reviewer-pass"  # #759: the review pass after the gates
+IMPORT_GATES_PATCH = "wg13-import-and-compliance-gates"  # #761: import gate, then licence/vuln/MCP
 # #117: an integrity or wiring defect in a gate is a platform defect (BUILD_ERROR, an admin fixes
 # it), not a crashed workflow nobody hears about. The other stages' wiring errors still fail loudly.
 # #119: a static tool or clamd that still gives no verdict after the activity's retries is the
@@ -142,7 +147,14 @@ REVIEWER_PATCH = "wg11-reviewer-pass"  # #759: the review pass after the gates
 # the Sub-Skill in BUILDING for good, with Retry disabled. Now it parks in BUILD_ERROR: an admin
 # fixes it, and Retry works.
 PLATFORM_DEFECTS = frozenset(
-    {BUNDLE_TAMPERED, GATE_INPUT_MISMATCH, STATIC_GATE_INFRA, SUITE_INVALID, PROVENANCE_MISSING}
+    {
+        BUNDLE_TAMPERED,
+        GATE_INPUT_MISMATCH,
+        IMPORT_GATE_INFRA,
+        STATIC_GATE_INFRA,
+        SUITE_INVALID,
+        PROVENANCE_MISSING,
+    }
 )
 MAX_SUMMARY_PATHS = 10
 SPECS: dict[BuildStage, _Spec] = {
@@ -153,6 +165,10 @@ SPECS: dict[BuildStage, _Spec] = {
     BuildStage.ASSEMBLE: _Spec(TaskQueue.BUILD, 2 * _MIN, 2, (TEMPLATE_ERROR,)),
     BuildStage.AST_GATE: _Spec(TaskQueue.BUILD, 10 * _MIN, 2, (GATE_FAILED,)),
     BuildStage.STATIC_GATE: _Spec(TaskQueue.BUILD, 10 * _MIN, 2, (GATE_FAILED,)),
+    # #761: a failed import or compliance row is a GateFailed (the corrector); a sandbox that cannot
+    # be reached is IMPORT_GATE_INFRA, retried and then a platform defect (an admin fixes it).
+    BuildStage.IMPORT_GATE: _Spec(TaskQueue.BUILD, 15 * _MIN, 3, (GATE_FAILED,)),
+    BuildStage.COMPLIANCE_GATES: _Spec(TaskQueue.BUILD, 5 * _MIN, 2, (GATE_FAILED,)),
     # #759: a FAIL is a GateFailed (the corrector), a model that cannot answer parks the build.
     BuildStage.REVIEW: _Spec(TaskQueue.LLM, 5 * _MIN, 3, (GATE_FAILED, *_LLM_ERRORS)),
     BuildStage.GENERATE_TESTS: _Spec(TaskQueue.LLM, 15 * _MIN, 3, _LLM_ERRORS),
@@ -375,6 +391,9 @@ class SubSkillBuild:
         await self._call(BuildStage.ASSEMBLE, assemble, ref)
         await self._call(BuildStage.AST_GATE, ast_gate, ref)
         await self._call(BuildStage.STATIC_GATE, static_gate, ref)
+        if workflow.patched(IMPORT_GATES_PATCH):  # #761: import in the sandbox, then the evidence
+            await self._call(BuildStage.IMPORT_GATE, import_gate, ref)
+            await self._call(BuildStage.COMPLIANCE_GATES, compliance_gates, ref)
         if workflow.patched(REVIEWER_PATCH):  # #759: one review once every gate has passed
             await self._call(BuildStage.REVIEW, review_code, ref)
         await self._call(BuildStage.GENERATE_TESTS, generate_tests, ref)
