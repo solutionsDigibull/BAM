@@ -20,6 +20,7 @@ from sbam_contracts import (
     budget,
     build_dashboard,
     code_view,
+    connections,
     documents,
     harness,
     held_patch,
@@ -271,6 +272,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("workflow_registry", workflow_registry),
             ("workflow", workflow_repos),
             ("build", review),
+            ("connections", connections),
         )
         for stem in module.schemas()
     }

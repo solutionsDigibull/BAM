@@ -1,5 +1,7 @@
 """E1.3-T07: the app refuses to start with missing or invalid settings."""
 
+import base64
+import os
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,8 @@ def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> pytest.MonkeyPatch:
     monkeypatch.chdir(tmp_path)  # no stray .env
     for key, value in VALID.items():
         monkeypatch.setenv(key, value)
+    # a deployed environment needs the keys that encrypt stored secrets (#764): a real one here
+    monkeypatch.setenv("SECRETS_KEYS", "*k1:" + base64.b64encode(bytes(range(32))).decode())
     return monkeypatch
 
 
@@ -215,3 +219,84 @@ def test_a15_several_replicas_with_a_secret_start(env: pytest.MonkeyPatch) -> No
 def test_a15_a_blank_cursor_secret_never_becomes_the_key(env: pytest.MonkeyPatch) -> None:
     env.setenv("CURSOR_SECRET", "")
     assert len(load_settings().cursor_secret.get_secret_value()) == 64  # the random per-process key
+
+
+# --- #764 (ADR 0030): the keys that encrypt a project's stored secrets ---------------------------
+
+KEY_ONE = base64.b64encode(os.urandom(32)).decode()
+KEY_TWO = base64.b64encode(os.urandom(32)).decode()
+DEV_KEY = base64.b64encode(b"change-me-dev-only-secrets-key!!").decode()  # == compose/.env.example
+
+
+def keyed(env: pytest.MonkeyPatch, spec: str | None, sbam_env: str) -> None:
+    env.setenv("SBAM_ENV", sbam_env)
+    if spec is None:
+        env.delenv("SECRETS_KEYS", raising=False)
+    else:
+        env.setenv("SECRETS_KEYS", spec)
+    if sbam_env not in ("development", "test", "ci"):
+        env.setenv("LLM_PROVIDER", "bifrost")
+        env.setenv("UPLOAD_TOKEN_KEY", "u" * 40)
+
+
+def test_wg16_development_runs_without_keys_and_with_the_development_key(
+    env: pytest.MonkeyPatch,
+) -> None:
+    keyed(env, None, "development")
+    assert load_settings().secrets_keys is None
+    keyed(env, f"*dev1:{DEV_KEY}", "development")
+    assert load_settings().secrets_keys is not None
+
+
+@pytest.mark.parametrize("sbam_env", ["production", "staging", "prod", "live"])
+def test_wg16_a_deployed_environment_needs_the_keys(env: pytest.MonkeyPatch, sbam_env: str) -> None:
+    keyed(env, None, sbam_env)
+    with pytest.raises(SettingsError, match="SECRETS_KEYS is required"):
+        load_settings()
+    keyed(env, f"*k1:{KEY_ONE}", sbam_env)
+    assert load_settings().secrets_keys is not None
+
+
+@pytest.mark.parametrize(
+    ("spec", "needle"),
+    [
+        (f"k1:{KEY_ONE}", "exactly one key active"),
+        (f"*k1:{KEY_ONE},*k2:{KEY_TWO}", "exactly one key active"),
+        ("*k1:not-base64!!", "not valid base64"),
+        (f"*k1:{base64.b64encode(b'short').decode()}", "not 32 bytes"),
+        (f"*k1:{KEY_ONE},k1:{KEY_TWO}", "twice"),
+        ("*k1", "not `id:base64key`"),
+    ],
+)
+@pytest.mark.parametrize("sbam_env", ["development", "production"])
+def test_wg16_malformed_keys_fail_fast_in_every_environment_without_echoing_them(
+    env: pytest.MonkeyPatch, spec: str, needle: str, sbam_env: str
+) -> None:
+    keyed(env, spec, sbam_env)
+    with pytest.raises(SettingsError) as caught:
+        load_settings()
+    assert needle in str(caught.value)
+    assert KEY_ONE not in str(caught.value) and KEY_TWO not in str(caught.value)
+
+
+def test_wg16_the_development_key_is_refused_outside_development(env: pytest.MonkeyPatch) -> None:
+    keyed(env, f"*dev1:{DEV_KEY}", "production")
+    with pytest.raises(SettingsError, match="development placeholder"):
+        load_settings()
+
+
+def test_wg16_the_keys_never_show_in_the_settings_repr(env: pytest.MonkeyPatch) -> None:
+    keyed(env, f"*k1:{KEY_ONE}", "development")
+    assert KEY_ONE not in repr(load_settings())
+
+
+def test_wg16_the_env_example_key_is_the_development_key_and_the_compose_file_passes_it_on() -> (
+    None
+):
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[3]
+    example = (repo / "compose" / ".env.example").read_text(encoding="utf-8")
+    assert f"SECRETS_KEYS=*dev1:{DEV_KEY}" in example and "SECRETS_ACTIVE_KEY_ID" not in example
+    compose = (repo / "compose" / "compose.yaml").read_text(encoding="utf-8")
+    assert "SECRETS_KEYS: ${SECRETS_KEYS:-}" in compose and "SECRETS_ACTIVE_KEY_ID" not in compose

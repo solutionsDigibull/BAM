@@ -202,6 +202,10 @@ class Actor:
         )
 
 
+# A fixed test keyring (`*` marks the active key); never a real one.
+CONNECTION_KEYS = "*k1:QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU="
+
+
 @dataclass
 class World:
     """One fresh app and database. Build one per test: allowed requests change the data."""
@@ -256,6 +260,7 @@ class World:
             enable_ping=True,
             tusd_hook_secret=SecretStr(HOOK_SECRET),
             storage_signing_key=SecretStr(SIGNING_KEY),
+            secrets_keys=SecretStr(CONNECTION_KEYS),  # connection values need a key (#764)
         )
 
     # -- seeding ---------------------------------------------------------------------------

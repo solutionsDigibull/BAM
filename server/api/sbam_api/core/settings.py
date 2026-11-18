@@ -7,6 +7,8 @@ from typing import Any, Literal
 from pydantic import AnyHttpUrl, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from sbam_api.connections.crypto import KeyRing, SecretsKeyError
+
 # The only environments where the deterministic LLM mock (and the dev PostHog shortcut) may run,
 # the same list as sbam-llm-mock and `STUB_ENVS`. An allowlist, so a spelling nobody listed
 # ("prod-eu", "live", " production") counts as deployed and fails closed.
@@ -53,6 +55,10 @@ class Settings(BaseSettings):
     # Uploads (#61): tusd calls the hook endpoint with this secret; no secret = hooks and upload
     # tokens answer 503. The browser reaches tusd at `tusd_public_url`.
     tusd_hook_secret: SecretStr | None = None
+    # Project connections (#764, ADR 0030): the master keyring, `*active_id:base64,old_id:base64`.
+    # Deployed it is the Docker secret `sbam_secrets_keys` (SECRETS_KEYS_FILE); one secret, and the
+    # active key is marked inside it, so a rotation is one atomic edit.
+    secrets_keys: SecretStr | None = None
     # The key that signs upload tokens, separate from the hook secret (A-14) so rotating or leaking
     # one never touches the other. Unset in a dev environment it falls back to the hook secret; a
     # deployed environment must set its own.
@@ -137,6 +143,24 @@ class Settings(BaseSettings):
                     f"{', '.join(bad)} still hold the `{PLACEHOLDER}` template value "
                     f"while SBAM_ENV={self.sbam_env}. Provision real secrets."
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _secrets_keys_usable(self) -> "Settings":
+        """Outside development the keyring is required; wherever it is set it must be usable (32
+        bytes each, exactly one active key) and outside development not the development key."""
+        deployed = deployed_env(self.sbam_env)
+        if not _set(self.secrets_keys):
+            if deployed:
+                raise SettingsError(f"SECRETS_KEYS is required when SBAM_ENV={self.sbam_env}.")
+            return self
+        try:
+            KeyRing.parse(
+                self.secrets_keys.get_secret_value() if self.secrets_keys else "",
+                allow_placeholder=not deployed,
+            )
+        except SecretsKeyError as exc:  # names a key id or a position, never key material
+            raise SettingsError(str(exc)) from None
         return self
 
     def upload_token_secret(self) -> str | None:

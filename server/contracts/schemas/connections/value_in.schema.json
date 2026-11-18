@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:connections/value_in:0.1.0",
+  "additionalProperties": false,
+  "description": "`PUT .../connections/{name}/value`. The only model in this module that carries a value.",
+  "properties": {
+    "value": {
+      "format": "password",
+      "title": "Value",
+      "type": "string",
+      "writeOnly": true
+    }
+  },
+  "required": [
+    "value"
+  ],
+  "title": "ConnectionValueIn",
+  "type": "object"
+}

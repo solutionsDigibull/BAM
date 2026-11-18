@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:166654d1812d7ea0fe2e838358e91bdd24a79b608921588a47c7d24d66b9353a
+// source-sha256:7e252a15dd01b560df86f3e5ceba2d61dfa6c8888ef5f000dbc5c3d7fa72d4cf
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -598,6 +598,56 @@ export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
  * via the `definition` "BudgetLevel".
  */
 export type BudgetLevel = "OK" | "FIRST_ALERT" | "SECOND_ALERT" | "STOPPED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionSource".
+ */
+export type ConnectionSource = "ISATVON" | "REPO" | "FDE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionStatus".
+ */
+export type ConnectionStatus = "MISSING" | "SET" | "TESTED" | "TEST_FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionTestMode".
+ */
+export type ConnectionTestMode = "HTTP" | "NONE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProbeMethod".
+ */
+export type ProbeMethod = "GET" | "HEAD";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "AuthScheme".
+ */
+export type AuthScheme = "BEARER" | "BASIC" | "HEADER" | "QUERY";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionTestOutcome".
+ */
+export type ConnectionTestOutcome =
+  | "OK"
+  | "UNAUTHORIZED"
+  | "NOT_FOUND"
+  | "RATE_LIMITED"
+  | "SERVER_ERROR"
+  | "REDIRECT"
+  | "UNREACHABLE"
+  | "TIMEOUT"
+  | "TLS_ERROR"
+  | "BLOCKED_HOST";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CleanStep".
+ */
+export type CleanStep = "TRIMMED" | "UNQUOTED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BlockerReason".
+ */
+export type BlockerReason = "MISSING" | "NOT_TESTED" | "TEST_FAILED" | "INVALID_NAME";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -758,6 +808,13 @@ export interface SbamContracts {
   WorkflowRepositories?: WorkflowRepositories;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
+  Connection?: Connection;
+  ConnectionList?: ConnectionList;
+  ConnectionValueIn?: ConnectionValueIn;
+  ConnectionValueResult?: ConnectionValueResult;
+  ConnectionUpdate?: ConnectionUpdate;
+  ConnectionTestResult?: ConnectionTestResult;
+  Readiness?: Readiness;
 }
 /**
  * `application/problem+json` body returned for every 4xx/5xx response.
@@ -7112,4 +7169,124 @@ export interface BudgetState {
   cap: number;
   level: BudgetLevel;
   raised_once?: boolean;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Connection".
+ */
+export interface Connection {
+  /**
+   * Pattern: `^[A-Z_][A-Z0-9_]{0,127}$`
+   */
+  name: string;
+  source: ConnectionSource;
+  purpose?: string;
+  where_to_get?: string;
+  required: boolean;
+  status: ConnectionStatus;
+  masked_tail?: string;
+  test_mode?: ConnectionTestMode;
+  test_config?: ConnectionTestConfig | null;
+  value_set_at?: string | null;
+  value_set_by?: string | null;
+  last_test_at?: string | null;
+  last_test_outcome?: ConnectionTestOutcome | null;
+  row_version?: number;
+}
+/**
+ * Where and how to test a key. No value in here; a change makes the stored value untested.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionTestConfig".
+ */
+export interface ConnectionTestConfig {
+  url: string;
+  method?: ProbeMethod;
+  auth?: AuthScheme;
+  auth_name?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionList".
+ */
+export interface ConnectionList {
+  project_id: string;
+  /**
+   * @maxItems 500
+   */
+  connections?: Connection[];
+}
+/**
+ * `PUT .../connections/{name}/value`. The only model in this module that carries a value.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionValueIn".
+ */
+export interface ConnectionValueIn {
+  value: string;
+}
+/**
+ * What a save answers: the entry, which clean-ups ran (names, never the value) and warnings.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionValueResult".
+ */
+export interface ConnectionValueResult {
+  connection: Connection;
+  /**
+   * @maxItems 2
+   */
+  cleaned?: [] | [CleanStep] | [CleanStep, CleanStep];
+  unexpected_name?: boolean;
+  did_you_mean?: string | null;
+}
+/**
+ * `PUT .../connections/{name}`: an entry's metadata. Any field left out is kept.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionUpdate".
+ */
+export interface ConnectionUpdate {
+  purpose?: string | null;
+  where_to_get?: string | null;
+  required?: boolean | null;
+  test_mode?: ConnectionTestMode | null;
+  test_config?: ConnectionTestConfig | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ConnectionTestResult".
+ */
+export interface ConnectionTestResult {
+  /**
+   * Pattern: `^[A-Z_][A-Z0-9_]{0,127}$`
+   */
+  name: string;
+  outcome: ConnectionTestOutcome;
+  message: string;
+  http_status_class?: number | null;
+  tested_at: string;
+  connection: Connection;
+}
+/**
+ * Whether Commit may go on: every required connection is set and tested (ADR 0030, 10).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Readiness".
+ */
+export interface Readiness {
+  workflow_id: string;
+  ready: boolean;
+  /**
+   * @maxItems 500
+   */
+  blockers?: Blocker[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Blocker".
+ */
+export interface Blocker {
+  name: string;
+  reason: BlockerReason;
 }
