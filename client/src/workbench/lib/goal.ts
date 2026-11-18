@@ -29,6 +29,30 @@ export function parseGoal(text: string): Goal {
   if (m && m[1]!.trim() && m[2]!.trim()) return { what: m[1]!.trim(), who: m[2]!.trim(), where: (m[3] ?? 'your market').trim() }
   return { what: t, who: 'your team', where: 'your market' }
 }
+/** A part of the goal sentence as [start, end) offsets into the text, or null when that part is not written yet. */
+export type GoalSpan = [number, number] | null
+/** What / Who / Where spans of the goal sentence as offsets into `value` (#822, UI team 17 Nov 2026). It splits like
+ *  parseGoal: first " for ", then " in ". Without " for ", the whole text is the What. Trailing dots and spaces belong
+ *  to no part. These drive the three cards under the goal box; clicking a card highlights its part. */
+export function goalSpans(value: string): [GoalSpan, GoalSpan, GoalSpan] {
+  const base = value.length - value.replace(/^build an ai agent that automates\s+/i, '').length
+  const typed = value.slice(base)
+  const end = typed.replace(/[.\s]+$/, '').length
+  if (!end) return [null, null, null]
+  const m = /^(.*?)\s+for\s+(.*?)(?:\s+in\s+(.+))?$/i.exec(typed.slice(0, end))
+  if (!m) return [[base, base + end], null, null]
+  const one = m[1] ?? '', two = m[2] ?? ''
+  const what: GoalSpan = one ? [base, base + one.length] : null
+  const whoStart = one.length + (/^\s+for\s+/i.exec(typed.slice(one.length))?.[0].length ?? 0)
+  const who: GoalSpan = two ? [base + whoStart, base + whoStart + two.length] : null
+  let where: GoalSpan = null
+  if (m[3] != null) {
+    const wEnd = whoStart + two.length
+    const wStart = wEnd + (/^\s+in\s+/i.exec(typed.slice(wEnd))?.[0].length ?? 0)
+    where = m[3] ? [base + wStart, base + wStart + m[3].length] : null
+  }
+  return [what, who, where]
+}
 /** One line, as the server stores it: whitespace (newlines included) collapsed, trimmed. */
 export const cleanGoal = (raw: string) => raw.replace(/\s+/g, ' ').trim()
 
