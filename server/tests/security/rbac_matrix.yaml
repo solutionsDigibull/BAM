@@ -342,7 +342,7 @@ routes:
       path: /api/v1/admin/srim-defaults
       headers: {if-match: '"0"'}
       json:
-        orchestration: {router: Acme_Router, trigger: Acme_Trigger}
+        orchestration: {router: Temporal_Workflow_Orchestrator, trigger: Acme_Trigger}  # fixed (ADR 0031)
         execution: {engine: Acme_Engine}
         gateway: {route_via: Acme_Gateway}
         persistence: {database: Acme_DB, action: Acme_SQL}
