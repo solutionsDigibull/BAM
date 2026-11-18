@@ -557,6 +557,85 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # ---- Project connections and secrets (WG-16, #764; ADR 0030) -----------------------------
+  # Assigned FDE only: Admins have no access (403 WRONG_PORTAL), another tenant's or an unassigned
+  # project is 404. No route returns a value; the route-level checks are in
+  # tests/api/test_wg16_connections_api.py. The seeded world names no secret in any Sub-Skill, so
+  # an entry is an FDE entry and a name nobody stored is a 404.
+  list_connections_api_v1_projects__project_id__connections_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/connections
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  get_connection_api_v1_projects__project_id__connections__name__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/connections/{name}
+      params: {project_id: "@project_a", name: NOBODY_STORED_THIS}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  set_connection_value_api_v1_projects__project_id__connections__name__value_put:
+    request:
+      method: PUT
+      path: /api/v1/projects/{project_id}/connections/{name}/value
+      params: {project_id: "@project_a", name: PAGER_KEY}
+      json: {value: "a-secret-value-0123456789"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  clear_connection_value_api_v1_projects__project_id__connections__name__value_delete:
+    request:
+      method: DELETE
+      path: /api/v1/projects/{project_id}/connections/{name}/value
+      params: {project_id: "@project_a", name: NOBODY_STORED_THIS}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  update_connection_api_v1_projects__project_id__connections__name__put:
+    request:
+      method: PUT
+      path: /api/v1/projects/{project_id}/connections/{name}
+      params: {project_id: "@project_a", name: PAGER_KEY}
+      json: {purpose: "Pages the on-call engineer"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  test_connection_route_api_v1_projects__project_id__connections__name__test_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/connections/{name}/test
+      params: {project_id: "@project_a", name: NOBODY_STORED_THIS}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  connections_readiness_api_v1_projects__project_id__workflows__workflow_id__connections_readiness_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/connections/readiness
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  connections_env_example_api_v1_projects__project_id__workflows__workflow_id__connections_env_example_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/connections/env-example
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   # ---- SOW (E6.3) -------------------------------------------------------------------------
   sow_api_v1_projects__project_id__sow_get:
     request:

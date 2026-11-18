@@ -198,8 +198,10 @@ services:
       KEYCLOAK_ADMIN_CLIENT_SECRET: !reset null
       TUSD_HOOK_SECRET: !reset null
       UPLOAD_TOKEN_KEY: !reset null
+      SECRETS_KEYS: !reset null
       DATABASE_URL_TEMPLATE: postgresql://sbam:__SBAM_DB_PASSWORD__@postgres:5432/sbam
       SBAM_DB_PASSWORD_FILE: /run/secrets/sbam_db_password
+      SECRETS_KEYS_FILE: /run/secrets/sbam_secrets_keys
       STORAGE_SIGNING_KEY_FILE: /run/secrets/storage_signing_key
       KEYCLOAK_ADMIN_CLIENT_SECRET_FILE: /run/secrets/keycloak_admin_client_secret
       TUSD_HOOK_SECRET_FILE: /run/secrets/tusd_hook_secret
@@ -217,6 +219,7 @@ services:
       - { source: keycloak_admin_client_secret, target: keycloak_admin_client_secret, uid: "10001", gid: "10001", mode: 0400 }
       - { source: tusd_hook_secret, target: tusd_hook_secret, uid: "10001", gid: "10001", mode: 0400 }
       - { source: upload_token_key, target: upload_token_key, uid: "10001", gid: "10001", mode: 0400 }
+      - { source: sbam_secrets_keys, target: sbam_secrets_keys, uid: "10001", gid: "10001", mode: 0400 }
 
   worker-ingest:
     <<: *worker-deploy
@@ -390,3 +393,4 @@ secrets:
   openrouter_api_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/openrouter_api_key" }
   cognee_user_secret: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/cognee_user_secret" }
   bifrost_virtual_key: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/bifrost_virtual_key" }
+  sbam_secrets_keys: { file: "${SBAM_SECRETS_DIR:-/etc/sbam/secrets}/sbam_secrets_keys" }

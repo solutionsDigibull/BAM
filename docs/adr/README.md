@@ -35,6 +35,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0027](0027-code-under-test-runs-in-its-own-process.md) | The code under test runs in a child process of its own; the runner never imports it, and an outputs file from a runner that did not exit cleanly is not evidence (#625) | Accepted | refines 0012, 0023 |
 | [0028](0028-workflow-mcp-server-repo-first-bifrost-registry.md) | Workflow code generation: repo-first code, one MCP server per workflow, Bifrost as the registry, named agent roles, a token budget, a demo before Commit (#751) | Accepted | refines 0010 (O-19), 0011, 0012, 0023 |
 | [0029](0029-approved-masters-ui.md) | The approved Admin Masters UI becomes the masters spec ("Masters 0.3") (#65) | Proposed | supersedes the TD §7.3.1 column table; related 0028 |
+| [0030](0030-project-connections-and-secrets.md) | Project connections and secrets: an encrypted, write-only store with AES-256-GCM, SSRF-guarded Test connection, one audited injection point, a Commit gate (#764) | Accepted | refines 0028 |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 

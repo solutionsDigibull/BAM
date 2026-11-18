@@ -423,6 +423,8 @@ DEPLOYED = {
     "llm_provider": "bifrost",
     "upload_token_key": "u" * 32,
     "tusd_hook_secret": "t" * 32,
+    "secrets_keys": "*k1:"
+    + "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU=",  # a deployed env needs it (#764)
 }
 
 

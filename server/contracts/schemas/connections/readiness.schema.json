@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:connections/readiness:0.1.0",
+  "$defs": {
+    "Blocker": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/BlockerReason"
+        }
+      },
+      "required": [
+        "name",
+        "reason"
+      ],
+      "title": "Blocker",
+      "type": "object"
+    },
+    "BlockerReason": {
+      "enum": [
+        "MISSING",
+        "NOT_TESTED",
+        "TEST_FAILED",
+        "INVALID_NAME"
+      ],
+      "title": "BlockerReason",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Whether Commit may go on: every required connection is set and tested (ADR 0030, 10).",
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "ready": {
+      "title": "Ready",
+      "type": "boolean"
+    },
+    "blockers": {
+      "items": {
+        "$ref": "#/$defs/Blocker"
+      },
+      "maxItems": 500,
+      "title": "Blockers",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "ready"
+  ],
+  "title": "Readiness",
+  "type": "object"
+}

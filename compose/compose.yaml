@@ -432,6 +432,8 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
       # Signs download URLs (#37). Empty = signed downloads answer 503; existing stacks keep starting.
       STORAGE_SIGNING_KEY: ${STORAGE_SIGNING_KEY:-}
+      # Encrypts the projects' stored secrets (#764, ADR 0030). Empty is allowed in development only.
+      SECRETS_KEYS: ${SECRETS_KEYS:-}
       TEMPORAL_HOST: temporal:7233
       TEMPORAL_NAMESPACE: sbam
       ENABLE_PING: ${ENABLE_PING:-true} # sample command POST …/runs/ping (#40); local stack only

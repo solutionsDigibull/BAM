@@ -676,6 +676,7 @@ SECRET_NAMES = [
     "openrouter_api_key",
     "cognee_user_secret",
     "bifrost_virtual_key",
+    "sbam_secrets_keys",
 ]
 
 

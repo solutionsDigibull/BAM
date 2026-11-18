@@ -20,6 +20,15 @@ from sbam_contracts.code_view import (
     WorkflowCodeTree,
     WorkflowFileView,
 )
+from sbam_contracts.connections import (
+    Connection,
+    ConnectionList,
+    ConnectionTestResult,
+    ConnectionUpdate,
+    ConnectionValueIn,
+    ConnectionValueResult,
+    Readiness,
+)
 from sbam_contracts.documents import (
     CleanupResult,
     DocumentOut,
@@ -325,4 +334,11 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("workflow/repositories", WorkflowRepositories),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
+    ("connections/connection", Connection),
+    ("connections/connection_list", ConnectionList),
+    ("connections/value_in", ConnectionValueIn),
+    ("connections/value_result", ConnectionValueResult),
+    ("connections/update", ConnectionUpdate),
+    ("connections/test_result", ConnectionTestResult),
+    ("connections/readiness", Readiness),
 )

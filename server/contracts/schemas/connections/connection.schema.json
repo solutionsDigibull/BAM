@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:connections/connection:0.1.0",
+  "$defs": {
+    "AuthScheme": {
+      "enum": [
+        "BEARER",
+        "BASIC",
+        "HEADER",
+        "QUERY"
+      ],
+      "title": "AuthScheme",
+      "type": "string"
+    },
+    "ConnectionSource": {
+      "enum": [
+        "ISATVON",
+        "REPO",
+        "FDE"
+      ],
+      "title": "ConnectionSource",
+      "type": "string"
+    },
+    "ConnectionStatus": {
+      "enum": [
+        "MISSING",
+        "SET",
+        "TESTED",
+        "TEST_FAILED"
+      ],
+      "title": "ConnectionStatus",
+      "type": "string"
+    },
+    "ConnectionTestConfig": {
+      "additionalProperties": false,
+      "description": "Where and how to test a key. No value in here; a change makes the stored value untested.",
+      "properties": {
+        "url": {
+          "maxLength": 2048,
+          "minLength": 9,
+          "title": "Url",
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/ProbeMethod",
+          "default": "GET"
+        },
+        "auth": {
+          "$ref": "#/$defs/AuthScheme",
+          "default": "BEARER"
+        },
+        "auth_name": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth Name"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "ConnectionTestConfig",
+      "type": "object"
+    },
+    "ConnectionTestMode": {
+      "enum": [
+        "HTTP",
+        "NONE"
+      ],
+      "title": "ConnectionTestMode",
+      "type": "string"
+    },
+    "ConnectionTestOutcome": {
+      "enum": [
+        "OK",
+        "UNAUTHORIZED",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "SERVER_ERROR",
+        "REDIRECT",
+        "UNREACHABLE",
+        "TIMEOUT",
+        "TLS_ERROR",
+        "BLOCKED_HOST"
+      ],
+      "title": "ConnectionTestOutcome",
+      "type": "string"
+    },
+    "ProbeMethod": {
+      "enum": [
+        "GET",
+        "HEAD"
+      ],
+      "title": "ProbeMethod",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "pattern": "^[A-Z_][A-Z0-9_]{0,127}$",
+      "title": "Name",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/ConnectionSource"
+    },
+    "purpose": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Purpose",
+      "type": "string"
+    },
+    "where_to_get": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Where To Get",
+      "type": "string"
+    },
+    "required": {
+      "title": "Required",
+      "type": "boolean"
+    },
+    "status": {
+      "$ref": "#/$defs/ConnectionStatus"
+    },
+    "masked_tail": {
+      "default": "",
+      "maxLength": 4,
+      "title": "Masked Tail",
+      "type": "string"
+    },
+    "test_mode": {
+      "$ref": "#/$defs/ConnectionTestMode",
+      "default": "HTTP"
+    },
+    "test_config": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConnectionTestConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "value_set_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value Set At"
+    },
+    "value_set_by": {
+      "anyOf": [
+        {
+          "maxLength": 255,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value Set By"
+    },
+    "last_test_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Test At"
+    },
+    "last_test_outcome": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConnectionTestOutcome"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "row_version": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Row Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "source",
+    "required",
+    "status"
+  ],
+  "title": "Connection",
+  "type": "object"
+}

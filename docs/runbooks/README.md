@@ -8,5 +8,6 @@ Operational procedures, written by issue E16.6. Planned runbooks: stuck Temporal
 - [Backups and restore](backup-restore.md) (E16.5): nightly encrypted, append-only backups, the backup host, failed backups, the restore drill.
 - [An API dependency bulkhead is saturated](bulkhead-saturated.md) (N-02b): the alert, what fails fast, how to tell which dependency, why readiness does not change.
 - [The Workflow registry in Bifrost](workflow-registry.md) (WG-12): what is registered and when, supersede, lookup, reconcile, and what production needs (TLS, token, health check).
+- [Project connections: the keyring, rotation and loss](connections-secrets.md) (WG-16): the `sbam_secrets_keys` secret, the `*` active key, rotating with `rekey`, a compromised or lost key.
 
 Runbook structure: **Symptoms** · **Impact** · **Diagnosis** (commands, dashboards) · **Fix** · **Verification** · **Escalation**.

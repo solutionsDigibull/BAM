@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:connections/update:0.1.0",
+  "$defs": {
+    "AuthScheme": {
+      "enum": [
+        "BEARER",
+        "BASIC",
+        "HEADER",
+        "QUERY"
+      ],
+      "title": "AuthScheme",
+      "type": "string"
+    },
+    "ConnectionTestConfig": {
+      "additionalProperties": false,
+      "description": "Where and how to test a key. No value in here; a change makes the stored value untested.",
+      "properties": {
+        "url": {
+          "maxLength": 2048,
+          "minLength": 9,
+          "title": "Url",
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/ProbeMethod",
+          "default": "GET"
+        },
+        "auth": {
+          "$ref": "#/$defs/AuthScheme",
+          "default": "BEARER"
+        },
+        "auth_name": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth Name"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "ConnectionTestConfig",
+      "type": "object"
+    },
+    "ConnectionTestMode": {
+      "enum": [
+        "HTTP",
+        "NONE"
+      ],
+      "title": "ConnectionTestMode",
+      "type": "string"
+    },
+    "ProbeMethod": {
+      "enum": [
+        "GET",
+        "HEAD"
+      ],
+      "title": "ProbeMethod",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`PUT .../connections/{name}`: an entry's metadata. Any field left out is kept.",
+  "properties": {
+    "purpose": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Purpose"
+    },
+    "where_to_get": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Where To Get"
+    },
+    "required": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Required"
+    },
+    "test_mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConnectionTestMode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "test_config": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConnectionTestConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "ConnectionUpdate",
+  "type": "object"
+}
