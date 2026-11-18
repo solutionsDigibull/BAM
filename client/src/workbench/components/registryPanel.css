@@ -1,0 +1,11 @@
+/* Translate (4.3): the registry entry of the workflow, read only (#849). Tokens come from the workbench theme. */
+.bam-wb .reg { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; overflow: auto; container-type: inline-size; }
+.bam-wb .reg-lookup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .reg-input { width: 110px; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: inherit; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.bam-wb .reg-input[aria-invalid='true'] { border-color: var(--err); }
+.bam-wb .reg-card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.bam-wb .reg-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .reg-head h4 { margin: 0; font-size: 14px; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-family: 'JetBrains Mono', monospace; }
+.bam-wb .reg-tools { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.bam-wb .reg-tools li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.bam-wb .reg-foot { margin: 0; }
