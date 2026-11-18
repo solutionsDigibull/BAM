@@ -52,7 +52,9 @@ class RegisteredWorkflowRow(ProjectOwned, Base):
     # registered before the UI bundle existed.
     ui_bundle: Mapped[dict[str, Any] | None] = mapped_column(Json)
     kind: Mapped[str] = mapped_column(
-        String(20), default=RegistryKind.PRODUCTION.value, server_default=RegistryKind.PRODUCTION.value
+        String(20),
+        default=RegistryKind.PRODUCTION.value,
+        server_default=RegistryKind.PRODUCTION.value,
     )
     status: Mapped[str] = mapped_column(String(20), default=RegistryStatus.REGISTERED.value)
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

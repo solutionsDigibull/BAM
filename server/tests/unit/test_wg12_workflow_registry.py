@@ -299,9 +299,7 @@ def test_wg12_another_tenant_cannot_register_a_workflow_it_does_not_own() -> Non
     world.freeze()
     other = TenantContext(OTHER_TENANT, PROJECT)
     with world.sessions() as session, pytest.raises(ApiError) as caught:
-        service.register(
-            session, other, WORKFLOW_ID, fake, kind=RegistryKind.PRODUCTION, owner="x"
-        )
+        service.register(session, other, WORKFLOW_ID, fake, kind=RegistryKind.PRODUCTION, owner="x")
     assert caught.value.status == 404 and fake.calls == []
 
 

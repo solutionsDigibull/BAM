@@ -1,11 +1,11 @@
 """`GET /projects/{project_id}/workflows/{workflow_id}/registration`: the lookup contract (#760).
 
-Returns the registry entry of one Workflow version, or the newest enabled one (`?kind=staging|production` picks the kind; none shows both, staging
-first): the kind, the registry name,
-the image digest and manifest hash that were certified, the tools with their schemas, and whether
-a later version superseded it. Only a registered (so certified and frozen) Workflow has an entry:
-nothing else is ever visible here. Read-only. Another tenant or an unassigned project is a 404
-before this runs.
+Returns the registry entry of one Workflow version, or the newest enabled one: the kind, the
+registry name, the image digest and manifest hash that were certified, the tools with their
+schemas, and whether a later version superseded it. `?kind=staging|production` picks the kind;
+with none the assigned FDE sees both, staging first (ADR 0032). Only a registered (so certified
+and frozen) Workflow has an entry: nothing else is ever visible here. Read-only. Another tenant
+or an unassigned project is a 404 before this runs.
 
 Registering itself is not a route: the Commit step (#766) does it through `service.register`,
 only after the Workflow is frozen.

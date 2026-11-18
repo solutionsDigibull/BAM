@@ -129,7 +129,8 @@ def test_wg26_t12_lookup_shows_the_kind_and_filters_by_it(h: Harness) -> None:
     staging = RegisteredWorkflow.model_validate_json(get(h, kind="staging").text)
     assert staging.kind is RegistryKind.STAGING and staging.registry_name.endswith("_stg")
     production = RegisteredWorkflow.model_validate_json(get(h, kind="production").text)
-    assert production.kind is RegistryKind.PRODUCTION and not production.registry_name.endswith("_stg")
+    assert production.kind is RegistryKind.PRODUCTION
+    assert not production.registry_name.endswith("_stg")
     assert get(h, kind="preview").status_code == 422
 
 
