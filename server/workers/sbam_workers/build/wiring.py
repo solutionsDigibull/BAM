@@ -26,7 +26,7 @@ The loaders rebuild what the earlier stages produced from the database; no stage
 import asyncio
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import lru_cache
@@ -49,6 +49,7 @@ from sbam_contracts.isatvon14 import SubSkill
 from sbam_contracts.manifest import SkillManifest
 from sbam_contracts.pipeline import IdResult
 from sbam_contracts.runs import TaskQueue
+from sbam_contracts.sandbox import normalize_digest
 from sqlalchemy.orm import Session, sessionmaker
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -74,17 +75,27 @@ from sbam_workers.build.correct import (
     SqlCorrectionStore,
 )
 from sbam_workers.build.gates import ast_gate as ast_gate_stage_module
+from sbam_workers.build.gates import compliance as compliance_stage_module
+from sbam_workers.build.gates import import_gate as import_gate_stage_module
 from sbam_workers.build.gates import static_gate as static_gate_stage_module
 from sbam_workers.build.gates.ast_gate import AstGate
+from sbam_workers.build.gates.compliance import ComplianceGates
+from sbam_workers.build.gates.errors import IMPORT_GATE_INFRA
+from sbam_workers.build.gates.import_gate import ImportGate
+from sbam_workers.build.gates.sandbox_import_runner import SandboxImportRunner
 from sbam_workers.build.gates.static_gate import StaticGate
 from sbam_workers.build.gates.static_tools import make_tools
 from sbam_workers.build.gates.toolchain import Executor, LocalExecutor, SidecarExecutor
+from sbam_workers.build.review import STAGE as REVIEW_STAGE
+from sbam_workers.build.review import Review, ReviewInputs
 from sbam_workers.isatvon.loop_spec import LoopSpecError, compile_definition
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.registry import PromptRegistry
 from sbam_workers.llm.store import SqlCallStore
 from sbam_workers.llm.trace import LangfuseTracer
 from sbam_workers.registry import activity_for
+from sbam_workers.sandbox.backend import SandboxInfraError
+from sbam_workers.sandbox.factory import make_sandbox
 from sbam_workers.settings import WorkerSettings
 from sbam_workers.test import promptfoo_suite as suite_stage
 from sbam_workers.test import testgen as testgen_stage
@@ -278,6 +289,21 @@ class SqlBuildInputs:
                 manifest_id=loaded.manifest_id,
             )
 
+    def _review(self, inp: BuildStageInput) -> ReviewInputs:
+        with self.sessions() as session:
+            attempt = CodeAttemptRepository(session, self._ctx(inp)).find(
+                inp.sub_skill_id, inp.build_no, inp.cycle, inp.attempt
+            )
+            if attempt is None:  # the gates ran on this attempt; a missing row is a wiring bug
+                raise _mismatch(
+                    f"no code_attempts row for {inp.sub_skill_id} attempt {inp.attempt}"
+                )
+            loaded = self._load(session, inp, attempt.manifest_id)
+            return ReviewInputs(
+                sub_skill=loaded.sub_skill,
+                skeleton=render_manifest(loaded.template, loaded.manifest),
+            )
+
     def _tests_sub_skill(self, inp: BuildStageInput) -> dict[str, Any]:
         with self.sessions() as session:
             return self._sub_skill(session, inp)
@@ -291,6 +317,9 @@ class SqlBuildInputs:
 
     async def assemble(self, inp: BuildStageInput) -> AssembleInputs:
         return await asyncio.to_thread(self._assemble, inp)
+
+    async def review(self, inp: BuildStageInput) -> ReviewInputs:
+        return await asyncio.to_thread(self._review, inp)
 
     async def correction(self, inp: CorrectionInput) -> CorrectionInputs:
         return await asyncio.to_thread(self._correction, inp)
@@ -338,6 +367,15 @@ def _ast_gate() -> AstGate:
     return AstGate(SqlBuildInputs(sessions).assemble, make_backend(settings), sessions)
 
 
+@lru_cache(maxsize=1)
+def _review_stage() -> Review:
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    storage = make_backend(settings)
+    return Review(
+        SqlBuildInputs(sessions).review, storage, sessions, _llm(settings, sessions)
+    )
+
+
 @activity_for(TaskQueue.LLM)
 @activity.defn(name=bodies_stage.STAGE)
 async def generate_bodies_stage(inp: BuildStageInput) -> IdResult:
@@ -368,6 +406,46 @@ def _static_gate() -> StaticGate:
         make_tools(executor),
         max_signature_age=timedelta(hours=settings.clamav_max_signature_age_hours),
     )
+
+
+def runtime_image_of(sessions: sessionmaker[Session]) -> Callable[[BuildStageInput], str]:
+    """The skill-runtime image the build pinned: `skill-runtime@sha256:...` from the digest of the
+    manifest of this very code attempt (the import gate refuses anything that is not a digest)."""
+
+    def image_for(inp: BuildStageInput) -> str:
+        ctx = TenantContext(inp.tenant_id, inp.project_id)
+        with sessions() as session:
+            attempt = CodeAttemptRepository(session, ctx).find(
+                inp.sub_skill_id, inp.build_no, inp.cycle, inp.attempt
+            )
+            row = (
+                None
+                if attempt is None or attempt.manifest_id is None
+                else SubSkillManifestRepository(session, ctx).get(attempt.manifest_id)
+            )
+            if row is None:
+                raise _mismatch("no manifest for the code attempt: the import gate has no image")
+            return f"skill-runtime@{normalize_digest(row.runtime_digest)}"
+
+    return image_for
+
+
+def _import_gate() -> ImportGate:
+    """The import gate on the sandbox adapter (#761). A worker with no sandbox configured gives
+    `IMPORT_GATE_INFRA`: retried, never a correction and never a verdict."""
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    try:
+        sandbox = make_sandbox(settings)
+    except SandboxInfraError as exc:
+        raise ApplicationError(str(exc), type=IMPORT_GATE_INFRA) from exc
+    runner = SandboxImportRunner(sandbox.backend, environment=settings.sbam_env)
+    return ImportGate(make_backend(settings), sessions, runner, runtime_image_of(sessions))
+
+
+@lru_cache(maxsize=1)
+def _compliance_gates() -> ComplianceGates:
+    settings, sessions = WorkerSettings(), mirror.sessions()  # type: ignore[call-arg]
+    return ComplianceGates(make_backend(settings), sessions)
 
 
 @lru_cache(maxsize=1)
@@ -403,6 +481,23 @@ async def static_gate_stage_activity(inp: BuildStageInput) -> IdResult:
     return await _static_gate().run(inp)
 
 
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name=import_gate_stage_module.STAGE)
+async def import_gate_stage_activity(inp: BuildStageInput) -> IdResult:
+    """Every module of the stored bundle imports, with no side effect, in a sandbox VM of the pinned
+    runtime (#761); a failed import is GateFailed with the attempt id, the verdict in
+    `gate_results`, and a sandbox that cannot be reached is the retryable IMPORT_GATE_INFRA."""
+    return await _import_gate().run(inp)
+
+
+@activity_for(TaskQueue.BUILD)
+@activity.defn(name=compliance_stage_module.STAGE)
+async def compliance_gates_stage_activity(inp: BuildStageInput) -> IdResult:
+    """The licence, dependency vulnerability and MCP compliance rows certification needs (#761);
+    a failing row is GateFailed with the attempt id, the findings in `gate_results`."""
+    return await _compliance_gates().run(inp)
+
+
 @activity_for(TaskQueue.LLM)
 @activity.defn(name=testgen_stage.STAGE)
 async def generate_tests_stage_activity(inp: BuildStageInput) -> IdResult:
@@ -422,3 +517,12 @@ async def build_promptfoo_suite_stage_activity(inp: BuildStageInput) -> IdResult
 async def correct_stage_activity(inp: CorrectionInput) -> CorrectionResult:
     """The correction written as the next attempt (E11.4)."""
     return await _correct().run(inp)
+
+
+@activity_for(TaskQueue.LLM)
+@activity.defn(name=REVIEW_STAGE)
+async def review_code_stage_activity(inp: BuildStageInput) -> IdResult:
+    """One model review of the stored bundle after the AST and static gates passed (#759); a FAIL
+    is GateFailed with the attempt id, the verdict and findings in `gate_results`. Not called by
+    `SubSkillBuild` yet."""
+    return await _review_stage().run(inp)

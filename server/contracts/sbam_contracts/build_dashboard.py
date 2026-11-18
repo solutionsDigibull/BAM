@@ -46,6 +46,10 @@ class GateName(StrEnum):
     CLAMAV = "CLAMAV"
     BANDIT = "BANDIT"
     IMPORT_RESOLUTION = "IMPORT_RESOLUTION"
+    REPO_LICENCE = "REPO_LICENCE"  # #761: the licence of the repository and its dependencies
+    DEPENDENCY_VULN = "DEPENDENCY_VULN"  # #761: known vulnerabilities in what the code depends on
+    MCP_COMPLIANCE = "MCP_COMPLIANCE"  # #761: the Sub-Skill's two tools are legal MCP tools
+    REVIEW = "REVIEW"  # #759: the model review after the AST and static gates
     LOOP_TESTS = "LOOP_TESTS"
 
 

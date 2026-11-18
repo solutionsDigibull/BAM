@@ -1,11 +1,12 @@
-import { EmptyState } from "@/components/ui-kit";
 import { isUuid } from "@/lib/roles";
 
 import { CodeScreen } from "./code-screen";
+import { WorkflowCodeScreen } from "./workflow-code-screen";
 
 export const metadata = { title: "Code" };
 
-// The workflow layout has already rejected a malformed workflow id. `?sub=` names the Sub-Skill.
+// The workflow layout has already rejected a malformed workflow id. `?sub=` names a Sub-Skill and opens its
+// attempts, files and diffs; without it the whole Workflow's code is shown, a tag per file (WG-15).
 export default async function CodePage({
   params,
   searchParams,
@@ -16,6 +17,6 @@ export default async function CodePage({
   const { projectId, workflowId } = await params;
   const { sub } = await searchParams;
   const subId = typeof sub === "string" && isUuid(sub) ? sub : null;
-  if (!subId) return <EmptyState message="Choose a Sub-Skill to see its generated code" />;
+  if (!subId) return <WorkflowCodeScreen projectId={projectId} workflowId={workflowId} />;
   return <CodeScreen projectId={projectId} workflowId={workflowId} subId={subId} />;
 }

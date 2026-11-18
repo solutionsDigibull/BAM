@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     # Where the preflight page asks the gateway whether the provider key works (no key is sent:
     # Bifrost is reachable from the internal network only).
     bifrost_url: AnyHttpUrl = AnyHttpUrl("http://bifrost:8080")
+    # Bifrost management API (#760): registering certified Workflow servers. A secret from the
+    # environment or a Docker secret; without it nothing is registered. Rotate it by changing the
+    # secret and restarting.
+    bifrost_setup_token: SecretStr | None = None
     # Product analytics (E16.2): server-side PostHog events from the outbox. Unset host or key = no
     # events (a laptop without the `analytics` profile). The salt hashes user ids into distinct_ids.
     posthog_host: str | None = None  # Compose passes "" when unset: a str, not a URL

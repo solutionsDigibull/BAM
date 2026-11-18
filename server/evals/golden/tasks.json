@@ -53,5 +53,14 @@
     ],
     "status": "ready",
     "note": "20 items: the MS01.1 bodies with one flaw each of five kinds the build's pre-check refuses (correction.json, from sbam_workers.evals.correction_set); the findings are the pre-check's own."
+  },
+  {
+    "task": "review",
+    "alias": "sbam-reviewer",
+    "prompt_ids": [
+      "review-diff"
+    ],
+    "status": "ready",
+    "note": "20 items: the MS01.1 login bodies, 12 with one defect no gate can see (inverted condition, wrong handoff value, unenforced limit, secret in the record) and 8 clean variants (review.json, from sbam_workers.evals.review_set). No baseline yet: it needs a real call."
   }
 ]

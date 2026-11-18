@@ -27,9 +27,12 @@
 /* One canvas: the same gap between panes and around them, one header height, one body padding, one rail width. */
 .bam-wb .shell {
   --gap: 12px; --pad: 16px; --head: 52px; --rail: 56px;
-  /* NAVIGATE and the workspace share the width; the assistant has one clamped width on every stage (21 Oct 2026, round 3),
-     so collapsing NAVIGATE or a grid reflow never resizes the chat. A collapsed pane gives its share to the workspace. */
+  /* 17 Nov 2026 (approved pane wireframes): default widths NAVIGATE 20% · assistant 40% · RESULTS & EDITS 40% of the
+     content width; --pane-columns (set by PaneLayout) carries the exact shares, drag-resize and the 6px hairlines.
+     A collapsed pane is a hairline; the last pane in the visual order takes the freed space. --nav/--assist below stay
+     for Upload's own stages (goal.css), which keep their earlier layout. */
   --nav: minmax(0, 1fr); --assist: clamp(320px, 32vw, 480px);
+  position: relative;
   display: grid; grid-template-columns: var(--nav) var(--assist) minmax(0, 1fr); gap: var(--gap);
   padding: var(--gap); min-height: 0; min-width: 0; background: var(--bg);
 }
@@ -43,9 +46,12 @@
 }
 .bam-wb .shell-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none;
-  height: var(--head); padding: 0 12px 0 var(--pad); border-bottom: 1px solid var(--border);
+  position: relative;
+  /* 17 Nov 2026: a fixed slot at the left edge for the swap grip, same in every pane header. */
+  height: var(--head); padding: 0 12px 0 calc(var(--pad) + 26px); border-bottom: 1px solid var(--border);
 }
 .bam-wb .shell-head h2 { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--text); min-width: 0; }
+.bam-wb .navrail .shell-head { justify-content: flex-start; }
 .bam-wb .navrail .shell-head h2 { text-transform: uppercase; letter-spacing: .08em; }
 .bam-wb .shell-head h2 .icon { color: var(--muted); }
 
@@ -103,11 +109,16 @@
 .bam-wb .shell-rail.shell-pane { overflow: visible; }
 .bam-wb .shell-rail .tip { left: calc(100% + 10px); right: auto; top: 50%; bottom: auto; transform: translateY(-50%); white-space: nowrap; }
 .bam-wb .shell-rail .tip::after { left: -5px; right: auto; top: 50%; margin-top: -4px; transform: rotate(135deg); }
+.bam-wb .shell-rail[data-opens="left"] .tip { left: auto; right: calc(100% + 10px); }
+.bam-wb .shell-rail[data-opens="left"] .tip::after { left: auto; right: -5px; transform: rotate(-45deg); }
 
 /* ---- collapsed rails: identical for NAVIGATE and Enterprise Assistant (toggle in the header row, content below) ---- */
 .bam-wb .shell-rail { align-items: stretch; }
 .bam-wb .rail-head { height: var(--head); flex: none; display: grid; place-items: center; border-bottom: 1px solid var(--border); }
-.bam-wb .shell-rail .nv-mini { padding: var(--pad) 0; align-items: center; }
+.bam-wb .shell-rail .nv-mini { padding: var(--pad) 0; align-items: center; gap: 14px; }
+/* Dotted connector between the stage icons (17 Nov 2026); names stay in tooltips, so the mini labels hide. */
+.bam-wb .shell-rail .nv-mini-label { display: none; }
+.bam-wb .shell-rail .nv-mini > li:not(:last-child) .nv-dot::after { content: ''; position: absolute; top: calc(100% + 1px); left: 50%; height: 13px; border-left: 2px dotted var(--border-strong); }
 .bam-wb .nv-mini > li { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .bam-wb .nv-mini-label { max-width: 54px; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: -.01em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bam-wb .nv-mini > li:has(.nv-dot.on) .nv-mini-label { color: var(--accent-txt); }
@@ -297,8 +308,8 @@
 /* Header title removed per user (5 Nov 2026): where the Hide assistant control is hidden too, the header row
    would be an empty bar, so the whole row goes; the thread/goal card starts at the pane top. */
 .bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .assist > .shell-head, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .assist > .shell-head { display: none; }
-/* With the title gone the Hide assistant control is the header's only child - keep it at the right edge. */
-.bam-wb .assist > .shell-head { justify-content: flex-end; }
+/* 17 Nov 2026: the assistant's Hide control sits at the header's left edge, like NAVIGATE's collapse. */
+.bam-wb .assist > .shell-head { justify-content: flex-start; }
 .bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .workspace, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .workspace {
   /* Collapsed, not display:none, so the review dialog (a top-layer <dialog> inside this pane) can still open from the files pane. */
   position: absolute; width: 0; height: 0; min-width: 0; margin: 0; padding: 0; border: 0; overflow: hidden; visibility: hidden; pointer-events: none;
@@ -314,3 +325,62 @@
   /* The workspace is the main pane on small screens; until files exist the goal chat takes its place. */
   .bam-wb[data-upload-stage="1"] .shell[data-screen="1.1"] .slot-assist, .bam-wb[data-upload-stage="2"] .shell[data-screen="1.1"] .slot-assist { display: flex; }
 }
+
+/* Rearrangement is presentation-only: pane widths and collapse state travel with their pane.
+   Intake's one/two-pane stages and mobile drawers retain their existing layout. */
+@media (min-width: 861px) {
+  .bam-wb:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] {
+    grid-template-columns: var(--pane-columns);
+  }
+  .bam-wb:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > [data-layout-pane="nav"] { order: var(--order-nav); }
+  .bam-wb:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > [data-layout-pane="assistant"] { order: var(--order-assistant); }
+  .bam-wb:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > [data-layout-pane="workspace"] { order: var(--order-workspace); }
+  .bam-wb:not([data-upload-stage="1"]):not([data-upload-stage="2"]) [data-pane-handle] { cursor: grab; touch-action: none; }
+  .bam-wb [data-pane-handle]:focus-visible { outline: 2px solid var(--bl-blue); outline-offset: -3px; }
+  .bam-wb .shell[data-pane-drag] { user-select: none; cursor: grabbing; }
+  .bam-wb:not([data-upload-stage="1"]):not([data-upload-stage="2"]) .shell[data-pane-order] > .pane-divider { display: block; }
+}
+
+/* ---- pane swap transition, grips, hairlines, resize dividers, first-use hint (17 Nov 2026, approved wireframes) ---- */
+/* Change 3 (updated 17 Nov 2026, per user): a self-drawn two-panes/double-arrow grip in every pane header.
+   It is a button (click moves the pane one position left, wrapping from the left edge to the far right) and is
+   highlighted - accent colour on a soft chip - so it stands out in the header. */
+.bam-wb .pane-grip { display: inline-grid; place-items: center; position: absolute; left: var(--pad); top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 2px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--bl-blue) 14%, transparent); color: var(--bl-blue); cursor: pointer; transition: background .15s ease; }
+.bam-wb .pane-grip:hover, .bam-wb .pane-grip:focus-visible { background: color-mix(in srgb, var(--bl-blue) 26%, transparent); }
+
+/* Change 2: the picked-up pane lifts as a ghost at ~90% opacity with a raised shadow. */
+.bam-wb .pane-ghost { position: fixed; z-index: 100; margin: 0; display: flex; opacity: .9; pointer-events: none; filter: drop-shadow(0 16px 30px rgb(15 23 42 / .35)); }
+.bam-wb .pane-ghost > * { flex: 1; min-width: 0; }
+/* The landing place is a dashed slot; neighbours glide aside in real time (FLIP in PaneLayout). */
+.bam-wb .shell-slot[data-drop-slot] { position: relative; }
+.bam-wb .shell-slot[data-drop-slot] > * { visibility: hidden; }
+.bam-wb .shell-slot[data-drop-slot]::before { content: ''; position: absolute; inset: 0; border: 2px dashed var(--bl-blue); border-radius: 12px; background: var(--bl-blue-soft); }
+.bam-wb .shell-slot[data-drop-slot]::after { content: 'Drop to place here'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--bl-blue); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+
+/* Change 4: a collapsed pane is a 6 px hairline in the background colour - no icon, no label, no visible strip.
+   Hovering the edge fades in a slim strip with a chevron; click or pull it to restore the pane. */
+.bam-wb .shell-hair { position: relative; background: none; border: 0; border-radius: 0; overflow: visible; }
+.bam-wb .shell-hair::before { content: ''; position: absolute; top: 6px; bottom: 6px; left: 2px; width: 2px; border-radius: 2px; background: var(--border-strong); opacity: .45; }
+.bam-wb .shell-hair .hair-hot { position: absolute; top: 0; bottom: 0; left: -5px; right: -5px; }
+.bam-wb .hair-restore { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 25; width: 26px; height: 64px; padding: 0; border-radius: 999px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); color: var(--accent-txt); cursor: pointer; opacity: 0; transition: opacity .15s ease; }
+.bam-wb .shell-hair:hover .hair-restore, .bam-wb .hair-restore:focus-visible { opacity: 1; }
+.bam-wb .shell-hair[data-opens="left"] .hair-restore .icon { transform: rotate(180deg); }
+
+/* Change 5: drag a divider to resize - the line lights up with a pill grip; a live readout shows all three widths.
+   Double-click a divider resets to 20 / 40 / 40. */
+.bam-wb .pane-divider { display: none; position: absolute; top: var(--gap); bottom: var(--gap); z-index: 30; width: 14px; transform: translateX(-50%); cursor: col-resize; touch-action: none; }
+.bam-wb .pane-divider::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; border-radius: 2px; background: transparent; transition: background .15s ease; }
+.bam-wb .pane-divider::after { content: ''; position: absolute; top: var(--grip-y, 50%); left: 50%; width: 8px; height: 28px; transform: translate(-50%, -50%); border-radius: 99px; background: transparent; transition: background .15s ease; }
+.bam-wb .pane-divider:hover::before, .bam-wb .pane-divider.on::before, .bam-wb .pane-divider:focus-visible::before { background: var(--bl-blue); }
+.bam-wb .pane-divider:hover::after, .bam-wb .pane-divider.on::after, .bam-wb .pane-divider:focus-visible::after { background: var(--bl-blue); box-shadow: inset 0 0 0 1.5px var(--surface); }
+.bam-wb .pane-divider:focus-visible { outline: none; }
+.bam-wb .pane-readout { position: fixed; z-index: 120; transform: translate(-50%, 0); padding: 6px 12px; border-radius: 99px; background: #101828; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: var(--shadow); }
+
+/* Change 3: first visit only - a one-time hint points at a grip; it retires forever after the first successful swap. */
+.bam-wb .pane-hint { position: fixed; z-index: 130; transform: translateX(-50%); max-width: 300px; padding: 12px 14px; border-radius: 12px; background: var(--bl-blue); color: #fff; box-shadow: var(--shadow); font-size: 13px; }
+.bam-wb .pane-hint::before { content: ''; position: absolute; top: -5px; left: 50%; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); background: inherit; }
+.bam-wb .pane-hint p { margin: 0 0 10px; font-weight: 600; line-height: 1.35; }
+.bam-wb .pane-hint-actions { display: flex; align-items: center; gap: 12px; }
+.bam-wb .pane-hint-ok { padding: 5px 14px; border: 0; border-radius: 99px; background: #fff; color: var(--bl-blue); font-weight: 700; font-size: 12px; cursor: pointer; }
+.bam-wb .pane-hint-later { padding: 5px 0; border: 0; background: none; color: rgb(255 255 255 / .85); font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.bam-wb .pane-hint-later:hover { color: #fff; }

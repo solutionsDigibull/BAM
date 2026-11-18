@@ -34,6 +34,7 @@ from sbam_workers.build.codegen.render import render_manifest
 from sbam_workers.build.codegen.store import LoadedTemplate, load_template
 from sbam_workers.build.correct import Correct, CorrectionInputs
 from sbam_workers.build.gates.static_gate import StaticGate
+from sbam_workers.build.review import Review, ReviewInputs
 from sbam_workers.build.wiring import (
     INPUT_MISMATCH,
     LOOP_SPEC_INVALID,
@@ -93,6 +94,9 @@ class World:
 
     def correction(self, inp: CorrectionInput) -> CorrectionInputs:
         return asyncio.run(self.loaders.correction(inp))
+
+    def review(self, inp: BuildStageInput) -> ReviewInputs:
+        return asyncio.run(self.loaders.review(inp))
 
     def add_registry(self) -> None:
         with self.sessions() as session:
@@ -298,6 +302,31 @@ def test_e11_2b_t04_the_correction_gets_the_effective_sub_skill() -> None:
     assert given.trace == ""  # the test stages are stubs: there is no sandbox trace yet
 
 
+def test_wg11_the_review_gets_the_effective_sub_skill_and_the_skeleton_of_the_attempt() -> None:
+    world = World()
+    world.add_registry()
+    manifest = world.add_manifest(0)
+    for attempt in (0, 1):
+        world.add_code_attempt(attempt, manifest_id=manifest)
+    given = world.review(world.stage())
+    assert given.sub_skill == structured()
+    assert given.skeleton == render_manifest(
+        world.template, SkillManifest.model_validate(world.manifest_data())
+    )
+    world.add_correction(1, patched_sub_skill(7))  # the review judges the code against the patch
+    assert world.review(world.stage(attempt=1)).sub_skill == patched_sub_skill(7)
+    assert world.review(world.stage(attempt=0)).sub_skill == structured()
+
+
+def test_wg11_a_review_without_a_code_attempt_is_a_wiring_bug() -> None:
+    world = World()
+    world.add_registry()
+    world.add_manifest(0)
+    with pytest.raises(ApplicationError) as error:
+        world.review(world.stage())
+    refused(error, INPUT_MISMATCH)
+
+
 # --- what refuses ---------------------------------------------------------------------------------
 
 
@@ -358,6 +387,7 @@ def test_e11_2b_t05_a_loop_spec_that_does_not_compile_is_not_retried() -> None:
     [
         ("generate_bodies", TaskQueue.LLM),
         ("correct", TaskQueue.LLM),
+        ("review_code", TaskQueue.LLM),
         ("assemble", TaskQueue.BUILD),
         ("ast_gate", TaskQueue.BUILD),
         ("static_gate", TaskQueue.BUILD),
@@ -394,6 +424,7 @@ def test_e11_2b_t07_the_registered_stages_build_their_dependencies(
             (wiring._generate, GenerateBodies),
             (wiring._assemble, Assemble),
             (wiring._correct, Correct),
+            (wiring._review_stage, Review),
             (wiring._static_gate, StaticGate),
             (wiring._generate_tests, GenerateTests),
             (wiring._build_promptfoo_suite, BuildPromptfooSuite),

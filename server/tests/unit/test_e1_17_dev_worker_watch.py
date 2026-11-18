@@ -22,8 +22,16 @@ WATCH = [
 ]
 
 
+class _ComposeLoader(yaml.SafeLoader):
+    """A safe loader that also reads Compose's `!reset` tag (used by the override file, #807)."""
+
+
+_ComposeLoader.add_constructor("!reset", lambda loader, node: None)
+
+
 def override() -> dict[str, Any]:
-    data: dict[str, Any] = yaml.safe_load((COMPOSE / "compose.override.yaml").read_text("utf-8"))
+    text = (COMPOSE / "compose.override.yaml").read_text("utf-8")
+    data: dict[str, Any] = yaml.load(text, Loader=_ComposeLoader)  # noqa: S506
     return data
 
 
@@ -53,3 +61,13 @@ def test_e1_17_t03_no_watcher_in_deployed_overlays_or_the_prod_image() -> None:
     dockerfile = (COMPOSE / "docker" / "server.Dockerfile").read_text("utf-8")
     prod = dockerfile.split("FROM base AS prod", 1)[1]
     assert "watchfiles" not in prod and "--reload" not in prod
+
+
+def test_807_one_worker_builds_the_image_and_api_migrate_and_seed_build_nothing() -> None:
+    services = override()["services"]
+    builders = [q for q in WORKERS if services[f"worker-{q}"].get("build")]
+    assert builders == ["build"]  # one build of sbam-worker:local, shared by the six workers
+    for name in ("api-migrate", "api-seed"):
+        assert services[name]["build"] is None, name  # they use sbam-api's dev image
+        # They mount the source, so `up` runs the checkout's migrations and seed.
+        assert services[name]["volumes"] == ["../server:/app/server"], name

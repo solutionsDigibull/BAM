@@ -30,6 +30,21 @@
     "primary": "openai/gpt-4o-mini",
     "fallback": "openai/gpt-4o"
   },
+  "sbam-reviewer": {
+    "use": "Reviews the generated diff against the Sub-Skill spec after all gates pass (WG-11). Cheap model, different from the coder.",
+    "primary": "openai/gpt-4o-mini",
+    "fallback": "openai/gpt-4o"
+  },
+  "sbam-repo-scout": {
+    "use": "Scores repo candidates for a Sub-Skill on close calls (WG-11). Cheap model.",
+    "primary": "openai/gpt-4o-mini",
+    "fallback": "openai/gpt-4o"
+  },
+  "sbam-relevance": {
+    "use": "How useful one parsed document is for the project's goal (RelevanceAnswer, #802)",
+    "primary": "openai/gpt-4o-mini",
+    "fallback": "openai/gpt-4o"
+  },
   "sbam-rubric": {
     "use": "Promptfoo llm-rubric grading of free-text outputs in the sbam-promptfoo sidecar (E13.6c)",
     "primary": "openai/gpt-4o-mini",

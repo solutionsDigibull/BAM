@@ -27,6 +27,7 @@ from pydantic import AnyHttpUrl
 from sbam_api.db.session import make_engine
 from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_contracts.pipeline import StageRef
+from sbam_contracts.review import ReviewAnswer
 from sbam_contracts.testgen import TestgenOutput
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -34,6 +35,8 @@ from sqlalchemy.pool import StaticPool
 from sbam_workers.build.codegen.bodies import CodeBodies, GeneratedBodies, generate_bodies
 from sbam_workers.build.codegen.correction import Correction, correct_code
 from sbam_workers.build.codegen.store import LoadedTemplate
+from sbam_workers.build.review import ALIAS as REVIEW_ALIAS
+from sbam_workers.build.review import PROMPT as REVIEW_PROMPT
 from sbam_workers.evals.baseline import (
     Baseline,
     Decision,
@@ -65,16 +68,20 @@ from sbam_workers.evals.golden import (
     load_codegen,
     load_correction,
     load_ocr,
+    load_review,
     load_tasks,
     load_testgen,
     testgen_base,
 )
 from sbam_workers.evals.render import render_page
+from sbam_workers.evals.review_set import ReviewCase
+from sbam_workers.evals.review_set import build_cases as build_review_cases
 from sbam_workers.evals.scoring import (
     ItemResult,
     score_codegen,
     score_correction,
     score_ocr,
+    score_review,
     score_testgen,
     task_score,
 )
@@ -104,6 +111,9 @@ CorrectionRunner = Callable[
 ]
 # (the Sub-Skill's case) -> the generated bodies, or None if the model never gave any
 CodegenRunner = Callable[[CodegenCase], Awaitable[GeneratedBodies | None]]
+# (the case: the spec and the diff, plus what it is) -> the reviewer's answer, or None if it never
+# gave one the client accepts
+ReviewRunner = Callable[[ReviewCase], Awaitable[ReviewAnswer | None]]
 EXIT = {Verdict.PASS: 0, Verdict.REGRESSED: 1, Verdict.INFRA_ERROR: 2, Verdict.NO_BASELINE: 3}
 
 
@@ -357,6 +367,51 @@ def live_codegen_factory(
     return make
 
 
+async def run_review(
+    make_runner: Callable[[], ReviewRunner], cases: Sequence[ReviewCase], runs: int
+) -> list[list[ItemResult]]:
+    """`runs` passes over the cases, each with its own runner (so its own client)."""
+    out: list[list[ItemResult]] = []
+    for _ in range(runs):
+        run = make_runner()
+        results: list[ItemResult] = []
+        for case in cases:
+            try:
+                answer = await run(case)
+            except LlmTransportError as exc:
+                raise InfraError(
+                    f"the provider failed on {case.item.id}: {type(exc).__name__}"
+                ) from None
+            results.append(score_review(case.item, answer))
+        out.append(results)
+    return out
+
+
+def live_review_factory(bifrost_url: str | None = None) -> Callable[[], ReviewRunner]:
+    """Runners on the real `sbam-reviewer` call (schema re-asks included) through Bifrost."""
+
+    def make() -> ReviewRunner:
+        client, _ = _live_client(bifrost_url)
+
+        async def run(case: ReviewCase) -> ReviewAnswer | None:
+            scope = LlmScope(
+                uuid.uuid4(), uuid.uuid4(), "eval-gate", f"wf-{uuid.uuid4()}:run", "act-eval"
+            )
+            try:
+                result = await client.run(
+                    REVIEW_ALIAS, REVIEW_PROMPT, ReviewAnswer, case.context, scope
+                )
+            except SchemaInvalidAfterRetries:
+                return None  # the model never gave an answer the schema accepts
+            except (LlmRequestRejected, ContextTooLarge):
+                return None
+            return result.output
+
+        return run
+
+    return make
+
+
 def prompt_shas(task: Task, golden_dir: Path = GOLDEN_DIR) -> dict[str, str]:
     """`prompt id/version -> sha256` of the latest version of every prompt the task uses."""
     registry = PromptRegistry()
@@ -522,6 +577,32 @@ async def run_codegen_gate(
     )
 
 
+async def run_review_gate(
+    make_runner: Callable[[], ReviewRunner],
+    *,
+    record: bool = False,
+    runs: int | None = None,
+    golden_dir: Path = GOLDEN_DIR,
+    evals_dir: Path = EVALS_DIR,
+    baseline_dir: Path = BASELINE_DIR,
+    today: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> GateReport:
+    """The reviewer gate."""
+    items = load_review(golden_dir).items
+    cases = build_review_cases(items, correction_base(golden_dir))
+    return await run_task_gate(
+        Task.REVIEW,
+        lambda count: run_review(make_runner, cases, count),
+        items=len(items),
+        record=record,
+        runs=runs,
+        golden_dir=golden_dir,
+        evals_dir=evals_dir,
+        baseline_dir=baseline_dir,
+        today=today,
+    )
+
+
 def render_report(report: GateReport) -> str:
     lines = [f"{report.decision.verdict}: {report.decision.reason}"]
     for number, run in enumerate(report.runs, start=1):
@@ -537,7 +618,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a golden set against the model")
     parser.add_argument(
         "--task",
-        choices=[Task.OCR.value, Task.TESTGEN.value, Task.CORRECTION.value, Task.CODEGEN.value],
+        choices=[
+            Task.OCR.value,
+            Task.TESTGEN.value,
+            Task.CORRECTION.value,
+            Task.CODEGEN.value,
+            Task.REVIEW.value,
+        ],
         default="ocr",
     )
     parser.add_argument("--runs", type=int, default=None, help="override gate.json")
@@ -551,6 +638,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             live_codegen_factory(load_codegen_template(), args.bifrost_url),
             record=args.record,
             runs=args.runs,
+        )
+    elif args.task == Task.REVIEW.value:
+        coroutine = run_review_gate(
+            live_review_factory(args.bifrost_url), record=args.record, runs=args.runs
         )
     elif args.task == Task.CORRECTION.value:
         coroutine = run_correction_gate(

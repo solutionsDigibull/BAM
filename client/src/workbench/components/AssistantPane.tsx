@@ -1,3 +1,4 @@
+import { Hairline, PaneGrip, paneHeaderProps } from './PaneLayout'
 // Enterprise Assistant (middle pane), built on assistant-ui primitives with a local runtime. The thread lives for the
 // whole session and is never keyed by screen, so navigating keeps the conversation. The pane is only the thread and the
 // composer (input, Dictate, send). The chat holds no unprompted status notes: an assistant message only answers something
@@ -53,7 +54,9 @@ function loadThread(project: string): ExportedMessageRepository | null {
 const threads = new Map<string, ExportedMessageRepository>()
 
 export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; screenId?: string; locked?: string }) {
-  const collapsed = useUi(s => s.shell.assistant)
+  const drawer = useUi(s => s.drawer)
+  // Narrow screens open the pane as an overlay drawer: always show the full pane there (UI team, 17 Nov 2026).
+  const collapsed = useUi(s => s.shell.assistant) && drawer !== 'assistant'
   const ask = useUi(s => s.assistantAsk)
   const rag = useRag(s => s)
   const statuses = useStatuses()
@@ -123,20 +126,19 @@ export function AssistantPane({ snap, screenId, locked }: { snap: Snapshot; scre
 
   // Hidden by the person only (Hide assistant); a stage change never hides it. The runtime provider stays mounted, so
   // the thread keeps its messages while the pane is hidden.
+  // Collapsed (UI team, 17 Nov 2026, approved wireframes change 4): a 6 px hairline, no icon or label; hover the edge
+  // for the restore strip. The runtime provider stays mounted so the thread survives.
   if (collapsed) return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <aside className="shell-pane shell-rail" aria-label="BuLLM Assistant">
-        <button className="rail-show" onClick={toggle} aria-expanded={false} aria-label="Show assistant">
-          <Icon name="panel-right" size={16} /><span>Show assistant</span>
-        </button>
-      </aside>
+      <Hairline pane="assistant" label="Show assistant" onRestore={toggle} />
     </AssistantRuntimeProvider>
   )
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <aside className="shell-pane assist" aria-label="BuLLM Assistant" data-screen={screenId}>
-        <header className="shell-head">
-          <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant"><Icon name="panel-left" size={14} />Hide assistant</button>
+        <header {...paneHeaderProps} className="shell-head">
+          <PaneGrip pane="assistant" />
+          <button className="btn btn-ghost sm as-hide" onClick={toggle} aria-expanded aria-label="Hide assistant" title="Hide assistant"><Icon name="panel-left" size={14} /></button>
         </header>
         <ThreadBody note={note} screenId={screenId} />
       </aside>
@@ -212,7 +214,7 @@ function Composer({ chips }: { chips: readonly string[] }) {
       </Tip>
       <label className="sr-only" htmlFor="as-input">Message the Enterprise Assistant</label>
       <div className="as-field">
-        <ComposerPrimitive.Input id="as-input" className="as-input" rows={1} placeholder="Ask about this project..." />
+        <ComposerPrimitive.Input id="as-input" className="as-input" rows={1} placeholder="ask BuLLM" />
         {dictation && <DictateListening />}
       </div>
       {dictation && <DictateControls />}

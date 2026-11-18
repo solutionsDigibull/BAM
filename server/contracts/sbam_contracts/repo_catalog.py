@@ -13,7 +13,7 @@ the same candidate on every read and a changed URL yields a new one.
 from enum import StrEnum
 from typing import Annotated, Any, Final
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.isatvon14 import RepoUrl, ShortText
@@ -62,6 +62,39 @@ class RepoCatalog(_Strict):
     rejected: list[CatalogRejection] = Field(default_factory=list, max_length=500)
 
 
+MAX_SCOUT_SCORES: Final = 500
+MAX_SCOUT_REASONS: Final = 8
+
+
+class ScoutScore(BaseModel):
+    """How well one catalog candidate fits the Sub-Skill, as the repo scout judged it (#759)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: ShortText  # a `CatalogCandidate.id` from the request
+    score: Annotated[float, Field(ge=0.0, le=1.0)]
+    reasons: list[ShortText] = Field(default_factory=list, max_length=MAX_SCOUT_REASONS)
+
+
+class RepoScoutAnswer(BaseModel):
+    """What the model answers when asked which candidates fit a Sub-Skill. Advice only: the
+    chooser (#756) validates every id against the catalog and applies the ADR 0028 rules."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scores: list[ScoutScore] = Field(default_factory=list, max_length=MAX_SCOUT_SCORES)
+
+    @model_validator(mode="after")
+    def _once_each(self) -> "RepoScoutAnswer":
+        ids = [s.candidate_id for s in self.scores]
+        if len(set(ids)) != len(ids):
+            raise ValueError("a candidate may be scored once")
+        return self
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/repo/`."""
-    return {"catalog": contract_schema(RepoCatalog, "repo/catalog")}
+    return {
+        "catalog": contract_schema(RepoCatalog, "repo/catalog"),
+        "scout_answer": contract_schema(RepoScoutAnswer, "repo/scout_answer"),
+    }

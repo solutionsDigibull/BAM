@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:4ff0f81897651ecb91f19d14156f9867803a217ef8b425bd72787cb26e5ce3be
+// source-sha256:b6170407a93233a05c5d960664c62df038f8b1929a1edc5d8b6cda0e7d9ab329
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -170,6 +170,9 @@ export type BuildStage =
   | "assemble"
   | "ast_gate"
   | "static_gate"
+  | "import_gate"
+  | "compliance_gates"
+  | "review_code"
   | "generate_tests"
   | "build_promptfoo_suite"
   | "run_sandbox_tests"
@@ -213,15 +216,32 @@ export type GateName =
   | "CLAMAV"
   | "BANDIT"
   | "IMPORT_RESOLUTION"
+  | "REPO_LICENCE"
+  | "DEPENDENCY_VULN"
+  | "MCP_COMPLIANCE"
+  | "REVIEW"
   | "LOOP_TESTS";
 /**
  * How serious a static-gate finding is (E12.4). A gate fails on a HIGH finding; LOW and MEDIUM
  * ones are reported (Bandit's own scale; Ruff, Black, MyPy and ClamAV findings are all HIGH).
  *
  * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "Severity".
+ * via the `definition` "sbam_contracts__build_dashboard__Severity".
  */
-export type Severity = "LOW" | "MEDIUM" | "HIGH";
+export type SbamContracts_BuildDashboard__Severity = "LOW" | "MEDIUM" | "HIGH";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewVerdict".
+ */
+export type ReviewVerdict = "PASS" | "FAIL";
+/**
+ * What kind of deviation a finding is; the finding code is `REVIEW_<category>`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewCategory".
+ */
+export type ReviewCategory =
+  "SPEC_MISMATCH" | "MISSING_REQUIREMENT" | "WRONG_OUTPUT" | "HANDOFF" | "STATE_WRITE" | "SAFETY" | "OTHER";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SchemaSource".
@@ -252,6 +272,18 @@ export type SowVersionSource = "GENERATED" | "EDITED";
  * via the `definition` "SectionChange".
  */
 export type SectionChange = "ADDED" | "REMOVED" | "MODIFIED" | "UNCHANGED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GroupKind".
+ */
+export type GroupKind = "sub_skill" | "workflow";
+/**
+ * Where a file of the Workflow's code comes from (ADR 0028, WG-15).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FileTag".
+ */
+export type FileTag = "reused" | "customized" | "generated";
 /**
  * What a run works on; `subject_id` is that entity's id.
  *
@@ -351,6 +383,11 @@ export type BlockType = "heading" | "paragraph" | "list_item" | "row" | "cell" |
  * via the `definition` "AttachmentOutcome".
  */
 export type AttachmentOutcome = "REGISTERED" | "FILE_LIMIT_REACHED" | "TOO_LARGE" | "TOO_DEEP";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RelevanceLevel".
+ */
+export type RelevanceLevel = "HIGH" | "MEDIUM" | "LOW";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterType".
@@ -523,6 +560,31 @@ export type DecidedBy = "AUTO" | "FDE";
 export type RejectReason = "NOT_HTTPS" | "HAS_CREDENTIALS" | "HAS_QUERY" | "PRIVATE_ADDRESS" | "INVALID_URL";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "FetchDecision".
+ */
+export type FetchDecision = "VENDORED" | "REFUSED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RefusalReason".
+ */
+export type RefusalReason = "HOST_NOT_APPROVED" | "CLONE_FAILED" | "LICENCE" | "MALWARE" | "UNSAFE_TREE" | "TOO_LARGE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LicenceVerdict".
+ */
+export type LicenceVerdict = "ALLOWED" | "REFUSED" | "UNKNOWN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "sbam_contracts__repo_scan__Severity".
+ */
+export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegistryStatus".
+ */
+export type RegistryStatus = "REGISTERED" | "SUPERSEDED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "BudgetScope".
  */
 export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
@@ -555,6 +617,7 @@ export interface SbamContracts {
   SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
+  ReviewAnswer?: ReviewAnswer;
   HeldPatchResponse?: HeldPatchResponse;
   PatchDecision?: PatchDecision;
   PatchDecided?: PatchDecided;
@@ -589,6 +652,8 @@ export interface SbamContracts {
   CodeAttemptList?: CodeAttemptList;
   CodeFileView?: CodeFileView;
   CodeDiff?: CodeDiff;
+  WorkflowCodeTree?: WorkflowCodeTree;
+  WorkflowFileView?: WorkflowFileView;
   SowNewVersionRequest?: SowNewVersionRequest;
   SowImpact?: SowImpact;
   Run?: Run;
@@ -619,6 +684,7 @@ export interface SbamContracts {
   ParseReport?: ParseReport;
   ParseOutcome?: ParseOutcome;
   OcrPage?: OcrPage;
+  RelevanceAnswer?: RelevanceAnswer;
   MasterEntryCreate?: MasterEntryCreate;
   MasterVersionCreate?: MasterVersionCreate;
   MasterEntry?: MasterEntry;
@@ -680,6 +746,10 @@ export interface SbamContracts {
   RunnerOutputs?: RunnerOutputs;
   RepoDecision?: RepoDecision;
   RepoCatalog?: RepoCatalog;
+  RepoOverlay?: RepoOverlay;
+  RepoScanReport?: RepoScanReport;
+  RepoScoutAnswer?: RepoScoutAnswer;
+  RegisteredWorkflow?: RegisteredWorkflow;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
 }
@@ -1356,7 +1426,246 @@ export interface Finding {
   expected?: string | null;
   actual?: string | null;
   package?: string | null;
-  severity?: Severity | null;
+  severity?: SbamContracts_BuildDashboard__Severity | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewAnswer".
+ */
+export interface ReviewAnswer {
+  verdict: ReviewVerdict;
+  /**
+   * @maxItems 20
+   */
+  findings?:
+    | []
+    | [ReviewFinding]
+    | [ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding, ReviewFinding]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ]
+    | [
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding,
+        ReviewFinding
+      ];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ReviewFinding".
+ */
+export interface ReviewFinding {
+  category: ReviewCategory;
+  severity: SbamContracts_BuildDashboard__Severity;
+  message: string;
+  file?: string | null;
+  line?: number | null;
+  expected?: string | null;
 }
 /**
  * `held` is null when no patch is waiting (none was proposed, or it was already decided).
@@ -1801,6 +2110,40 @@ export interface Build {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   schema_sql_sha256: string;
+  repos?:
+    | []
+    | [RepoOverlay]
+    | [RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay, RepoOverlay]
+    | [
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay
+      ]
+    | [
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay,
+        RepoOverlay
+      ]
+    | null;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -1813,6 +2156,188 @@ export interface TemplateRef {
    * Pattern: `^(sha256:)?[0-9a-f]{64}$`
    */
   sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoOverlay".
+ */
+export interface RepoOverlay {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  /**
+   * Pattern: `^([0-9a-f]{40}|[0-9a-f]{64})$`
+   */
+  commit: string;
+  licence?: string | null;
+  scan_report_sha256?: string | null;
+  repo_dir: string;
+  /**
+   * @maxItems 20
+   */
+  licence_files?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  vendor_tree_sha256: string;
+  /**
+   * @maxItems 50
+   */
+  patches?: PatchRecord[];
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  patched_tree_sha256: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "PatchRecord".
+ */
+export interface PatchRecord {
+  path: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  sha256: string;
+  reason: string;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  files: [string, ...string[]];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
@@ -2767,6 +3292,63 @@ export interface CodeDiff {
   truncated: boolean;
 }
 /**
+ * GET W/code: the Workflow's code as stored: a group per Sub-Skill, plus the Workflow's own.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeTree".
+ */
+export interface WorkflowCodeTree {
+  workflow_id: string;
+  groups: WorkflowCodeGroup[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeGroup".
+ */
+export interface WorkflowCodeGroup {
+  kind: GroupKind;
+  group_id: string;
+  label: string;
+  build_no?: number | null;
+  cycle?: number | null;
+  attempt?: number | null;
+  status?: string | null;
+  files: WorkflowCodeFile[];
+  gates: GateStatusRow[];
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowCodeFile".
+ */
+export interface WorkflowCodeFile {
+  path: string;
+  sha256: string;
+  tag: FileTag;
+  findings: CodeFinding[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "GateStatusRow".
+ */
+export interface GateStatusRow {
+  gate: string;
+  status: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowFileView".
+ */
+export interface WorkflowFileView {
+  group_id: string;
+  path: string;
+  tag: FileTag;
+  sha256: string;
+  content: string;
+  truncated: boolean;
+  findings: CodeFinding[];
+}
+/**
  * `POST P/sow/new-version` (E7.2): start a scope change from the approved version. The
  * answer is the new IN_REVIEW draft (`SowVersionSummary`), a copy of the approved content.
  *
@@ -2824,7 +3406,7 @@ export interface SowImpactSubSkill {
 export interface Run {
   id: string;
   /**
-   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
    */
   temporal_workflow_id: string;
   temporal_run_id: string;
@@ -3531,6 +4113,19 @@ export interface OcrPage {
   unreadable?: boolean;
 }
 /**
+ * What the model answers when asked how useful one parsed document is for the project's goal
+ * (#802). Nothing else is accepted: a model that adds a field is re-asked, never stored. `score`
+ * only orders documents within a level; the level and the reason are what the FDE reads.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RelevanceAnswer".
+ */
+export interface RelevanceAnswer {
+  level: RelevanceLevel;
+  score: number;
+  reason: string;
+}
+/**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "MasterEntryCreate".
  */
@@ -3992,6 +4587,25 @@ export interface DocumentOut {
   parse_report?: ParseReport | null;
   parent_document_id?: string | null;
   archive_path?: string | null;
+  relevance?: DocumentRelevance | null;
+}
+/**
+ * How useful the document is for the project's goal, read from its parsed content (#802).
+ * Advisory only: it never blocks, rejects or deletes a document. `goal_sha256` is the goal it was
+ * scored against, so a changed goal is visibly stale until the document is scored again.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DocumentRelevance".
+ */
+export interface DocumentRelevance {
+  level: RelevanceLevel;
+  score: number;
+  reason: string;
+  /**
+   * Pattern: `^[0-9a-f]{64}$`
+   */
+  goal_sha256: string;
+  scored_at: string;
 }
 /**
  * One deleted document that is due for purging (IDs only, like every workflow input).
@@ -6041,6 +6655,381 @@ export interface CatalogRejection {
   source: RepoSource;
   master_entry_id: string;
   stable_id: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoScanReport".
+ */
+export interface RepoScanReport {
+  /**
+   * Pattern: `^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s?#@]*)?$`
+   */
+  url: string;
+  host: string;
+  ref?: string | null;
+  commit?: string | null;
+  decision: FetchDecision;
+  /**
+   * @maxItems 10
+   */
+  refusals?:
+    | []
+    | [RefusalReason]
+    | [RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason, RefusalReason]
+    | [
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason
+      ]
+    | [
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason
+      ]
+    | [
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason,
+        RefusalReason
+      ];
+  licence?: LicenceFinding | null;
+  /**
+   * @maxItems 500
+   */
+  dependency_licences?: DependencyLicence[];
+  /**
+   * @maxItems 500
+   */
+  vulnerabilities?: VulnFinding[];
+  /**
+   * @maxItems 500
+   */
+  static_findings?: StaticFinding[];
+  /**
+   * @maxItems 100
+   */
+  clam_findings?: ClamFinding[];
+  files_scanned?: number;
+  /**
+   * @maxItems 100
+   */
+  unsafe_paths?: string[];
+  health?: Health;
+  bundle_sha256?: string | null;
+  bundle_files?: number;
+  /**
+   * @maxItems 20
+   */
+  notes?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string
+      ];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LicenceFinding".
+ */
+export interface LicenceFinding {
+  spdx?: string | null;
+  source: string;
+  verdict: LicenceVerdict;
+  override?: LicenceOverride | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "LicenceOverride".
+ */
+export interface LicenceOverride {
+  reason: string;
+  by: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DependencyLicence".
+ */
+export interface DependencyLicence {
+  ecosystem: string;
+  name: string;
+  version: string;
+  spdx?: string | null;
+  verdict: LicenceVerdict;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "VulnFinding".
+ */
+export interface VulnFinding {
+  ecosystem: string;
+  package: string;
+  version: string;
+  id: string;
+  summary?: string;
+  severity?: SbamContracts_RepoScan__Severity;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StaticFinding".
+ */
+export interface StaticFinding {
+  tool: string;
+  rule: string;
+  path: string;
+  line?: number;
+  severity?: SbamContracts_RepoScan__Severity;
+  message?: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ClamFinding".
+ */
+export interface ClamFinding {
+  path: string;
+  signature: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Health".
+ */
+export interface Health {
+  last_commit_at?: string | null;
+  last_release_at?: string | null;
+  archived?: boolean | null;
+  /**
+   * @maxItems 10
+   */
+  flags?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string];
+}
+/**
+ * What the model answers when asked which candidates fit a Sub-Skill. Advice only: the
+ * chooser (#756) validates every id against the catalog and applies the ADR 0028 rules.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoScoutAnswer".
+ */
+export interface RepoScoutAnswer {
+  /**
+   * @maxItems 500
+   */
+  scores?: ScoutScore[];
+}
+/**
+ * How well one catalog candidate fits the Sub-Skill, as the repo scout judged it (#759).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ScoutScore".
+ */
+export interface ScoutScore {
+  candidate_id: string;
+  score: number;
+  /**
+   * @maxItems 8
+   */
+  reasons?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RegisteredWorkflow".
+ */
+export interface RegisteredWorkflow {
+  workflow_id: string;
+  /**
+   * Pattern: `^\d+\.0\.\d+$`
+   */
+  version: string;
+  /**
+   * Pattern: `^wf_[a-z0-9]+(_[a-z0-9]+)*$`
+   */
+  registry_name: string;
+  registry_id: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  image_digest: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  manifest_hash: string;
+  certification_id: string;
+  owner: string;
+  /**
+   * @minItems 2
+   */
+  tools: [McpToolEntry, McpToolEntry, ...McpToolEntry[]];
+  status: RegistryStatus;
+  registered_at: string;
+  superseded_at?: string | null;
+  superseded_by?: string | null;
 }
 /**
  * A project's caps.

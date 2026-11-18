@@ -139,6 +139,10 @@
         "CLAMAV",
         "BANDIT",
         "IMPORT_RESOLUTION",
+        "REPO_LICENCE",
+        "DEPENDENCY_VULN",
+        "MCP_COMPLIANCE",
+        "REVIEW",
         "LOOP_TESTS"
       ],
       "title": "GateName",

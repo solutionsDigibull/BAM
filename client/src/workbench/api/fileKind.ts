@@ -1,14 +1,10 @@
-// Upload results (16 Oct 2026): a detected document type, a confidence and a source lane per file. No classifier
-// service exists in this build, so this is a rule-based reading of the file name and extension: a name keyword that
-// agrees with the extension scores high, a keyword alone lower. Without a keyword a document or sheet is still surely a
-// document or sheet (80%); only a guess flags for review (below LOW_CONFIDENCE): an image read as a drawing, an
-// unknown type (round 2, 21 Oct 2026: plain PDFs and sheets no longer flag a typical batch).
+// Upload results (16 Oct 2026): a document type and a source lane per file, read from the file name and extension (no
+// classifier exists in this build). The Confidence column no longer comes from here: it is the backend's relevance to
+// the goal, read from the file's content (#802, `lib/relevance.ts`).
 // ponytail: name + extension rules only; swap for the parse service's document classifier when it exists.
 
 export type Lane = 'Documents' | 'Sheets' | 'Images' | 'Other'
 export const LANES: Lane[] = ['Documents', 'Sheets', 'Images', 'Other']
-/** Rows below this are flagged "Needs review" on Upload; tune here. */
-export const LOW_CONFIDENCE = 70
 
 const ext = (name: string) => (name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '')
 const DOC = ['pdf', 'docx', 'doc', 'pptx', 'txt', 'eml', 'rtf'], SHEET = ['xlsx', 'xls', 'csv'], IMAGE = ['png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp', 'jp2']
@@ -30,11 +26,10 @@ const RULES: { type: string; re: RegExp; lanes: Lane[] }[] = [
 ]
 const BY_LANE: Record<Lane, string> = { Documents: 'Document', Sheets: 'Sheet', Images: 'Drawing', Other: 'Archive' }
 
-export interface Kind { type: string; confidence: number; lane: Lane }
+export interface Kind { type: string; lane: Lane }
 export function detectKind(name: string): Kind {
   const lane = laneOf(name)
   const base = name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ')
   const rule = RULES.find(r => r.re.test(base))
-  if (rule) return { type: rule.type, confidence: rule.lanes.includes(lane) ? 92 : 76, lane }
-  return { type: BY_LANE[lane], confidence: lane === 'Other' ? 55 : lane === 'Images' ? 64 : 80, lane }
+  return { type: rule ? rule.type : BY_LANE[lane], lane }
 }

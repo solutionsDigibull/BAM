@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:repo/scout_answer:0.1.0",
+  "$defs": {
+    "ScoutScore": {
+      "additionalProperties": false,
+      "description": "How well one catalog candidate fits the Sub-Skill, as the repo scout judged it (#759).",
+      "properties": {
+        "candidate_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "reasons": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "score"
+      ],
+      "title": "ScoutScore",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the model answers when asked which candidates fit a Sub-Skill. Advice only: the\nchooser (#756) validates every id against the catalog and applies the ADR 0028 rules.",
+  "properties": {
+    "scores": {
+      "items": {
+        "$ref": "#/$defs/ScoutScore"
+      },
+      "maxItems": 500,
+      "title": "Scores",
+      "type": "array"
+    }
+  },
+  "title": "RepoScoutAnswer",
+  "type": "object"
+}

@@ -294,6 +294,59 @@ class OcrPage(BaseModel):
     unreadable: bool = False  # the page is blank, noise, or too poor to read
 
 
+class RelevanceLevel(StrEnum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+RELEVANCE_REASON_MAX: Final = 200
+RELEVANCE_RESCORE: Final = "RelevanceRescore"  # workflow type of POST P/documents/relevance/rescore
+
+
+def relevance_workflow_id(project_id: UUID) -> str:
+    """One re-score per project at a time; a newer start replaces a running one (#802)."""
+    return f"relevance-{project_id}"
+
+
+class RelevanceAnswer(BaseModel):
+    """What the model answers when asked how useful one parsed document is for the project's goal
+    (#802). Nothing else is accepted: a model that adds a field is re-asked, never stored. `score`
+    only orders documents within a level; the level and the reason are what the FDE reads."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    level: RelevanceLevel
+    score: int = Field(ge=0, le=100)
+    reason: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=RELEVANCE_REASON_MAX)
+    ]
+
+    @model_validator(mode="after")
+    def _score_fits_level(self) -> "RelevanceAnswer":
+        low, high = RELEVANCE_BANDS[self.level]
+        if not low <= self.score <= high:
+            raise ValueError(f"a {self.level.value} document scores {low}..{high}")
+        return self
+
+
+# The score range each level may use, so a score never contradicts its level.
+RELEVANCE_BANDS: Final[dict[RelevanceLevel, tuple[int, int]]] = {
+    RelevanceLevel.HIGH: (67, 100),
+    RelevanceLevel.MEDIUM: (34, 66),
+    RelevanceLevel.LOW: (0, 33),
+}
+
+
+class DocumentRelevance(RelevanceAnswer):
+    """How useful the document is for the project's goal, read from its parsed content (#802).
+    Advisory only: it never blocks, rejects or deletes a document. `goal_sha256` is the goal it was
+    scored against, so a changed goal is visibly stale until the document is scored again."""
+
+    goal_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    scored_at: datetime
+
+
 class DocumentOut(BaseModel):
     """A document with the state of its stored file (`GET`, `POST .../restore`)."""
 
@@ -318,6 +371,9 @@ class DocumentOut(BaseModel):
     parent_document_id: UUID | None = None
     # E4.7: where this document sits inside its parent archive (`reports/q3.csv`). None otherwise.
     archive_path: str | None = None
+    # #802: how useful it is for the project's goal, read by the model after parsing. None until
+    # it is scored (not parsed yet, no goal set, or the model could not answer).
+    relevance: DocumentRelevance | None = None
 
 
 class PurgeTarget(BaseModel):
@@ -367,6 +423,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "parse_report": ParseReport,
         "parse_outcome": ParseOutcome,
         "ocr_page": OcrPage,
+        "relevance_answer": RelevanceAnswer,
         "document": DocumentOut,
         "purge_target": PurgeTarget,
         "purge_request": PurgeRequest,

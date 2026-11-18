@@ -6,15 +6,19 @@
 # sbam_workers at start (registry.load_all), so any change restarts all of them; the API reloads itself
 # (uvicorn --reload) and the web app is untouched. Polling, because file events don't cross Docker
 # Desktop bind mounts (as WATCHPACK_POLLING for sbam-web). init: `docker compose stop` reaches the worker.
-x-worker-dev: &worker-dev
-  build:
-    target: dev
+x-worker-dev-run: &worker-dev-run
   volumes: [../server:/app/server]
   init: true
   command: [watchfiles, --filter, python, "python -m sbam_workers.bootstrap", /app/server/api, /app/server/workers,
             /app/server/contracts] # the packages only: polling server/.venv would take minutes
   environment:
     WATCHFILES_FORCE_POLLING: "true"
+
+# The one worker that builds the image (see the services below).
+x-worker-dev: &worker-dev
+  <<: *worker-dev-run
+  build:
+    target: dev
 
 services:
   sbam-api:
@@ -26,14 +30,18 @@ services:
     depends_on:
       api-seed: { condition: service_completed_successfully }
 
+  # api-migrate and api-seed run the dev image `sbam-api:local` that sbam-api builds (#807): they used to build
+  # the prod target under the same tag, which cost about 110 s of export each and was overwritten anyway. They
+  # mount the source too, so `up` applies the migrations and the seed of the checkout without an image rebuild.
+  api-migrate:
+    build: !reset null
+    volumes: [../server:/app/server]
+
   # The dev tenants behind keycloak-seed's organizations, so their users pass the tenant check (#49).
   api-seed:
     image: sbam-api:local
-    build:
-      context: ..
-      dockerfile: compose/docker/server.Dockerfile
-      target: prod
-      args: { PACKAGE: sbam-api, ROLE: api }
+    build: !reset null
+    volumes: [../server:/app/server]
     command: ["python", "-m", "sbam_api.identity.seed"]
     environment:
       DATABASE_URL: postgresql://sbam:${SBAM_DB_PASSWORD:?is required - set it in compose/.env (copy compose/.env.example)}@postgres:5432/sbam
@@ -69,11 +77,26 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Docker fills the named volume web_node_modules only when it is created, so a later lockfile change never
+  # reached it (d3-force was missing in a running container, #817). This one-shot service runs the freshly built
+  # image and, when the image's pnpm-lock.yaml differs from the hash recorded in the volume, copies the image's
+  # node_modules into the volume. An unchanged lockfile costs a second.
+  web-deps:
+    image: sbam-web:local
+    user: "0:0"
+    entrypoint: ["sh", "/refresh-node-modules.sh"]
+    volumes:
+      - ./docker/web/refresh-node-modules.sh:/refresh-node-modules.sh:ro
+      - web_node_modules:/nm
+    network_mode: none
+    restart: "no"
+
   sbam-web:
     build:
       target: dev # next dev
     depends_on:
       keycloak-seed: { condition: service_completed_successfully }
+      web-deps: { condition: service_completed_successfully }
     environment:
       WATCHPACK_POLLING: "true" # file events don't cross Docker Desktop bind mounts on Windows
       # The upload URL the API hands out (compose.yaml); the dev CSP allows its origin (#568).
@@ -84,12 +107,24 @@ services:
       - web_next:/app/client/.next
 
   # The bootstrap (#40) runs from the mounted source and restarts on change (x-worker-dev above).
-  worker-ingest: *worker-dev
-  worker-knowledge: *worker-dev
-  worker-llm: *worker-dev
+  # One image for all six (#807): worker-build builds `sbam-worker:local`, the others only use it. Building it
+  # six times meant six exports and unpacks of the same 5.9 GB image (about 14 minutes).
+  worker-ingest:
+    <<: *worker-dev-run
+    build: !reset null
+  worker-knowledge:
+    <<: *worker-dev-run
+    build: !reset null
+  worker-llm:
+    <<: *worker-dev-run
+    build: !reset null
   worker-build: *worker-dev
-  worker-test: *worker-dev
-  worker-certify: *worker-dev
+  worker-test:
+    <<: *worker-dev-run
+    build: !reset null
+  worker-certify:
+    <<: *worker-dev-run
+    build: !reset null
 
 volumes:
   web_node_modules:

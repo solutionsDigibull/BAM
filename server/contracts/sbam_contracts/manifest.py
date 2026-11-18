@@ -56,6 +56,7 @@ from sbam_contracts.isatvon14 import (
     VVariables,
     parse_budget_ms,
 )
+from sbam_contracts.repo_overlay import RepoOverlay
 
 HASH_PLACEHOLDER: Final = "sha256:TO_BE_COMPUTED_ON_SAVE"  # ISA14 sample value, never on APPROVED
 WORKFLOW_SCHEMA_VERSION: Final = "sbam-workflow-manifest/1.0"
@@ -357,6 +358,11 @@ class Build(_Strict):
     runtime_image_digest: Digest
     libraries: list[Library]
     schema_sql_sha256: Digest
+    # The vendored repositories and their patches (ADR 0028, WG-9). Unset on every manifest built
+    # before it, and dump() leaves unset keys out, so their hashes do not change. The commit and the
+    # patch hashes in here are inside the manifest hash, and `repos_reuse_digest` is their share of
+    # the certification reuse key.
+    repos: list[RepoOverlay] | None = Field(default=None, max_length=10)
 
 
 class Evidence(_Strict):

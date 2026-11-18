@@ -55,7 +55,7 @@ export const codeHref = (
   return `/projects/${p}/workflows/${w}/code?${q}`;
 };
 
-export type GateFamily = "Contract" | "AST" | "Static" | "Tests";
+export type GateFamily = "Contract" | "AST" | "Static" | "Compliance" | "Review" | "Tests";
 
 /** The matrix columns, in the order the contract lists them, with the labels TD §9.3 uses. */
 export const GATES: readonly { name: GateName; label: string; family: GateFamily }[] = [
@@ -77,6 +77,10 @@ export const GATES: readonly { name: GateName; label: string; family: GateFamily
   { name: "CLAMAV", label: "ClamAV", family: "Static" },
   { name: "BANDIT", label: "Bandit", family: "Static" },
   { name: "IMPORT_RESOLUTION", label: "Imports", family: "Static" },
+  { name: "REPO_LICENCE", label: "Licence", family: "Compliance" },
+  { name: "DEPENDENCY_VULN", label: "Vulnerabilities", family: "Compliance" },
+  { name: "MCP_COMPLIANCE", label: "MCP", family: "Compliance" },
+  { name: "REVIEW", label: "Review", family: "Review" },
   { name: "LOOP_TESTS", label: "Loop tests", family: "Tests" },
 ];
 export const GATE_LABEL = Object.fromEntries(GATES.map((g) => [g.name, g.label])) as Record<
