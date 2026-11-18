@@ -226,4 +226,13 @@ describe("the grid step follows the project's Workflow (#714)", () => {
     expect(snap.steps[2]).toMatchObject({ state: "locked", editable: false });
     expect(snap.steps[2]?.reason).toMatch(/not available in the workbench yet/);
   });
+
+  test("test_842_the_workflow_id_is_given_only_once_the_build_has_started", async () => {
+    api({ state: "WORKFLOW_CREATED", workflows: [workflow("BUILDING", "2026-11-10T10:00:00Z")] });
+    expect((await buildSnapshot(PROJECT)).workflowId).toBe("w-2026-11-10T10:00:00Z");
+    api({ state: "WORKFLOW_CREATED", workflows: [workflow("ISATVON_REVIEW")] });
+    expect((await buildSnapshot(PROJECT)).workflowId).toBeUndefined();
+    api({ state: "SOW_REVIEW" });
+    expect((await buildSnapshot(PROJECT)).workflowId).toBeUndefined();
+  });
 });
