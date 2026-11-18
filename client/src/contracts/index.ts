@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:c5ce8c928c131c4f8e4d8a63cc8abd032ef22e5e2904deeb62cd699539b90924
+// source-sha256:166654d1812d7ea0fe2e838358e91bdd24a79b608921588a47c7d24d66b9353a
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -585,6 +585,11 @@ export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRIT
 export type RegistryStatus = "REGISTERED" | "SUPERSEDED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SbomKind".
+ */
+export type SbomKind = "repository" | "dependency";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "BudgetScope".
  */
 export type BudgetScope = "SUB_SKILL" | "WORKFLOW" | "KNOWLEDGE";
@@ -750,6 +755,7 @@ export interface SbamContracts {
   RepoScanReport?: RepoScanReport;
   RepoScoutAnswer?: RepoScoutAnswer;
   RegisteredWorkflow?: RegisteredWorkflow;
+  WorkflowRepositories?: WorkflowRepositories;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
 }
@@ -7045,6 +7051,39 @@ export interface RegisteredWorkflow {
   registered_at: string;
   superseded_at?: string | null;
   superseded_by?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowRepositories".
+ */
+export interface WorkflowRepositories {
+  workflow_id: string;
+  repositories: WorkflowRepository[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowRepository".
+ */
+export interface WorkflowRepository {
+  url: string;
+  commit: string;
+  licence?: string | null;
+  repo_dir: string;
+  sub_skills: string[];
+  patches: PatchRecord[];
+  report?: RepoScanReport | null;
+  sbom: SbomComponent[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SbomComponent".
+ */
+export interface SbomComponent {
+  kind: SbomKind;
+  name: string;
+  version: string;
+  ecosystem?: string | null;
+  licence?: string | null;
 }
 /**
  * A project's caps.

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CodeFinding, FileTag, WorkflowCodeGroup } from '@/contracts'
 import { fileCount, findingText, firstFile, groupHasProblem, isForbidden, placeFindings, splitLines, statusTone, tagCounts, TAG_HINT, TAG_LABEL, TAGS, useWorkflowCode, useWorkflowFile } from '../lib/workflowCode'
+import { RepositoryPanel } from './RepositoryPanel'
 import { Banner, Copy, Empty, ErrorState, Icon, Pane, Skeleton } from './ui'
 import './workflowCode.css'
 
@@ -155,21 +156,24 @@ export function WorkflowCodePreview({ workflowId }: { workflowId?: string }) {
 
 /** The Translate centre when the workbench has no validation run of its own: the stored code, read only. */
 export function WorkflowFilesCenter({ workflowId }: { workflowId?: string }) {
+  const [view, setView] = useState<'files' | 'repos'>('files')
   return (
-    <Pane id="center-title" kicker="Translation" title="Translate" className="center">
-      <WorkflowCodePreview workflowId={workflowId} />
+    <Pane id="center-title" kicker="Translation" title="Translate" className="center"
+      actions={<CodeViewSwitch view={view} set={v => setView(v === 'repos' ? 'repos' : 'files')} runless />}>
+      {view === 'repos' ? <RepositoryPanel workflowId={workflowId} /> : <WorkflowCodePreview workflowId={workflowId} />}
     </Pane>
   )
 }
 
-export type CodeView = 'run' | 'files'
+export type CodeView = 'run' | 'files' | 'repos'
 
-/** Switches Translate between the run's code and the whole workflow's stored files. */
-export function CodeViewSwitch({ view, set }: { view: CodeView; set: (v: CodeView) => void }) {
+/** Switches Translate between the run's code, the whole workflow's stored files and its repositories (#843). */
+export function CodeViewSwitch({ view, set, runless }: { view: CodeView; set: (v: CodeView) => void; runless?: boolean }) {
   return (
     <div className="wcp-switch" role="group" aria-label="Code view">
-      <button type="button" aria-pressed={view === 'run'} onClick={() => set('run')}>Run code</button>
+      {!runless && <button type="button" aria-pressed={view === 'run'} onClick={() => set('run')}>Run code</button>}
       <button type="button" aria-pressed={view === 'files'} onClick={() => set('files')}>Workflow files</button>
+      <button type="button" aria-pressed={view === 'repos'} onClick={() => set('repos')}>Repositories</button>
     </div>
   )
 }
