@@ -1,5 +1,5 @@
 import type { DataProvider } from '@refinedev/core'
-import type { WorkflowCodeTree, WorkflowFileView, WorkflowRepositories } from '@/contracts'
+import type { RegisteredWorkflow, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories } from '@/contracts'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
 
 export type ScanOutcome = 'clean' | 'threat' | 'error'
@@ -17,6 +17,8 @@ export interface BamApi {
   getWorkflowFile(workflowId: string, group: string, path: string): Promise<WorkflowFileView>
   /** The repositories the workflow starts from: patches, scan report and components (read only, #843). */
   getWorkflowRepositories(workflowId: string): Promise<WorkflowRepositories>
+  /** The workflow's registry entry: the newest enabled one, or `version` (read only, #849). Rejects with 404 when none. */
+  getWorkflowRegistration(workflowId: string, version?: string): Promise<RegisteredWorkflow>
   /** stageUpload: stores the file in private quarantine staging and starts an async virus scan (ClamAV in production). */
   uploadFile(file: { name: string; size: number; type?: string; data: Blob; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
   /** Removes a file from the active intake batch once the service confirms. A blocked object stays in quarantine (audit). Refused while scanning. */
@@ -84,6 +86,7 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'workflow-code': q => api.getWorkflowCode(q.workflowId ?? ''),
   'workflow-file': q => api.getWorkflowFile(q.workflowId ?? '', q.group ?? '', q.path ?? ''),
   'workflow-repos': q => api.getWorkflowRepositories(q.workflowId ?? ''),
+  'workflow-registration': q => api.getWorkflowRegistration(q.workflowId ?? '', q.version),
 }
 
 const unsupported = () => Promise.reject(new Error('Not used by the BAM workbench'))
