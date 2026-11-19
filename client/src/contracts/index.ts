@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:7a4b1d1368d01a9978135596843e35b2cd8e6841dfae1d1786a59f16a714369d
+// source-sha256:32bc309166a41b3a42352a8d1803f1b9ee5741662c253d4ad5cfd0e48bc1c019
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -613,6 +613,26 @@ export type RegistryKind = "staging" | "production";
 export type RegistryStatus = "REGISTERED" | "SUPERSEDED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CommitCheckName".
+ */
+export type CommitCheckName = "WORKFLOW_CERTIFIED" | "SUB_SKILLS_CERTIFIED" | "MCP_SERVER" | "UI_BUNDLE" | "SECRETS";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BlockerReason".
+ */
+export type BlockerReason = "MISSING" | "NOT_TESTED" | "TEST_FAILED" | "INVALID_NAME";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CommitState".
+ */
+export type CommitState = "NOT_COMMITTED" | "COMMITTING" | "COMMITTED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StagingStartStatus".
+ */
+export type StagingStartStatus = "STARTED" | "PENDING_RUNTIME" | "FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SbomKind".
  */
 export type SbomKind = "repository" | "dependency";
@@ -671,11 +691,6 @@ export type ConnectionTestOutcome =
  * via the `definition` "CleanStep".
  */
 export type CleanStep = "TRIMMED" | "UNQUOTED";
-/**
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "BlockerReason".
- */
-export type BlockerReason = "MISSING" | "NOT_TESTED" | "TEST_FAILED" | "INVALID_NAME";
 
 /**
  * Every SBAM contract root model (sbam_contracts/registry.py).
@@ -841,6 +856,10 @@ export interface SbamContracts {
   RepoAnswered?: RepoAnswered;
   RepoQuestions?: RepoQuestions;
   RegisteredWorkflow?: RegisteredWorkflow;
+  CommitStatus?: CommitStatus;
+  CommitAccepted?: CommitAccepted;
+  StagingStartRequest?: StagingStartRequest;
+  StagingStartResult?: StagingStartResult;
   WorkflowRepositories?: WorkflowRepositories;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
@@ -1869,7 +1888,7 @@ export interface ChangeNote {
 export interface Run {
   id: string;
   /**
-   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|request-change-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|request-change-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|workflow-commit-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
    */
   temporal_workflow_id: string;
   temporal_run_id: string;
@@ -7297,6 +7316,101 @@ export interface RegisteredWorkflow {
   superseded_by?: string | null;
 }
 /**
+ * What the Validation screen shows: the checks, the secrets gate, and what Commit did.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CommitStatus".
+ */
+export interface CommitStatus {
+  workflow_id: string;
+  manifest_hash?: string | null;
+  ready: boolean;
+  /**
+   * @maxItems 500
+   */
+  checks?: CommitCheck[];
+  /**
+   * @maxItems 500
+   */
+  blockers?: Blocker[];
+  state: CommitState;
+  registration?: RegisteredWorkflow | null;
+  staging?: StagingStartResult | null;
+  committed_by?: string | null;
+  committed_at?: string | null;
+  run?: Run | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CommitCheck".
+ */
+export interface CommitCheck {
+  name: CommitCheckName;
+  passed: boolean;
+  reason?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Blocker".
+ */
+export interface Blocker {
+  name: string;
+  reason: BlockerReason;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StagingStartResult".
+ */
+export interface StagingStartResult {
+  status: StagingStartStatus;
+  detail?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "CommitAccepted".
+ */
+export interface CommitAccepted {
+  run: Run;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  manifest_hash: string;
+}
+/**
+ * What the Staging runtime (#765) needs to start a committed Workflow. IDs, the digest that
+ * was certified, and secret names: never a secret value.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StagingStartRequest".
+ */
+export interface StagingStartRequest {
+  tenant_id: string;
+  project_id: string;
+  workflow_id: string;
+  /**
+   * Pattern: `^\d+\.0\.\d+$`
+   */
+  version: string;
+  /**
+   * Pattern: `^wf_[a-z0-9]+(_[a-z0-9]+)*$`
+   */
+  registry_name: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  image_digest: string;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  manifest_hash: string;
+  ui_bundle_digest?: string | null;
+  /**
+   * @maxItems 200
+   */
+  secret_names?: string[];
+  requested_by: string;
+}
+/**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "WorkflowRepositories".
  */
@@ -7468,12 +7582,4 @@ export interface Readiness {
    * @maxItems 500
    */
   blockers?: Blocker[];
-}
-/**
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "Blocker".
- */
-export interface Blocker {
-  name: string;
-  reason: BlockerReason;
 }

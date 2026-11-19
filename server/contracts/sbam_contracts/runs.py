@@ -36,7 +36,9 @@ WORKFLOW_ID_PATTERN: Final = (
     # relevance-: RelevanceRescore (#802), one re-score of a project's documents at a time
     rf"|relevance-{_UUID}"
     # request-change-: RequestChangeApply (#767), one FDE change note applied at a time per Workflow
-    rf"|request-change-{_UUID})$"
+    rf"|request-change-{_UUID}"
+    # workflow-commit-: WorkflowCommit (#766), one Commit to Staging at a time per Workflow
+    rf"|workflow-commit-{_UUID})$"
 )
 WORKFLOW_ID: Final = re.compile(WORKFLOW_ID_PATTERN)
 

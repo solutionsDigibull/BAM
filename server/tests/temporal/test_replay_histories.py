@@ -47,6 +47,7 @@ from sbam_contracts.runs import (
     ping_workflow_id,
     pipeline_workflow_id,
 )
+from sbam_contracts.workflow_commit import WORKFLOW_COMMIT, workflow_commit_id
 from sbam_workers import registry
 from sbam_workers.pipeline.sub_skill_build import SubSkillBuild
 from temporalio import activity, workflow
@@ -85,6 +86,7 @@ def workflow_id(path: Path) -> str:
         DOCUMENT_INGESTION: lambda: ingest_workflow_id(anyone),
         MASTER_DOCUMENT_INGESTION: lambda: master_document_workflow_id(anyone),
         PURGE_DELETED: lambda: f"{PURGE_SCHEDULE_ID}-replay",  # started by the daily schedule
+        WORKFLOW_COMMIT: lambda: workflow_commit_id(anyone),
         "PingWorkflow": lambda: ping_workflow_id(
             TaskQueue(started(path)["taskQueue"]["name"]), anyone
         ),

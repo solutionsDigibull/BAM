@@ -50,6 +50,8 @@ class WorkerSettings(BaseSettings):
     # LLM layer (E6.1): every call goes through Bifrost with an `sbam-*` alias. Defaults match
     # Compose.
     bifrost_url: AnyHttpUrl = AnyHttpUrl("http://bifrost:8080")
+    # Registering a committed Workflow in Bifrost's registry (#766); without it Commit stops there.
+    bifrost_setup_token: SecretStr | None = None
     llm_timeout_seconds: float = Field(default=120.0, gt=0)
     llm_max_context_tokens: int = Field(default=200_000, ge=1000)
     # The most document tokens one SOW or ISATVON prompt carries (cost and window cap). Over it the

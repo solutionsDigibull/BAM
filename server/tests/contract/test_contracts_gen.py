@@ -58,6 +58,7 @@ from sbam_contracts import (
     sow_api,
     state_machines,
     testgen,
+    workflow_commit,
     workflow_registry,
     workflow_repos,
 )
@@ -277,6 +278,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("build", review),
             ("connections", connections),
             ("request_change", request_change),
+            ("workflow_commit", workflow_commit),
         )
         for stem in module.schemas()
     }
