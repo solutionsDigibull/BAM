@@ -4,6 +4,7 @@ import { fileCount, findingText, firstFile, groupHasProblem, isForbidden, placeF
 import { RegistryPanel } from './RegistryPanel'
 import { RepositoryPanel } from './RepositoryPanel'
 import { RepoQuestionCard } from './RepoQuestionCard'
+import { EVIDENCE_VIEWS, EvidenceBody, isEvidenceView, type EvidenceView } from './BuildEvidence'
 import { Banner, Copy, Empty, ErrorState, Icon, Pane, Skeleton } from './ui'
 import './workflowCode.css'
 
@@ -158,19 +159,20 @@ export function WorkflowCodePreview({ workflowId }: { workflowId?: string }) {
 
 /** The Translate centre when the workbench has no validation run of its own: the stored code, read only. */
 export function WorkflowFilesCenter({ workflowId }: { workflowId?: string }) {
-  const [view, setView] = useState<'files' | 'repos' | 'registry'>('files')
+  const [view, setView] = useState<'files' | 'repos' | 'registry' | EvidenceView>('files')
   return (
     <Pane id="center-title" kicker="Translation" title="Translate" className="center"
-      actions={<CodeViewSwitch view={view} set={v => setView(v === 'repos' || v === 'registry' ? v : 'files')} runless />}>
+      actions={<CodeViewSwitch view={view} set={v => setView(v === 'repos' || v === 'registry' || isEvidenceView(v) ? v : 'files')} runless />}>
       {workflowId && <RepoQuestionCard workflowId={workflowId} quiet={view !== 'repos'} />}
       {view === 'repos' ? <RepositoryPanel workflowId={workflowId} />
         : view === 'registry' ? <RegistryPanel workflowId={workflowId} />
+        : isEvidenceView(view) ? <EvidenceBody view={view} workflowId={workflowId} />
         : <WorkflowCodePreview workflowId={workflowId} />}
     </Pane>
   )
 }
 
-export type CodeView = 'run' | 'files' | 'repos' | 'registry'
+export type CodeView = 'run' | 'files' | 'repos' | 'registry' | EvidenceView
 
 /** Switches Translate between the run's code, the whole workflow's stored files, its repositories (#843) and its registry entry (#849). */
 export function CodeViewSwitch({ view, set, runless }: { view: CodeView; set: (v: CodeView) => void; runless?: boolean }) {
@@ -180,6 +182,7 @@ export function CodeViewSwitch({ view, set, runless }: { view: CodeView; set: (v
       <button type="button" aria-pressed={view === 'files'} onClick={() => set('files')}>Workflow files</button>
       <button type="button" aria-pressed={view === 'repos'} onClick={() => set('repos')}>Repositories</button>
       <button type="button" aria-pressed={view === 'registry'} onClick={() => set('registry')}>Registry</button>
+      {EVIDENCE_VIEWS.map(e => <button key={e.id} type="button" aria-pressed={view === e.id} onClick={() => set(e.id)}>{e.label}</button>)}
     </div>
   )
 }
