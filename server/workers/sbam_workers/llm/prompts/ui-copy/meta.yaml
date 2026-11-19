@@ -1,0 +1,2 @@
+alias: sbam-codegen
+description: "Plain text for the generated Workflow UI (Sub-Skill summaries, field hints, review notes), #768. Output UiCopy."

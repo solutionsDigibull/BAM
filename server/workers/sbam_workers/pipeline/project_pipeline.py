@@ -11,6 +11,8 @@ E9.5 (behind `workflow.patched(MANIFEST_DRAFT_PATCH)`): once every Sub-Skill is 
 manifest draft (`build_workflow_manifest`) before certify_macros.
 #862 (behind `workflow.patched(SERVER_FILES_PATCH)`): then the Workflow's generated server files are
 stored (`build_workflow_server`).
+#768 (behind `workflow.patched(UI_BUNDLE_PATCH)`): then the Workflow's UI bundle is generated and
+stored (`build_workflow_ui`).
 
 Rules this file keeps (.claude/rules/temporal.md):
   * Deterministic: no clock, randomness, env or I/O here. Everything with side effects is an
@@ -74,6 +76,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_workers.build.plan import plan_builds
     from sbam_workers.build.schema_sql.activity import build_schema_sql
     from sbam_workers.build.server_stage import build_workflow_server
+    from sbam_workers.build.ui_stage import build_workflow_ui
     from sbam_workers.build.workflow_manifest import build_workflow_manifest
     from sbam_workers.certify.stubs import (
         certify_macros,
@@ -119,6 +122,7 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "plan_builds": (TaskQueue.BUILD, timedelta(minutes=1), 3),
     "build_workflow_manifest": (TaskQueue.BUILD, timedelta(minutes=2), 3),
     "build_workflow_server": (TaskQueue.BUILD, timedelta(minutes=5), 3),
+    "build_workflow_ui": LLM,
     "certify_macros": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "validate_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "certify_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
@@ -144,6 +148,9 @@ MANIFEST_DRAFT_PATCH = "e9-5-workflow-manifest-draft"
 # tools.json, Dockerfile, loop specs, schema.sql) so the code preview and the Staging runtime
 # can read them.
 SERVER_FILES_PATCH = "wg28-workflow-server-files"
+# #768: after the server files, generate the Workflow's UI bundle from the UI template and store it
+# with its digest (the `ui_bundle` entry Commit puts into the frozen manifest).
+UI_BUNDLE_PATCH = "wg20-workflow-ui-bundle"
 # #694: a failed schema.sql returns the Workflow to ISATVON_REVIEW and the Sub-Skills that Generate
 # sent to BUILDING back to VALID, and the notification names them. Older runs: nothing applied.
 SCHEMA_FAILURE_PATCH = "e10-1c-schema-failure-recovery"
@@ -450,6 +457,8 @@ class ProjectPipeline:
             await self._attempt(build_workflow_manifest, self._workflow_ref(), IdResult, None)
         if workflow.patched(SERVER_FILES_PATCH):
             await self._attempt(build_workflow_server, self._workflow_ref(), IdResult, None)
+        if workflow.patched(UI_BUNDLE_PATCH):
+            await self._attempt(build_workflow_ui, self._workflow_ref(), IdResult, None)
         await self._attempt(certify_macros, self._workflow_ref(), IdsResult, None)
 
     async def _stage_validate_workflow(self) -> None:
