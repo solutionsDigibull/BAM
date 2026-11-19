@@ -1288,8 +1288,8 @@ routes:
   staging_ui_api_v1_projects__project_id__workflows__workflow_id__staging_ui__path__get:
     request:
       method: GET
-      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/staging/ui/index.html
-      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/staging/ui/{path}
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", path: index.html}
     expect:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
