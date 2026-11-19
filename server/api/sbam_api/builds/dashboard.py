@@ -31,6 +31,7 @@ from sbam_api.isatvon.models import SubSkill
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.manifests.models import GateResultRow
 from sbam_api.manifests.repository import GateResultRepository
+from sbam_api.temporal.models import TemporalRun
 from sbam_api.temporal.repository import TemporalRunRepository
 from sbam_api.testruns import service as testruns  # module import: testruns.models imports builds
 from sbam_api.workflows.repository import WorkflowRepository
@@ -106,12 +107,14 @@ def builds(
     for sub_id, build_no, cycle, attempt, gate, status in seen:
         if newest[sub_id] == (build_no, cycle, attempt):
             gates[sub_id][GateName(gate)] = GateStatus(status)
-    runs = TemporalRunRepository(session, ctx)
+    runs = TemporalRunRepository(session, ctx).latest_for_subjects(
+        SubjectType.SUB_SKILL.value, [s.id for s in subs]
+    )
     ui_bundle = GateResultRepository(session, ctx).latest_workflow_gate(
         workflow_id, GateName.UI_BUNDLE.value
     )
     badges = testruns.loop_tests_badges(session, ctx, [s.id for s in subs])
-    rows = [_row(s, newest.get(s.id), gates[s.id], runs, badges.get(s.id)) for s in subs]
+    rows = [_row(s, newest.get(s.id), gates[s.id], runs.get(s.id), badges.get(s.id)) for s in subs]
     return BuildsResponse(
         workflow_id=workflow_id,
         workflow_state=WorkflowState(workflow.state),
@@ -125,11 +128,10 @@ def _row(
     sub: SubSkill,
     key: tuple[int, int, int] | None,
     gates: dict[GateName, GateStatus],
-    runs: TemporalRunRepository,
+    run: TemporalRun | None,
     loop_tests: LoopTestsBadge | None,
 ) -> BuildRow:
     state = SubSkillState(sub.state)
-    run = runs.latest_for_subject(SubjectType.SUB_SKILL.value, sub.id)
     stage = _stage(sub.state, run.current_stage if run else None)
     running = RUNNING_GATE.get(stage)
     if state in ACTIVE and running is not None and running not in gates:

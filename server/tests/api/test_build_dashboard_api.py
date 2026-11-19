@@ -5,14 +5,17 @@ parsed with here, so a drift between what the client reads and what is served fa
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 from sbam_api.core.ids import uuid7
+from sbam_api.db.repository import TenantContext
 from sbam_api.isatvon.models import SubSkill
 from sbam_api.manifests.models import GateResultRow
 from sbam_api.temporal.models import TemporalRun
+from sbam_api.temporal.repository import TemporalRunRepository
 from sbam_api.testruns.models import TestRunRow
 from sbam_contracts.build_dashboard import BuildRow, BuildsResponse, GateName, GatesResponse
 from sbam_contracts.promptfoo import LoopTestsBadge, TestRunState
@@ -329,3 +332,90 @@ def test_e13_6_the_badges_of_n_sub_skills_take_one_query(h: Harness) -> None:
         rows = h.grid()
     assert len(rows) == 20 and all(row.loop_tests is not None for row in rows.values())
     assert len([sql for sql in seen if "test_runs" in sql]) == 1
+
+
+def _mirror(
+    h: Harness,
+    sub: uuid.UUID,
+    run_no: int,
+    stage: str,
+    *,
+    row_id: uuid.UUID | None = None,
+    tenant: uuid.UUID = TENANT_A,
+    project: uuid.UUID | None = None,
+    subject_type: str = "sub_skill",
+    deleted: bool = False,
+) -> None:
+    """One `temporal_runs` row about `sub`; `run_no` keeps (workflow id, run id) unique."""
+    with h.sessions() as s:
+        s.add(
+            TemporalRun(
+                id=row_id or uuid7(),
+                tenant_id=tenant,
+                project_id=project or uuid.UUID(h.project),
+                temporal_workflow_id=f"sub-skill-build-{sub}",
+                temporal_run_id=f"r{run_no}",
+                type="SubSkillBuild",
+                task_queue="build",
+                subject_type=subject_type,
+                subject_id=sub,
+                state="RUNNING",
+                current_stage=stage,
+                deleted_at=datetime.now(UTC) if deleted else None,
+            )
+        )
+        s.commit()
+
+
+def test_e12_6b_t13_the_batched_latest_run_is_each_subjects_latest_run(h: Harness) -> None:
+    none, one, many, filtered = (h.sub, *(h.sub_skill(h.workflow_id) for _ in range(3)))
+    _mirror(h, one, 1, "check_libraries")
+    older, middle, newest = uuid7(), uuid7(), uuid7()
+    for run_no, row_id in enumerate((newest, older, middle)):  # inserted out of id order
+        _mirror(h, many, run_no, f"stage-{run_no}", row_id=row_id)
+    _mirror(h, filtered, 1, "render_skeleton")
+    _mirror(h, filtered, 2, "deleted", deleted=True)  # newer, but soft-deleted
+    _mirror(h, filtered, 3, "a project run", subject_type="project")  # same id, other type
+    _mirror(h, filtered, 4, "elsewhere", project=uuid.uuid4())  # same tenant, other project
+    ids = [none, one, many, filtered, uuid7()]  # the last one never existed
+    with h.sessions() as s:
+        repo = TemporalRunRepository(s, TenantContext(TENANT_A, uuid.UUID(h.project)))
+        batched = repo.latest_for_subjects("sub_skill", ids)
+        single = {i: repo.latest_for_subject("sub_skill", i) for i in ids}
+        assert repo.latest_for_subjects("sub_skill", []) == {}
+    assert {i: run.id for i, run in batched.items()} == {
+        i: run.id for i, run in single.items() if run is not None
+    }
+    assert set(batched) == {one, many, filtered}
+    assert batched[many].id == newest and batched[filtered].current_stage == "render_skeleton"
+
+
+def test_e12_6b_t14_another_tenants_runs_are_never_the_latest(h: Harness) -> None:
+    mine, theirs_only = h.sub, h.sub_skill(h.workflow_id)
+    _mirror(h, mine, 1, "check_libraries")
+    _mirror(h, mine, 2, "assemble", tenant=TENANT_B)  # newer, same subject id, another tenant
+    _mirror(h, theirs_only, 1, "assemble", tenant=TENANT_B)
+    with h.sessions() as s:
+        repo = TemporalRunRepository(s, TenantContext(TENANT_A, uuid.UUID(h.project)))
+        batched = repo.latest_for_subjects("sub_skill", [mine, theirs_only])
+    assert {i: run.current_stage for i, run in batched.items()} == {mine: "check_libraries"}
+    assert all(run.tenant_id == TENANT_A for run in batched.values())
+    h.put_state("BUILDING", mine)
+    assert h.grid()[mine].stage.value == "check_libraries"
+
+
+@pytest.mark.parametrize("n", [5, 20])
+def test_e12_6b_t15_the_grid_of_n_sub_skills_takes_one_temporal_runs_query(
+    h: Harness, n: int
+) -> None:
+    subs = [h.sub] + [h.sub_skill(h.workflow_id) for _ in range(n - 1)]
+    for i, sub in enumerate(subs):
+        h.put_state("BUILDING", sub)
+        if i % 2:
+            _mirror(h, sub, 1, "check_libraries")
+    with h.statements() as seen:
+        rows = h.grid()
+    assert {sub: rows[sub].stage.value for sub in subs} == {
+        sub: "check_libraries" if i % 2 else "build_manifest" for i, sub in enumerate(subs)
+    }
+    assert len([sql for sql in seen if "temporal_runs" in sql]) == 1
