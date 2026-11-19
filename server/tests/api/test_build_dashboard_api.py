@@ -3,6 +3,8 @@ the build wrote. The shapes are the committed `build_dashboard` contract, which 
 parsed with here, so a drift between what the client reads and what is served fails this test."""
 
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +13,10 @@ from sbam_api.core.ids import uuid7
 from sbam_api.isatvon.models import SubSkill
 from sbam_api.manifests.models import GateResultRow
 from sbam_api.temporal.models import TemporalRun
-from sbam_contracts.build_dashboard import BuildsResponse, GateName, GatesResponse
+from sbam_api.testruns.models import TestRunRow
+from sbam_contracts.build_dashboard import BuildRow, BuildsResponse, GateName, GatesResponse
+from sbam_contracts.promptfoo import LoopTestsBadge, TestRunState
+from sqlalchemy import event
 from test_auth import FDE_A2, TENANT_A, TENANT_B, problem
 from test_code_view_api import Harness as CodeHarness
 
@@ -19,7 +24,7 @@ from test_code_view_api import Harness as CodeHarness
 class Harness(CodeHarness):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
-        for table in (GateResultRow.__table__, TemporalRun.__table__):
+        for table in (GateResultRow.__table__, TemporalRun.__table__, TestRunRow.__table__):
             table.create(self.sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
 
     def put_state(self, state: str, sub: uuid.UUID | None = None) -> None:
@@ -76,6 +81,56 @@ class Harness(CodeHarness):
                 )
             )
             s.commit()
+
+    def put_run(
+        self,
+        state: str = "PASS",
+        passed: int = 3,
+        total: int = 3,
+        *,
+        sub: uuid.UUID | None = None,
+        tenant: uuid.UUID = TENANT_A,
+    ) -> None:
+        """A `test_runs` row as the run stage writes it (UUIDv7 ids: a later call is newer)."""
+        with self.sessions() as s:
+            s.add(
+                TestRunRow(
+                    id=uuid7(),
+                    tenant_id=tenant,
+                    project_id=uuid.UUID(self.project),
+                    sub_skill_id=sub or self.sub,
+                    code_attempt_id=uuid7(),
+                    sandbox_run_id=uuid7(),
+                    suite_sha256="a" * 64,
+                    state=state,
+                    total=total,
+                    passed=passed,
+                    failed=total - passed,
+                    non_certifying=state == "NON_CERTIFYING",
+                    results=[],
+                    created_by="test",
+                )
+            )
+            s.commit()
+
+    def grid(self) -> dict[uuid.UUID, BuildRow]:
+        body = BuildsResponse.model_validate(self.builds().json())
+        return {row.sub_skill_id: row for row in body.sub_skills}
+
+    @contextmanager
+    def statements(self) -> Iterator[list[str]]:
+        """Every SQL statement the app sends to the database inside the block."""
+        seen: list[str] = []
+        engine = self.sessions.kw["bind"]
+
+        def record(*args: Any) -> None:
+            seen.append(args[2])  # (conn, cursor, statement, parameters, context, executemany)
+
+        event.listen(engine, "before_cursor_execute", record)
+        try:
+            yield seen
+        finally:
+            event.remove(engine, "before_cursor_execute", record)
 
     def builds(self, token: str | None = None, workflow: uuid.UUID | None = None) -> Any:
         return self.call(
@@ -213,3 +268,64 @@ def test_e12_6b_t12_without_a_token_it_is_401(h: Harness) -> None:
     url = f"{h.path(h.workflow_id)}/builds"
     res = h.client.get(f"/api/v1{url}" if not url.startswith("/api") else url)
     assert res.status_code == 401
+
+
+def _badge(state: TestRunState, passed: int, total: int) -> LoopTestsBadge:
+    return LoopTestsBadge(state=state, passed=passed, total=total)
+
+
+def test_e13_6_t02_grid_shows_the_loop_tests_badge(h: Harness) -> None:
+    h.put_run("PASS", 3, 3)
+    assert h.grid()[h.sub].loop_tests == _badge(TestRunState.PASS, 3, 3)
+    assert h.builds().json()["sub_skills"][0]["loop_tests"] == {
+        "state": "PASS",
+        "passed": 3,
+        "total": 3,
+    }
+
+
+@pytest.mark.parametrize(
+    ("state", "passed"),
+    [("FAIL", 1), ("NON_CERTIFYING", 3)],  # NON_CERTIFYING: a local-docker run, all cases passed
+)
+def test_e13_6_grid_shows_a_failed_or_non_certifying_run(
+    h: Harness, state: str, passed: int
+) -> None:
+    h.put_run(state, passed, 3)
+    assert h.grid()[h.sub].loop_tests == _badge(TestRunState(state), passed, 3)
+
+
+def test_e13_6_a_sub_skill_without_a_run_has_no_loop_tests_badge(h: Harness) -> None:
+    untested = h.sub_skill(h.workflow_id)
+    h.put_state("TESTING_BLOCKED", untested)  # no run stored: no badge, whatever the state
+    h.put_run("PASS", 3, 3)
+    rows = h.grid()
+    assert rows[untested].loop_tests is None
+    assert rows[h.sub].loop_tests == _badge(TestRunState.PASS, 3, 3)
+
+
+def test_e13_6_the_newest_run_is_the_badge(h: Harness) -> None:
+    h.put_run("FAIL", 2, 3)
+    h.put_run("PASS", 3, 3)
+    other = h.sub_skill(h.workflow_id)
+    h.put_run("PASS", 3, 3, sub=other)
+    h.put_run("FAIL", 0, 3, sub=other)
+    rows = h.grid()
+    assert rows[h.sub].loop_tests == _badge(TestRunState.PASS, 3, 3)
+    assert rows[other].loop_tests == _badge(TestRunState.FAIL, 0, 3)
+
+
+def test_e13_6_another_tenants_run_never_shows_on_the_grid(h: Harness) -> None:
+    h.put_run("PASS", 3, 3)
+    h.put_run("FAIL", 0, 3, tenant=TENANT_B)  # newer, same Sub-Skill id, another tenant
+    assert h.grid()[h.sub].loop_tests == _badge(TestRunState.PASS, 3, 3)
+
+
+def test_e13_6_the_badges_of_n_sub_skills_take_one_query(h: Harness) -> None:
+    subs = [h.sub] + [h.sub_skill(h.workflow_id) for _ in range(19)]
+    for i, sub in enumerate(subs):
+        h.put_run("PASS" if i % 2 else "FAIL", 3 if i % 2 else 1, 3, sub=sub)
+    with h.statements() as seen:
+        rows = h.grid()
+    assert len(rows) == 20 and all(row.loop_tests is not None for row in rows.values())
+    assert len([sql for sql in seen if "test_runs" in sql]) == 1
