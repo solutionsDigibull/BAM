@@ -1,7 +1,7 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
   BuildsResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
-  GatesResponse, HeldPatchResponse, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
+  CodeAttemptList, CodeDiff, CodeFileView, GatesResponse, HeldPatchResponse, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
 import type { RetryAccepted } from '../lib/workflowBuilds'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
@@ -41,6 +41,12 @@ export interface BamApi {
   getSubSkillGates(workflowId: string, subId: string, attempt?: number): Promise<GatesResponse>
   /** Retry a Sub-Skill build that waits for the FDE, with the reason and an Idempotency-Key. 409 when it is not waiting (#715). */
   retrySubSkill(workflowId: string, subId: string, reason: string, key: string): Promise<RetryAccepted>
+  /** The code attempts (0 first generation, 1 and 2 corrections) of one Sub-Skill, newest build. Read only (#715). */
+  getCodeAttempts(workflowId: string, subId: string): Promise<CodeAttemptList>
+  /** One file of one attempt, with the generated-body slots and the findings on it. */
+  getCodeAttemptFile(workflowId: string, subId: string, attempt: number, path: string): Promise<CodeFileView>
+  /** The unified diff of one file between two attempts. */
+  getCodeAttemptDiff(workflowId: string, subId: string, from: number, to: number, path: string): Promise<CodeDiff>
   /** The ISATVON patch a correction proposed and a Sub-Skill waits on (`held: null` when none). Read only (#715). */
   getHeldPatch(workflowId: string, subId: string): Promise<HeldPatchResponse>
   /** The FDE's decision on the held patch, then the build retries from it. Accepting sends the Sub-Skill's hash as If-Match; both send an Idempotency-Key. */
@@ -134,6 +140,9 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'staging-status': q => api.getStagingStatus(q.workflowId ?? ''),
   'change-notes': q => api.getChangeNotes(q.workflowId ?? ''),
   'workflow-builds': q => api.getWorkflowBuilds(q.workflowId ?? ''),
+  'code-attempts': q => api.getCodeAttempts(q.workflowId ?? '', q.subId ?? ''),
+  'code-attempt-file': q => api.getCodeAttemptFile(q.workflowId ?? '', q.subId ?? '', Number(q.attempt), q.path ?? ''),
+  'code-attempt-diff': q => api.getCodeAttemptDiff(q.workflowId ?? '', q.subId ?? '', Number(q.from), Number(q.to), q.path ?? ''),
   'held-patch': q => api.getHeldPatch(q.workflowId ?? '', q.subId ?? ''),
   'sub-skill-gates': q => api.getSubSkillGates(q.workflowId ?? '', q.subId ?? '', q.attempt === undefined ? undefined : Number(q.attempt)),
   connections: () => api.getConnections(),

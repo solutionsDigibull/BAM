@@ -13,6 +13,9 @@ import type {
   CommitStatus,
   Connection,
   ConnectionList,
+  CodeAttemptList,
+  CodeDiff,
+  CodeFileView,
   GatesResponse,
   HeldPatchResponse,
   PatchDecided,
@@ -121,6 +124,13 @@ export function createSbamApi(projectId: string): BamApi {
       (await getJson<GatesResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/gates${attempt === undefined ? "" : `?attempt=${attempt}`}`)).body,
     retrySubSkill: async (workflowId, subId, reason, key) =>
       (await postJson<RetryAccepted>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/retry`, { reason }, { "Idempotency-Key": key })).body,
+    // The code attempts of a Sub-Skill, one file of one and a diff of two (#715, read only). The path is a query value, so it is encoded.
+    getCodeAttempts: async (workflowId, subId) =>
+      (await getJson<CodeAttemptList>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/code/attempts`)).body,
+    getCodeAttemptFile: async (workflowId, subId, attempt, path) =>
+      (await getJson<CodeFileView>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/code/attempts/${attempt}/files?${new URLSearchParams({ path })}`)).body,
+    getCodeAttemptDiff: async (workflowId, subId, from, to, path) =>
+      (await getJson<CodeDiff>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/code/attempts/${from}/diff/${to}?${new URLSearchParams({ path })}`)).body,
     // The held ISATVON patch of a Sub-Skill and the FDE's decision on it (#715): accepting is guarded by the Sub-Skill's hash (If-Match).
     getHeldPatch: async (workflowId, subId) =>
       (await getJson<HeldPatchResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/held-patch`)).body,
