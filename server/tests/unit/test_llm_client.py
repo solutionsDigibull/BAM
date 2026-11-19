@@ -439,6 +439,7 @@ def test_e6_1_shipped_prompts_match_their_manifest() -> None:
         "smoke",
         "sow-generate",
         "testgen",
+        "ui-copy",
     ]
     assert json.loads((PROMPTS_DIR / "manifest.json").read_text()) == build_manifest()
 

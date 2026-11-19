@@ -171,6 +171,13 @@ async def workflow_server_stand_in(inp: WorkflowRef) -> IdResult:
     return IdResult(id=stub_id(inp, "workflow_server"))
 
 
+@activity.defn(name="build_workflow_ui")
+async def workflow_ui_stand_in(inp: WorkflowRef) -> IdResult:
+    """The real stage (#768) renders the UI bundle from the Skill manifests and stores it; its tests
+    are tests/unit/test_wg20_ui_stage.py."""
+    return IdResult(id=stub_id(inp, "workflow_ui"))
+
+
 @activity.defn(name="attach_repo")
 async def attach_repo_stand_in(inp: AttachRepoInput) -> AttachRepoResult:
     """The real stage (#862) clones and scans the repository; see tests/unit/test_wg28_*.py."""
@@ -211,6 +218,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "carry_over_workflow": carry_over_stand_in,
     "build_workflow_manifest": workflow_manifest_stand_in,
     "build_workflow_server": workflow_server_stand_in,
+    "build_workflow_ui": workflow_ui_stand_in,
     "attach_repo": attach_repo_stand_in,
     "plan_builds": plan_stand_in,
     # the real codegen stages (#355) need a database of manifests and an LLM; the stubs answer
@@ -416,6 +424,36 @@ def test_wg28_t04_the_server_files_are_stored_once_after_the_manifest_draft() ->
     assert status.stage is PipelineStage.DONE
     assert order == ["manifest", "server"]  # the pipeline went on to certify and freeze
     assert len(workflows) == 1
+
+
+def test_wg20_the_ui_bundle_is_generated_once_after_the_server_files() -> None:
+    """#768: the UI bundle has its own activity, after the server files and before the macros are
+    certified; the pipeline is not given a new stage and still ends DONE."""
+    order: list[str] = []
+
+    @activity.defn(name="build_workflow_server")
+    async def server(inp: WorkflowRef) -> IdResult:
+        order.append("server")
+        return IdResult(id=stub_id(inp, "workflow_server"))
+
+    @activity.defn(name="build_workflow_ui")
+    async def ui(inp: WorkflowRef) -> IdResult:
+        order.append("ui")
+        return IdResult(id=stub_id(inp, "workflow_ui"))
+
+    async def scenario(sessions: sessionmaker[Session]) -> PipelineStatus:
+        project = new_project(sessions, TENANT)
+        async with environment({"build_workflow_server": server, "build_workflow_ui": ui}) as env:
+            handle = await start(env, sessions, project)
+            await until(handle, PipelineStage.WAIT_SOW_APPROVAL)
+            await approve(handle)
+            await until(handle, PipelineStage.WAIT_GENERATE)
+            await generate(handle)
+            return await finish(handle)
+
+    status = run(scenario)
+    assert status.stage is PipelineStage.DONE
+    assert order == ["server", "ui"]
 
 
 def test_e10_1_t02_sow_approved_creates_exactly_one_workflow() -> None:
