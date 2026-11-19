@@ -627,7 +627,9 @@ def test_wg18_a_bundle_that_changed_in_storage_is_refused_with_409(
     record = workflow_ui.newest(h.sessions(), TENANT_A, WORKFLOW)
     assert record is not None
     other = bundle_tar({**BUNDLE, "app.js": b"console.log(2)"})
-    storage(h)._path(record.tar_key).write_bytes(other)  # type: ignore[attr-defined]
+    stored = storage(h)._path(record.tar_key)  # type: ignore[attr-defined]
+    stored.chmod(0o644)  # a stored object is read-only
+    stored.write_bytes(other)
     res = post(h, sha)
     problem(res, 409, "CONFLICT")
     assert "UI_BUNDLE_CHANGED" in res.json()["detail"]
