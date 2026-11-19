@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:request_change/note_list:0.1.0",
+  "$defs": {
+    "ChangeNote": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "sub_skill_id": {
+          "format": "uuid",
+          "title": "Sub Skill Id",
+          "type": "string"
+        },
+        "workflow_version": {
+          "maxLength": 20,
+          "title": "Workflow Version",
+          "type": "string"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ChangeNoteStatus"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sub_skill_id",
+        "workflow_version",
+        "note",
+        "status",
+        "created_at"
+      ],
+      "title": "ChangeNote",
+      "type": "object"
+    },
+    "ChangeNoteStatus": {
+      "enum": [
+        "PROCESSING",
+        "REBUILDING",
+        "HELD_PATCH",
+        "PARKED",
+        "QUEUED"
+      ],
+      "title": "ChangeNoteStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "notes": {
+      "items": {
+        "$ref": "#/$defs/ChangeNote"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "used": {
+      "minimum": 0,
+      "title": "Used",
+      "type": "integer"
+    },
+    "limit": {
+      "default": 3,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "used"
+  ],
+  "title": "ChangeNoteList",
+  "type": "object"
+}

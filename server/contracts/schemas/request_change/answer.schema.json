@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:request_change/answer:0.1.0",
+  "$defs": {
+    "ChangeNoteOutcome": {
+      "enum": [
+        "CODE",
+        "MEANING"
+      ],
+      "title": "ChangeNoteOutcome",
+      "type": "string"
+    },
+    "HeldPatchOp": {
+      "additionalProperties": false,
+      "description": "One RFC 6902 operation, as the build recorded it. `value` is empty for `remove`.",
+      "properties": {
+        "op": {
+          "enum": [
+            "add",
+            "remove",
+            "replace",
+            "test"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 512,
+          "title": "Path",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "op",
+        "path"
+      ],
+      "title": "HeldPatchOp",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "What the classifier model answers. A MEANING answer carries the patch (RFC 6902, every\npath under `/isatvon_definition/`); a CODE answer carries none.",
+  "properties": {
+    "outcome": {
+      "$ref": "#/$defs/ChangeNoteOutcome"
+    },
+    "rationale": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Rationale",
+      "type": "string"
+    },
+    "isatvon_patch": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/HeldPatchOp"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Isatvon Patch"
+    }
+  },
+  "required": [
+    "outcome",
+    "rationale"
+  ],
+  "title": "ChangeNoteAnswer",
+  "type": "object"
+}

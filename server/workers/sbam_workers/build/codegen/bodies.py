@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sbam_workers.build.codegen import allowlist as body_rules
 from sbam_workers.build.codegen import state_sql
-from sbam_workers.build.codegen.params import GATES_PARAM, SCHEMA_PARAM
+from sbam_workers.build.codegen.params import CHANGE_NOTES_PARAM, GATES_PARAM, SCHEMA_PARAM
 from sbam_workers.build.codegen.render import RenderedSkeleton, params_json, str_literal
 from sbam_workers.build.codegen.store import LoadedTemplate
 from sbam_workers.llm.client import LlmClient
@@ -141,7 +141,11 @@ def request_context(
     """The `<data>` blocks of the request: params, allowlist, every rendered file. Nothing else."""
     context = {
         "manifest": params_json(
-            {k: v for k, v in params.items() if k not in (SCHEMA_PARAM, GATES_PARAM)}
+            {
+                k: v
+                for k, v in params.items()
+                if k not in (SCHEMA_PARAM, GATES_PARAM, CHANGE_NOTES_PARAM)
+            }
         ),
         "allowed_imports": json.dumps(list(allowlist)),
     }
@@ -149,6 +153,8 @@ def request_context(
         context["loop_gates"] = str(params[GATES_PARAM])
     if params.get(SCHEMA_PARAM):  # the tables and columns SQL must be written against
         context["workflow_schema_sql"] = str(params[SCHEMA_PARAM])
+    if params.get(CHANGE_NOTES_PARAM):  # the FDE's notes (#767): what to change, as data only
+        context["change_notes"] = str(params[CHANGE_NOTES_PARAM])
     for name, text in skeleton.files.items():
         context[f"skeleton.{name}"] = text
     return context

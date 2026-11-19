@@ -148,6 +148,12 @@ from sbam_contracts.repo_choice import RepoAnswered, RepoAnswerRequest, RepoQues
 from sbam_contracts.repo_decision import RepoDecision
 from sbam_contracts.repo_overlay import RepoOverlay
 from sbam_contracts.repo_scan import RepoScanReport
+from sbam_contracts.request_change import (
+    ChangeNoteAnswer,
+    ChangeNoteList,
+    RequestChangeAccepted,
+    RequestChangeCreate,
+)
 from sbam_contracts.review import ReviewAnswer
 from sbam_contracts.runs import Run, RunAccepted
 from sbam_contracts.runtime_registry import RuntimeRegistry
@@ -203,6 +209,10 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("held_patch/held_patch_response", HeldPatchResponse),
     ("held_patch/patch_decision", PatchDecision),
     ("held_patch/patch_decided", PatchDecided),
+    ("request_change/create", RequestChangeCreate),
+    ("request_change/accepted", RequestChangeAccepted),
+    ("request_change/note_list", ChangeNoteList),
+    ("request_change/answer", ChangeNoteAnswer),
     ("build/schema_sql", WorkflowSchemaSql),
     ("build/schema_sql_source_put", SchemaSqlSourcePut),
     ("manifest/isa14_manifest", Isa14Manifest),

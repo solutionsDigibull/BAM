@@ -1234,6 +1234,29 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  # Request change (#767): the FDE's notes about the generated code. The seeded Workflow has no
+  # notes (200, empty); a note names a Sub-Skill the world does not seed, so the assigned FDE
+  # reaches the handler and gets 404 and nothing is stored or started.
+  change_notes_api_v1_projects__project_id__workflows__workflow_id__request_change_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/request-change
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  request_change_api_v1_projects__project_id__workflows__workflow_id__request_change_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/request-change
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      headers: {idempotency-key: "rbac-request-change-0001"}
+      json: {sub_skill_id: "00000000-0000-4000-8000-000000000001", note: "The status should read REJECTED."}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.

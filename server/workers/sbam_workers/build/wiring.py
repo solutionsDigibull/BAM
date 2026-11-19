@@ -41,10 +41,12 @@ from sbam_api.manifests.repository import SubSkillManifestRepository
 from sbam_api.projects.repository import ProjectRepository
 from sbam_api.registry.repository import registry_for_digest
 from sbam_api.repo_catalog.service import build_for as repo_catalog
+from sbam_api.request_change import notes as request_change_notes
 from sbam_api.scan.clamd import ClamdClient
 from sbam_api.schema_sql.repository import WorkflowSchemaRepository
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.factory import make_backend
+from sbam_api.workflows.repository import WorkflowRepository
 from sbam_contracts.build import BuildStageInput, CorrectionInput, CorrectionResult
 from sbam_contracts.build_dashboard import GateStatus
 from sbam_contracts.isatvon14 import SubSkill
@@ -64,6 +66,7 @@ from sbam_workers.build import correct as correct_stage
 from sbam_workers.build.assemble import Assemble, AssembleInputs, SqlBundleStore
 from sbam_workers.build.bodies import BodiesInputs, GenerateBodies, SqlAttemptStore
 from sbam_workers.build.codegen.params import (
+    CHANGE_NOTES_PARAM,
     GATES_PARAM,
     MAX_SCHEMA_BYTES,
     SCHEMA_PARAM,
@@ -199,7 +202,20 @@ class SqlBuildInputs:
         if schema:
             params[SCHEMA_PARAM] = schema
         params[GATES_PARAM] = gates_text(loaded.sub_skill)
+        change_notes = self._change_notes(session, inp)
+        if change_notes:
+            params[CHANGE_NOTES_PARAM] = json.dumps(change_notes, ensure_ascii=False)
         return params
+
+    def _change_notes(self, session: Session, inp: BuildStageInput) -> list[str]:
+        """The FDE's change notes about this Sub-Skill (#767), as texts for a data block. Only the
+        coder's request gets them: no gate, test or manifest reads a note."""
+        workflow = WorkflowRepository(session, self._ctx(inp)).get(inp.workflow_id)
+        if workflow is None:
+            return []
+        return request_change_notes.coder_notes(
+            session, inp.tenant_id, inp.workflow_id, workflow.version, inp.sub_skill_id
+        )
 
     def _load(
         self, session: Session, inp: BuildStageInput, manifest_id: uuid.UUID | None

@@ -34,7 +34,9 @@ WORKFLOW_ID_PATTERN: Final = (
     # isatvon-regen-: IsatvonRegenerate (E8.4), one re-extraction per Macro Skill / Sub-Skill
     rf"|isatvon-regen-{_UUID}"
     # relevance-: RelevanceRescore (#802), one re-score of a project's documents at a time
-    rf"|relevance-{_UUID})$"
+    rf"|relevance-{_UUID}"
+    # request-change-: RequestChangeApply (#767), one FDE change note applied at a time per Workflow
+    rf"|request-change-{_UUID})$"
 )
 WORKFLOW_ID: Final = re.compile(WORKFLOW_ID_PATTERN)
 

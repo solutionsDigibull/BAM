@@ -21,6 +21,7 @@ from sbam_api.isatvon.models import SubSkill
 from sbam_api.manifests.models import SubSkillManifest
 from sbam_api.registry.models import RuntimeRegistryPackageRow, RuntimeRegistryRow
 from sbam_api.registry.repository import upsert_registry
+from sbam_api.workflows.models import Workflow
 from sbam_contracts.build import BuildStageInput, CorrectionInput
 from sbam_contracts.manifest import SkillManifest
 from sbam_contracts.runs import TaskQueue
@@ -78,6 +79,7 @@ class World:
             CodeAttempt.__table__,
             RuntimeRegistryRow.__table__,
             RuntimeRegistryPackageRow.__table__,
+            Workflow.__table__,  # the change notes are read by the Workflow's version (#767)
         ]
         SubSkill.metadata.create_all(bind, tables=tables)  # type: ignore[arg-type]
         from sbam_api.audit.models import AuditLog

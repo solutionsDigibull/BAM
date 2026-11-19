@@ -1,0 +1,2 @@
+alias: sbam-corrector
+description: Classify an FDE change note about a Sub-Skill's generated code (code is wrong, or the meaning changes) and propose the ISATVON patch for a meaning change (#767). Output ChangeNoteAnswer.
