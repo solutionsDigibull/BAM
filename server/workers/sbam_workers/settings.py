@@ -122,6 +122,17 @@ class WorkerSettings(BaseSettings):
     # BUILDER_DISABLED and the pipeline goes on.
     image_builder: Literal["none", "docker"] = "none"
     image_build_timeout_seconds: int = Field(default=900, ge=60, le=3600)
+    # Staging runtime (#765, ADR 0036): `docker` starts the committed workflow's container by its
+    # certified digest on the Docker host DOCKER_HOST names (the host that built the image); `none`
+    # answers PENDING_RUNTIME and Commit still completes. Containers join an internal network and
+    # leave only through the egress proxy; with no proxy they have no outside access at all.
+    staging_runtime: Literal["none", "docker"] = "none"
+    staging_docker_timeout_seconds: int = Field(default=120, ge=10, le=900)
+    staging_network: str = Field(default="sbam-staging", min_length=1)
+    staging_egress_proxy_url: str | None = None  # `http://host:port` on the Staging network
+    staging_egress_policy_dir: str | None = None  # where the proxy reads each allowlist
+    # The master keyring (ADR 0030), only to inject a project's secrets at a Staging start.
+    secrets_keys: SecretStr | None = None
     # Environment and product analytics (E16.2): every worker dispatches the outbox, so each one
     # sends the PostHog events of the rows it dispatches. Same checks as sbam-api.
     sbam_env: str = Field(default="development", min_length=1)
@@ -142,6 +153,9 @@ class WorkerSettings(BaseSettings):
         "mock_api_url",
         "mock_api_ip",
         "mock_control_token",
+        "staging_egress_proxy_url",
+        "staging_egress_policy_dir",
+        "secrets_keys",
         mode="before",
     )
     @classmethod

@@ -16,9 +16,12 @@ its reason; Bifrost being down is retried.
 
 from collections.abc import Callable
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import SecretStr
+from sbam_api.connections.crypto import KeyRing
 from sbam_api.core.conventions import ApiError
+from sbam_api.core.settings import deployed_env
 from sbam_api.db.repository import TenantContext
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.factory import make_backend
@@ -51,6 +54,9 @@ from temporalio.exceptions import ApplicationError
 from sbam_workers import mirror
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
+from sbam_workers.staging.deployer import make_deployer
+from sbam_workers.staging.egress_proxy import PolicyDir
+from sbam_workers.staging.runtime import DeployerStagingRuntime, StagingConfig
 
 REFUSED = "CommitRefused"
 STAGING_FAILED = "StagingStartFailed"
@@ -166,6 +172,36 @@ def make_registry(settings: WorkerSettings) -> BifrostRegistry:
     return HttpBifrostRegistry(str(settings.bifrost_url), token.get_secret_value())
 
 
+def make_runtime(
+    settings: WorkerSettings, sessions: sessionmaker[Session], storage: StorageBackend
+) -> StagingRuntime:
+    """The Staging runtime #765 built, or the pending one when no Staging host is configured (the
+    default: `make up` stays healthy and Commit records PENDING_RUNTIME)."""
+    if settings.staging_runtime != "docker":
+        return default_runtime()
+    keys = settings.secrets_keys
+
+    def keyring() -> KeyRing | None:
+        if keys is None:
+            return None
+        return KeyRing.parse(
+            keys.get_secret_value(), allow_placeholder=not deployed_env(settings.sbam_env)
+        )
+
+    folder = settings.staging_egress_policy_dir
+    return DeployerStagingRuntime(
+        sessions,
+        storage,
+        keyring,
+        make_deployer(settings.staging_runtime, settings.staging_docker_timeout_seconds),
+        StagingConfig(
+            network=settings.staging_network,
+            proxy_url=settings.staging_egress_proxy_url,
+            policy_dir=None if folder is None else PolicyDir(Path(folder)),
+        ),
+    )
+
+
 @lru_cache(maxsize=1)
 def _steps() -> CommitSteps:
     settings = WorkerSettings()  # type: ignore[call-arg]
@@ -174,7 +210,7 @@ def _steps() -> CommitSteps:
         make_backend(settings),
         lambda: make_registry(settings),
         StateMachineFreezer(),
-        default_runtime(),
+        make_runtime(settings, mirror.sessions(), make_backend(settings)),
     )
 
 

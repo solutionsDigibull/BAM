@@ -56,6 +56,7 @@ from sbam_contracts import (
     schema_sql,
     sow,
     sow_api,
+    staging,
     state_machines,
     testgen,
     workflow_commit,
@@ -279,6 +280,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("connections", connections),
             ("request_change", request_change),
             ("workflow_commit", workflow_commit),
+            ("staging", staging),
         )
         for stem in module.schemas()
     }

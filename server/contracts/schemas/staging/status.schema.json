@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:staging/status:0.1.0",
+  "$defs": {
+    "StagingDeployment": {
+      "additionalProperties": false,
+      "description": "One Staging deployment as the runtime recorded it (kept for every version).",
+      "properties": {
+        "version": {
+          "pattern": "^\\d+\\.0\\.\\d+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "registry_name": {
+          "maxLength": 64,
+          "pattern": "^wf_[a-z0-9]+(_[a-z0-9]+)*$",
+          "title": "Registry Name",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/StagingState"
+        },
+        "image_digest": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Image Digest",
+          "type": "string"
+        },
+        "ui_bundle_digest": {
+          "anyOf": [
+            {
+              "pattern": "^(sha256:)?[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ui Bundle Digest"
+        },
+        "egress_allowed_hosts": {
+          "items": {
+            "maxLength": 253,
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Egress Allowed Hosts",
+          "type": "array"
+        },
+        "egress_enforced": {
+          "default": false,
+          "title": "Egress Enforced",
+          "type": "boolean"
+        },
+        "secret_names": {
+          "items": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Secret Names",
+          "type": "array"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "stopped_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stopped At"
+        },
+        "superseded_by": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+\\.0\\.\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Superseded By"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "version",
+        "registry_name",
+        "state",
+        "image_digest"
+      ],
+      "title": "StagingDeployment",
+      "type": "object"
+    },
+    "StagingHealth": {
+      "enum": [
+        "HEALTHY",
+        "UNREACHABLE",
+        "UNKNOWN"
+      ],
+      "title": "StagingHealth",
+      "type": "string"
+    },
+    "StagingState": {
+      "enum": [
+        "NOT_DEPLOYED",
+        "PENDING_RUNTIME",
+        "RUNNING",
+        "FAILED",
+        "STOPPED",
+        "SUPERSEDED"
+      ],
+      "title": "StagingState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the Staging screen reads: the current deployment, its health and the history.",
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "#/$defs/StagingState"
+    },
+    "health": {
+      "$ref": "#/$defs/StagingHealth"
+    },
+    "current": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StagingDeployment"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "ui_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ui Url"
+    },
+    "mcp_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mcp Url"
+    },
+    "history": {
+      "items": {
+        "$ref": "#/$defs/StagingDeployment"
+      },
+      "maxItems": 100,
+      "title": "History",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "state",
+    "health"
+  ],
+  "title": "StagingStatus",
+  "type": "object"
+}

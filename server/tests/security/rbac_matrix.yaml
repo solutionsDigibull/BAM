@@ -1276,6 +1276,43 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "409 VERSION_CONFLICT"
 
+  staging_status_api_v1_projects__project_id__workflows__workflow_id__staging_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/staging
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  staging_ui_api_v1_projects__project_id__workflows__workflow_id__staging_ui__path__get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/staging/ui/index.html
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  staging_mcp_post_api_v1_projects__project_id__workflows__workflow_id__staging_mcp_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/staging/mcp
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+      json: {}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  staging_mcp_delete_api_v1_projects__project_id__workflows__workflow_id__staging_mcp_delete:
+    request:
+      method: DELETE
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/staging/mcp
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.

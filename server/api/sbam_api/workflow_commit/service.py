@@ -131,7 +131,8 @@ def status(
     staging = None
     if staged is not None and registration is not None:
         after = staged.after or {}
-        if after.get("manifest_hash") == registration.manifest_hash:
+        recorded = after.get("manifest_hash")
+        if recorded == registration.manifest_hash or recorded in evaluation.lineage:
             staging = StagingStartResult.model_validate(
                 {"status": after["status"], "detail": after.get("detail")}
             )

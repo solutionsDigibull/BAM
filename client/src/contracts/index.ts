@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:32bc309166a41b3a42352a8d1803f1b9ee5741662c253d4ad5cfd0e48bc1c019
+// source-sha256:d29050f8e0de43ac2a315e6ab2e13da9ac856c23b53fe2b56dc753fa32503f29
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -613,6 +613,16 @@ export type RegistryKind = "staging" | "production";
 export type RegistryStatus = "REGISTERED" | "SUPERSEDED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StagingState".
+ */
+export type StagingState = "NOT_DEPLOYED" | "PENDING_RUNTIME" | "RUNNING" | "FAILED" | "STOPPED" | "SUPERSEDED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StagingHealth".
+ */
+export type StagingHealth = "HEALTHY" | "UNREACHABLE" | "UNKNOWN";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "CommitCheckName".
  */
 export type CommitCheckName = "WORKFLOW_CERTIFIED" | "SUB_SKILLS_CERTIFIED" | "MCP_SERVER" | "UI_BUNDLE" | "SECRETS";
@@ -856,6 +866,7 @@ export interface SbamContracts {
   RepoAnswered?: RepoAnswered;
   RepoQuestions?: RepoQuestions;
   RegisteredWorkflow?: RegisteredWorkflow;
+  StagingStatus?: StagingStatus;
   CommitStatus?: CommitStatus;
   CommitAccepted?: CommitAccepted;
   StagingStartRequest?: StagingStartRequest;
@@ -7314,6 +7325,59 @@ export interface RegisteredWorkflow {
   registered_at: string;
   superseded_at?: string | null;
   superseded_by?: string | null;
+}
+/**
+ * What the Staging screen reads: the current deployment, its health and the history.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StagingStatus".
+ */
+export interface StagingStatus {
+  workflow_id: string;
+  state: StagingState;
+  health: StagingHealth;
+  current?: StagingDeployment | null;
+  ui_url?: string | null;
+  mcp_url?: string | null;
+  /**
+   * @maxItems 100
+   */
+  history?: StagingDeployment[];
+}
+/**
+ * One Staging deployment as the runtime recorded it (kept for every version).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StagingDeployment".
+ */
+export interface StagingDeployment {
+  /**
+   * Pattern: `^\d+\.0\.\d+$`
+   */
+  version: string;
+  /**
+   * Pattern: `^wf_[a-z0-9]+(_[a-z0-9]+)*$`
+   */
+  registry_name: string;
+  state: StagingState;
+  /**
+   * Pattern: `^(sha256:)?[0-9a-f]{64}$`
+   */
+  image_digest: string;
+  ui_bundle_digest?: string | null;
+  /**
+   * @maxItems 200
+   */
+  egress_allowed_hosts?: string[];
+  egress_enforced?: boolean;
+  /**
+   * @maxItems 200
+   */
+  secret_names?: string[];
+  started_at?: string | null;
+  stopped_at?: string | null;
+  superseded_by?: string | null;
+  detail?: string | null;
 }
 /**
  * What the Validation screen shows: the checks, the secrets gate, and what Commit did.
