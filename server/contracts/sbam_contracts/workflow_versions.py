@@ -9,10 +9,11 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.manifest import VERSION_PATTERN
 
 Version = Annotated[str, Field(pattern=VERSION_PATTERN)]
@@ -45,3 +46,15 @@ class NewVersionStarted(_Strict):
     workflow_id: uuid.UUID
     sub_skill_id: uuid.UUID
     next_version: Version  # the version the patch will be frozen as
+
+
+def schemas() -> dict[str, dict[str, Any]]:
+    """File stem -> JSON Schema, for the committed files under `schemas/workflow_versions/`."""
+    models: dict[str, type[BaseModel]] = {
+        "list": WorkflowVersionList,
+        "new_request": NewVersionRequest,
+        "new_started": NewVersionStarted,
+    }
+    return {
+        stem: contract_schema(model, f"workflow_versions/{stem}") for stem, model in models.items()
+    }

@@ -62,6 +62,7 @@ from sbam_contracts import (
     workflow_commit,
     workflow_registry,
     workflow_repos,
+    workflow_versions,
 )
 from sbam_contracts._jsonschema import DRAFT, contract_schema
 from sbam_contracts.canonical import sha256_of
@@ -281,6 +282,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("request_change", request_change),
             ("workflow_commit", workflow_commit),
             ("staging", staging),
+            ("workflow_versions", workflow_versions),
         )
         for stem in module.schemas()
     }
