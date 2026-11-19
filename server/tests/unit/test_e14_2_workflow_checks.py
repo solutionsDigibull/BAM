@@ -189,3 +189,26 @@ def test_e14_2_findings_are_deterministic() -> None:
         shuffled = dict(rng.sample(sorted(declared.items()), len(declared)))
         assert workflow_verdict(_dag(edges), SCHEMA, shuffled, children) == expected
         assert macro_verdicts(children) == macro_verdicts(reversed(children))
+
+
+def test_e14_2_a_dag_skill_without_a_record_blocks_the_workflow() -> None:
+    children = _children()[:2]  # MS02.1_Ship is in the DAG but has no record
+    assert workflow_verdict(_dag(GOOD_EDGES), SCHEMA, DECLARED, children) == (
+        Finding(Check.SUB_SKILL_NOT_CERTIFIED, "MS02.1_Ship", "no Sub-Skill record"),
+    )
+
+
+def test_e14_2_a_record_outside_the_dag_is_reported() -> None:
+    children = [*_children(), _child("MS04.1_Stray", "MS04_Stray")]
+    assert workflow_verdict(_dag(GOOD_EDGES), SCHEMA, DECLARED, children) == (
+        Finding(Check.DAG_UNKNOWN_NODE, "MS04.1_Stray", "Sub-Skill not in the DAG"),
+    )
+
+
+def test_e14_2_an_empty_workflow_never_certifies() -> None:
+    no_sub_skills = (
+        Finding(Check.SUB_SKILL_NOT_CERTIFIED, "workflow", "the Workflow has no Sub-Skills"),
+    )
+    assert workflow_verdict(Dag(nodes=[], edges=[]), "", {}, []) == no_sub_skills
+    macros_only = Dag(nodes=[{"id": "MS01_Order", "kind": "macro"}], edges=[])
+    assert workflow_verdict(macros_only, "", {}, []) == no_sub_skills

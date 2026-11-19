@@ -181,7 +181,27 @@ def workflow_verdict(
     declared: Mapping[str, Iterable[str]],
     skills: Iterable[ChildSkill],
 ) -> tuple[Finding, ...]:
-    """Every finding that blocks the Workflow; empty: it may certify."""
+    """Every finding that blocks the Workflow; empty: it may certify. It never certifies
+    vacuously: every skill node of the DAG needs a Sub-Skill record, every record a DAG node,
+    and a Workflow with no Sub-Skills at all is blocked."""
+    children = list(skills)
     return _sorted(
-        [*dag_findings(dag), *schema_findings(schema_sql, declared), *children_findings(skills)]
+        [
+            *dag_findings(dag),
+            *schema_findings(schema_sql, declared),
+            *children_findings(children),
+            *_coverage_findings(dag, children),
+        ]
     )
+
+
+def _coverage_findings(dag: DagLike, children: Sequence[ChildSkill]) -> list[Finding]:
+    nodes = {str(n.get("id")) for n in dag.nodes if n.get("kind") == "skill"}
+    records = {c.skill_id for c in children}
+    if not nodes and not records:
+        return [
+            Finding(Check.SUB_SKILL_NOT_CERTIFIED, "workflow", "the Workflow has no Sub-Skills")
+        ]
+    return [
+        Finding(Check.SUB_SKILL_NOT_CERTIFIED, s, "no Sub-Skill record") for s in nodes - records
+    ] + [Finding(Check.DAG_UNKNOWN_NODE, s, "Sub-Skill not in the DAG") for s in records - nodes]
