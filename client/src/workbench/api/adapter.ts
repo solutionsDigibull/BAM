@@ -43,6 +43,8 @@ export interface BamApi {
   uploadFile(file: { name: string; size: number; type?: string; data: Blob; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
   /** Removes a file from the active intake batch once the service confirms. A blocked object stays in quarantine (audit). Refused while scanning. */
   removeUpload(id: string): Promise<void>
+  /** Takes a file out of the recycle bin. It is scanned and read again. Rejects with the server's reason (410 purged, 409 file limit). */
+  restoreUpload(id: string): Promise<void>
   /** Rescans a file whose scan failed (outage, timeout, malformed verdict). */
   retryScan(id: string): Promise<void>
   /** Approved access for a released, Verified file only; refused for scanning, blocked or errored files. */

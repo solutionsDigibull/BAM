@@ -50,11 +50,16 @@ export const putJson = <T>(path: string, body: unknown, headers?: Record<string,
 export const deleteJson = (path: string, headers?: Record<string, string>) => call<null>("DELETE", path, undefined, headers);
 
 /** Every row of a cursor-paged list (`{ items, next_cursor }`), up to a safety cap. */
-export async function listAll<T>(path: string, pageSize = 100, maxPages = 50): Promise<T[]> {
+export async function listAll<T>(
+  path: string,
+  pageSize = 100,
+  maxPages = 50,
+  extra: Record<string, string> = {},
+): Promise<T[]> {
   const items: T[] = [];
   let cursor: string | null | undefined;
   for (let n = 0; n < maxPages; n++) {
-    const qs = new URLSearchParams({ limit: String(pageSize) });
+    const qs = new URLSearchParams({ limit: String(pageSize), ...extra });
     if (cursor) qs.set("cursor", cursor);
     const { body } = await getJson<{ items: T[]; next_cursor?: string | null }>(`${path}?${qs}`);
     items.push(...body.items);

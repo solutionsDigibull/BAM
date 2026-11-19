@@ -15,7 +15,7 @@ import type {
 
 import type { IngestionRun, RunStatus, Snapshot, Sow, Stage, StepId, StepInfo } from "../api/types";
 import { setRagState, type KnowledgeGraph, type KnowledgeStatus } from "../rag/ragPipeline";
-import { isActive, scanEventsOf, toUploadRecord } from "./documents";
+import { deletedOf, isActive, scanEventsOf, toUploadRecord } from "./documents";
 import { getJson, listAll } from "./http";
 
 const TITLES = ["SOW generation and approval", "SOW to ISATVON skills", "Contract and checks", "Test, persist, deploy"];
@@ -161,7 +161,7 @@ function stepOne(state: ProjectPipelineState, files: number, error?: string): Pi
 
 export async function buildSnapshot(projectId: string): Promise<Snapshot> {
   const [documents, pipeline, knowledge] = await Promise.all([
-    listAll<DocumentOut>(`projects/${projectId}/documents`),
+    listAll<DocumentOut>(`projects/${projectId}/documents`, 100, 50, { include_deleted: "true" }),
     getJson<PipelineTimeline>(`projects/${projectId}/pipeline`).then((r) => r.body),
     getJson<KnowledgeVersionList>(`projects/${projectId}/knowledge`).then((r) => r.body.versions),
   ]);
@@ -241,6 +241,7 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
     activeStep: workflow && workflow.state !== "CANCELLED" ? 2 : 1,
     steps,
     uploads,
+    deleted: deletedOf(documents),
     scanEvents: scanEventsOf(documents),
     ingestion,
     sowGeneration: sowStages(state),

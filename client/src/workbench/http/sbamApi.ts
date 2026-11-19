@@ -131,6 +131,9 @@ export function createSbamApi(projectId: string): BamApi {
         throw new Error(problemMessage(e));
       }
     },
+    restoreUpload: async (id) => {
+      await postJson(`projects/${projectId}/documents/${id}/restore`);
+    },
     retryScan: async (id) => {
       try {
         await postJson(`projects/${projectId}/documents/${id}/retry`);
