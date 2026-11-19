@@ -8,9 +8,9 @@ Snapshots are made by the modules that use the masters (SOW generation, knowledg
 import asyncio
 import uuid
 from collections.abc import Iterator
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Form, Header, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, Form, Header, Query, Request, Response, UploadFile
 from sbam_contracts.api import Page
 from sbam_contracts.documents import MAX_FILE_BYTES
 from sbam_contracts.masters import MasterStatus, MasterType, SourceKind
@@ -27,6 +27,7 @@ from sbam_contracts.masters_api import (
     MasterVersionCreate,
     RoutedMasterType,
 )
+from sbam_contracts.masters_v03 import MasterBulkReport, MasterBulkRequest, MasterList
 from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
 from sqlalchemy.orm import Session
 
@@ -36,7 +37,7 @@ from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.request_session import request_scoped
 from sbam_api.db.session import app_sessions
-from sbam_api.masters import documents, exporter, importer, ingestion, models, service
+from sbam_api.masters import bulk, documents, exporter, importer, ingestion, lists, models, service
 from sbam_api.storage.router import backend
 from sbam_api.temporal.deps import temporal_client
 
@@ -166,9 +167,23 @@ def list_entries(
     user: Admin,
     session: Db,
     project_id: uuid.UUID | None = None,
+    include_retired: bool = False,
 ) -> Page[MasterEntry]:
-    rows = service.list_entries(session, user, master_type, project_id)
+    """Retired entries are hidden unless `include_retired=true` (#782)."""
+    rows = service.list_entries(session, user, master_type, project_id, include_retired)
     return Page[MasterEntry](items=[_out(e, v) for e, v in rows])
+
+
+@router.post("/admin/masters/{master_type}/bulk")
+def bulk_rows(
+    master_type: MasterType,
+    body: MasterBulkRequest,
+    user: Admin,
+    session: Db,
+    project_id: uuid.UUID | None = None,
+) -> MasterBulkReport:
+    """Validate or add many rows of one master at once (#782); see `bulk`."""
+    return bulk.bulk_rows(session, user, master_type, body, project_id)
 
 
 @router.get("/admin/masters/{master_type}/{entry_id}")
@@ -190,6 +205,62 @@ def create_version(
 ) -> MasterEntry:
     entry, version = service.new_version(session, user, master_type, entry_id, body, if_match)
     return _out(entry, version, response)
+
+
+@router.post("/admin/masters/{master_type}/{entry_id}/retire")
+def retire_entry(
+    master_type: MasterType,
+    entry_id: uuid.UUID,
+    user: Admin,
+    session: Db,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> MasterEntry:
+    """Retire is the only delete: status RETIRED, every version kept (#782)."""
+    entry, version = service.retire_entry(session, user, master_type, entry_id, if_match)
+    return _out(entry, version, response)
+
+
+# --- template lists (#782) ------------------------------------------------------------------
+
+
+@router.get(
+    "/admin/master-lists/{key}",
+    response_model=MasterList,
+    responses={200: {"content": {"text/csv": {}}, "description": "The list, or its CSV"}},
+)
+def get_master_list(
+    key: str,
+    user: Admin,
+    session: Db,
+    response: Response,
+    as_format: Annotated[Literal["json", "csv"], Query(alias="format")] = "json",
+) -> MasterList | Response:
+    body, row_version = lists.get_list(session, user, key)
+    if as_format == "csv":
+        headers = {
+            "Content-Disposition": content_disposition(f"{key}.csv"),
+            "Cache-Control": "no-store",
+            "ETag": etag(row_version),
+        }
+        return Response(lists.to_csv(body), media_type="text/csv; charset=utf-8", headers=headers)
+    response.headers["ETag"] = etag(row_version)
+    return body
+
+
+@router.put("/admin/master-lists/{key}")
+def put_master_list(
+    key: str,
+    body: MasterList,
+    user: Admin,
+    session: Db,
+    response: Response,
+    if_match: Annotated[str | None, Header()] = None,
+) -> MasterList:
+    """Replace the whole list; `If-Match: "0"` for its first save."""
+    saved, row_version = lists.put_list(session, user, key, body, if_match)
+    response.headers["ETag"] = etag(row_version)
+    return saved
 
 
 # --- master documents (E3.8) ----------------------------------------------------------------

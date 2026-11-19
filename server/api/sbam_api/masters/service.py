@@ -11,17 +11,20 @@
   ETag, or losing the race on (entry, version), answers 409 VERSION_CONFLICT. The stable id can't
   change in a new version; a different id is a different entry.
 * Every create and version is audited with the entry and version ids.
+* A blank id column gets the next server-assigned id (`next_id`, #782). Retiring an entry is the
+  only delete: its status becomes RETIRED, nothing is removed, and the list hides it by default.
 * Context outdated (T07): `context_outdated()` compares a stored snapshot with what the project
   would pin now. The Knowledge module calls it to mark its versions OUTDATED; nothing starts a run.
 """
 
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
 from pydantic import ValidationError
 from sbam_contracts.api import ErrorCode, FieldError
-from sbam_contracts.masters import ADMIN_EDITABLE, MasterIdentity, MasterType
+from sbam_contracts.masters import ADMIN_EDITABLE, MasterIdentity, MasterStatus, MasterType
 from sbam_contracts.masters_api import (
     InclusionReport,
     MasterEntryCreate,
@@ -29,7 +32,7 @@ from sbam_contracts.masters_api import (
     SnapshotDocument,
     SnapshotEntry,
 )
-from sbam_contracts.masters_v03 import ID_KEY, status_of
+from sbam_contracts.masters_v03 import ID_KEY, MasterPayloadV03, id_prefix, status_of
 from sbam_contracts.masters_workbook import ID_HEADER, ID_LABEL, PAYLOAD_MODELS, row_identity
 from sbam_contracts.projects import ProjectStatus
 from sqlalchemy.exc import IntegrityError
@@ -86,16 +89,10 @@ def _editable(master_type: MasterType) -> None:
         raise _not_editable(master_type)
 
 
-def _identity(
-    master_type: MasterType, payload: dict[str, Any], row_label: str | None = None
-) -> tuple[dict[str, Any], MasterIdentity, bool]:
-    """Validate the payload with the type's model; derive the SBAM metadata from its id column.
-
-    Returns (payload, identity, has_status): `has_status` is False for the masters without a
-    Status column, whose entry keeps the status it has.
-    """
+def _validated(master_type: MasterType, payload: dict[str, Any]) -> Any:
+    """The payload as the type's model, or 422 with an error at `payload.<field>`."""
     try:
-        model = PAYLOAD_MODELS[master_type].model_validate(payload)
+        return PAYLOAD_MODELS[master_type].model_validate(payload)
     except ValidationError as exc:
         raise _invalid(
             [
@@ -105,9 +102,20 @@ def _identity(
                 for e in exc.errors()
             ]
         ) from None
+
+
+def _identity(
+    master_type: MasterType, payload: dict[str, Any], row_label: str | None = None
+) -> tuple[dict[str, Any], MasterIdentity, bool]:
+    """Validate the payload with the type's model; derive the SBAM metadata from its id column.
+
+    Returns (payload, identity, has_status): `has_status` is False for the masters without a
+    Status column, whose entry keeps the status it has.
+    """
+    model = _validated(master_type, payload)
     key = ID_KEY[master_type]
     label = str(getattr(model, key)).strip()
-    if not label or not ID_LABEL.fullmatch(label):  # #782 assigns the id of a blank row
+    if not label or not ID_LABEL.fullmatch(label):
         message = f"{ID_HEADER[master_type]} is required: one line of at most 64 characters"
         raise _invalid([FieldError(path=f"payload.{key}", message=message)])
     if row_label is not None and row_label.strip() != label:
@@ -127,6 +135,38 @@ def _active_project(session: Session, user: CurrentUser, project_id: uuid.UUID) 
     return project
 
 
+# --- server-assigned ids (#782) -------------------------------------------------------------
+
+
+def next_id(
+    repo: MasterEntryRepository,
+    master_type: MasterType,
+    payload: MasterPayloadV03,
+    counters: dict[str, int],
+    taken: Iterable[str] = (),
+) -> str:
+    """The next `<prefix><nn>` for a blank id column (RULE-CUSTOM-<nnn>).
+
+    The first id of a prefix in a transaction takes a Postgres advisory lock on (tenant, type,
+    prefix) until commit, so two writers never compute the same number; the partial unique indexes
+    stay the backstop (IntegrityError -> 409). `counters` holds the numbers already handed out in
+    this transaction, `taken` the explicit ids of the same request.
+    """
+    prefix = id_prefix(master_type, payload)
+    if prefix not in counters:
+        repo.lock_ids(master_type.value, prefix)
+        suffixes = (t[len(prefix) :] for t in taken if t.startswith(prefix))
+        mine = [int(n) for n in suffixes if n.isdigit()]
+        counters[prefix] = max([repo.max_id_number(master_type.value, prefix), *mine])
+    counters[prefix] += 1
+    width = 3 if prefix == "RULE-CUSTOM-" else 2
+    return f"{prefix}{counters[prefix]:0{width}d}"
+
+
+def with_id(master_type: MasterType, payload: dict[str, Any], new_id: str) -> dict[str, Any]:
+    return {**payload, ID_KEY[master_type]: new_id}
+
+
 # --- entries and versions -------------------------------------------------------------------
 
 
@@ -137,7 +177,11 @@ def create_entry(
     repo = _repo(session, user)
     if body.project_id is not None:
         _active_project(session, user, body.project_id)
-    payload, identity, _ = _identity(master_type, body.payload, body.row_label)
+    payload = body.payload
+    if not str(payload.get(ID_KEY[master_type], "")).strip():  # a blank id: the server assigns it
+        model = _validated(master_type, payload)
+        payload = with_id(master_type, payload, next_id(repo, master_type, model, {}))
+    payload, identity, _ = _identity(master_type, payload, body.row_label)
     label = payload[ID_KEY[master_type]].strip()
     entry = MasterEntry(
         project_id=body.project_id,
@@ -217,16 +261,54 @@ def new_version(
     return entry, version
 
 
+def retire_entry(
+    session: Session,
+    user: CurrentUser,
+    master_type: MasterType,
+    entry_id: uuid.UUID,
+    if_match: str | None,
+) -> tuple[MasterEntry, MasterEntryVersion]:
+    """Retire is the only delete (#782): status RETIRED, every version kept. Idempotent."""
+    _editable(master_type)
+    repo = _repo(session, user)
+    entry = repo.get_for_update(entry_id)
+    if entry is None or entry.master_type != master_type.value:
+        raise not_found()
+    if not if_match:
+        raise ApiError(
+            428, ErrorCode.PRECONDITION_REQUIRED, "If-Match header required on this write"
+        )
+    if if_match.strip().removeprefix("W/") != etag(entry.row_version):
+        raise version_conflict()
+    version = repo.version(entry)
+    if version is None:
+        raise not_found()
+    if entry.status == MasterStatus.RETIRED.value:
+        return entry, version
+    entry.status = MasterStatus.RETIRED.value
+    try:
+        repo.update(entry, entry.row_version)
+        _audit(session, user, "MASTER_ENTRY_RETIRED", entry, version)
+        session.commit()
+    except StaleRowVersion:
+        session.rollback()
+        raise version_conflict() from None
+    return entry, version
+
+
 def list_entries(
     session: Session,
     user: CurrentUser,
     master_type: MasterType,
     project_id: uuid.UUID | None,
+    include_retired: bool = False,
 ) -> list[tuple[MasterEntry, MasterEntryVersion]]:
     repo = _repo(session, user)
     if project_id is not None:
         _active_project(session, user, project_id)
     entries = repo.of_type(master_type.value, project_id)
+    if not include_retired:
+        entries = [e for e in entries if e.status != MasterStatus.RETIRED.value]
     versions = repo.current_versions(entries)
     return [(e, versions[e.id]) for e in entries if e.id in versions]
 
