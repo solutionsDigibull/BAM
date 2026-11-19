@@ -130,6 +130,18 @@ A different answer from the owner becomes a new ADR that supersedes this one for
   `repo_decided`, so no table was added. The FDE answers in the workbench, the API checks the choice against the stored
   short list (an own repository is allowed only when the catalogue had none, and only after the catalogue's URL rules),
   and "no repository" is a GENERATED decision. Fetching and using the chosen repository is the next steps (#755, #862).
+- **Vendored trees and the server image (#867).** `build_workflow_server` copies each attached repository's stored
+  tree untouched into the server bundle under `vendor/<repo>@<commit>/` (the tree is found through the scan report named
+  in `build.repos` and must match the recorded tree digest), so the Dockerfile's `COPY vendor/` layer exists. The
+  activity `build_workflow_image` (behind `workflow.patched("wg29-workflow-image-build")`, after the server files, no
+  new pipeline stage) builds the image from the stored tar through an `ImageBuilder` port and writes the audit row
+  `workflow_image_built`: the image digest, the bundle hash it came from, the `mcp_server` entry and the content hash of
+  the draft sealed with it. Commit (#766) merges that entry with `workflow_image.manifest_with_image`; the draft row and
+  frozen manifests are never rewritten. The manifest is not placed inside the server bundle, because it records the
+  digest the bundle decides (circular). The worker holds no docker socket, so the builder is opt-in: set
+  `IMAGE_BUILDER=docker` on a build host whose `DOCKER_HOST` is reachable (a developer machine or the Staging
+  deployer's host); the default `none` records `workflow_image_failed` with `BUILDER_DISABLED` and the pipeline goes on.
+  The recorded digest is the local image id; pushing to a registry for the deployer (#765) is a later step.
 
 ## Sources
 

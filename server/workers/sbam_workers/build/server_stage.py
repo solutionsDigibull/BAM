@@ -10,9 +10,12 @@ gates and the certification evidence share, and the layer keys. The code preview
 the Staging runtime (#765) read it from there.
 
 The Workflow manifest is not part of the bundle (it records the server entry once the image is
-built, so it would be circular); the preview lists it from its own row. Vendored repository trees
-are not copied in here: `build.repos` of the Skill manifests names them, the fetcher's store holds
-them.
+built, so it would be circular); the preview lists it from its own row. The vendored repository
+trees (#867) are: `build.repos` of the Skill manifests names each one, the fetcher's store holds it
+(`Kind.REPOS`, found through the scan report), and it is copied untouched under
+`vendor/<repo>@<commit>/` into the Docker build context, so the Dockerfile's `COPY vendor/` layer
+exists and the gates and the preview see the same files the image ships. A tree whose digest is not
+the one the manifest recorded, or that is gone, is a `VENDOR_*` failure, never a silent skip.
 
 A Workflow whose bundle cannot be rendered (a Sub-Skill without its files, an unpinned image) is
 recorded as `workflow_server_failed` with the stable error code and the pipeline goes on: nothing
@@ -32,6 +35,7 @@ from sbam_api.artifacts.repository import ArtifactRepository
 from sbam_api.audit import repository as audit
 from sbam_api.builds.models import CodeAttemptStatus
 from sbam_api.builds.repository import CodeAttemptRepository
+from sbam_api.builds.workflow_code import overlays_of
 from sbam_api.builds.workflow_server import (
     BUILT_ACTION,
     ENTITY,
@@ -50,6 +54,8 @@ from sbam_api.workflows.repository import WorkflowRepository
 from sbam_contracts.build_dashboard import GateStatus
 from sbam_contracts.manifest import SkillManifest
 from sbam_contracts.pipeline import IdResult, WorkflowRef
+from sbam_contracts.repo_overlay import RepoOverlay
+from sbam_contracts.repo_scan import RepoScanReport
 from sbam_contracts.runs import TaskQueue
 from sbam_contracts.sandbox import normalize_digest
 from sqlalchemy.orm import Session, sessionmaker
@@ -57,6 +63,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from sbam_workers import mirror
+from sbam_workers.build.repo_attach import BUNDLE_MISSING, read_tree
 from sbam_workers.build.workflow_server import (
     SkillPart,
     WorkflowServerError,
@@ -64,6 +71,7 @@ from sbam_workers.build.workflow_server import (
     build_bundle,
 )
 from sbam_workers.registry import activity_for
+from sbam_workers.repo_fetch.overlay import OverlayError, build_overlay, tree_digest
 from sbam_workers.repo_fetch.report import bundle_tar
 from sbam_workers.settings import WorkerSettings
 
@@ -74,6 +82,47 @@ MAX_SCHEMA_BYTES: Final = 1024 * 1024
 
 def _failure(kind: str, message: str) -> ApplicationError:
     return ApplicationError(message, type=kind, non_retryable=True)
+
+
+def vendored_tree(
+    storage: StorageBackend, scope: StorageScope, overlay: RepoOverlay
+) -> dict[str, bytes]:
+    """`vendor/<repo>@<commit>/...` of one attached repository, read from the fetcher's store.
+
+    The tree is found through the scan report the overlay names, and must be the tree the manifest
+    recorded (its digest) with no patch the build did not keep: a patch file is stored nowhere yet,
+    so an overlay that lists one cannot be reproduced and is refused."""
+    if overlay.patches:
+        raise WorkflowServerError("VENDOR_PATCHES_UNAVAILABLE", f"{overlay.repo_dir} lists patches")
+    if overlay.scan_report_sha256 is None:
+        raise WorkflowServerError("VENDOR_REPORT_MISSING", f"{overlay.repo_dir} has no scan report")
+    try:
+        report = RepoScanReport.model_validate_json(
+            storage.get(scope.key(Kind.REPOS, overlay.scan_report_sha256))
+        )
+        if report.bundle_sha256 is None:
+            raise WorkflowServerError("VENDOR_TREE_MISSING", f"{overlay.repo_dir} was not vendored")
+        tree = read_tree(storage, scope, report.bundle_sha256)
+    except FileNotFoundError:
+        raise WorkflowServerError(
+            "VENDOR_TREE_MISSING", f"the scan report of {overlay.repo_dir} is gone"
+        ) from None
+    except ApplicationError as exc:
+        if exc.type == BUNDLE_MISSING:
+            raise WorkflowServerError(
+                "VENDOR_TREE_MISSING", f"the stored tree of {overlay.repo_dir} is gone"
+            ) from None
+        raise
+    if tree_digest(tree) != overlay.vendor_tree_sha256:
+        raise WorkflowServerError(
+            "VENDOR_TREE_CHANGED", f"{overlay.repo_dir} is not the tree the manifest recorded"
+        )
+    try:
+        built = build_overlay(url=str(overlay.url), commit=str(overlay.commit), vendor=tree)
+    except OverlayError as exc:
+        raise WorkflowServerError("VENDOR_TREE_UNSAFE", str(exc)) from None
+    prefix = f"{overlay.repo_dir}/"
+    return {p: d for p, d in built.layout.items() if p.startswith(prefix)}
 
 
 def _read_tar(data: bytes) -> dict[str, bytes]:
@@ -120,6 +169,9 @@ class SqlServerStore:
             attempts = CodeAttemptRepository(session, ctx)
             parts: list[SkillPart] = []
             digests: set[str] = set()
+            vendor: dict[str, bytes] = {}
+            seen: set[str] = set()
+            scope = StorageScope(inp.tenant_id, inp.project_id)
             for sub in subs:
                 found = manifests.get(sub.id)
                 rows = [
@@ -132,6 +184,10 @@ class SqlServerStore:
                         "SKILL_NOT_BUILT", f"{sub.skill_id} has no manifest or assembled bundle"
                     )
                 digests.add(found.runtime_digest)
+                for overlay in overlays_of(found.manifest):
+                    if overlay.repo_dir not in seen:  # one copy, however many Sub-Skills use it
+                        seen.add(overlay.repo_dir)
+                        vendor.update(vendored_tree(self.storage, scope, overlay))
                 key = rows[-1].bundle_key or ""
                 parts.append(
                     SkillPart(SkillManifest.model_validate(found.manifest), self._tar(key))
@@ -152,6 +208,7 @@ class SqlServerStore:
                 skills=parts,
                 schema_sql=schema_sql,
                 base_image=f"skill-runtime@{normalize_digest(digests.pop())}",
+                vendor=vendor or None,
             )
 
     def _tar(self, key: str) -> dict[str, bytes]:
