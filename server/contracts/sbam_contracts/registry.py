@@ -191,6 +191,11 @@ from sbam_contracts.workflow_commit import (
 )
 from sbam_contracts.workflow_registry import RegisteredWorkflow
 from sbam_contracts.workflow_repos import WorkflowRepositories
+from sbam_contracts.workflow_versions import (
+    NewVersionRequest,
+    NewVersionStarted,
+    WorkflowVersionList,
+)
 
 ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("problem_detail", ProblemDetail),
@@ -359,6 +364,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("workflow_commit/staging_start_request", StagingStartRequest),
     ("workflow_commit/staging_start_result", StagingStartResult),
     ("workflow/repositories", WorkflowRepositories),
+    ("workflow_versions/list", WorkflowVersionList),
+    ("workflow_versions/new_request", NewVersionRequest),
+    ("workflow_versions/new_started", NewVersionStarted),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
     ("connections/connection", Connection),

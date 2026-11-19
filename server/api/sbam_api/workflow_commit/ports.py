@@ -83,6 +83,9 @@ class FreezeRefused(ApiError):  # noqa: N818
 
 
 class StateMachineFreezer:
+    """The interim freezer of #766. #132 adds `versioning.freezer.OrderedFreezer`, which extends it
+    (it reuses `eligible`, `seal` and `transition`) and is the default of the worker."""
+
     def freeze(
         self,
         session: Session,
@@ -92,6 +95,19 @@ class StateMachineFreezer:
         correlation_id: str,
         storage: StorageBackend,
     ) -> None:
+        found = self.eligible(session, ctx, workflow_id, manifest_hash, storage)
+        self.seal(session, ctx, found, correlation_id)
+        self.transition(session, ctx, found, manifest_hash, correlation_id)
+        session.flush()
+
+    @staticmethod
+    def eligible(
+        session: Session,
+        ctx: TenantContext,
+        workflow_id: uuid.UUID,
+        manifest_hash: str,
+        storage: StorageBackend,
+    ) -> checks.Evaluation:
         found = checks.evaluate(session, ctx, workflow_id, storage)
         if not found.approved(manifest_hash) or found.row is None:
             raise FreezeRefused("the manifest changed since it was approved")
@@ -99,9 +115,17 @@ class StateMachineFreezer:
         for check in found.checks:
             if check.name in gated and not check.passed:
                 raise FreezeRefused(f"{check.name.value}: {check.reason}")
-        workflow, newest = found.workflow, found.row
-        if workflow.state not in checks.CERTIFIED_STATES:
-            raise FreezeRefused(f"the Workflow is {workflow.state}, not CERTIFIED")
+        if found.workflow.state not in checks.CERTIFIED_STATES:
+            raise FreezeRefused(f"the Workflow is {found.workflow.state}, not CERTIFIED")
+        return found
+
+    @staticmethod
+    def seal(
+        session: Session, ctx: TenantContext, found: checks.Evaluation, correlation_id: str
+    ) -> None:
+        workflow_id, newest = found.workflow.id, found.row
+        if newest is None:
+            raise FreezeRefused("there is no Workflow manifest yet")
         sealed = found.effective
         if sealed is not None and sealed.integrity.content_sha256 != newest.sha256:
             # The first freeze of this manifest: the version with the bundle entry becomes the
@@ -146,13 +170,22 @@ class StateMachineFreezer:
             )
         elif not newest.is_frozen:
             newest.is_frozen = True
-        if workflow.state == WorkflowState.CERTIFIED.value:
+
+    @staticmethod
+    def transition(
+        session: Session,
+        ctx: TenantContext,
+        found: checks.Evaluation,
+        manifest_hash: str,
+        correlation_id: str,
+    ) -> None:
+        if found.workflow.state == WorkflowState.CERTIFIED.value:
             apply_transition(
                 session,
                 ctx,
                 TransitionCommand(
                     model=Workflow,
-                    entity_id=workflow_id,
+                    entity_id=found.workflow.id,
                     event="freeze",
                     actor=Actor.SYSTEM,
                     actor_id=SYSTEM_ACTOR_ID,
@@ -160,4 +193,3 @@ class StateMachineFreezer:
                     idempotency_key=f"commit-freeze:{manifest_hash}",
                 ),
             )
-        session.flush()
