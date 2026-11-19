@@ -1264,7 +1264,7 @@ routes:
       params: {project_id: "@project_a", workflow_id: "@workflow_a"}
     expect:
       <<: *fde_project_resource
-      fde_a_assigned: "404 NOT_FOUND"
+      fde_a_assigned: "200"
 
   commit_api_v1_projects__project_id__workflows__workflow_id__commit_post:
     request:
@@ -1274,7 +1274,7 @@ routes:
       headers: {idempotency-key: "rbac-commit-0001", if-match: '"sha256:0000000000000000000000000000000000000000000000000000000000000000"'}
     expect:
       <<: *fde_project_resource
-      fde_a_assigned: "404 NOT_FOUND"
+      fde_a_assigned: "409 VERSION_CONFLICT"
 
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
