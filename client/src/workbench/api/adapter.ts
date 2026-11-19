@@ -1,8 +1,9 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
   BuildsResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
-  RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
+  GatesResponse, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
+import type { RetryAccepted } from '../lib/workflowBuilds'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
 
 export type ScanOutcome = 'clean' | 'threat' | 'error'
@@ -36,6 +37,10 @@ export interface BamApi {
   requestChange(workflowId: string, body: RequestChangeCreate, key: string): Promise<RequestChangeAccepted>
   /** The Sub-Skill rows of the workflow's build (the choices of a change note). */
   getWorkflowBuilds(workflowId: string): Promise<BuildsResponse>
+  /** One attempt's gate results with their findings (`attempt` omitted = the latest). Read only (#715). */
+  getSubSkillGates(workflowId: string, subId: string, attempt?: number): Promise<GatesResponse>
+  /** Retry a Sub-Skill build that waits for the FDE, with the reason and an Idempotency-Key. 409 when it is not waiting (#715). */
+  retrySubSkill(workflowId: string, subId: string, reason: string, key: string): Promise<RetryAccepted>
   /** The project's secrets: names, status and masked tail, never a value (#764). */
   getConnections(): Promise<ConnectionList>
   /** Sets or replaces one value (`ifMatch` is the entry's row version; none for a name with no row yet). The value is never read back. */
@@ -125,6 +130,7 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'staging-status': q => api.getStagingStatus(q.workflowId ?? ''),
   'change-notes': q => api.getChangeNotes(q.workflowId ?? ''),
   'workflow-builds': q => api.getWorkflowBuilds(q.workflowId ?? ''),
+  'sub-skill-gates': q => api.getSubSkillGates(q.workflowId ?? '', q.subId ?? '', q.attempt === undefined ? undefined : Number(q.attempt)),
   connections: () => api.getConnections(),
   'knowledge-node': q => api.getKnowledgeNode(q.versionId ?? '', q.nodeId ?? ''),
 }

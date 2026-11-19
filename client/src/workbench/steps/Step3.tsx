@@ -17,6 +17,7 @@ import { CodeFileTree } from '../components/CodeFileTree'
 import { RegistryPanel } from '../components/RegistryPanel'
 import { RepositoryPanel } from '../components/RepositoryPanel'
 import { RepoQuestionCard } from '../components/RepoQuestionCard'
+import { EvidenceBody, isEvidenceView } from '../components/BuildEvidence'
 import { CodeViewSwitch, WorkflowCodePreview, WorkflowFilesCenter, type CodeView } from '../components/WorkflowCodePreview'
 import { tips } from '../lib/actionTips'
 import { approve, templateApproved, templateKey, useApprovals } from '../lib/approvals'
@@ -295,6 +296,7 @@ export function CodeCenter({ snap, info }: StepProps) {
       {view === 'files' && workflowId ? <WorkflowCodePreview workflowId={workflowId} />
         : view === 'repos' && workflowId ? <RepositoryPanel workflowId={workflowId} />
         : view === 'registry' && workflowId ? <RegistryPanel workflowId={workflowId} />
+        : isEvidenceView(view) && workflowId ? <EvidenceBody view={view} workflowId={workflowId} />
         : r.error ? <ErrorState title="Could not load generated code" action={<button className="btn btn-primary" onClick={() => r.refetch()}>Retry</button>}>{r.error.message}</ErrorState>
         : r.isLoading && !r.files ? <Skeleton rows={8} label="Loading generated code" />
         : !r.files?.length ? <Empty icon="file" title="No generated code yet">Activity C translates each skill and checks the result.</Empty>

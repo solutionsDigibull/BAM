@@ -3,6 +3,7 @@
 // wired yet rejects with `NotWiredError`, so the screen shows an error state, never an invented result.
 import type { BamApi } from "../api/adapter";
 import type { IngestionRun } from "../api/types";
+import type { RetryAccepted } from "../lib/workflowBuilds";
 import { ragPipeline, setRagActions } from "../rag/ragPipeline";
 import { API_BASE } from "@/providers/data-provider";
 import type {
@@ -12,6 +13,7 @@ import type {
   CommitStatus,
   Connection,
   ConnectionList,
+  GatesResponse,
   KnowledgeNodeDetail,
   ConnectionTestResult,
   ConnectionValueResult,
@@ -112,6 +114,11 @@ export function createSbamApi(projectId: string): BamApi {
       (await postJson<RequestChangeAccepted>(`projects/${projectId}/workflows/${workflowId}/request-change`, body, { "Idempotency-Key": key })).body,
     getWorkflowBuilds: async (workflowId) =>
       (await getJson<BuildsResponse>(`projects/${projectId}/workflows/${workflowId}/builds`)).body,
+    // The gates of one Sub-Skill attempt and Retry of a build that waits for the FDE (#715). The server decides the refusals.
+    getSubSkillGates: async (workflowId, subId, attempt) =>
+      (await getJson<GatesResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/gates${attempt === undefined ? "" : `?attempt=${attempt}`}`)).body,
+    retrySubSkill: async (workflowId, subId, reason, key) =>
+      (await postJson<RetryAccepted>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/retry`, { reason }, { "Idempotency-Key": key })).body,
     // The project's secrets (#764): the value goes out once in a PUT and is never returned.
     getConnections: async () => (await getJson<ConnectionList>(`projects/${projectId}/connections`)).body,
     setConnectionValue: async (name, value, ifMatch) =>
