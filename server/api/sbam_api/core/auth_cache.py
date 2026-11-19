@@ -12,6 +12,16 @@ What it never does:
   * outlive a new login: the Keycloak `sid` is part of the key, so a new session misses;
   * keep a session the caller says is gone: `invalidate(sub)` drops every entry of a user, which is
     what a logout, a deactivation or a role change should call.
+
+Invalidation (#670): `invalidate(sub)` is now called after the commit of a logout, a deactivation or
+reactivation or role change (`identity.service.update_user`) and an assignment change, for every
+user added or removed (`projects.service.set_members`). The services take it as an optional
+callback and stay pure.
+
+Enable decision (owner): keep `AUTH_STATE_CACHE_SECONDS=0` (off) by default. `invalidate()` is
+PER PROCESS: with more than one API replica, a TTL above 0 still lets the other replicas serve the
+old answer for up to the TTL. Only turn the cache on for a single replica, until a shared epoch or
+revocation exists (future work).
 """
 
 import threading

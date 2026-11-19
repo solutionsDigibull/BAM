@@ -115,9 +115,12 @@ def get_members(project_id: uuid.UUID, user: Admin, session: Db) -> ProjectMembe
 
 @router.put("/admin/projects/{project_id}/members")
 def put_members(
-    project_id: uuid.UUID, body: ProjectMembersPut, user: Admin, session: Db
+    project_id: uuid.UUID, body: ProjectMembersPut, user: Admin, session: Db, request: Request
 ) -> ProjectMembers:
-    return _members(project_id, service.set_members(session, user, project_id, body))
+    invalidate = request.app.state.auth.state_cache.invalidate  # A-12: an assignment changed
+    return _members(
+        project_id, service.set_members(session, user, project_id, body, invalidate=invalidate)
+    )
 
 
 def _goal(project: Project, response: Response) -> ProjectGoalOut:
