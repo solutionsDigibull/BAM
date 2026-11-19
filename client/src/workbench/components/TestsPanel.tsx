@@ -116,7 +116,7 @@ function Runs({ workflowId, subId }: { workflowId: string; subId: string }) {
   const projectId = typeof window === 'undefined' ? undefined : projectIdOfPath(window.location.pathname)
   if (error) return isForbidden(error) ? <Forbidden /> : <ErrorState title="Could not load the test runs" action={retryAction(refetch)}>{problemText(error)}</ErrorState>
   if (isLoading || !runs) return <Skeleton rows={4} label="Loading the test runs" />
-  if (runs.length === 0) return <Empty icon="file" title="Tests not run yet">The build runs the test cases in the sandbox once the Sub-Skill's code passes its gates.</Empty>
+  if (runs.length === 0) return <Empty icon="file" title="Tests not run yet">The build runs the test cases in the sandbox once the Sub-Skill&apos;s code passes its gates.</Empty>
   return <ul className="tp-runs" aria-label="Test runs">{runs.map(r => <Run key={r.id} run={r} workflowId={workflowId} subId={subId} projectId={projectId} />)}</ul>
 }
 
