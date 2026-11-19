@@ -6,7 +6,8 @@ import { cookies, headers } from "next/headers";
 import type { Portal } from "./landing";
 import { parseRoles, type Role } from "./roles";
 
-export type Session = { roles: Role[] };
+/** `user`: the email or name to show as signed in (#785); absent for the dev cookie. */
+export type Session = { roles: Role[]; user?: string };
 
 export const DEV_ROLES_COOKIE = "sbam_dev_roles";
 
@@ -48,7 +49,8 @@ export async function getSession(): Promise<Session | null> {
   const token = await sessionToken();
   if (token && !token.error) {
     const roles = parseRoles(((token.roles as string[] | undefined) ?? []).join(","));
-    if (roles.length) return { roles };
+    const user = (token.email ?? token.name ?? undefined) as string | undefined;
+    if (roles.length) return { roles, user };
   }
   if (!devAuthEnabled()) return null;
   const roles = parseRoles(jar.get(DEV_ROLES_COOKIE)?.value ?? "");

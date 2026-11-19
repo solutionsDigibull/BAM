@@ -26,7 +26,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     );
   }
   return (
-    <PortalShell portal="admin" nav={ADMIN_NAV} canSwitch={isFde(session.roles)}>
+    <PortalShell
+      portal="admin"
+      nav={ADMIN_NAV}
+      canSwitch={isFde(session.roles)}
+      user={session.user}
+    >
       {children}
     </PortalShell>
   );

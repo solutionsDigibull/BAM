@@ -1,0 +1,171 @@
+/* The approved Admin Masters shell (#785): Admin_Masters/src/style.css (aside, .brand, .nav-*, header, .avatar). */
+.portal-shell {
+  --shell-line: #dce3ee;
+  --shell-text: #0f1b2d;
+  --shell-muted: #7b8ba3;
+  --shell-pick: #f2f9fd;
+  --shell-picked: #006c99;
+  --shell-menu: #ffffff;
+}
+.portal-shell[data-theme="dark"] {
+  --shell-line: #22395c;
+  --shell-text: #e6edf7;
+  --shell-muted: #93a6c2;
+  --shell-pick: #1c2e51;
+  --shell-picked: #5b83f2;
+  --shell-menu: #101e32;
+  color-scheme: dark;
+}
+
+:root[data-sbam-theme="dark"] {
+  /* The ui-kit table and badge colours (components/ui-kit/grid.tsx), dark. */
+  --sbam-muted: #93a6c2;
+  --sbam-grid-head: #142540;
+  --sbam-grid-line: #22395c;
+  --sbam-grid-hover: #1a2e4d;
+  --sbam-badge-bg: #22395c;
+}
+
+.portal-sider {
+  border-right: 1px solid var(--shell-line);
+}
+.portal-sider .ant-layout-sider-children {
+  padding: 0 12px;
+}
+.portal-sider.ant-layout-sider-collapsed {
+  border-right: 0;
+}
+.portal-sider .ant-menu {
+  border-inline-end: 0 !important;
+}
+.portal-sider .ant-menu-item {
+  width: 100%;
+  margin-block: 2px;
+}
+
+.portal-brand {
+  display: block;
+  padding: 12px 8px 4px;
+}
+.portal-logo {
+  display: block;
+  height: 46px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+.portal-nav-label {
+  font-size: 12px;
+  color: var(--shell-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 25px 12px 12px;
+}
+
+.portal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 65px;
+  padding: 0 25px !important;
+  border-bottom: 1px solid var(--shell-line);
+  line-height: normal;
+}
+.portal-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--shell-text);
+}
+.portal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.portal-account {
+  position: relative;
+  margin-left: 8px;
+}
+.portal-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: var(--shell-pick);
+  color: var(--shell-picked);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.portal-avatar:hover {
+  filter: brightness(0.96);
+}
+.portal-avatar:focus-visible,
+.portal-menu-item:focus-visible {
+  outline: 2px solid var(--shell-picked);
+  outline-offset: 2px;
+}
+.portal-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  min-width: 180px;
+  max-width: min(260px, calc(100vw - 24px));
+  background: var(--shell-menu);
+  border: 1px solid var(--shell-line);
+  border-radius: 8px;
+  padding: 5px;
+  box-shadow: 0 8px 30px #24384d20;
+}
+.portal-menu-who {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--shell-muted);
+  overflow-wrap: anywhere;
+}
+.portal-menu form {
+  margin: 0;
+}
+.portal-menu-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--shell-text);
+  cursor: pointer;
+}
+.portal-menu-item:hover {
+  background: var(--shell-pick);
+  color: var(--shell-text);
+}
+
+@media (max-width: 991px) {
+  .portal-header {
+    padding: 0 12px !important;
+  }
+  /* Below lg the open sider overlays the page instead of pushing it wider than the screen. */
+  .portal-sider:not(.ant-layout-sider-collapsed) {
+    position: fixed !important;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    box-shadow: 10px 0 30px #20305020;
+  }
+}
