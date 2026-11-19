@@ -3,7 +3,7 @@
 Started by ProjectPipeline with id `build-<sub_skill_id>-<build_no>` on sbam-build. One *cycle* is
 a first pass (attempt 0) plus at most MAX_CORRECTIONS correction passes:
 
-    [choose_repo††, first pass of the build only] build_manifest → check_libraries →
+    [choose_repo††, attach_repo†††, first pass of the build only] build_manifest → check_libraries →
     render_skeleton → generate_bodies* → assemble → ast_gate →
     static_gate → import_gate → compliance_gates → review_code† → generate_tests →
     build_promptfoo_suite → [tests_started] → run_sandbox_tests → certify_sub_skill →
@@ -16,7 +16,11 @@ a first pass (attempt 0) plus at most MAX_CORRECTIONS correction passes:
     ISATVON is decided inside the activity; several close candidates, a weak match or no candidate
     make the build wait for the FDE's `repo_answer` signal (stage WAIT_REPO, no timeout, a
     reminder notification every 3 days), then the activity records the answer. It runs once per
-    build: a retry that opens a new cycle finds the decision and skips it.)
+    build: a retry that opens a new cycle finds the decision and skips it.
+    ††† #862: when the decision is a repository, fetch and scan it and attach the scan report and
+    the overlay record to the build (`build.repos` of the manifest). A refused repository is
+    recorded and the build generates its own code; a fetch that cannot answer after its retries
+    does not stop the build either, it goes on without a repository.)
 
 A gate or test failure runs `correct` and starts the next pass from the manifest (every gate runs
 again; a corrector that changed the ISATVON is picked up by the re-manifest). After MAX_CORRECTIONS
@@ -98,6 +102,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from sbam_workers.build.libraries import check_libraries
     from sbam_workers.build.manifest import PROVENANCE_MISSING, build_manifest
+    from sbam_workers.build.repo_attach import BUNDLE_MISSING, AttachRepoInput, attach_repo
     from sbam_workers.build.stubs import (
         assemble,
         ast_gate,
@@ -163,6 +168,10 @@ RETRY_TESTS_PATCH = "704-retry-regenerates-tests"
 REVIEWER_PATCH = "wg11-reviewer-pass"  # #759: the review pass after the gates
 IMPORT_GATES_PATCH = "wg13-import-and-compliance-gates"  # #761: import gate, then licence/vuln/MCP
 REPO_CHOICE_PATCH = "wg8-choose-repo"  # #756: pick the repository, or ask the FDE, before building
+REPO_ATTACH_PATCH = (
+    "wg28-attach-repo-report"  # #862: fetch the chosen repository, attach its report
+)
+REPO_ATTACH_TIMEOUT = timedelta(minutes=15)  # a clone, the scan and the overlay record
 REPO_REMINDER_AFTER = timedelta(days=3)  # #756: how long the FDE may leave the question alone
 # #117: an integrity or wiring defect in a gate is a platform defect (BUILD_ERROR, an admin fixes
 # it), not a crashed workflow nobody hears about. The other stages' wiring errors still fail loudly.
@@ -457,19 +466,45 @@ class SubSkillBuild:
         """#756: decide the repository, or wait for the FDE's answer and record it. The activity
         keeps one decision per build, so a retried or replayed call answers from what it stored."""
         ref = self._ref()
-        first: ChooseRepoResult = await self._call(
+        decided: ChooseRepoResult = await self._call(
             BuildStage.CHOOSE_REPO,
             choose_repo,
             ChooseRepoInput(**ref, cycle=self.cycle, attempt=self.attempt),
         )
-        if first.status is ChooseRepoStatus.ASKED:
+        if decided.status is ChooseRepoStatus.ASKED:
             answer = await self._wait_repo_answer()
-            await self._call(
+            decided = await self._call(
                 BuildStage.CHOOSE_REPO,
                 choose_repo,
                 ChooseRepoInput(**ref, cycle=self.cycle, attempt=self.attempt, answer=answer),
             )
         self.repo_decided = True
+        if decided.url is not None and workflow.patched(REPO_ATTACH_PATCH):
+            await self._attach_repo(decided.url)
+
+    async def _attach_repo(self, url: str) -> None:
+        """#862: fetch and scan the chosen repository and attach its report and overlay to the
+        build. The activity keeps one record per build, so a replayed or retried call answers from
+        what it stored."""
+        self._checkpoint()
+        self.stage = BuildStage.CHOOSE_REPO
+        try:
+            await workflow.execute_activity(
+                attach_repo,
+                AttachRepoInput(**self._ref(), cycle=self.cycle, attempt=self.attempt, url=url),
+                task_queue=TaskQueue.BUILD.value,
+                start_to_close_timeout=REPO_ATTACH_TIMEOUT,
+                retry_policy=RetryPolicy(
+                    initial_interval=timedelta(seconds=1),
+                    maximum_interval=timedelta(seconds=30),
+                    maximum_attempts=3,
+                    non_retryable_error_types=[BUNDLE_MISSING],
+                ),
+            )
+        except ActivityError as error:
+            if not isinstance(error.cause, ApplicationError | ActivityTimeout):
+                raise  # a cancellation, not a fetch that failed
+            workflow.logger.warning("the repository could not be attached; building without it")
 
     async def _wait_repo_answer(self) -> RepoAnswerSignal:
         """Wait for the FDE's `repo_answer` (or `cancel`). There is no deadline: the build waits as
