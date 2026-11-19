@@ -318,6 +318,9 @@ test("e766_t10 commit success: confirm, send, then committed", async ({ page, ba
   });
   await page.locator(".bam-btn").click();
   await confirm(page).click();
+  // Commit leads to Staging in the same login (#861); the Validation screen shows the result when the toggle goes back.
+  await expect(page.locator(".bam-wb")).toHaveAttribute("data-env", "Staging");
+  await page.locator("label.eg-fde").click();
   await expect(page.getByText(/Committed to Staging as version 1.0.0/)).toBeVisible();
   expect(sent).toHaveLength(1);
   expect(sent[0]!.match).toBe(`"${HASH}"`);
