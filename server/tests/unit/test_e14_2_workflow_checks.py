@@ -1,8 +1,13 @@
 """E14.2 (#130): pure Macro and Workflow validators."""
 
+import json
 import random
 import uuid
+from pathlib import Path
+from typing import Any
 
+import pytest
+from sbam_contracts.isatvon14 import SubSkill, build_contracts
 from sbam_contracts.manifest import Dag
 from sbam_contracts.state_machines import SubSkillState
 from sbam_workers.build.dag import find_cycle
@@ -10,12 +15,16 @@ from sbam_workers.certify.workflow_checks import (
     Check,
     ChildSkill,
     Finding,
+    Interface,
     children_findings,
     dag_findings,
+    interface_findings,
     macro_verdicts,
     schema_findings,
     workflow_verdict,
 )
+
+ISA14 = Path(__file__).parents[1] / "fixtures/isa14/ms01_1_structured.json"
 
 BUNDLE_A = "a" * 64
 BUNDLE_B = "b" * 64
@@ -226,3 +235,128 @@ def test_e14_2_an_empty_workflow_never_certifies() -> None:
     assert workflow_verdict(Dag(nodes=[], edges=[]), "", {}, []) == no_sub_skills
     macros_only = Dag(nodes=[{"id": "MS01_Order", "kind": "macro"}], edges=[])
     assert workflow_verdict(macros_only, "", {}, []) == no_sub_skills
+
+
+# --- interfaces (T05) -----------------------------------------------------------------------------
+
+
+def _iface(
+    inputs: dict[str, str], outputs: dict[str, str], *, output_required: list[str] | None = None
+) -> Interface:
+    """Contracts shaped like `build_contracts`; `output_required` only when the test sets it."""
+    output: dict[str, Any] = {
+        "type": "object",
+        "properties": {k: {"type": t} for k, t in outputs.items()},
+    }
+    if output_required is not None:
+        output["required"] = output_required
+    return Interface(
+        {
+            "input_schema": {
+                "type": "object",
+                "properties": {k: {"type": t} for k, t in inputs.items()},
+                "required": list(inputs),
+            },
+            "output_schema": output,
+        }
+    )
+
+
+def _linked(field: str = "amount") -> Dag:
+    """GOOD_EDGES plus a field-level data edge MS01.1_Intake -> MS01.2_Bill (as build_dag)."""
+    dag = _dag(GOOD_EDGES)
+    edge = {"from": "MS01.1_Intake", "to": "MS01.2_Bill", "kind": "data", "field": field}
+    return Dag(nodes=dag.nodes, edges=[*dag.edges, edge])  # type: ignore[list-item]
+
+
+def _ifaces(amount_out: str, amount_in: str, **out: Any) -> dict[str, Interface]:
+    return {
+        "MS01.1_Intake": _iface({"email": "string"}, {"amount": amount_out}, **out),
+        "MS01.2_Bill": _iface({"amount": amount_in}, {"invoice_id": "string"}),
+        "MS02.1_Ship": _iface({"invoice_id": "string"}, {"tracking": "string"}),
+    }
+
+
+def test_e14_2_t05_interface_mismatch_string_into_number() -> None:
+    assert interface_findings(_linked(), _ifaces("string", "number")) == (
+        Finding(
+            Check.INTERFACE_INCOMPATIBLE,
+            "MS01.2_Bill",
+            "MS01.1_Intake outputs amount as string; MS01.2_Bill takes amount as number",
+        ),
+    )
+    verdict = workflow_verdict(
+        _linked(), SCHEMA, DECLARED, _children(), interfaces=_ifaces("string", "number")
+    )
+    assert [f.check for f in verdict] == [Check.INTERFACE_INCOMPATIBLE]
+
+
+@pytest.mark.parametrize(
+    ("out", "into", "ok"),
+    [
+        ("string", "string", True),
+        ("integer", "number", True),  # the one widening the spec allows
+        ("number", "number", True),
+        ("number", "integer", False),  # narrowing loses data
+        ("boolean", "string", False),
+        ("object", "array", False),
+    ],
+)
+def test_e14_2_t05_compatible_types(out: str, into: str, ok: bool) -> None:
+    findings = interface_findings(_linked(), _ifaces(out, into))
+    assert (findings == ()) is ok, findings
+
+
+def test_e14_2_t05_optional_output_into_a_required_input() -> None:
+    """Edge case: the upstream output schema says the field may be absent, the downstream needs it.
+    `build_contracts` never writes `required` on an output schema, so today every output counts as
+    present and this fires only for an output schema that declares `required`."""
+    optional = _ifaces("number", "number", output_required=["state_handoff_id"])
+    assert interface_findings(_linked(), optional) == (
+        Finding(
+            Check.INTERFACE_INCOMPATIBLE,
+            "MS01.2_Bill",
+            "MS01.1_Intake output amount is optional; MS01.2_Bill input amount is required",
+        ),
+    )
+    required = _ifaces("number", "number", output_required=["amount"])
+    assert interface_findings(_linked(), required) == ()
+    assert interface_findings(_linked(), _ifaces("number", "number")) == ()  # no `required`
+
+
+def test_e14_2_t05_a_linked_field_or_contract_missing_is_a_finding() -> None:
+    ifaces = _ifaces("string", "string")
+    assert [f.message for f in interface_findings(_linked("total"), ifaces)] == [
+        "MS01.1_Intake -> MS01.2_Bill: total is not in the output_schema of MS01.1_Intake "
+        "and not in the input_schema of MS01.2_Bill"
+    ]
+    del ifaces["MS01.1_Intake"]
+    assert [f.message for f in interface_findings(_linked(), ifaces)] == [
+        "MS01.1_Intake -> MS01.2_Bill: no interface contract for MS01.1_Intake"
+    ]
+    # the activity always passes the interfaces: none at all is not a pass
+    assert [f.check for f in workflow_verdict(_linked(), SCHEMA, DECLARED, _children())] == [
+        Check.INTERFACE_INCOMPATIBLE
+    ]
+
+
+def test_e14_2_t05_reference_contracts_from_build_contracts_link_cleanly() -> None:
+    """MS01.1's real contracts (`build_contracts` on the reference fixture) feed a Sub-Skill that
+    takes `auth_status` (an enum, so a string) and `otp_match` (a boolean)."""
+    sub = json.loads(ISA14.read_text("utf-8"))
+    upstream = Interface(build_contracts(SubSkill.model_validate(sub)))
+    downstream = _iface({"auth_status": "string", "otp_match": "boolean"}, {"kyc": "string"})
+    nodes = [{"id": s, "kind": "skill"} for s in ("MS01.1_Investor_Auth_Manager", "MS01.2_Kyc")]
+    edges = [
+        {"from": "MS01.1_Investor_Auth_Manager", "to": "MS01.2_Kyc", "kind": "data", "field": f}
+        for f in ("auth_status", "otp_match")
+    ]
+    dag = Dag(nodes=nodes, edges=edges)  # type: ignore[arg-type]
+    ifaces = {"MS01.1_Investor_Auth_Manager": upstream, "MS01.2_Kyc": downstream}
+    assert interface_findings(dag, ifaces) == ()
+    downstream = _iface({"auth_status": "integer", "otp_match": "boolean"}, {"kyc": "string"})
+    ifaces["MS01.2_Kyc"] = downstream
+    assert [f.message for f in interface_findings(dag, ifaces)] == [
+        "MS01.1_Investor_Auth_Manager outputs auth_status as string; "
+        "MS01.2_Kyc takes auth_status as integer"
+    ]
