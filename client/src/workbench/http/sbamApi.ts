@@ -17,6 +17,8 @@ import type {
   CodeDiff,
   CodeFileView,
   GatesResponse,
+  ManifestVersionList,
+  ManifestView,
   HeldPatchResponse,
   PatchDecided,
   KnowledgeNodeDetail,
@@ -131,6 +133,15 @@ export function createSbamApi(projectId: string): BamApi {
       (await getJson<CodeFileView>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/code/attempts/${attempt}/files?${new URLSearchParams({ path })}`)).body,
     getCodeAttemptDiff: async (workflowId, subId, from, to, path) =>
       (await getJson<CodeDiff>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/code/attempts/${from}/diff/${to}?${new URLSearchParams({ path })}`)).body,
+    // The stored manifests of the workflow or of one Sub-Skill and one of them (#715, read only).
+    getManifestVersions: async (workflowId, subId) =>
+      (await getJson<ManifestVersionList>(`projects/${projectId}/workflows/${workflowId}${subId ? `/sub-skills/${subId}` : ""}/manifests`)).body,
+    getManifest: async (workflowId, subId, buildNo, version) => {
+      const qs = new URLSearchParams();
+      if (version && subId) qs.set("version", version);
+      if (buildNo !== undefined) qs.set("build_no", String(buildNo));
+      return (await getJson<ManifestView>(`projects/${projectId}/workflows/${workflowId}${subId ? `/sub-skills/${subId}` : ""}/manifest${qs.size ? `?${qs}` : ""}`)).body;
+    },
     // The held ISATVON patch of a Sub-Skill and the FDE's decision on it (#715): accepting is guarded by the Sub-Skill's hash (If-Match).
     getHeldPatch: async (workflowId, subId) =>
       (await getJson<HeldPatchResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/held-patch`)).body,
