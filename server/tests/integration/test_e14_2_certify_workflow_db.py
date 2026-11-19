@@ -315,4 +315,4 @@ def test_e14_2_happy_path_certifies_two_macros_and_the_workflow_db(
             text("UPDATE sbam.certifications SET evidence = '{}' WHERE id = :i"), {"i": cert_id}
         )
         s.commit()
-    assert "SB423" in str(err.value)
+    assert getattr(err.value.orig, "sqlstate", None) == "SB423"  # as test_db.py checks it
