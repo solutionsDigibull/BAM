@@ -189,7 +189,12 @@ def test_e14_5_t01_happy_export_has_every_entry_and_checksums_verify(
     h: Harness, client: FakeClient, monkeypatch: pytest.MonkeyPatch  # noqa: F811
 ) -> None:
     notified: list[Any] = []
-    monkeypatch.setattr(activities, "notify_project", lambda *a, **k: notified.append(k) or 1)
+
+    def notify(*_: Any, **kwargs: Any) -> int:
+        notified.append(kwargs)
+        return 1
+
+    monkeypatch.setattr(activities, "notify_project", notify)
     frozen(h)
     put_value(h, LEDGER, SECRET)  # a stored secret value must never reach the package
     res = post(h)

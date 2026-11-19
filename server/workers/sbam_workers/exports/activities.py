@@ -13,6 +13,7 @@
 import logging
 import tempfile
 from functools import lru_cache
+from typing import BinaryIO, cast
 
 from sbam_api.artifacts.models import ArtifactKind
 from sbam_api.artifacts.repository import ArtifactRepository
@@ -70,7 +71,7 @@ class ExportSteps:
                 with tempfile.TemporaryFile() as sink:
                     info = write_package(collected.entries, sink)
                     stored = self.storage.put(
-                        sink,
+                        cast(BinaryIO, sink),
                         StorageScope(ctx.tenant_id, inp.project_id, inp.workflow_id),
                         Kind.EXPORTS,
                         "application/zip",
