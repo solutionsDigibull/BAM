@@ -1,9 +1,12 @@
-"""WG-31 (#908) on the staging-runtime stack: `scripts/staging-proof.sh` end to end, mock LLM only.
+"""WG-31 (#908) and WG-32 (#909) on the staging-runtime stack: `scripts/staging-proof.sh` end to
+end, mock LLM only.
 
-T02 Staging RUNNING (UI served to the assigned FDE only, MCP forwarded), T03 an undeclared host is
-refused and logged, T04 a newer version supersedes the old deployment, T05b the socket proxy refuses
-exec, a privileged create and a bind mount. T01 and T05 (no docker.sock in a worker) are also
-checked statically in tests/unit/test_wg31_staging_compose.py.
+WG32-T01 a REAL Commit (WorkflowCommit on Temporal, no stand-in registry) ends in Staging RUNNING;
+WG32-T02 Bifrost lists the manifest's tools at the container's address; T02 Staging RUNNING (UI
+served to the assigned FDE only, MCP forwarded), T03 an undeclared host is refused and logged, T04
+a newer version supersedes the old deployment, T05b the socket proxy refuses exec, a privileged
+create and a bind mount. T01 and T05 (no docker.sock in a worker) are also checked statically in
+tests/unit/test_wg31_staging_compose.py.
 
 Needs `make up PROFILES=staging-runtime` (and bash, docker, `LLM_PROVIDER=mock`); skipped when that
 stack is not running (the script exits 2 for a missing precondition).
@@ -21,6 +24,8 @@ from .conftest import ENV_FILE, REPO
 pytestmark = pytest.mark.integration
 
 CASES = (
+    "WG32-T01a",
+    "WG32-T02",
     "WG31-T01a",
     "WG31-T02",
     "WG31-T02f",

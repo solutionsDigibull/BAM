@@ -29,6 +29,7 @@ from sbam_api.connections.crypto import KeyRing
 from sbam_api.db.base import utcnow
 from sbam_api.staging import records
 from sbam_api.workflow_commit import service as commit_service
+from sbam_api.workflow_registry.bifrost import RegistryUnavailable
 from sbam_api.workflow_registry.models import RegisteredWorkflowRow
 from sbam_contracts.workflow_commit import StagingStartStatus
 from sbam_workers.repo_fetch.report import bundle_tar
@@ -51,9 +52,11 @@ from test_wg18_commit_api import (  # noqa: F401 - the fixtures and the Commit h
     BUNDLE,
     FakeClient,
     FakeRuntime,
+    Flaky,
     certify,
     client,
     commit_input,
+    commit_url,
     ctx,
     h,
     run_all,
@@ -532,3 +535,152 @@ def test_wg17_a_worker_without_the_keyring_refuses_to_start_with_secrets(
         result.detail or ""
     )
     assert deployer.started == []
+
+
+# --- WG-32 (#909): Commit starts the container first, then registers its own address ----------
+
+
+CONTAINER = "stg-{}-wf-investor-onboarding-v1-0-stg"
+
+
+def test_wg32_t01_commit_starts_first_and_bifrost_gets_the_containers_own_address(
+    h: Harness, client: FakeClient
+) -> None:
+    deployer, fake = FakeDeployer(), FakeBifrost(TOOLS)
+    sha = commit(h, deployer)
+    result = run_all(steps(h, fake, runtime_for(h, deployer)), commit_input(h, sha))  # type: ignore[arg-type]
+    name = CONTAINER.format(WORKFLOW.hex[:8])
+    assert result.staging.status is StagingStartStatus.STARTED
+    assert [spec.name for spec in deployer.started] == [name]
+    assert fake.address == f"http://{name}:8000/mcp"  # not http://<registry name>:8000/mcp
+    with h.sessions() as s:
+        [entry] = s.scalars(select(RegisteredWorkflowRow)).all()
+        assert entry.status == "REGISTERED" and entry.kind == "staging"
+    body = h.call("GET", staging_url(h), h.fde()).json()
+    assert body["state"] == "RUNNING"
+
+
+def test_wg32_the_container_is_running_before_bifrost_is_called(
+    h: Harness, client: FakeClient
+) -> None:
+    deployer = FakeDeployer()
+    seen: list[set[str]] = []
+
+    class Watching(FakeBifrost):
+        def register(self, name: str, address: str) -> Any:
+            seen.append(set(deployer.running))
+            return super().register(name, address)
+
+    sha = commit(h, deployer)
+    run_all(steps(h, Watching(TOOLS), runtime_for(h, deployer)), commit_input(h, sha))  # type: ignore[arg-type]
+    assert seen == [{CONTAINER.format(WORKFLOW.hex[:8])}]
+
+
+def test_wg32_a_server_without_the_manifest_tools_is_refused_and_its_container_is_stopped(
+    h: Harness, client: FakeClient
+) -> None:
+    deployer, fake = FakeDeployer(), FakeBifrost(exposed=())
+    sha = commit(h, deployer)
+    s = steps(h, fake, runtime_for(h, deployer))  # type: ignore[arg-type]
+    inp = commit_input(h, sha)
+    s.recheck(inp)
+    s.freeze(inp)
+    s.start_staging(inp)
+    with pytest.raises(ApplicationError) as caught:
+        s.register(inp)
+    assert caught.value.type == "CommitRefused" and "does not expose" in str(caught.value)
+    name = CONTAINER.format(WORKFLOW.hex[:8])
+    assert deployer.stopped == [name] and deployer.running == set()
+    with h.sessions() as db:
+        assert db.scalars(select(RegisteredWorkflowRow)).all() == []  # nothing is registered
+        from sbam_api.workflows.models import Workflow
+
+        assert db.get(Workflow, WORKFLOW).state == "FROZEN"  # type: ignore[union-attr]  # the freeze is kept
+    assert ("disable", "wf_investor_onboarding_v1_0_stg") in fake.calls
+    [failed] = trail(h, records.FAILED)
+    assert "does not expose" in (failed.after or {})["detail"]
+    body = h.call("GET", staging_url(h), h.fde()).json()
+    assert body["state"] == "FAILED"
+    commit_body = h.call("GET", commit_url(h), h.fde()).json()
+    assert commit_body["staging"]["status"] == "FAILED"
+
+
+def test_wg32_a_commit_that_failed_after_the_start_finishes_without_a_second_container(
+    h: Harness, client: FakeClient
+) -> None:
+    deployer, down = FakeDeployer(), Flaky(TOOLS)
+    sha = commit(h, deployer)
+    inp = commit_input(h, sha)
+    first = steps(h, down, runtime_for(h, deployer))  # type: ignore[arg-type]
+    first.recheck(inp)
+    first.freeze(inp)
+    first.start_staging(inp)
+    with pytest.raises(RegistryUnavailable):  # Bifrost is down: the run stops after the start
+        first.register(inp)
+    assert len(deployer.started) == 1
+    down.up = True
+    result = run_all(steps(h, down, runtime_for(h, deployer)), inp)  # type: ignore[arg-type]
+    assert result.staging.status is StagingStartStatus.STARTED
+    assert len(deployer.started) == 1 and deployer.stopped == []  # no second container
+    with h.sessions() as s:
+        assert len(s.scalars(select(RegisteredWorkflowRow)).all()) == 1
+    assert h.call("GET", staging_url(h), h.fde()).json()["state"] == "RUNNING"
+
+
+def test_wg32_a_failed_start_keeps_the_freeze_and_registers_nothing(
+    h: Harness, client: FakeClient
+) -> None:
+    deployer, fake = FakeDeployer(), FakeBifrost(TOOLS)
+    deployer.fail = DeployError("IMAGE_MISSING", "no image")
+    sha = commit(h, deployer)
+    s = steps(h, fake, runtime_for(h, deployer))  # type: ignore[arg-type]
+    inp = commit_input(h, sha)
+    s.recheck(inp)
+    s.freeze(inp)
+    with pytest.raises(ApplicationError) as caught:
+        s.start_staging(inp)
+    assert caught.value.type == "StagingStartFailed"
+    assert fake.calls == []  # Bifrost was never asked
+    with h.sessions() as db:
+        from sbam_api.workflows.models import Workflow
+
+        assert db.get(Workflow, WORKFLOW).state == "FROZEN"  # type: ignore[union-attr]
+    deployer.fail = None
+    result = run_all(s, inp)  # Commit again completes it
+    assert result.staging.status is StagingStartStatus.STARTED
+
+
+def test_wg32_with_no_staging_host_the_registry_keeps_its_default_address(
+    h: Harness, client: FakeClient
+) -> None:
+    fake = FakeBifrost(TOOLS)
+    seed(h)
+    sha = certify(h)
+    run_all(steps(h, fake, FakeRuntime(StagingStartStatus.PENDING_RUNTIME)), commit_input(h, sha))
+    assert fake.address == "http://wf_investor_onboarding_v1_0_stg:8000/mcp"
+
+
+def test_wg32_a_server_that_never_answers_is_stopped_and_refused(
+    h: Harness, client: FakeClient
+) -> None:
+    deployer = FakeDeployer()
+    sha = commit(h, deployer)
+    clock = iter(range(0, 1000))
+    runtime = DeployerStagingRuntime(
+        h.sessions,
+        storage(h),
+        lambda: KeyRing.parse(KEYS, allow_placeholder=True),
+        deployer,
+        StagingConfig(ready_timeout_seconds=3),
+        ready=lambda endpoint: False,
+        sleep=lambda seconds: None,
+        clock=lambda: float(next(clock)),
+    )
+    s = steps(h, FakeBifrost(TOOLS), runtime)  # type: ignore[arg-type]
+    inp = commit_input(h, sha)
+    s.recheck(inp)
+    s.freeze(inp)
+    with pytest.raises(ApplicationError) as caught:
+        s.start_staging(inp)
+    assert caught.value.type == "StagingStartFailed" and "SERVER_NOT_READY" in str(caught.value)
+    assert deployer.running == set() and len(deployer.stopped) == 1

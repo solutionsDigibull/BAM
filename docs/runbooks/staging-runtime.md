@@ -53,6 +53,8 @@ revision is the head (WG31-T01a), builds two tiny test-only images on the daemon
 
 | Check | What it proves |
 |---|---|
+| WG32-T01 | A REAL Commit (the `WorkflowCommit` workflow on Temporal, no stand-in registry) ends with Staging `RUNNING`; the registry entry is the container's. |
+| WG32-T02 | Bifrost lists the manifest's tools at the registered address (the container's name on `sbam-staging`). |
 | WG31-T02 | The real runtime (`DeployerStagingRuntime` + `DockerCliDeployer`) started the digest through the socket proxy; `GET .../staging` is `RUNNING` and `HEALTHY` with the egress allowlist enforced. |
 | WG31-T02c..d | `GET .../staging/ui/index.html` and `app.js` serve the certified bundle to the assigned FDE with the strict CSP. |
 | WG31-T02e, T02g | Another FDE of the tenant (unassigned) and an FDE of another tenant get 404 on the status, the UI and `/mcp`. |
@@ -62,9 +64,8 @@ revision is the head (WG31-T01a), builds two tiny test-only images on the daemon
 | WG31-T05, T05b | No worker holds `docker.sock`; the socket proxy refuses `docker ps`, `exec`, a privileged create and a bind mount. |
 
 **What is faked, and only in the test driver (never in production code):** the WORKFLOW certificate row, because the
-producer (#130) is not merged (PR #902 is open): when it is, replace the seeding with the real path; a stand-in Bifrost
-registry (see "Known gap"); and the Workflow server, a stdlib script in a `python:3.12-slim` image, not a generated one.
-Everything else is real: Keycloak logins, the API and its auth chain, the database, the storage volume, the runtime, the
+producer (#130) is not merged (PR #902 is open): when it is, replace the seeding with the real path; and the Workflow server, a stdlib script in a `python:3.12-slim` image, not a generated one.
+Everything else is real: Commit itself (`WorkflowCommit`, the real worker and Bifrost), Keycloak logins, the API and its auth chain, the database, the storage volume, the runtime, the
 Docker daemon, the internal network and the egress proxy.
 
 ## Environment names
@@ -74,6 +75,7 @@ Docker daemon, the internal network and the egress proxy.
 | `STAGING_RUNTIME` | `none` (profile sets `docker`) | `none`: Commit answers `PENDING_RUNTIME`. |
 | `STAGING_NETWORK` | `sbam-staging` | The internal network the containers join; the proxy refuses a create on any other. |
 | `STAGING_DOCKER_TIMEOUT_SECONDS` | `120` | One `docker` call (10..900). |
+| `STAGING_READY_TIMEOUT_SECONDS` | `60` (settings and profile) | How long the runtime waits for the started server to answer before Commit registers it (0 = do not wait). |
 | `STAGING_EGRESS_PROXY_URL`, `STAGING_EGRESS_POLICY_DIR` | set by the profile | The proxy the containers use and the volume that holds each deployment's allowlist. |
 | `DOCKER_HOST` | set by the profile | `tcp://docker-socket-proxy:2375`; never a socket path in a worker. |
 | `SECRETS_KEYS` | the `.env` dev key | Opens a project's stored secrets at a start (ADR 0030). Deployed: a Docker secret file. |
@@ -105,7 +107,8 @@ production data.
 | `RUNNING` but health `UNREACHABLE` | `sbam-api` is not on `sbam-staging`, or the server is not listening on 8000 | `docker network inspect sbam-staging`; `docker logs stg-...` |
 | A call out of the container gets 403 `no egress policy for this caller` | The proxy cannot read the allowlist: the `staging-egress` volume is not shared, or the token has no password | Both services mount `staging-egress`; the runtime puts `token:x@` in `HTTP_PROXY` (urllib and requests send no credentials for a bare user name) |
 | A declared host gets 502 | It passed the policy but the proxy has no route (offline laptop) | Expected offline; the policy decision is the 403 vs not 403 |
-| Commit stops at `register` | See "Known gap" | |
+| Commit stops at `register` with "does not expose the manifest's tools" | The image's server does not list the tools its manifest declares (the registry's check, now at the container's real address) | Fix the server and Commit a new version; the old container was stopped and recorded FAILED |
+| Commit fails at `start_staging` with `SERVER_NOT_READY` | The container did not answer on port 8000 within the wait | `docker logs <stg-name>` on the host; raise `STAGING_READY_TIMEOUT_SECONDS` for a slow image |
 | Registration answers 503 "refused the setup token" | `BIFROST_SETUP_TOKEN` of the worker differs from Bifrost's, or is empty | One value in `.env`; recreate `bifrost` and the workers |
 | `docker ps` / `exec` in a worker answers 403 | By design | Use the host's Docker, not the worker's |
 
@@ -115,16 +118,14 @@ production data.
 - Next.js redirects the Staging UI frame address `/api/staging-ui/<p>/<w>/` to the same address without the slash, so the bundle's relative `./app.js` resolved beside the workflow folder and the host script (which read the ids from a trailing slash) did not run. The entry page now gets a `<base href>` and the host script accepts both forms (`client/src/lib/staging-ui.ts`).
 - The workbench lists Workflows through a contract that requires `created_by`; a hand-seeded row without it made `GET /workflows` answer 500 (the proof seeds `SYSTEM`).
 
-## Known gap (follow-up issue #909)
+## Commit order (ADR 0039, #909)
 
-A real Commit registers the workflow in Bifrost **before** its container exists, and at the address
-`http://<registry name>:8000/mcp`, which is neither reachable then nor the container's name (`stg-<id>-<registry name>`).
-Bifrost accepts such a registration but lists no tools (measured on the stack: HTTP 200, `"tools": []`), so
-`workflow_registry.service.register` ends with "the server does not expose the manifest's tools" and disables the entry.
-On a live stack Commit therefore stops at `register` and never reaches Staging, until the order or the address is fixed
-(start first, register with the container's address, or do not register Staging entries in Bifrost; #909). The proof drives
-the runtime from the committed state with a stand-in registry for exactly this reason. This is a design change to
-Commit (ADR 0035/0036), not part of the wiring in #908.
+Commit runs `recheck -> freeze -> start_staging -> register`. The container starts first; Bifrost is then asked to
+connect to the container's own address (`http://stg-<id>-<registry name>:8000/mcp`, on `sbam-staging`, where the
+`staging-runtime` profile also puts `bifrost`) and must list the manifest's tools, or the entry is refused. If it is
+refused, the container is stopped, the deployment is recorded FAILED, the freeze stays, and Commit ends with the
+reason; running Commit again restarts the server and registers again (a start that already runs is not repeated).
+Before the register the runtime waits up to `STAGING_READY_TIMEOUT_SECONDS` (default 60) for the server to answer.
 
 ## Stopping and cleaning up
 

@@ -1,10 +1,12 @@
 """`WorkflowCommit` (#766): `workflow-commit-<workflow id>`, started by POST W/commit.
 
 One own workflow, not a stage of ProjectPipeline. It runs four idempotent activities in order:
-recheck (the checks, on the approved hash), freeze, register the STAGING entry on the certified
-digest, and start Staging through the runtime port. A crash or a worker restart at any point is
-completed by Commit again: every step finds what the earlier run already did. Deterministic:
-everything with side effects is an activity.
+recheck (the checks, on the approved hash), freeze, start Staging through the runtime port, and
+register the STAGING entry on the certified digest at the address the container serves (#909,
+ADR 0039: Bifrost can only list the tools of a server that is running). Runs that started before
+that change (`workflow.patched`) registered first and replay in that order. A crash or a worker
+restart at any point is completed by Commit again: every step finds what the earlier run
+already did. Deterministic: everything with side effects is an activity.
 """
 
 from datetime import timedelta
@@ -38,6 +40,7 @@ STEP_RETRY = RetryPolicy(
 )
 STEP_TIMEOUT = timedelta(minutes=5)
 T = TypeVar("T")
+START_BEFORE_REGISTER = "909-start-staging-before-register"
 
 
 @workflow_for(TaskQueue.CERTIFY)
@@ -53,12 +56,20 @@ class WorkflowCommit:
             stage = "freeze"
             await self._mirror(RunState.RUNNING, stage, None)
             await self._step("commit_freeze", IdResult)
-            stage = "register"
-            await self._mirror(RunState.RUNNING, stage, None)
-            await self._step("commit_register", IdResult)
-            stage = "start_staging"
-            await self._mirror(RunState.RUNNING, stage, None)
-            result = await self._step("commit_start_staging", WorkflowCommitResult)
+            if workflow.patched(START_BEFORE_REGISTER):
+                stage = "start_staging"
+                await self._mirror(RunState.RUNNING, stage, None)
+                result = await self._step("commit_start_staging", WorkflowCommitResult)
+                stage = "register"
+                await self._mirror(RunState.RUNNING, stage, None)
+                await self._step("commit_register", IdResult)
+            else:  # histories recorded before #909
+                stage = "register"
+                await self._mirror(RunState.RUNNING, stage, None)
+                await self._step("commit_register", IdResult)
+                stage = "start_staging"
+                await self._mirror(RunState.RUNNING, stage, None)
+                result = await self._step("commit_start_staging", WorkflowCommitResult)
         except ActivityError as exc:
             reason = getattr(exc.cause, "message", None) or type(exc.cause).__name__
             await self._mirror(RunState.FAILED, stage, f"{stage}: {reason}"[:500])

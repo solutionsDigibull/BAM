@@ -71,14 +71,16 @@ services:
     restart: unless-stopped
 
   # Commit runs on this worker: it starts and stops the Staging containers and registers the workflow in Bifrost.
+  # It joins sbam_staging only to wait until a started server answers, before it registers it (#909, ADR 0039).
   worker-certify:
-    networks: [sbam_internal, sbam_docker]
+    networks: [sbam_internal, sbam_docker, sbam_staging]
     environment:
       STAGING_RUNTIME: docker
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       PATH: /opt/docker:/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       STAGING_DOCKER_TIMEOUT_SECONDS: ${STAGING_DOCKER_TIMEOUT_SECONDS:-120}
       STAGING_NETWORK: ${STAGING_NETWORK:-sbam-staging}
+      STAGING_READY_TIMEOUT_SECONDS: ${STAGING_READY_TIMEOUT_SECONDS:-60}
       STAGING_EGRESS_PROXY_URL: http://staging-egress-proxy:3128
       STAGING_EGRESS_POLICY_DIR: /var/sbam/egress
       # Opens a project's secrets at a Staging start (ADR 0030) and lets Commit register in Bifrost (ADR 0035).
@@ -109,7 +111,9 @@ services:
     networks: [sbam_edge, sbam_internal, sbam_staging]
 
   # Bifrost's management API is locked by the setup token; the workers send it to register a workflow.
+  # It joins sbam_staging so it connects to the Staging container by name and lists its tools (#909, ADR 0039).
   bifrost:
+    networks: [sbam_staging]
     environment:
       BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
 

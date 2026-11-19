@@ -15,7 +15,7 @@ import hashlib
 import mimetypes
 import uuid
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.canonical import canonical_json
@@ -67,10 +67,14 @@ def status(
         for d in sorted(deployed.values(), key=lambda d: version_key(d.version), reverse=True)
     ]
     if entry is None:
+        # Commit starts Staging before it registers (#909): a start that failed, or one whose
+        # registration has not happened yet, has no entry. Show the newest deployment as it is.
+        newest = history[0] if history else None
         return StagingStatus(
             workflow_id=workflow_id,
-            state=StagingState.NOT_DEPLOYED,
+            state=StagingState.NOT_DEPLOYED if newest is None else newest.state,
             health=StagingHealth.UNKNOWN,
+            current=newest,
             history=history,
         )
     found = deployed.get(entry.version)
@@ -150,9 +154,21 @@ def bundle_files(
     entry: RegisteredWorkflowRow,
 ) -> dict[str, bytes]:
     """The files of the certified bundle, verified against the digest the entry records."""
-    if not entry.ui_bundle:
+    return verified_bundle_files(session, ctx, workflow_id, storage, entry.ui_bundle)
+
+
+def verified_bundle_files(
+    session: Session,
+    ctx: TenantContext,
+    workflow_id: uuid.UUID,
+    storage: StorageBackend,
+    ui_bundle: dict[str, Any] | None,
+) -> dict[str, bytes]:
+    """The same, from the bundle entry itself (the registry entry's or the frozen manifest's: Commit
+    starts Staging before the entry exists, #909)."""
+    if not ui_bundle:
         raise not_found()
-    certified = str(entry.ui_bundle["digest"])
+    certified = str(ui_bundle["digest"])
     record = _recorded_bundle(session, ctx.tenant_id, workflow_id, certified)
     files = None if record is None else workflow_ui.packaged_files(storage, record)
     if files is not None:

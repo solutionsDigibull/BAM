@@ -4,7 +4,9 @@ It is NOT a generated Workflow server. It answers the three JSON-RPC calls the p
 `POST /mcp` (port 8000), so the real Staging runtime has a real container to start, health-check and
 forward to:
 
-* `tools/list`, `initialize`: the tool names the manifest declares.
+* `initialize` and `tools/list`: enough of the MCP handshake (protocol version, tools capability,
+  tools with an input schema, a 202 for notifications) for Bifrost, which connects to the container
+  by its Staging address when Commit registers it (#909), to list the manifest's tool names.
 * `tools/call` `echo`: returns the server's VERSION, so the proof can tell v1 from v2.
 * `tools/call` `probe`: fetches `http://<host>/` through the proxy in HTTP_PROXY and reports the
   status code: the egress policy, seen from the inside.
@@ -59,12 +61,25 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": "bad json"})
             return
         method, params = request.get("method"), request.get("params") or {}
+        if request.get("id") is None:  # a notification (`notifications/initialized`): no body
+            self.send_response(202)
+            self.send_header("content-length", "0")
+            self.end_headers()
+            return
         if method == "tools/list":
-            result: dict[str, Any] = {"tools": [{"name": n} for n in TOOLS]}
+            result: dict[str, Any] = {
+                "tools": [
+                    {"name": n, "description": n, "inputSchema": {"type": "object"}} for n in TOOLS
+                ]
+            }
         elif method == "tools/call":
             result = {"content": [call(str(params.get("name")), params.get("arguments") or {})]}
         else:
-            result = {"serverInfo": {"name": "wf_proof", "version": VERSION}}
+            result = {
+                "protocolVersion": str(params.get("protocolVersion") or "2025-03-26"),
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "wf_proof", "version": VERSION},
+            }
         self._send(200, {"jsonrpc": "2.0", "id": request.get("id"), "result": result})
 
     def log_message(self, format: str, *args: Any) -> None:

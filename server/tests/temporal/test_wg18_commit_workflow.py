@@ -1,9 +1,11 @@
-"""#766 on Temporal's time-skipping server: `WorkflowCommit` runs recheck, freeze, register and
-start Staging in that order, stops at a refusal, is completed by running it again (WG18-T05), and
-is no stage of ProjectPipeline. WG18-T06: the recorded history replays (`test_replay_histories.py`
-replays every file in `histories/`; `RECORD_HISTORY=1` re-records this one).
+"""#766 on Temporal's time-skipping server: `WorkflowCommit` runs recheck, freeze, start Staging and
+register in that order (#909: the container starts before Bifrost is asked to connect to it),
+stops at a refusal, is completed by running it again (WG18-T05), and is no stage of
+ProjectPipeline. WG18-T06: the recorded history replays (`test_replay_histories.py` replays every
+file in `histories/`; `RECORD_HISTORY=1` re-records this one).
 """
 
+import base64
 import json
 import os
 import uuid
@@ -29,6 +31,8 @@ from temporalio.exceptions import ApplicationError
 from test_project_pipeline import TENANT, environment, run
 
 HISTORY = Path(__file__).parent / "histories" / "workflow_commit.json"
+HISTORY_BEFORE_909 = Path(__file__).parent / "histories" / "workflow_commit_before_909.json"
+PATCH_ID = "909-start-staging-before-register"
 DIGEST = "sha256:" + "a" * 64
 HASH = "sha256:" + "b" * 64
 REGISTRY_NAME = "wf_ledger_v1_0_stg"
@@ -85,7 +89,7 @@ class Steps:
         }
 
 
-ORDER = ["commit_recheck", "commit_freeze", "commit_register", "commit_start_staging"]
+ORDER = ["commit_recheck", "commit_freeze", "commit_start_staging", "commit_register"]
 
 
 def test_wg18_the_steps_run_in_order_and_the_result_carries_the_certified_digest() -> None:
@@ -129,7 +133,7 @@ def test_wg18_a_refusal_stops_the_run_before_anything_after_it() -> None:
 
 def test_wg18_t05_a_stopped_commit_is_completed_by_running_it_again() -> None:
     steps = Steps(failing="commit_register")
-    seen: list[list[str]] = []
+    seen: list[list[str]] = []  # the first run stops at register: after the start (#909)
 
     async def scenario(sessions: Any) -> None:
         project, workflow_id = new_project(sessions, TENANT, state="IDLE"), uuid.uuid4()
@@ -153,8 +157,41 @@ def test_wg18_t05_a_stopped_commit_is_completed_by_running_it_again() -> None:
             )
 
     run(scenario)
-    assert seen == [ORDER[:3]]
-    assert steps.calls == [*ORDER[:3], *ORDER]  # the second run does every step, finishing the job
+    assert seen == [ORDER]
+    assert steps.calls == [*ORDER, *ORDER]  # the second run does every step, finishing the job
+
+
+def test_wg32_t03_the_old_history_keeps_the_old_order_and_the_new_one_carries_the_patch() -> None:
+    """Both histories replay (`test_replay_histories.py` replays every file in `histories/`); the
+    recorded events prove which order each one is: register before start before #909, start before
+    register with the patch marker after it."""
+
+    def activities(path: Path) -> list[str]:
+        events = json.loads(path.read_text("utf-8"))["events"]
+        names = []
+        for event in events:
+            attributes = event.get("activityTaskScheduledEventAttributes")
+            if attributes:
+                names.append(attributes["activityType"]["name"])
+        return [n for n in names if n.startswith("commit_")]
+
+    def patches(path: Path) -> list[str]:
+        found = []
+        for event in json.loads(path.read_text("utf-8"))["events"]:
+            marker = event.get("markerRecordedEventAttributes")
+            if marker and marker["markerName"] == "core_patch":
+                data = marker["details"]["patch-data"]["payloads"][0]["data"]
+                found.append(json.loads(base64.b64decode(data))["id"])
+        return found
+
+    assert patches(HISTORY_BEFORE_909) == [] and patches(HISTORY) == [PATCH_ID]
+    assert activities(HISTORY_BEFORE_909) == [
+        "commit_recheck",
+        "commit_freeze",
+        "commit_register",
+        "commit_start_staging",
+    ]
+    assert activities(HISTORY) == ORDER
 
 
 def test_wg18_the_commit_steps_are_not_stages_of_project_pipeline() -> None:

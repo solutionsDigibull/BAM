@@ -28,11 +28,13 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from sbam_contracts.api import ErrorCode
 from sbam_contracts.build_dashboard import GateName
 from sbam_contracts.manifest import (
     MCP_SERVER_NAME,
+    McpServerEntry,
     McpToolEntry,
     UiBundleEntry,
     WorkflowManifest,
@@ -50,6 +52,7 @@ from sbam_api.manifests.repository import GateResultRepository, WorkflowManifest
 from sbam_api.workflow_registry.bifrost import BifrostRegistry, RegistryUnavailable
 from sbam_api.workflow_registry.models import RegisteredWorkflowRow
 from sbam_api.workflow_registry.repository import RegisteredWorkflowRepository, version_key
+from sbam_api.workflows.models import Workflow
 from sbam_api.workflows.repository import WorkflowRepository
 
 SERVER_PORT = 8000
@@ -119,23 +122,30 @@ def to_model(row: RegisteredWorkflowRow) -> RegisteredWorkflow:
     )
 
 
-def register(
-    session: Session,
-    ctx: TenantContext,
-    workflow_id: uuid.UUID,
-    client: BifrostRegistry,
-    *,
-    kind: RegistryKind,
-    owner: str,
-    version: str | None = None,
-    address_for: AddressFor = default_address,
-    now: datetime | None = None,
-) -> RegisteredWorkflow:
-    """Register the frozen, certified manifest of a Workflow (the newest, or `version`) as `kind`.
+@dataclass(frozen=True)
+class Plan:
+    """What would be registered, resolved from the frozen manifest alone (no Bifrost, no row)."""
 
-    `kind` has no default on purpose: Commit (#766) passes STAGING, promotion (#148) PRODUCTION.
-    """
-    stamp = now or datetime.now(UTC)
+    version: str
+    registry_name: str
+    image_digest: str
+    manifest_hash: str
+    ui_bundle: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class _Resolved:
+    workflow: Workflow
+    manifest_hash: str
+    certification_id: uuid.UUID
+    manifest: WorkflowManifest
+    server: McpServerEntry
+
+
+def _resolve(
+    session: Session, ctx: TenantContext, workflow_id: uuid.UUID, version: str | None
+) -> _Resolved:
+    """The checks every registration passes (frozen, certified, built, UI bundle certified)."""
     workflow = WorkflowRepository(session, ctx).get(workflow_id)
     if workflow is None:
         raise not_found()
@@ -170,11 +180,59 @@ def register(
         )
         if reasons:
             raise NotRegistrable(f"the UI bundle is not certified ({reasons[0]})")
+    return _Resolved(workflow, row.sha256, certificate.id, manifest, server)
+
+
+def plan(
+    session: Session,
+    ctx: TenantContext,
+    workflow_id: uuid.UUID,
+    kind: RegistryKind,
+    version: str | None = None,
+) -> Plan:
+    """What `register` would register for `kind`, from the frozen manifest. Commit starts Staging
+    from this before the Bifrost entry exists (#909): the container needs the certified digest,
+    not a registry row."""
+    found = _resolve(session, ctx, workflow_id, version)
+    return Plan(
+        version=found.server.version,
+        registry_name=registry_name_for(found.server.name, found.server.version, kind),
+        image_digest=found.server.image_digest,
+        manifest_hash=found.manifest_hash,
+        ui_bundle=found.manifest.ui_bundle.dump() if found.manifest.ui_bundle else None,
+    )
+
+
+def register(
+    session: Session,
+    ctx: TenantContext,
+    workflow_id: uuid.UUID,
+    client: BifrostRegistry,
+    *,
+    kind: RegistryKind,
+    owner: str,
+    version: str | None = None,
+    address_for: AddressFor = default_address,
+    address: str | None = None,
+    now: datetime | None = None,
+) -> RegisteredWorkflow:
+    """Register the frozen, certified manifest of a Workflow (the newest, or `version`) as `kind`.
+
+    `kind` has no default on purpose: Commit (#766) passes STAGING, promotion (#148) PRODUCTION.
+    `address` is the address Bifrost connects to when the caller knows where the server runs (the
+    Staging container, #909); without it `address_for(name)` decides.
+    """
+    stamp = now or datetime.now(UTC)
+    found = _resolve(session, ctx, workflow_id, version)
+    workflow, manifest, server = found.workflow, found.manifest, found.server
 
     repo = RegisteredWorkflowRepository(session, ctx)
     existing = repo.of_version(workflow_id, server.version, kind)
     if existing is not None:
-        if existing.image_digest == server.image_digest and existing.manifest_hash == row.sha256:
+        if (
+            existing.image_digest == server.image_digest
+            and existing.manifest_hash == found.manifest_hash
+        ):
             return to_model(existing)  # idempotent: Bifrost is not called
         raise RegistrationConflict(server.version)
     wanted = version_key(server.version)
@@ -183,7 +241,7 @@ def register(
         raise NotRegistrable(f"a newer version ({newer[0].version}) is already registered")
 
     name = registry_name_for(server.name, server.version, kind)
-    entry = client.register(name, address_for(name))
+    entry = client.register(name, address or address_for(name))
     missing = sorted({tool.name for tool in server.tools} - set(entry.tools))
     if missing:  # the image is not what the manifest says: nothing uncertified may stay visible
         client.disable(entry.id)
@@ -199,8 +257,8 @@ def register(
         registry_name=name,
         registry_id=entry.id,
         image_digest=server.image_digest,
-        manifest_hash=row.sha256,
-        certification_id=certificate.id,
+        manifest_hash=found.manifest_hash,
+        certification_id=found.certification_id,
         owner=owner,
         tools=[tool.model_dump(mode="json") for tool in server.tools],
         ui_bundle=manifest.ui_bundle.dump() if manifest.ui_bundle else None,

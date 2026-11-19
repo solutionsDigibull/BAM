@@ -2,7 +2,7 @@
  "events": [
   {
    "eventId": "1",
-   "eventTime": "2026-11-19T08:27:30.758Z",
+   "eventTime": "2026-11-19T19:10:35.850Z",
    "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
    "workflowExecutionStartedEventAttributes": {
     "workflowType": {
@@ -17,16 +17,16 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwicnVuX2lkIjoiNjFlYWQ0ZjUtNzIwZC00MzkwLWJjNTItODA2ZGUzM2NkYWY3IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
       }
      ]
     },
     "workflowExecutionTimeout": "315360000s",
     "workflowRunTimeout": "315360000s",
     "workflowTaskTimeout": "10s",
-    "originalExecutionRunId": "e05e6386-204d-4c3d-8be7-25f39e2cfb4f",
-    "identity": "8023@c770c870d066",
-    "firstExecutionRunId": "e05e6386-204d-4c3d-8be7-25f39e2cfb4f",
+    "originalExecutionRunId": "6968fc1e-d5ae-4222-b2fc-e1ef7bfaee8f",
+    "identity": "62809@c770c870d066",
+    "firstExecutionRunId": "6968fc1e-d5ae-4222-b2fc-e1ef7bfaee8f",
     "attempt": 1,
     "firstWorkflowTaskBackoff": "0s",
     "priority": {}
@@ -34,7 +34,7 @@
   },
   {
    "eventId": "2",
-   "eventTime": "2026-11-19T08:27:30.758Z",
+   "eventTime": "2026-11-19T19:10:35.850Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -46,28 +46,28 @@
   },
   {
    "eventId": "3",
-   "eventTime": "2026-11-19T08:27:30.805Z",
+   "eventTime": "2026-11-19T19:10:35.884Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
     "scheduledEventId": "2",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "597"
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "598"
    }
   },
   {
    "eventId": "4",
-   "eventTime": "2026-11-19T08:27:30.891Z",
+   "eventTime": "2026-11-19T19:10:35.972Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
     "scheduledEventId": "2",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {
      "coreUsedFlags": [
-      2,
-      1,
       4,
-      3
+      2,
+      3,
+      1
      ],
      "sdkName": "temporal-python",
      "sdkVersion": "1.35.0"
@@ -77,7 +77,7 @@
   },
   {
    "eventId": "5",
-   "eventTime": "2026-11-19T08:27:30.891Z",
+   "eventTime": "2026-11-19T19:10:35.972Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "1",
@@ -95,7 +95,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InJlY2hlY2siLCJsYXN0X2Vycm9yIjpudWxsfQ=="
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwidGVtcG9yYWxfcnVuX2lkIjoiNjk2OGZjMWUtZDVhZS00MjIyLWIyZmMtZTFlZjdiZmFlZThmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InJlY2hlY2siLCJsYXN0X2Vycm9yIjpudWxsfQ=="
       }
      ]
     },
@@ -115,35 +115,35 @@
   },
   {
    "eventId": "6",
-   "eventTime": "2026-11-19T08:27:56.025Z",
+   "eventTime": "2026-11-19T19:11:01.228Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
     "scheduledEventId": "5",
-    "identity": "8023@c770c870d066",
+    "identity": "62809@c770c870d066",
     "attempt": 6
    }
   },
   {
    "eventId": "7",
-   "eventTime": "2026-11-19T08:27:56.041Z",
+   "eventTime": "2026-11-19T19:11:01.241Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
    "activityTaskFailedEventAttributes": {
     "failure": {
      "message": "mirror row not written yet",
-     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w909/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
      "applicationFailureInfo": {
       "type": "MirrorRowMissing"
      }
     },
     "scheduledEventId": "5",
     "startedEventId": "6",
-    "identity": "8023@c770c870d066",
+    "identity": "62809@c770c870d066",
     "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
    }
   },
   {
    "eventId": "8",
-   "eventTime": "2026-11-19T08:27:56.041Z",
+   "eventTime": "2026-11-19T19:11:01.241Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -155,29 +155,29 @@
   },
   {
    "eventId": "9",
-   "eventTime": "2026-11-19T08:27:56.042Z",
+   "eventTime": "2026-11-19T19:11:01.241Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
     "scheduledEventId": "8",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "2541"
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "2546"
    }
   },
   {
    "eventId": "10",
-   "eventTime": "2026-11-19T08:27:56.067Z",
+   "eventTime": "2026-11-19T19:11:01.255Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
     "scheduledEventId": "8",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
    "eventId": "11",
-   "eventTime": "2026-11-19T08:27:56.067Z",
+   "eventTime": "2026-11-19T19:11:01.255Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "2",
@@ -195,7 +195,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwicnVuX2lkIjoiNjFlYWQ0ZjUtNzIwZC00MzkwLWJjNTItODA2ZGUzM2NkYWY3IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
       }
      ]
     },
@@ -215,17 +215,17 @@
   },
   {
    "eventId": "12",
-   "eventTime": "2026-11-19T08:27:56.067Z",
+   "eventTime": "2026-11-19T19:11:01.256Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
     "scheduledEventId": "11",
-    "identity": "8023@c770c870d066",
+    "identity": "62809@c770c870d066",
     "attempt": 1
    }
   },
   {
    "eventId": "13",
-   "eventTime": "2026-11-19T08:27:56.077Z",
+   "eventTime": "2026-11-19T19:11:01.261Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
    "activityTaskCompletedEventAttributes": {
     "result": {
@@ -234,18 +234,18 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJpZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiJ9"
+       "data": "eyJpZCI6IjgxNDRiMzIzLWQ2NTctNDRiOS1iYzQ2LTk0OTQ3YjAyMmFiZiJ9"
       }
      ]
     },
     "scheduledEventId": "11",
     "startedEventId": "12",
-    "identity": "8023@c770c870d066"
+    "identity": "62809@c770c870d066"
    }
   },
   {
    "eventId": "14",
-   "eventTime": "2026-11-19T08:27:56.077Z",
+   "eventTime": "2026-11-19T19:11:01.261Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -257,29 +257,29 @@
   },
   {
    "eventId": "15",
-   "eventTime": "2026-11-19T08:27:56.077Z",
+   "eventTime": "2026-11-19T19:11:01.261Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
     "scheduledEventId": "14",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "3348"
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "3357"
    }
   },
   {
    "eventId": "16",
-   "eventTime": "2026-11-19T08:27:56.089Z",
+   "eventTime": "2026-11-19T19:11:01.274Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
     "scheduledEventId": "14",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
    "eventId": "17",
-   "eventTime": "2026-11-19T08:27:56.089Z",
+   "eventTime": "2026-11-19T19:11:01.274Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "3",
@@ -297,7 +297,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6ImZyZWV6ZSIsImxhc3RfZXJyb3IiOm51bGx9"
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwidGVtcG9yYWxfcnVuX2lkIjoiNjk2OGZjMWUtZDVhZS00MjIyLWIyZmMtZTFlZjdiZmFlZThmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6ImZyZWV6ZSIsImxhc3RfZXJyb3IiOm51bGx9"
       }
      ]
     },
@@ -317,35 +317,35 @@
   },
   {
    "eventId": "18",
-   "eventTime": "2026-11-19T08:28:21.153Z",
+   "eventTime": "2026-11-19T19:11:26.381Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
     "scheduledEventId": "17",
-    "identity": "8023@c770c870d066",
+    "identity": "62809@c770c870d066",
     "attempt": 6
    }
   },
   {
    "eventId": "19",
-   "eventTime": "2026-11-19T08:28:21.163Z",
+   "eventTime": "2026-11-19T19:11:26.404Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
    "activityTaskFailedEventAttributes": {
     "failure": {
      "message": "mirror row not written yet",
-     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w909/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
      "applicationFailureInfo": {
       "type": "MirrorRowMissing"
      }
     },
     "scheduledEventId": "17",
     "startedEventId": "18",
-    "identity": "8023@c770c870d066",
+    "identity": "62809@c770c870d066",
     "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
    }
   },
   {
    "eventId": "20",
-   "eventTime": "2026-11-19T08:28:21.163Z",
+   "eventTime": "2026-11-19T19:11:26.404Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -357,29 +357,29 @@
   },
   {
    "eventId": "21",
-   "eventTime": "2026-11-19T08:28:21.163Z",
+   "eventTime": "2026-11-19T19:11:26.404Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
     "scheduledEventId": "20",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "5257"
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "5275"
    }
   },
   {
    "eventId": "22",
-   "eventTime": "2026-11-19T08:28:21.171Z",
+   "eventTime": "2026-11-19T19:11:26.433Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
     "scheduledEventId": "20",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
    "eventId": "23",
-   "eventTime": "2026-11-19T08:28:21.171Z",
+   "eventTime": "2026-11-19T19:11:26.433Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "4",
@@ -397,7 +397,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwicnVuX2lkIjoiNjFlYWQ0ZjUtNzIwZC00MzkwLWJjNTItODA2ZGUzM2NkYWY3IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
       }
      ]
     },
@@ -417,17 +417,17 @@
   },
   {
    "eventId": "24",
-   "eventTime": "2026-11-19T08:28:21.171Z",
+   "eventTime": "2026-11-19T19:11:26.433Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
     "scheduledEventId": "23",
-    "identity": "8023@c770c870d066",
+    "identity": "62809@c770c870d066",
     "attempt": 1
    }
   },
   {
    "eventId": "25",
-   "eventTime": "2026-11-19T08:28:21.176Z",
+   "eventTime": "2026-11-19T19:11:26.439Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
    "activityTaskCompletedEventAttributes": {
     "result": {
@@ -436,18 +436,18 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJpZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiJ9"
+       "data": "eyJpZCI6IjgxNDRiMzIzLWQ2NTctNDRiOS1iYzQ2LTk0OTQ3YjAyMmFiZiJ9"
       }
      ]
     },
     "scheduledEventId": "23",
     "startedEventId": "24",
-    "identity": "8023@c770c870d066"
+    "identity": "62809@c770c870d066"
    }
   },
   {
    "eventId": "26",
-   "eventTime": "2026-11-19T08:28:21.176Z",
+   "eventTime": "2026-11-19T19:11:26.439Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -459,29 +459,69 @@
   },
   {
    "eventId": "27",
-   "eventTime": "2026-11-19T08:28:21.176Z",
+   "eventTime": "2026-11-19T19:11:26.439Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
     "scheduledEventId": "26",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "6063"
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "6091"
    }
   },
   {
    "eventId": "28",
-   "eventTime": "2026-11-19T08:28:21.185Z",
+   "eventTime": "2026-11-19T19:11:26.486Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
     "scheduledEventId": "26",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
    "eventId": "29",
-   "eventTime": "2026-11-19T08:28:21.185Z",
+   "eventTime": "2026-11-19T19:11:26.486Z",
+   "eventType": "EVENT_TYPE_MARKER_RECORDED",
+   "markerRecordedEventAttributes": {
+    "markerName": "core_patch",
+    "details": {
+     "patch-data": {
+      "payloads": [
+       {
+        "metadata": {
+         "encoding": "anNvbi9wbGFpbg=="
+        },
+        "data": "eyJpZCI6IjkwOS1zdGFydC1zdGFnaW5nLWJlZm9yZS1yZWdpc3RlciIsImRlcHJlY2F0ZWQiOmZhbHNlfQ=="
+       }
+      ]
+     }
+    },
+    "workflowTaskCompletedEventId": "27"
+   }
+  },
+  {
+   "eventId": "30",
+   "eventTime": "2026-11-19T19:11:26.486Z",
+   "eventType": "EVENT_TYPE_UPSERT_WORKFLOW_SEARCH_ATTRIBUTES",
+   "upsertWorkflowSearchAttributesEventAttributes": {
+    "workflowTaskCompletedEventId": "27",
+    "searchAttributes": {
+     "indexedFields": {
+      "TemporalChangeVersion": {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg==",
+        "type": "S2V5d29yZExpc3Q="
+       },
+       "data": "WyI5MDktc3RhcnQtc3RhZ2luZy1iZWZvcmUtcmVnaXN0ZXIiXQ=="
+      }
+     }
+    }
+   }
+  },
+  {
+   "eventId": "31",
+   "eventTime": "2026-11-19T19:11:26.486Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "5",
@@ -499,7 +539,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InJlZ2lzdGVyIiwibGFzdF9lcnJvciI6bnVsbH0="
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwidGVtcG9yYWxfcnVuX2lkIjoiNjk2OGZjMWUtZDVhZS00MjIyLWIyZmMtZTFlZjdiZmFlZThmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InN0YXJ0X3N0YWdpbmciLCJsYXN0X2Vycm9yIjpudWxsfQ=="
       }
      ]
     },
@@ -518,36 +558,36 @@
    }
   },
   {
-   "eventId": "30",
-   "eventTime": "2026-11-19T08:28:46.269Z",
+   "eventId": "32",
+   "eventTime": "2026-11-19T19:11:51.555Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
-    "scheduledEventId": "29",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "31",
+    "identity": "62809@c770c870d066",
     "attempt": 6
    }
   },
   {
-   "eventId": "31",
-   "eventTime": "2026-11-19T08:28:46.287Z",
+   "eventId": "33",
+   "eventTime": "2026-11-19T19:11:51.569Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
    "activityTaskFailedEventAttributes": {
     "failure": {
      "message": "mirror row not written yet",
-     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w909/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
      "applicationFailureInfo": {
       "type": "MirrorRowMissing"
      }
     },
-    "scheduledEventId": "29",
-    "startedEventId": "30",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "31",
+    "startedEventId": "32",
+    "identity": "62809@c770c870d066",
     "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
    }
   },
   {
-   "eventId": "32",
-   "eventTime": "2026-11-19T08:28:46.287Z",
+   "eventId": "34",
+   "eventTime": "2026-11-19T19:11:51.569Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -558,35 +598,35 @@
    }
   },
   {
-   "eventId": "33",
-   "eventTime": "2026-11-19T08:28:46.288Z",
+   "eventId": "35",
+   "eventTime": "2026-11-19T19:11:51.570Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
-    "scheduledEventId": "32",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "7977"
+    "scheduledEventId": "34",
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "8293"
    }
   },
   {
-   "eventId": "34",
-   "eventTime": "2026-11-19T08:28:46.303Z",
+   "eventId": "36",
+   "eventTime": "2026-11-19T19:11:51.578Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
-    "scheduledEventId": "32",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "scheduledEventId": "34",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
-   "eventId": "35",
-   "eventTime": "2026-11-19T08:28:46.303Z",
+   "eventId": "37",
+   "eventTime": "2026-11-19T19:11:51.578Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "6",
     "activityType": {
-     "name": "commit_register"
+     "name": "commit_start_staging"
     },
     "taskQueue": {
      "name": "sbam-certify",
@@ -599,7 +639,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwicnVuX2lkIjoiNjFlYWQ0ZjUtNzIwZC00MzkwLWJjNTItODA2ZGUzM2NkYWY3IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
       }
      ]
     },
@@ -607,7 +647,7 @@
     "scheduleToStartTimeout": "315360000s",
     "startToCloseTimeout": "300s",
     "heartbeatTimeout": "0s",
-    "workflowTaskCompletedEventId": "33",
+    "workflowTaskCompletedEventId": "35",
     "retryPolicy": {
      "initialInterval": "2s",
      "backoffCoefficient": 2.0,
@@ -618,18 +658,18 @@
    }
   },
   {
-   "eventId": "36",
-   "eventTime": "2026-11-19T08:28:46.304Z",
+   "eventId": "38",
+   "eventTime": "2026-11-19T19:11:51.579Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
-    "scheduledEventId": "35",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "37",
+    "identity": "62809@c770c870d066",
     "attempt": 1
    }
   },
   {
-   "eventId": "37",
-   "eventTime": "2026-11-19T08:28:46.310Z",
+   "eventId": "39",
+   "eventTime": "2026-11-19T19:11:51.585Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
    "activityTaskCompletedEventAttributes": {
     "result": {
@@ -638,18 +678,18 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJpZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiJ9"
+       "data": "eyJ3b3JrZmxvd19pZCI6IjgxNDRiMzIzLWQ2NTctNDRiOS1iYzQ2LTk0OTQ3YjAyMmFiZiIsInZlcnNpb24iOiIxLjAuMCIsInJlZ2lzdHJ5X25hbWUiOiJ3Zl9sZWRnZXJfdjFfMF9zdGciLCJpbWFnZV9kaWdlc3QiOiJzaGEyNTY6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm1hbmlmZXN0X2hhc2giOiJzaGEyNTY6YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInN0YWdpbmciOnsic3RhdHVzIjoiUEVORElOR19SVU5USU1FIiwiZGV0YWlsIjpudWxsfX0="
       }
      ]
     },
-    "scheduledEventId": "35",
-    "startedEventId": "36",
-    "identity": "8023@c770c870d066"
+    "scheduledEventId": "37",
+    "startedEventId": "38",
+    "identity": "62809@c770c870d066"
    }
   },
   {
-   "eventId": "38",
-   "eventTime": "2026-11-19T08:28:46.310Z",
+   "eventId": "40",
+   "eventTime": "2026-11-19T19:11:51.585Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -660,30 +700,30 @@
    }
   },
   {
-   "eventId": "39",
-   "eventTime": "2026-11-19T08:28:46.311Z",
+   "eventId": "41",
+   "eventTime": "2026-11-19T19:11:51.585Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
-    "scheduledEventId": "38",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "8791"
+    "scheduledEventId": "40",
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "9416"
    }
   },
   {
-   "eventId": "40",
-   "eventTime": "2026-11-19T08:28:46.325Z",
+   "eventId": "42",
+   "eventTime": "2026-11-19T19:11:51.596Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
-    "scheduledEventId": "38",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "scheduledEventId": "40",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
-   "eventId": "41",
-   "eventTime": "2026-11-19T08:28:46.325Z",
+   "eventId": "43",
+   "eventTime": "2026-11-19T19:11:51.596Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "7",
@@ -701,7 +741,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InN0YXJ0X3N0YWdpbmciLCJsYXN0X2Vycm9yIjpudWxsfQ=="
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwidGVtcG9yYWxfcnVuX2lkIjoiNjk2OGZjMWUtZDVhZS00MjIyLWIyZmMtZTFlZjdiZmFlZThmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InJlZ2lzdGVyIiwibGFzdF9lcnJvciI6bnVsbH0="
       }
      ]
     },
@@ -709,7 +749,7 @@
     "scheduleToStartTimeout": "315360000s",
     "startToCloseTimeout": "30s",
     "heartbeatTimeout": "0s",
-    "workflowTaskCompletedEventId": "39",
+    "workflowTaskCompletedEventId": "41",
     "retryPolicy": {
      "initialInterval": "1s",
      "backoffCoefficient": 2.0,
@@ -720,36 +760,36 @@
    }
   },
   {
-   "eventId": "42",
-   "eventTime": "2026-11-19T08:29:11.403Z",
+   "eventId": "44",
+   "eventTime": "2026-11-19T19:12:16.663Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
-    "scheduledEventId": "41",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "43",
+    "identity": "62809@c770c870d066",
     "attempt": 6
    }
   },
   {
-   "eventId": "43",
-   "eventTime": "2026-11-19T08:29:11.420Z",
+   "eventId": "45",
+   "eventTime": "2026-11-19T19:12:16.677Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
    "activityTaskFailedEventAttributes": {
     "failure": {
      "message": "mirror row not written yet",
-     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w909/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
      "applicationFailureInfo": {
       "type": "MirrorRowMissing"
      }
     },
-    "scheduledEventId": "41",
-    "startedEventId": "42",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "43",
+    "startedEventId": "44",
+    "identity": "62809@c770c870d066",
     "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
    }
   },
   {
-   "eventId": "44",
-   "eventTime": "2026-11-19T08:29:11.420Z",
+   "eventId": "46",
+   "eventTime": "2026-11-19T19:12:16.677Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -760,35 +800,35 @@
    }
   },
   {
-   "eventId": "45",
-   "eventTime": "2026-11-19T08:29:11.420Z",
+   "eventId": "47",
+   "eventTime": "2026-11-19T19:12:16.678Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
-    "scheduledEventId": "44",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "10713"
+    "scheduledEventId": "46",
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "11337"
    }
   },
   {
-   "eventId": "46",
-   "eventTime": "2026-11-19T08:29:11.435Z",
+   "eventId": "48",
+   "eventTime": "2026-11-19T19:12:16.687Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
-    "scheduledEventId": "44",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "scheduledEventId": "46",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
-   "eventId": "47",
-   "eventTime": "2026-11-19T08:29:11.435Z",
+   "eventId": "49",
+   "eventTime": "2026-11-19T19:12:16.687Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "8",
     "activityType": {
-     "name": "commit_start_staging"
+     "name": "commit_register"
     },
     "taskQueue": {
      "name": "sbam-certify",
@@ -801,7 +841,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwicnVuX2lkIjoiNjFlYWQ0ZjUtNzIwZC00MzkwLWJjNTItODA2ZGUzM2NkYWY3IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
       }
      ]
     },
@@ -809,7 +849,7 @@
     "scheduleToStartTimeout": "315360000s",
     "startToCloseTimeout": "300s",
     "heartbeatTimeout": "0s",
-    "workflowTaskCompletedEventId": "45",
+    "workflowTaskCompletedEventId": "47",
     "retryPolicy": {
      "initialInterval": "2s",
      "backoffCoefficient": 2.0,
@@ -820,18 +860,18 @@
    }
   },
   {
-   "eventId": "48",
-   "eventTime": "2026-11-19T08:29:11.436Z",
+   "eventId": "50",
+   "eventTime": "2026-11-19T19:12:16.687Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
-    "scheduledEventId": "47",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "49",
+    "identity": "62809@c770c870d066",
     "attempt": 1
    }
   },
   {
-   "eventId": "49",
-   "eventTime": "2026-11-19T08:29:11.444Z",
+   "eventId": "51",
+   "eventTime": "2026-11-19T19:12:16.690Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
    "activityTaskCompletedEventAttributes": {
     "result": {
@@ -840,18 +880,18 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ3b3JrZmxvd19pZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiIsInZlcnNpb24iOiIxLjAuMCIsInJlZ2lzdHJ5X25hbWUiOiJ3Zl9sZWRnZXJfdjFfMF9zdGciLCJpbWFnZV9kaWdlc3QiOiJzaGEyNTY6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm1hbmlmZXN0X2hhc2giOiJzaGEyNTY6YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInN0YWdpbmciOnsic3RhdHVzIjoiUEVORElOR19SVU5USU1FIiwiZGV0YWlsIjpudWxsfX0="
+       "data": "eyJpZCI6IjgxNDRiMzIzLWQ2NTctNDRiOS1iYzQ2LTk0OTQ3YjAyMmFiZiJ9"
       }
      ]
     },
-    "scheduledEventId": "47",
-    "startedEventId": "48",
-    "identity": "8023@c770c870d066"
+    "scheduledEventId": "49",
+    "startedEventId": "50",
+    "identity": "62809@c770c870d066"
    }
   },
   {
-   "eventId": "50",
-   "eventTime": "2026-11-19T08:29:11.444Z",
+   "eventId": "52",
+   "eventTime": "2026-11-19T19:12:16.690Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -862,30 +902,30 @@
    }
   },
   {
-   "eventId": "51",
-   "eventTime": "2026-11-19T08:29:11.444Z",
+   "eventId": "53",
+   "eventTime": "2026-11-19T19:12:16.691Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
-    "scheduledEventId": "50",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "11832"
+    "scheduledEventId": "52",
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "12155"
    }
   },
   {
-   "eventId": "52",
-   "eventTime": "2026-11-19T08:29:11.463Z",
+   "eventId": "54",
+   "eventTime": "2026-11-19T19:12:16.702Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
-    "scheduledEventId": "50",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "scheduledEventId": "52",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
-   "eventId": "53",
-   "eventTime": "2026-11-19T08:29:11.463Z",
+   "eventId": "55",
+   "eventTime": "2026-11-19T19:12:16.702Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
    "activityTaskScheduledEventAttributes": {
     "activityId": "9",
@@ -903,7 +943,7 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJDT01QTEVURUQiLCJjdXJyZW50X3N0YWdlIjoiZG9uZSIsImxhc3RfZXJyb3IiOm51bGx9"
+       "data": "eyJ0ZW5hbnRfaWQiOiI0MjUwOWMyYi1lZGFhLTRkMWMtYjczMS00Yjg5MTBjOTM3NzAiLCJwcm9qZWN0X2lkIjoiYWY0ODQzYzgtMDhhMy00OTNmLWJjYzItMGNhNzliMjNjMGNlIiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtODE0NGIzMjMtZDY1Ny00NGI5LWJjNDYtOTQ5NDdiMDIyYWJmIiwidGVtcG9yYWxfcnVuX2lkIjoiNjk2OGZjMWUtZDVhZS00MjIyLWIyZmMtZTFlZjdiZmFlZThmIiwic3RhdGUiOiJDT01QTEVURUQiLCJjdXJyZW50X3N0YWdlIjoiZG9uZSIsImxhc3RfZXJyb3IiOm51bGx9"
       }
      ]
     },
@@ -911,7 +951,7 @@
     "scheduleToStartTimeout": "315360000s",
     "startToCloseTimeout": "30s",
     "heartbeatTimeout": "0s",
-    "workflowTaskCompletedEventId": "51",
+    "workflowTaskCompletedEventId": "53",
     "retryPolicy": {
      "initialInterval": "1s",
      "backoffCoefficient": 2.0,
@@ -922,36 +962,36 @@
    }
   },
   {
-   "eventId": "54",
-   "eventTime": "2026-11-19T08:29:36.557Z",
+   "eventId": "56",
+   "eventTime": "2026-11-19T19:12:41.758Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
    "activityTaskStartedEventAttributes": {
-    "scheduledEventId": "53",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "55",
+    "identity": "62809@c770c870d066",
     "attempt": 6
    }
   },
   {
-   "eventId": "55",
-   "eventTime": "2026-11-19T08:29:36.574Z",
+   "eventId": "57",
+   "eventTime": "2026-11-19T19:12:41.768Z",
    "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
    "activityTaskFailedEventAttributes": {
     "failure": {
      "message": "mirror row not written yet",
-     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w909/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
      "applicationFailureInfo": {
       "type": "MirrorRowMissing"
      }
     },
-    "scheduledEventId": "53",
-    "startedEventId": "54",
-    "identity": "8023@c770c870d066",
+    "scheduledEventId": "55",
+    "startedEventId": "56",
+    "identity": "62809@c770c870d066",
     "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
    }
   },
   {
-   "eventId": "56",
-   "eventTime": "2026-11-19T08:29:36.574Z",
+   "eventId": "58",
+   "eventTime": "2026-11-19T19:12:41.768Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
    "workflowTaskScheduledEventAttributes": {
     "taskQueue": {
@@ -962,30 +1002,30 @@
    }
   },
   {
-   "eventId": "57",
-   "eventTime": "2026-11-19T08:29:36.575Z",
+   "eventId": "59",
+   "eventTime": "2026-11-19T19:12:41.768Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
    "workflowTaskStartedEventAttributes": {
-    "scheduledEventId": "56",
-    "identity": "8023@c770c870d066",
-    "historySizeBytes": "13747"
+    "scheduledEventId": "58",
+    "identity": "62809@c770c870d066",
+    "historySizeBytes": "14074"
    }
   },
   {
-   "eventId": "58",
-   "eventTime": "2026-11-19T08:29:36.583Z",
+   "eventId": "60",
+   "eventTime": "2026-11-19T19:12:41.785Z",
    "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
    "workflowTaskCompletedEventAttributes": {
-    "scheduledEventId": "56",
-    "identity": "8023@c770c870d066",
-    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "scheduledEventId": "58",
+    "identity": "62809@c770c870d066",
+    "binaryChecksum": "c496295f68a148a270d9868b4ab7f3bd",
     "sdkMetadata": {},
     "meteringMetadata": {}
    }
   },
   {
-   "eventId": "59",
-   "eventTime": "2026-11-19T08:29:36.583Z",
+   "eventId": "61",
+   "eventTime": "2026-11-19T19:12:41.785Z",
    "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
    "workflowExecutionCompletedEventAttributes": {
     "result": {
@@ -994,11 +1034,11 @@
        "metadata": {
         "encoding": "anNvbi9wbGFpbg=="
        },
-       "data": "eyJ3b3JrZmxvd19pZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiIsInZlcnNpb24iOiIxLjAuMCIsInJlZ2lzdHJ5X25hbWUiOiJ3Zl9sZWRnZXJfdjFfMF9zdGciLCJpbWFnZV9kaWdlc3QiOiJzaGEyNTY6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm1hbmlmZXN0X2hhc2giOiJzaGEyNTY6YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInN0YWdpbmciOnsic3RhdHVzIjoiUEVORElOR19SVU5USU1FIiwiZGV0YWlsIjpudWxsfX0="
+       "data": "eyJ3b3JrZmxvd19pZCI6IjgxNDRiMzIzLWQ2NTctNDRiOS1iYzQ2LTk0OTQ3YjAyMmFiZiIsInZlcnNpb24iOiIxLjAuMCIsInJlZ2lzdHJ5X25hbWUiOiJ3Zl9sZWRnZXJfdjFfMF9zdGciLCJpbWFnZV9kaWdlc3QiOiJzaGEyNTY6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm1hbmlmZXN0X2hhc2giOiJzaGEyNTY6YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInN0YWdpbmciOnsic3RhdHVzIjoiUEVORElOR19SVU5USU1FIiwiZGV0YWlsIjpudWxsfX0="
       }
      ]
     },
-    "workflowTaskCompletedEventId": "57"
+    "workflowTaskCompletedEventId": "59"
    }
   }
  ]

@@ -6,14 +6,14 @@
 #
 # What it does: brings the database to Alembic head, builds two tiny test-only images on THIS machine's Docker daemon
 # (the one the socket proxy reaches), runs server/tests/staging_proof/driver.py inside worker-certify (seeds a committed
-# workflow, starts it through the real Staging runtime, calls the real API as the FDE, another FDE and another tenant),
+# workflow, runs a REAL Commit (WorkflowCommit on Temporal: freeze, start, register in Bifrost), calls the real API as the FDE, another FDE and another tenant),
 # then checks from the host: the egress proxy logged the blocked host, the superseded container stopped, the containers
 # sit on the internal network, no worker holds docker.sock, and the socket proxy refuses exec, a privileged create and
 # a bind mount. Prints no secret. Exit 0 only when every check passed.
 #
 # Settings (environment, or compose/.env values, never printed): ENV_FILE (default compose/.env), COMPOSE_PROJECT_NAME,
 # KEYCLOAK_PORT, WEB_PORT, SEED_USER_PASSWORD, PROOF_KEEP=1 (leave the Staging containers running afterwards).
-# Not production code: it seeds a WORKFLOW certificate (#130 is not merged) and a stand-in Bifrost, see the driver.
+# Not production code: it seeds a WORKFLOW certificate (#130 is not merged) and uses a stand-in Workflow image, see the driver. Commit and Bifrost are real (ADR 0039).
 set -uo pipefail
 
 cd "$(dirname "$0")/.."

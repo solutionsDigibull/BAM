@@ -129,10 +129,10 @@ def status(
     else:
         state = CommitState.NOT_COMMITTED
     staging = None
-    if staged is not None and registration is not None:
+    if staged is not None:  # Staging starts before the registration (#909): shown either way
         after = staged.after or {}
         recorded = after.get("manifest_hash")
-        if recorded == registration.manifest_hash or recorded in evaluation.lineage:
+        if recorded == current or recorded in evaluation.lineage:
             staging = StagingStartResult.model_validate(
                 {"status": after["status"], "detail": after.get("detail")}
             )
@@ -265,23 +265,24 @@ def recheck(
 def staging_request(
     session: Session, ctx: TenantContext, workflow_id: uuid.UUID, actor_id: str
 ) -> StagingStartRequest:
-    """What the runtime is asked to start: the STAGING entry that was registered, secret names."""
-    entry = RegisteredWorkflowRepository(session, ctx).current(workflow_id, RegistryKind.STAGING)
+    """What the runtime is asked to start: the certified digest of the frozen manifest and the
+    secret names. It does not need the Bifrost entry (#909: Commit starts Staging first)."""
+    planned = registry.plan(session, ctx, workflow_id, RegistryKind.STAGING)
     workflow = WorkflowRepository(session, ctx).get(workflow_id)
-    if entry is None or workflow is None:
+    if workflow is None:
         raise not_found()
     names = sorted(
         c.name for c in connections.expected_for_workflow(session, ctx, workflow_id).names
     )
-    bundle = None if not entry.ui_bundle else str(entry.ui_bundle["digest"])
+    bundle = None if not planned.ui_bundle else str(planned.ui_bundle["digest"])
     return StagingStartRequest(
         tenant_id=ctx.tenant_id,
         project_id=workflow.project_id,
         workflow_id=workflow_id,
-        version=entry.version,
-        registry_name=entry.registry_name,
-        image_digest=entry.image_digest,
-        manifest_hash=entry.manifest_hash,
+        version=planned.version,
+        registry_name=planned.registry_name,
+        image_digest=planned.image_digest,
+        manifest_hash=planned.manifest_hash,
         ui_bundle_digest=bundle,
         secret_names=names,
         requested_by=actor_id,

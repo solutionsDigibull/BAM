@@ -99,10 +99,14 @@ class FakeRuntime:
     def __init__(self, status: StagingStartStatus = StagingStartStatus.STARTED) -> None:
         self.status = status
         self.requests: list[StagingStartRequest] = []
+        self.abandoned: list[tuple[StagingStartRequest, str]] = []
 
     def start(self, request: StagingStartRequest) -> StagingStartResult:
         self.requests.append(request)
         return StagingStartResult(status=self.status, detail=None)
+
+    def abandon(self, request: StagingStartRequest, detail: str) -> None:
+        self.abandoned.append((request, detail))
 
 
 def ctx(h: Harness) -> TenantContext:
@@ -503,10 +507,12 @@ def commit_input(h: Harness, sha: str) -> WorkflowCommitInput:
 
 
 def run_all(s: CommitSteps, inp: WorkflowCommitInput) -> Any:
+    """The activities in the order of WorkflowCommit since #909: start Staging, then register."""
     s.recheck(inp)
     s.freeze(inp)
+    result = s.start_staging(inp)
     s.register(inp)
-    return s.start_staging(inp)
+    return result
 
 
 def test_wg18_t04_the_staging_entry_has_the_certified_digest_and_that_is_what_starts(
@@ -588,7 +594,7 @@ def test_wg18_a_runtime_that_is_not_built_yet_is_recorded_not_hidden(
     assert staging["status"] == "PENDING_RUNTIME"
 
 
-def test_wg18_a_runtime_that_fails_ends_the_run_but_keeps_the_commit(
+def test_wg18_a_runtime_that_fails_ends_the_run_before_the_registration_and_keeps_the_freeze(
     h: Harness, client: FakeClient
 ) -> None:
     seed(h)
@@ -600,7 +606,11 @@ def test_wg18_a_runtime_that_fails_ends_the_run_but_keeps_the_commit(
         )
     assert caught.value.type == "StagingStartFailed"
     status = h.call("GET", commit_url(h), h.fde()).json()
-    assert status["state"] == "COMMITTED" and status["staging"]["status"] == "FAILED"
+    # since #909 the start comes first: nothing registered, the failed start shown, freeze kept
+    assert status["state"] == "NOT_COMMITTED" and status["staging"]["status"] == "FAILED"
+    with h.sessions() as s:
+        assert s.get(Workflow, WORKFLOW).state == "FROZEN"  # type: ignore[union-attr]
+        assert s.scalars(select(RegisteredWorkflowRow)).all() == []
 
 
 def test_wg18_freezing_never_certifies_a_workflow_that_is_not_certified(h: Harness) -> None:
