@@ -79,6 +79,8 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
     // Translate: opens for review once Template is approved; done with the approval for the current hash.
     '4.3': approved ? 'done' : !wf || !tplOk ? 'not_started' : wf.status === 'running' ? 'in_progress' : wf.status === 'failed' ? 'blocked' : 'needs_review',
     // Sandbox: the isolated environment for the current hash is up, then approved by the FDE.
+    // Validation: the backend step 4 (opens when certification starts; done once the workflow is committed).
+    '4.9': FROM_STEP[snap.steps[3]!.state],
     '4.8': !t ? 'not_started' : running(t.sandbox) ? 'in_progress' : t.sandbox.status === 'failed' ? 'blocked' : sandboxOk ? 'done' : 'needs_review',
     // Check: after the sandbox is approved, the results for the current hash are clean and approved by the FDE.
     '4.4': !t || !sandboxOk ? 'not_started' : testing ? 'in_progress' : t.promptfoo.status === 'failed' ? 'blocked' : checkOk ? 'done' : 'needs_review',
@@ -98,7 +100,7 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
 /** FDE Workbench and Sandbox screens whose evidence comes from an earlier RAG run (the SOW was generated from another run's context). */
 export function previousRun(snap: Snapshot, rag: RagState): string[] {
   const from = snap.sow?.contextRunId
-  return from && rag.runId && from !== rag.runId ? ['3.1', '3.2', '3.3', '3.4', '4.1', '4.2', '4.3', '4.8', '4.4', '4.5', '4.6', '4.7'] : []
+  return from && rag.runId && from !== rag.runId ? ['3.1', '3.2', '3.3', '3.4', '4.1', '4.2', '4.3', '4.9', '4.8', '4.4', '4.5', '4.6', '4.7'] : []
 }
 
 /** What marks each screen done: the single rule behind the tracker counts, shown in the chip tooltips. */
@@ -123,6 +125,7 @@ export const DONE_RULE: Record<string, string> = {
   '4.1': 'Done when the validation run (activities A to D) succeeds.',
   '4.2': 'Done when manifest and code are approved for the current hash.',
   '4.3': 'Done when manifest and code are approved for the current hash.',
+  '4.9': 'Done when the workflow is committed: frozen and registered in Staging.',
   '4.8': 'Done when the isolated sandbox run for the current manifest finishes.',
   '4.4': 'Done when the validation results for the current manifest are clean.',
   '4.5': 'Done when the FDE certifies (reviews) the clean results for this exact manifest hash.',

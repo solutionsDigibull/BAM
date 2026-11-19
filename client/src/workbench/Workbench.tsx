@@ -17,6 +17,7 @@ import { Intake } from './steps/Intake'
 import { HostSlot } from './host/slots'
 import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
+import * as Validation from './steps/Validation'
 import { FileDetail, IngestReviewFooter, IngestionReview, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
 import { StandardizeFooter, StandardizeView } from './steps/Standardize'
 import { UploadCount, UploadMenu, useUploadRows } from './steps/UploadPanes'
@@ -48,6 +49,7 @@ const PANES: Record<string, { Left?: (p: StepProps) => React.ReactNode; Center: 
   '4.3': { Center: Step3.CodeCenter },
   '4.2': { Center: Step3.TemplateCenter }, // Template: a real step (Ready · Running · Review · Failed · Approved)
   // Validation: centre-only. Sandbox · Check · Certify · Commit over the same backend step 4 and gates.
+  '4.9': { Center: Validation.ValidationCenter },
   '4.8': { Center: Step4.SandboxCenter },
   '4.4': { Center: Step4.TestCenter },
 }
@@ -61,6 +63,7 @@ const FOOT: Record<string, (p: { snap: Snapshot; info?: StepInfo }) => React.Rea
   '1.1': p => <UploadFoot snap={p.snap} />, '1.8': p => <StandardizeFooter snap={p.snap} />, '1.9': p => <ParseFooter snap={p.snap} />, '1.4': p => <IngestReviewFooter snap={p.snap} />,
   '2.5': () => <SyncFooter />, '2.1': () => <AutoContextFooter />,
   '4.2': p => <Step3.TemplateFooter snap={p.snap} info={p.info!} />, '4.3': p => <Step3.TranslateFooter snap={p.snap} info={p.info!} />,
+  '4.9': p => <Validation.ValidationFooter snap={p.snap} info={p.info!} />,
   '4.8': p => <Step4.SandboxFooter snap={p.snap} info={p.info!} />, '4.4': p => <Step4.CheckFooter snap={p.snap} info={p.info!} />,
 }
 // Back button order (5 Nov 2026, per user): the visible screens as the rail lists them; Back opens the previous one.

@@ -1,0 +1,4 @@
+/* Validation (4.9): the checks, the evidence, the secrets and Commit (#766). Tokens come from the workbench theme. */
+.bam-wb .val { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; container-type: inline-size; }
+.bam-wb .val-secrets { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.bam-wb .val-secrets li { display: flex; align-items: baseline; gap: 6px; }
