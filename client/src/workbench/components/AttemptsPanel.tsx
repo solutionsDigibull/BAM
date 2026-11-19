@@ -82,7 +82,7 @@ function Attempts({ workflowId, subId }: { workflowId: string; subId: string }) 
   useEffect(() => { setAttempt(undefined); setPath(undefined); setCompare(undefined) }, [subId])
   if (error) return isForbidden(error) ? <Forbidden /> : <ErrorState title="Could not load the code attempts" action={retryAction(refetch)}>{problemText(error)}</ErrorState>
   if (isLoading || !items) return <Skeleton rows={5} label="Loading the code attempts" />
-  if (list.length === 0 || !current) return <Empty icon="code" title="No code attempts yet">The build stores an attempt when it generates the Sub-Skill's code.</Empty>
+  if (list.length === 0 || !current) return <Empty icon="code" title="No code attempts yet">The build stores an attempt when it generates the Sub-Skill&apos;s code.</Empty>
   const file = current.files.find(f => f.path === path) ?? current.files[0]
   const others = comparable(list, current.attempt)
   const cmp = others.some(o => o.attempt === compare) ? compare : undefined
