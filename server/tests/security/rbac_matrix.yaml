@@ -1313,6 +1313,26 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "404 NOT_FOUND"
 
+  versions_api_v1_projects__project_id__workflows__workflow_id__versions_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/versions
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  new_version_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_skill_id__new_version_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_skill_id}/new-version
+      params: {project_id: "@project_a", workflow_id: "@workflow_a", sub_skill_id: "@sub_a"}
+      headers: {idempotency-key: "rbac-new-version-0001"}
+      json: {change_reason: "Fix the rounding"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
   # ---- internal and signed ----------------------------------------------------------------
   # Only tusd, holding the hook secret, may call the hook; no user token ever works (E2.7-T08).
   # The suite sends no secret, so every role is 401. The accepted-secret path is in test_idor.py.
