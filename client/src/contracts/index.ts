@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:d29050f8e0de43ac2a315e6ab2e13da9ac856c23b53fe2b56dc753fa32503f29
+// source-sha256:5004254d2576db49af5786fe3890f2a6b785dafdebb25211589b31a9f8c797a7
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -872,6 +872,9 @@ export interface SbamContracts {
   StagingStartRequest?: StagingStartRequest;
   StagingStartResult?: StagingStartResult;
   WorkflowRepositories?: WorkflowRepositories;
+  WorkflowVersionList?: WorkflowVersionList;
+  NewVersionRequest?: NewVersionRequest;
+  NewVersionStarted?: NewVersionStarted;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
   Connection?: Connection;
@@ -7506,6 +7509,49 @@ export interface SbomComponent {
   version: string;
   ecosystem?: string | null;
   licence?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowVersionList".
+ */
+export interface WorkflowVersionList {
+  items: WorkflowVersion[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WorkflowVersion".
+ */
+export interface WorkflowVersion {
+  id: string;
+  workflow_id: string;
+  /**
+   * Pattern: `^\d+\.0\.\d+$`
+   */
+  version: string;
+  sow_version_id: string;
+  workflow_manifest_id: string;
+  change_reason: string;
+  frozen_at: string;
+  superseded: boolean;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "NewVersionRequest".
+ */
+export interface NewVersionRequest {
+  change_reason: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "NewVersionStarted".
+ */
+export interface NewVersionStarted {
+  workflow_id: string;
+  sub_skill_id: string;
+  /**
+   * Pattern: `^\d+\.0\.\d+$`
+   */
+  next_version: string;
 }
 /**
  * A project's caps.

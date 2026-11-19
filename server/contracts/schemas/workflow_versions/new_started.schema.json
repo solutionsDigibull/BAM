@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow_versions/new_started:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "sub_skill_id": {
+      "format": "uuid",
+      "title": "Sub Skill Id",
+      "type": "string"
+    },
+    "next_version": {
+      "pattern": "^\\d+\\.0\\.\\d+$",
+      "title": "Next Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "sub_skill_id",
+    "next_version"
+  ],
+  "title": "NewVersionStarted",
+  "type": "object"
+}

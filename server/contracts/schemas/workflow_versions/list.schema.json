@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow_versions/list:0.1.0",
+  "$defs": {
+    "WorkflowVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "workflow_id": {
+          "format": "uuid",
+          "title": "Workflow Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^\\d+\\.0\\.\\d+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "sow_version_id": {
+          "format": "uuid",
+          "title": "Sow Version Id",
+          "type": "string"
+        },
+        "workflow_manifest_id": {
+          "format": "uuid",
+          "title": "Workflow Manifest Id",
+          "type": "string"
+        },
+        "change_reason": {
+          "maxLength": 500,
+          "title": "Change Reason",
+          "type": "string"
+        },
+        "frozen_at": {
+          "format": "date-time",
+          "title": "Frozen At",
+          "type": "string"
+        },
+        "superseded": {
+          "title": "Superseded",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "workflow_id",
+        "version",
+        "sow_version_id",
+        "workflow_manifest_id",
+        "change_reason",
+        "frozen_at",
+        "superseded"
+      ],
+      "title": "WorkflowVersion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/WorkflowVersion"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "WorkflowVersionList",
+  "type": "object"
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow_versions/new_request:0.1.0",
+  "additionalProperties": false,
+  "properties": {
+    "change_reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Change Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "change_reason"
+  ],
+  "title": "NewVersionRequest",
+  "type": "object"
+}

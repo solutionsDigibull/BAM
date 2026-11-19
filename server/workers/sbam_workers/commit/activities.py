@@ -3,7 +3,7 @@
 Each is idempotent, so a crash between any two is finished by running Commit again (WG18-T05):
 
 - `commit_recheck`  the same checks the API ran, on the hash the FDE approved (stale: refused);
-- `commit_freeze`   `WorkflowFreezer.freeze` (no-op when the Workflow is already FROZEN);
+- `commit_freeze`   `WorkflowFreezer.freeze` (`OrderedFreezer`, #132; a re-run completes it);
 - `commit_register` `service.register(kind=STAGING)` on the manifest's certified digest: no rebuild,
                     and the same version with the same digest is a no-op (Bifrost is not called);
 - `commit_start_staging` writes the audit row of who approved, then calls the `StagingRuntime` port
@@ -25,10 +25,10 @@ from sbam_api.core.settings import deployed_env
 from sbam_api.db.repository import TenantContext
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.factory import make_backend
+from sbam_api.versioning.freezer import OrderedFreezer
 from sbam_api.workflow_commit import service
 from sbam_api.workflow_commit.ports import (
     StagingRuntime,
-    StateMachineFreezer,
     WorkflowFreezer,
     default_runtime,
 )
@@ -209,7 +209,7 @@ def _steps() -> CommitSteps:
         mirror.sessions(),
         make_backend(settings),
         lambda: make_registry(settings),
-        StateMachineFreezer(),
+        OrderedFreezer(),
         make_runtime(settings, mirror.sessions(), make_backend(settings)),
     )
 
