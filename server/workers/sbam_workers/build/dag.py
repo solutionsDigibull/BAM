@@ -15,7 +15,7 @@ gives the same DAG whatever order the database returns its rows in.
 """
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +23,7 @@ from sbam_contracts.api import ErrorCode
 from sbam_contracts.isatvon14 import output_fields
 
 KINDS = {ErrorCode.DAG_CYCLE: "DagCycle", ErrorCode.SCHEMA_SQL_MISSING: "SchemaSqlMissing"}
+
 
 class DraftInvalid(Exception):  # noqa: N818 - named like the other stage failures
     """The Workflow can't get a manifest draft; `code` is the stable ErrorCode, `kind` the
@@ -126,13 +127,14 @@ def build_dag(nodes: Sequence[Node]) -> Graph:
     )
 
 
-def find_cycle(edges: Mapping[uuid.UUID, list[uuid.UUID]]) -> list[uuid.UUID]:
-    """One cycle as a path (first id repeated at the end), or [] when the graph is acyclic."""
-    state: dict[uuid.UUID, int] = {}  # 1 = on the current path, 2 = finished
+def find_cycle[T: Hashable](edges: Mapping[T, Sequence[T]]) -> list[T]:
+    """One cycle as a path (first id repeated at the end), or [] when the graph is acyclic. Ids
+    are Sub-Skill UUIDs for the build plan, DAG node ids (str) for Workflow certification."""
+    state: dict[T, int] = {}  # 1 = on the current path, 2 = finished
     for root in sorted(edges, key=str):
         if root in state:
             continue
-        path: list[uuid.UUID] = [root]
+        path: list[T] = [root]
         stack = [iter(edges.get(root, []))]
         state[root] = 1
         while stack:
