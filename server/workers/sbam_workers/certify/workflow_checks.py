@@ -19,7 +19,12 @@ Every check is a pure function of what the certify activity loaded, so every rul
     `required` list without the field) into a required input is one too. `build_contracts` never
     writes `required` on an output schema, so today every output counts as present: optionality
     is judged only where the schema states it, never assumed. A data edge with no `field` (not
-    from `build_dag`) links nothing to compare.
+    from `build_dag`) links nothing to compare;
+  * `dangling_findings` (#130 option B): a Sub-Skill that another Sub-Skill's `next` leads to runs
+    mid-chain, so each of its required inputs comes from an upstream output (a data edge with
+    that field) or is named in its `s_source.external_data` (DAG_DANGLING_INPUT). A Sub-Skill no
+    Sub-Skill `next` leads to is an entry point: its inputs are inputs of the Workflow (or, for a
+    `next` that names a Macro, of that Agent), which the stored ISATVON does not declare.
 
 A failing Sub-Skill blocks its Macro and the Workflow, never another Macro (`macro_verdicts`).
 Findings are sorted, so the same inputs in any order give the same tuple. They name ids, tables
@@ -49,6 +54,7 @@ class Check(StrEnum):
     SCHEMA_INVALID = "SCHEMA_INVALID"
     SUB_SKILL_NOT_CERTIFIED = "SUB_SKILL_NOT_CERTIFIED"
     INTERFACE_INCOMPATIBLE = "INTERFACE_INCOMPATIBLE"
+    DAG_DANGLING_INPUT = "DAG_DANGLING_INPUT"
 
 
 @dataclass(frozen=True, order=True)
@@ -86,6 +92,8 @@ class Interface:
     # `build_contracts`: {"input_schema": ..., "output_schema": ...}; None when the stored
     # ISATVON can't give them (a data edge to or from it is then a finding)
     contracts: Mapping[str, Any] | None
+    inputs: tuple[str, ...] = ()  # s_source.required_inputs
+    external: frozenset[str] = frozenset()  # s_source.external_data[].name
 
 
 NO_INTERFACES: Final[Mapping[str, Interface]] = MappingProxyType({})
@@ -221,6 +229,29 @@ def interface_findings(dag: DagLike, interfaces: Mapping[str, Interface]) -> tup
     )
 
 
+def dangling_findings(dag: DagLike, interfaces: Mapping[str, Interface]) -> tuple[Finding, ...]:
+    """Required inputs of a mid-chain Sub-Skill that nothing provides (module docstring)."""
+    skills = {str(n.get("id")) for n in dag.nodes if n.get("kind") == "skill"}
+    mid_chain = {
+        str(e.get("to"))
+        for e in dag.edges
+        if e.get("kind") == "next" and str(e.get("from")) in skills and str(e.get("to")) in skills
+    }
+    provided = {(down, field) for _, down, field in _field_links(dag)}
+    return _sorted(
+        Finding(
+            Check.DAG_DANGLING_INPUT,
+            skill,
+            f"required input {field} has no upstream output and is not in "
+            "s_source.external_data",
+        )
+        for skill in mid_chain
+        if (interface := interfaces.get(skill)) is not None
+        for field in interface.inputs
+        if (skill, field) not in provided and field not in interface.external
+    )
+
+
 # --- schema.sql -----------------------------------------------------------------------------------
 
 
@@ -315,6 +346,7 @@ def workflow_verdict(
         [
             *dag_findings(dag),
             *interface_findings(dag, interfaces),
+            *dangling_findings(dag, interfaces),
             *schema_findings(schema_sql, declared),
             *children_findings(children),
             *_coverage_findings(dag, children),

@@ -18,6 +18,7 @@ from sbam_workers.certify.workflow_checks import (
     Interface,
     children_findings,
     dag_findings,
+    dangling_findings,
     interface_findings,
     macro_verdicts,
     schema_findings,
@@ -360,3 +361,85 @@ def test_e14_2_t05_reference_contracts_from_build_contracts_link_cleanly() -> No
         "MS01.1_Investor_Auth_Manager outputs auth_status as string; "
         "MS01.2_Kyc takes auth_status as integer"
     ]
+
+
+# --- dangling inputs (T04, option B on #130) ------------------------------------------------------
+
+
+def _source(inputs: list[str], external: list[str] | None = None) -> Interface:
+    return Interface(None, inputs=tuple(inputs), external=frozenset(external or ()))
+
+
+def _chain(*extra: dict[str, Any]) -> Dag:
+    """GOOD_EDGES (MS01.1 -next-> MS01.2 -next-> MS02_Ship) plus `extra` edges."""
+    dag = _dag(GOOD_EDGES)
+    return Dag(nodes=dag.nodes, edges=[*dag.edges, *extra])
+
+
+DANGLING = "required input account_id has no upstream output and is not in s_source.external_data"
+
+
+def test_e14_2_t04_dangling_input() -> None:
+    sources = {
+        "MS01.1_Intake": _source(["email"]),
+        "MS01.2_Bill": _source(["account_id"]),
+        "MS02.1_Ship": _source(["invoice_id"]),
+    }
+    assert dangling_findings(_chain(), sources) == (
+        Finding(Check.DAG_DANGLING_INPUT, "MS01.2_Bill", DANGLING),
+    )
+    verdict = workflow_verdict(_chain(), SCHEMA, DECLARED, _children(), interfaces=sources)
+    assert [f.check for f in verdict] == [Check.DAG_DANGLING_INPUT]
+
+
+def test_e14_2_t04_an_upstream_output_or_external_data_provides_the_input() -> None:
+    linked = {"from": "MS01.1_Intake", "to": "MS01.2_Bill", "kind": "data", "field": "account_id"}
+    assert dangling_findings(_chain(linked), {"MS01.2_Bill": _source(["account_id"])}) == ()
+    external = {"MS01.2_Bill": _source(["account_id"], external=["account_id"])}
+    assert dangling_findings(_chain(), external) == ()
+    # a data edge for another field does not provide this one
+    other = {**linked, "field": "email"}
+    assert dangling_findings(_chain(other), {"MS01.2_Bill": _source(["account_id"])}) == (
+        Finding(Check.DAG_DANGLING_INPUT, "MS01.2_Bill", DANGLING),
+    )
+
+
+def test_e14_2_t04_entry_points_take_workflow_inputs() -> None:
+    """No Sub-Skill `next` leads to MS01.1 (the Workflow's entry) nor to MS02.1: a `next` naming a
+    Macro (MS01.2 -> MS02_Ship) hands over to the next Agent, it is not an edge into one of its
+    Sub-Skills, so MS02.1's inputs are inputs of that Agent."""
+    sources = {
+        "MS01.1_Intake": _source(["account_id"]),
+        "MS02.1_Ship": _source(["account_id"]),
+    }
+    assert dangling_findings(_chain(), sources) == ()
+
+
+def test_e14_2_t04_the_reference_and_existing_multi_skill_fixtures_have_no_dangling_input() -> None:
+    """MS01.1 (tests/fixtures/isa14) declares no external_data for its entry inputs; the E9.5 and
+    E14.2 multi-skill DAGs take `rfq_file` / `email` from outside. None of them dangles."""
+    from sbam_workers.build.dag import Node, build_dag
+    from sbam_workers.certify.workflow import interface_of
+    from test_e9_5_workflow_manifest import three
+
+    auth = json.loads(ISA14.read_text("utf-8"))
+    nxt = auth["isatvon_definition"]["n_notification"]["next"]  # MS01.2_Investor_KYC_Verifier
+    kyc = json.loads(ISA14.read_text("utf-8"))  # its next Sub-Skill takes two of its outputs
+    kyc["skill_metadata"]["skill_id"] = nxt
+    kyc["isatvon_definition"]["s_source"]["required_inputs"] = ["auth_status", "user_role"]
+    kyc["isatvon_definition"]["n_notification"]["next"] = None
+    macro = auth["skill_metadata"]["macro_category"]
+    pair = [Node(uuid.uuid4(), s["skill_metadata"]["skill_id"], macro, s) for s in (auth, kyc)]
+    graph = build_dag(pair)
+    sources = {n.skill_id: interface_of(n.isatvon) for n in pair}
+    assert "external_data" not in auth["isatvon_definition"]["s_source"]
+    assert dangling_findings(graph, sources) == ()
+    assert interface_findings(graph, sources) == ()
+    kyc["isatvon_definition"]["s_source"]["required_inputs"].append("account_id")
+    assert [f.subject for f in dangling_findings(graph, {nxt: interface_of(kyc)})] == [nxt]
+
+    nodes = [s.node for s in three()]
+    graph = build_dag(nodes)
+    sources = {n.skill_id: interface_of(n.isatvon) for n in nodes}
+    assert sources["MS02.1_Quote"].inputs == ("investor_id", "rfq_file")
+    assert dangling_findings(graph, sources) == ()

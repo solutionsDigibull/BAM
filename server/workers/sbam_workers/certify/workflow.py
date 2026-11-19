@@ -26,8 +26,8 @@ of `workflow_checks`; this module only loads what they judge and writes what the
 Every certificate goes through `CertificationRepository.record`, so a retried activity finds the
 row it wrote. Messages and logs carry ids, names and hashes, never code or SQL text.
 
-TODO(#130): the Workflow smoke run through the loop harness in CubeSandbox and the dangling-input
-check are not built yet; see the issue.
+TODO(#130): the Workflow smoke run through the loop harness in CubeSandbox is not built yet; see
+the issue.
 """
 
 import asyncio
@@ -235,11 +235,27 @@ class SqlFacts:
 
 def interface_of(isatvon: Mapping[str, Any]) -> Interface:
     """The Sub-Skill's contracts as its Skill Manifest has them; none when its stored ISATVON is
-    not a valid ISATVON 1.4 Sub-Skill (a data edge to or from it is then a finding)."""
+    not a valid ISATVON 1.4 Sub-Skill (a data edge to or from it is then a finding). Its required
+    inputs and external_data names are read as `build.dag` reads the inputs, leniently."""
+    definition = isatvon.get("isatvon_definition")
+    source = definition.get("s_source") if isinstance(definition, Mapping) else None
+    source = source if isinstance(source, Mapping) else {}
+    inputs = source.get("required_inputs")
+    external = source.get("external_data")
+    names = (
+        [e.get("name") for e in external if isinstance(e, Mapping)]
+        if isinstance(external, list)
+        else []
+    )
     try:
-        return Interface(build_contracts(SubSkillModel.model_validate(isatvon)))
+        contracts: dict[str, Any] | None = build_contracts(SubSkillModel.model_validate(isatvon))
     except ValueError:  # pydantic's ValidationError too
-        return Interface(None)
+        contracts = None
+    return Interface(
+        contracts,
+        inputs=tuple(i for i in inputs if isinstance(i, str)) if isinstance(inputs, list) else (),
+        external=frozenset(n for n in names if isinstance(n, str)),
+    )
 
 
 FactsLoader = Callable[[Session, TenantContext, uuid.UUID], Facts]

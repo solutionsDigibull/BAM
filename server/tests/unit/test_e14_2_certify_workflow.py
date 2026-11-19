@@ -631,18 +631,25 @@ def full_isatvon(
     return data
 
 
-def typed_world(amount_out: str) -> World:
-    """MS01.1 outputs `amount` as `amount_out`; MS01.2 takes `amount` as a number."""
+def typed_world(
+    amount_out: str, verify_needs: tuple[str, ...] = (), external: list[str] | None = None
+) -> World:
+    """MS01.1 outputs `amount` as `amount_out`; MS01.2 (after MS01.1 by `next`) takes `amount`
+    as a number, plus `verify_needs`, with `external` as its s_source.external_data."""
     io: dict[str, tuple[list[str], dict[str, Any], list[dict[str, Any]]]] = {
         "MS01.1_Login": (["email"], {"amount": amount_out}, []),
         "MS01.2_Verify": (
-            ["amount"],
+            ["amount", *verify_needs],
             {"investor_id": "string"},
             [{"name": "amount", "type": "number"}],
         ),
         "MS02.1_Quote": (["investor_id"], {"quote": "number"}, []),
     }
-    return World(sql=HANDOFF_SQL, isatvon_of=lambda sid: full_isatvon(sid, *io[sid]))
+    ext = {"MS01.2_Verify": external}
+    return World(
+        sql=HANDOFF_SQL,
+        isatvon_of=lambda sid: full_isatvon(sid, *io[sid], external=ext.get(sid)),
+    )
 
 
 def test_e14_2_t05_an_integer_output_feeds_a_number_input() -> None:
@@ -669,3 +676,26 @@ def test_e14_2_t05_a_string_output_into_a_number_input_fails_validation() -> Non
         }
     ]
     assert failure(w.certify_workflow).type == CERTIFICATION_REFUSED
+
+
+def test_e14_2_t04_a_mid_chain_input_nobody_provides_fails_validation() -> None:
+    w = typed_world("integer", verify_needs=("account_id",))
+    w.certify_macros()
+    error = failure(w.validate)
+    assert error.message == "workflow validation failed: DAG_DANGLING_INPUT:MS01.2_Verify"
+    [row] = w.audit(VALIDATION_ACTION)
+    assert row.after is not None
+    assert row.after["findings"] == [
+        {
+            "check": "DAG_DANGLING_INPUT",
+            "subject": "MS01.2_Verify",
+            "message": "required input account_id has no upstream output and is not in "
+            "s_source.external_data",
+        }
+    ]
+
+
+def test_e14_2_t04_external_data_provides_a_mid_chain_input() -> None:
+    w = typed_world("integer", verify_needs=("account_id",), external=["account_id"])
+    w.certify_macros()
+    assert w.validate() is not None
