@@ -1,7 +1,7 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
   BuildsResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
-  CodeAttemptList, CodeDiff, CodeFileView, GatesResponse, HeldPatchResponse, ManifestVersionList, ManifestView, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
+  CodeAttemptList, CodeDiff, CodeFileView, GatesResponse, HeldPatchResponse, TestRunTraces, TestRunsResponse, TestsResponse, ManifestVersionList, ManifestView, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
 import type { RetryAccepted } from '../lib/workflowBuilds'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
@@ -51,6 +51,12 @@ export interface BamApi {
   getManifestVersions(workflowId: string, subId?: string): Promise<ManifestVersionList>
   /** One manifest as stored, by build (and version for a Sub-Skill). 404 when it was not generated yet. */
   getManifest(workflowId: string, subId: string | undefined, buildNo?: number, version?: string): Promise<ManifestView>
+  /** The newest test data of one Sub-Skill with its cases (`dataset: null` before generation). Read only (#715). */
+  getSubSkillTests(workflowId: string, subId: string): Promise<TestsResponse>
+  /** The Promptfoo runs of one Sub-Skill, newest first, each with its assertion results. */
+  getTestRuns(workflowId: string, subId: string): Promise<TestRunsResponse>
+  /** The harness trace of every case of one run. */
+  getTestRunTraces(workflowId: string, subId: string, runId: string): Promise<TestRunTraces>
   /** The ISATVON patch a correction proposed and a Sub-Skill waits on (`held: null` when none). Read only (#715). */
   getHeldPatch(workflowId: string, subId: string): Promise<HeldPatchResponse>
   /** The FDE's decision on the held patch, then the build retries from it. Accepting sends the Sub-Skill's hash as If-Match; both send an Idempotency-Key. */
@@ -149,6 +155,9 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'code-attempt-diff': q => api.getCodeAttemptDiff(q.workflowId ?? '', q.subId ?? '', Number(q.from), Number(q.to), q.path ?? ''),
   'manifest-versions': q => api.getManifestVersions(q.workflowId ?? '', q.subId),
   manifest: q => api.getManifest(q.workflowId ?? '', q.subId, q.buildNo === undefined ? undefined : Number(q.buildNo), q.version),
+  'sub-skill-tests': q => api.getSubSkillTests(q.workflowId ?? '', q.subId ?? ''),
+  'test-runs': q => api.getTestRuns(q.workflowId ?? '', q.subId ?? ''),
+  'test-run-traces': q => api.getTestRunTraces(q.workflowId ?? '', q.subId ?? '', q.runId ?? ''),
   'held-patch': q => api.getHeldPatch(q.workflowId ?? '', q.subId ?? ''),
   'sub-skill-gates': q => api.getSubSkillGates(q.workflowId ?? '', q.subId ?? '', q.attempt === undefined ? undefined : Number(q.attempt)),
   connections: () => api.getConnections(),

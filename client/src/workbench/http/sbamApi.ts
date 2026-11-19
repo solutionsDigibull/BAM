@@ -17,6 +17,9 @@ import type {
   CodeDiff,
   CodeFileView,
   GatesResponse,
+  TestRunTraces,
+  TestRunsResponse,
+  TestsResponse,
   ManifestVersionList,
   ManifestView,
   HeldPatchResponse,
@@ -142,6 +145,13 @@ export function createSbamApi(projectId: string): BamApi {
       if (buildNo !== undefined) qs.set("build_no", String(buildNo));
       return (await getJson<ManifestView>(`projects/${projectId}/workflows/${workflowId}${subId ? `/sub-skills/${subId}` : ""}/manifest${qs.size ? `?${qs}` : ""}`)).body;
     },
+    // The tests of a Sub-Skill, its sandbox runs and the traces of a run (#715, read only).
+    getSubSkillTests: async (workflowId, subId) =>
+      (await getJson<TestsResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/tests`)).body,
+    getTestRuns: async (workflowId, subId) =>
+      (await getJson<TestRunsResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/test-runs`)).body,
+    getTestRunTraces: async (workflowId, subId, runId) =>
+      (await getJson<TestRunTraces>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/test-runs/${runId}/traces`)).body,
     // The held ISATVON patch of a Sub-Skill and the FDE's decision on it (#715): accepting is guarded by the Sub-Skill's hash (If-Match).
     getHeldPatch: async (workflowId, subId) =>
       (await getJson<HeldPatchResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/held-patch`)).body,
