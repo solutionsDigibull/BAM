@@ -353,6 +353,7 @@ jobs:
         run: scripts/ci-llm-egress-guard.sh start
       # Flaky first boot (image pulls, Keycloak import): retry once, then fail.
       - name: make up
+        id: up
         run: make up ENV_FILE="$ENV_FILE" || { echo "::warning::make up failed, retrying once"; make down ENV_FILE="$ENV_FILE"; make up ENV_FILE="$ENV_FILE"; }
       # skill-runtime + runtime registry (#67): build, generate inside the image, sync into the stack DB.
       # SKILL_RUNTIME_IMAGE also enables the in-image PostgreSQL test (E12.1-T05) in make test-int.
@@ -375,7 +376,9 @@ jobs:
         env: { ENV_FILE: compose/.env.ci }
       # E15.3-T08 (#137): ZAP baseline (passive, Apache-2.0) over every API operation, imported from the
       # dev stack's OpenAPI document. Warnings are reported; any High-risk alert fails the job.
+      # Runs even when an earlier test step failed: the scan only needs the running stack.
       - name: ZAP baseline (API)
+        if: ${{ !cancelled() && steps.up.outcome == 'success' }}
         run: |
           mkdir -p reports/zap && chmod 777 reports/zap
           port="$(sed -n 's/^API_PORT=//p' "$ENV_FILE")"
