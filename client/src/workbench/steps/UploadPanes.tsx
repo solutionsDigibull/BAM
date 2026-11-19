@@ -3,6 +3,7 @@
 // the same upload store (stored uploads + the uploader's in-flight files), so list, table, lanes and quota agree.
 // All three entry points (+ Add files, the left-pane drop, the middle drop zone) go through Intake's existing pick
 // handler: triage, the review dialog, then the existing resumable uploader.
+import { RecycleBin } from './RecycleBin'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUppyState } from '@uppy/react'
 import { api } from '../api/adapter'
@@ -309,6 +310,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
     <main className="up-right" aria-labelledby="center-title">
       <h2 id="center-title" className="sr-only" tabIndex={-1}>Uploaded files</h2>
       <UploadIdle />
+      <RecycleBin snap={snap} hideWhenEmpty />
     </main>
   )
   return (
@@ -371,6 +373,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
         <p className="muted xs">Discarded files stay listed here. Removing a file from the list never deletes its data.</p>
         <ul className="dc-files">{archived.map((a, i) => <li key={i}><Icon name="tb-file" size={15} /><span className="dc-name">{a.name}</span><span className="muted xs">{a.reason}</span></li>)}</ul>
       </details>}
+      <RecycleBin snap={snap} />
       {menu && <RowMenu snap={snap} {...menu} onClose={() => setMenu(null)} />}
     </main>
   )

@@ -2,7 +2,8 @@
 // to the knowledge build. The backend owns the state; nothing here invents a verdict.
 import type { DocumentOut, DocumentVersionState } from "@/contracts";
 
-import type { ParseInfo, ScanEvent, UploadRecord } from "../api/types";
+import type { DeletedFile, ParseInfo, ScanEvent, UploadRecord } from "../api/types";
+import { ApiFailure } from "./http";
 
 /** What the FDE reads for each reason the server refuses or rejects a file. */
 export const REASONS: Record<string, string> = {
@@ -93,4 +94,23 @@ export function scanEventsOf(documents: DocumentOut[]): ScanEvent[] {
               : "staged",
     at: d.created_at,
   }));
+}
+
+/** The recycle bin: deleted documents still inside their 90 days, newest deletion first. A purged one cannot come back. */
+export function deletedOf(documents: DocumentOut[]): DeletedFile[] {
+  return documents
+    .filter((d) => d.deleted_at && d.state !== "PURGED")
+    .map((d) => ({ id: d.id, name: d.title, size: d.size, deletedAt: d.deleted_at!, purgeAfter: d.purge_after ?? undefined }))
+    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+}
+
+/** What the FDE reads when a restore is refused. */
+export function restoreReason(error: unknown): string {
+  const f = error as Partial<ApiFailure> | null;
+  if (f?.statusCode === 410) return "This file was permanently deleted and cannot be restored.";
+  if (f?.problem?.code === "FILE_LIMIT_REACHED") return `${REASONS.FILE_LIMIT_REACHED}. Remove one before restoring this file.`;
+  if (f?.statusCode === 409) return "This file is not in the recycle bin.";
+  if (f?.statusCode === 403) return "You are not allowed to restore files in this project.";
+  if (f?.statusCode === 404) return "This file no longer exists.";
+  return f?.problem?.detail ?? f?.message ?? "The file could not be restored.";
 }

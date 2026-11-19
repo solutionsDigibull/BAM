@@ -284,6 +284,15 @@ export interface Persist {
   deployedSkills: { agent: string; skills: string[] }[]
 }
 
+/** A file in the project's recycle bin: kept 90 days, then purged. It can be restored until `purgeAfter`. */
+export interface DeletedFile {
+  id: string
+  name: string
+  size: number
+  deletedAt: string
+  purgeAfter?: string
+}
+
 export interface Snapshot {
   serverTime: string
   workflowName: string
@@ -292,6 +301,8 @@ export interface Snapshot {
   activeStep: StepId
   steps: StepInfo[]
   uploads: UploadRecord[]
+  /** The recycle bin: deleted files that can still be restored (newest first). */
+  deleted?: DeletedFile[]
   /** Scan activity for the active batch, oldest first; ids are stable across polls. */
   scanEvents: ScanEvent[]
   ingestion?: IngestionRun

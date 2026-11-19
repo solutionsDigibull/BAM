@@ -2,7 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import type { DocumentOut, DocumentVersionState } from "@/contracts";
 
-import { isActive, scanEventsOf, toUploadRecord } from "./documents";
+import { ApiFailure } from "./http";
+import { deletedOf, isActive, restoreReason, scanEventsOf, toUploadRecord } from "./documents";
 
 const doc = (state: DocumentVersionState, extra: Partial<DocumentOut> = {}): DocumentOut => ({
   id: "d1",
@@ -105,5 +106,29 @@ describe("a document's relevance to the goal reaches its upload row (#802)", () 
     };
     expect(toUploadRecord(doc("PARSED", { relevance })).relevance).toEqual(relevance);
     expect(toUploadRecord(doc("PARSED")).relevance).toBeUndefined();
+  });
+});
+
+describe("the recycle bin and the reason a restore is refused (#712)", () => {
+  test("test_712_the_bin_lists_deleted_files_newest_first_and_never_a_purged_one", () => {
+    const bin = deletedOf([
+      doc("PARSED"),
+      doc("DELETED", { id: "a", title: "old.pdf", deleted_at: "2026-11-01T10:00:00Z", purge_after: "2027-01-30T10:00:00Z" }),
+      doc("DELETED", { id: "b", title: "new.pdf", deleted_at: "2026-11-05T10:00:00Z" }),
+      doc("PURGED", { id: "c", deleted_at: "2026-08-01T10:00:00Z" }),
+    ]);
+    expect(bin.map((d) => d.name)).toEqual(["new.pdf", "old.pdf"]);
+    expect(bin[1]!.purgeAfter).toBe("2027-01-30T10:00:00Z");
+  });
+
+  test("test_712_restore_refusals_are_said_in_words", () => {
+    const f = (status: number, code?: string, detail?: string) =>
+      new ApiFailure("x", status, { code, detail } as never);
+    expect(restoreReason(f(410))).toMatch(/permanently deleted/);
+    expect(restoreReason(f(409, "FILE_LIMIT_REACHED"))).toMatch(/20 files/);
+    expect(restoreReason(f(409, "CONFLICT"))).toMatch(/not in the recycle bin/);
+    expect(restoreReason(f(403))).toMatch(/not allowed/);
+    expect(restoreReason(f(500, undefined, "Server said no"))).toBe("Server said no");
+    expect(restoreReason(new Error("offline"))).toBe("offline");
   });
 });
