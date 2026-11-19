@@ -13,10 +13,11 @@ one. The handover to SRIM is the registry lookup (#760): there is no `/handover/
 
 import re
 import uuid
-from typing import Annotated, Final
+from typing import Annotated, Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.manifest import VERSION_PATTERN
 from sbam_contracts.runs import Run, RunInput
 
@@ -76,3 +77,8 @@ class ExportResult(_Strict):
     sha256: Annotated[str, Field(pattern=SHA256_HEX.pattern)]
     size: Annotated[int, Field(ge=0)]
     entries: Annotated[int, Field(ge=1)]
+
+
+def schemas() -> dict[str, dict[str, Any]]:
+    """File stem -> JSON Schema, for the committed files under `schemas/exports/`."""
+    return {"accepted": contract_schema(ExportAccepted, "exports/accepted")}
