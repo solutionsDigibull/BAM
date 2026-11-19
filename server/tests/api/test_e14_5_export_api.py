@@ -70,7 +70,7 @@ def url(h: Harness, version: str = "1.0.0") -> str:  # noqa: F811
     return f"/projects/{h.project}/workflows/{WORKFLOW}/versions/{version}/export"
 
 
-def frozen(h: Harness) -> str:  # noqa: F811
+def frozen(h: Harness, code: dict[str, bytes] = CODE) -> str:  # noqa: F811
     """Version 1.0.0 frozen as #132 leaves it. Returns the code bundle's storage key."""
     seed(h, LEDGER)
     bind = h.sessions.kw["bind"]
@@ -78,7 +78,7 @@ def frozen(h: Harness) -> str:  # noqa: F811
         table.__table__.create(bind, checkfirst=True)  # type: ignore[attr-defined]
     project = uuid.UUID(h.project)
     scope = StorageScope(TENANT_A, project, WORKFLOW)
-    bundle = storage(h).put(bundle_tar(CODE), scope, Kind.CODE, "application/x-tar")
+    bundle = storage(h).put(bundle_tar(code), scope, Kind.CODE, "application/x-tar")
     sql = storage(h).put(b"CREATE TABLE t (id int);\n", scope, Kind.CODE, "text/plain")
     skill = json.loads(FIXTURE.read_text(encoding="utf-8"))
     skill_id = skill["skill_metadata"]["skill_id"]
@@ -321,6 +321,17 @@ def test_e14_5_t07_a_tampered_frozen_file_aborts_with_an_alert_and_no_zip(
         actions = [r.action for r in s.scalars(select(AuditLog))]
     assert "EXPORT_HASH_MISMATCH" in actions and "EXPORTED" not in actions
     assert h.call("GET", url(h), h.fde(), follow_redirects=False).status_code == 404
+
+
+def test_e14_5_t05_a_bundle_holding_a_dotenv_is_refused_without_retry(
+    h: Harness, client: FakeClient  # noqa: F811
+) -> None:
+    frozen(h, {**CODE, ".env": b"SECRET=x"})
+    post(h)
+    with pytest.raises(ApplicationError) as error:
+        run(h, client)
+    assert error.value.type == "ExportRefused" and error.value.non_retryable
+    assert exports(h) == []
 
 
 def test_e14_5_t08_every_skill_manifest_is_isa14_and_approved(

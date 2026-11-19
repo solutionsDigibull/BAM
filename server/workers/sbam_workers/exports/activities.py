@@ -67,6 +67,8 @@ class ExportSteps:
                 raise ApplicationError(
                     f"{error.title}: {error.detail or ''}"[:500], type=REFUSED, non_retryable=True
                 ) from None
+            except UnsafePath as error:  # a bundle file named .env, '..', ...: never retried
+                raise ApplicationError(str(error), type=REFUSED, non_retryable=True) from None
             try:
                 with tempfile.TemporaryFile() as sink:
                     info = write_package(collected.entries, sink)
