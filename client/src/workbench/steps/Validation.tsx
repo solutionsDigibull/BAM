@@ -1,14 +1,15 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CommitStatus } from '@/contracts'
 import { api } from '../api/adapter'
 import type { StepProps } from '../Workbench'
 import { ConnectionsPanel } from '../components/ConnectionsPanel'
 import { Banner, Confirm, Copy, Empty, ErrorState, GateButton, Icon, Pane, Section, Skeleton, StatusPill, Time, shortHash } from '../components/ui'
 import { useAction } from '../lib/data'
+import { setUi } from '../lib/store'
 import { useConnections, tailText } from '../lib/connections'
 import { projectIdOfPath } from '../lib/evidence'
 import {
-  checkLabel, commitReason, isForbidden, isNotFound, isRunning, problemOf, STAGING_LABEL, useCommitStatus,
+  canRestart, checkLabel, commitReason, isForbidden, isNotFound, isRunning, problemOf, STAGING_LABEL, useCommitStatus,
 } from '../lib/workflowCommit'
 import { idempotencyKey } from '../http/http'
 import { CertEvidence } from './CertEvidence'
@@ -112,23 +113,28 @@ export function ValidationFooter({ snap, info }: { snap: StepProps['snap']; info
   const [ask, setAsk] = useState(false)
   const [failed, setFailed] = useState<string | undefined>()
   const key = useRef<{ hash: string; key: string } | undefined>(undefined)
+  // Commit leads to Staging in the same login (#861, ADR 0032): once this session's Commit is recorded, the toggle flips to Staging.
+  const flip = useRef(false)
+  useEffect(() => {
+    if (flip.current && data?.state === 'COMMITTED') { flip.current = false; setUi({ env: 'Staging' }) }
+  }, [data?.state])
   const ro = info.editable ? undefined : 'This screen is read-only'
   if (!workflowId) return null
 
   const reason = ro ?? commitReason(data)
-  const again = data?.state === 'COMMITTING' && !isRunning(data)
+  const again = (data?.state === 'COMMITTING' && !isRunning(data)) || canRestart(data)
   const send = async () => {
     const hash = data?.manifest_hash
     if (!hash) return
-    if (key.current?.hash !== hash) key.current = { hash, key: idempotencyKey() } // a retry of the same hash is the same command
+    if (key.current?.hash !== hash || canRestart(data)) key.current = { hash, key: idempotencyKey() } // a retry of the same hash is the same command
     setAsk(false)
     setFailed(undefined)
     await run('Commit', async () => {
-      try { await api.commitWorkflow(workflowId, hash, key.current!.key) } catch (e) { setFailed(problemOf(e)) }
+      try { await api.commitWorkflow(workflowId, hash, key.current!.key); if (canRestart(data)) setUi({ env: 'Staging' }); else flip.current = true } catch (e) { setFailed(problemOf(e)) }
     })
   }
   const working = busy === 'Commit' || isRunning(data)
-  const done = data?.state === 'COMMITTED'
+  const done = data?.state === 'COMMITTED' && !canRestart(data)
   const title = done ? 'Committed to Staging' : failed ? 'The commit did not start' : again ? 'The last commit did not finish' : 'Commit to Staging'
   const line = failed ?? (done ? 'Staging is not production' : 'Freezes this version and registers it in Staging on the digest that was certified')
 
