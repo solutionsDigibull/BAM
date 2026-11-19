@@ -27,7 +27,7 @@ export function stagingUpstream(
 /** The script that points the bundle's `/mcp` calls at the Staging MCP route. It reads the ids from its own address. */
 export function hostScript(): string {
   return String.raw`(() => {
-  const m = location.pathname.match(/^\/api\/staging-ui\/([0-9a-f-]{36})\/([0-9a-f-]{36})\//);
+  const m = location.pathname.match(/^\/api\/staging-ui\/([0-9a-f-]{36})\/([0-9a-f-]{36})(?:\/|$)/);
   if (!m) return;
   const target = location.origin + "/api/proxy/api/v1/projects/" + m[1] + "/workflows/" + m[2] + "/staging/mcp";
   const native = window.fetch.bind(window);
@@ -42,9 +42,12 @@ export function hostScript(): string {
 `;
 }
 
-/** The entry page with the host script first, so it runs before the bundle's own scripts. Anything but an HTML page is returned as it is. */
+/** The entry page with a `<base>` and the host script first, so both apply before the bundle's own scripts. Next redirects
+ *  `/api/staging-ui/<p>/<w>/` to the same address without the slash, which would make `./app.js` resolve beside the workflow
+ *  folder: the `<base>` pins relative URLs under it. Anything but an HTML page is returned as it is. */
 export function withHostScript(html: string, projectId: string, workflowId: string): string {
-  const tag = `<script src="${stagingFrameSrc(projectId, workflowId)}${HOST_SCRIPT}"></script>`;
+  const src = stagingFrameSrc(projectId, workflowId);
+  const tag = `<base href="${src}"><script src="${src}${HOST_SCRIPT}"></script>`;
   return /<head[^>]*>/i.test(html)
     ? html.replace(/<head[^>]*>/i, (h) => `${h}${tag}`)
     : `${tag}${html}`;
