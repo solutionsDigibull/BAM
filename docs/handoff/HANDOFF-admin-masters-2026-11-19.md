@@ -27,6 +27,12 @@ The approved UI is `D:\SBAM\Admin_Masters` (repo ParvithaCGowda29/Admin_Masters)
 
 All of these issues are assigned to prateekh-spec. Reassign the ones you take.
 
+Also open: **PR #882**, a chore with no issue. It holds:
+- the real-stack walkthrough probes (`client/e2e/stack/zz-*.spec.ts`);
+- the 2026-11-03 E2E run notes;
+- the workflow-MCP research doc;
+- the senior-architect agent skill.
+
 ## #782 (PR #880): what reviewers should know
 
 - Bulk upsert writes only the clean rows. A changed existing id is a conflict and is never overwritten. This deliberately differs from the workbook import, which adds a version.
@@ -44,7 +50,7 @@ Done:
 - Screenshots in `client/walkthrough-out/mui6/` (local, untracked).
 
 Still to do before marking it ready:
-1. **`next build` was never verified.** Locally it fails only on the untracked `client/e2e/stack/zz-*.spec.ts` throwaway files. Let CI build it, or build in a clean checkout.
+1. **`next build` was never verified.** Locally it failed only on the then-untracked `client/e2e/stack/zz-*.spec.ts` probes. Those are now lint- and type-clean in PR #882, so the build should pass. Confirm it in CI.
 2. e2e `e12_6_t06` ("50x23 gates render within 1 s") measured 1309 ms on the laptop. Compare it against a dev baseline. It's probably machine speed.
 3. Some screens still hard-code light colours, e.g. `project-form-drawer`'s `#e5e7eb` border. Dark mode only covers antd tokens and the ui-kit variables.
 4. FDE pages share PortalShell, so they get the new light look but no theme toggle. That's by design.
@@ -136,4 +142,7 @@ The scope is in the issues and in section 2 of the [UI mapping](../research/admi
   - Set `E2E_SEED_PASSWORD` (= `SEED_USER_PASSWORD` in `compose/.env`), `E2E_BASE_URL=http://localhost:3000` and `E2E_STACK=1`.
   - Run `pnpm exec playwright test <spec> --project=stack` from `client/`.
   - The #782 probe spec is kept outside the repo; re-create it from PR #880's test notes if needed.
-- **Untracked local files belong to the user:** `client/e2e/stack/zz-*.spec.ts`, `client/walkthrough-out/`, `.agents/`, `docs/audit/07-*`, `skills-lock.json`. They also break `next build` and the repo-wide lint and typecheck locally. Never commit them.
+- **The walkthrough probes, run notes, workflow-MCP research and senior-architect skill** are in PR #882. The `zz-*` specs run only with `E2E_STACK=1`.
+- **Still local only, never commit:**
+  - `client/walkthrough-out/`: screenshots, including the #785 light/dark set.
+  - A local `.claude/settings.json` change that would narrow the team's `.env.*` read deny.
