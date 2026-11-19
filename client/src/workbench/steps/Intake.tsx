@@ -13,7 +13,7 @@ import '@uppy/dashboard/css/style.min.css'
 import { api } from '../api/adapter'
 import type { ScanOutcome } from '../api/adapter'
 import { ACCEPTED_TYPES, AV_NAME, CHUNK_BYTES, chunkCount, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_UPLOAD_BYTES, type ScanEvent, type Snapshot, type UploadRecord } from '../api/types'
-import { autoPick, chunkNames, extOf, fit, triage, MAX_MULTI_BATCH_FILES, MAX_MULTI_BATCH_BYTES, SYSTEM_FILE_LABEL, type Triage } from '../api/scanGate'
+import { autoPick, chunkNames, extOf, fit, triage, MAX_MULTI_BATCH_FILES, MAX_MULTI_BATCH_BYTES, multiBatchLimitText, SYSTEM_FILE_LABEL, type Triage } from '../api/scanGate'
 import type { StepProps } from '../Workbench'
 import { useAction } from '../lib/data'
 import { setUi, uploadFiles, uppy, useUi } from '../lib/store'
@@ -208,12 +208,12 @@ function ReviewDialog({ review, existing, onClose, onUpload }: { review?: Review
           <div className={`meter ${over(f.count, maxRoomFiles)}`}>
             <span className="meter-l">Files</span>
             <span className="meter-bar"><span style={{ width: `${pctFiles}%` }} /></span>
-            <span className="meter-n">{f.count} / {f.multiBatch ? `${MAX_MULTI_BATCH_FILES} (up to 9 batches)` : Math.max(f.roomFiles, 0)}</span>
+            <span className="meter-n">{f.count} / {f.multiBatch ? `${MAX_MULTI_BATCH_FILES} (${multiBatchLimitText()})` : Math.max(f.roomFiles, 0)}</span>
           </div>
           <div className={`meter ${over(f.bytes, maxRoomBytes)}`}>
             <span className="meter-l">Size</span>
             <span className="meter-bar"><span style={{ width: `${pctBytes}%` }} /></span>
-            <span className="meter-n">{fmtBytes(f.bytes)} / {f.multiBatch ? `${fmtBytes(MAX_MULTI_BATCH_BYTES)} (up to 9 batches)` : MB(Math.max(f.roomBytes, 0))}</span>
+            <span className="meter-n">{fmtBytes(f.bytes)} / {f.multiBatch ? `${fmtBytes(MAX_MULTI_BATCH_BYTES)} (${multiBatchLimitText()})` : MB(Math.max(f.roomBytes, 0))}</span>
           </div>
         </div>
         <div className="tile-panel">
