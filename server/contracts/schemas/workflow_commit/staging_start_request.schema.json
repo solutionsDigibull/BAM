@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow_commit/staging_start_request:0.1.0",
+  "additionalProperties": false,
+  "description": "What the Staging runtime (#765) needs to start a committed Workflow. IDs, the digest that\nwas certified, and secret names: never a secret value.",
+  "properties": {
+    "tenant_id": {
+      "format": "uuid",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "version": {
+      "pattern": "^\\d+\\.0\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "registry_name": {
+      "maxLength": 64,
+      "pattern": "^wf_[a-z0-9]+(_[a-z0-9]+)*$",
+      "title": "Registry Name",
+      "type": "string"
+    },
+    "image_digest": {
+      "pattern": "^(sha256:)?[0-9a-f]{64}$",
+      "title": "Image Digest",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "pattern": "^(sha256:)?[0-9a-f]{64}$",
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "ui_bundle_digest": {
+      "anyOf": [
+        {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ui Bundle Digest"
+    },
+    "secret_names": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 200,
+      "title": "Secret Names",
+      "type": "array"
+    },
+    "requested_by": {
+      "maxLength": 255,
+      "minLength": 1,
+      "title": "Requested By",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tenant_id",
+    "project_id",
+    "workflow_id",
+    "version",
+    "registry_name",
+    "image_digest",
+    "manifest_hash",
+    "requested_by"
+  ],
+  "title": "StagingStartRequest",
+  "type": "object"
+}

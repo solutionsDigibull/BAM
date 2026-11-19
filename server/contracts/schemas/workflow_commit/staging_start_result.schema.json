@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow_commit/staging_start_result:0.1.0",
+  "$defs": {
+    "StagingStartStatus": {
+      "enum": [
+        "STARTED",
+        "PENDING_RUNTIME",
+        "FAILED"
+      ],
+      "title": "StagingStartStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "$ref": "#/$defs/StagingStartStatus"
+    },
+    "detail": {
+      "anyOf": [
+        {
+          "maxLength": 300,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Detail"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "StagingStartResult",
+  "type": "object"
+}

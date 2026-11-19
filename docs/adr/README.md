@@ -40,6 +40,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0032](0032-staging-replaces-the-pre-commit-preview.md) | Staging replaces the pre-commit preview: FDE mode builds, Staging mode runs the complete workflow in the same FDE login (#859) | Accepted | refines 0028 (decision 7), 0023 |
 | [0033](0033-ui-bundle-is-part-of-the-certified-workflow.md) | The UI bundle is part of the certified Workflow: BAM delivers it, SRIM shows only it; manifest entry, `UI_BUNDLE` evidence, registry lookup (#857) | Accepted | refines 0028 (decisions 3, 4), 0031, 0032 |
 | [0034](0034-enterprise-assistant-llm.md) | Enterprise Assistant: cited document and graph Q&A behind the middle-pane chat, on its own `sbam-assistant` alias; decline when ungrounded; history stays in the browser (#729) | Proposed | — |
+| [0035](0035-commit-to-staging-ports-and-the-132-gap.md) | Commit to Staging: `WorkflowCommit`, the `WorkflowFreezer` and `StagingRuntime` ports, and what Commit does while #132 and #765 are not built (#766) | Accepted | refines 0032 (decision 2), 0030 (decision 10) |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 

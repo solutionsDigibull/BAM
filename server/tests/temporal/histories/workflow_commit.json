@@ -1,0 +1,1005 @@
+{
+ "events": [
+  {
+   "eventId": "1",
+   "eventTime": "2026-11-19T08:27:30.758Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
+   "workflowExecutionStartedEventAttributes": {
+    "workflowType": {
+     "name": "WorkflowCommit"
+    },
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+      }
+     ]
+    },
+    "workflowExecutionTimeout": "315360000s",
+    "workflowRunTimeout": "315360000s",
+    "workflowTaskTimeout": "10s",
+    "originalExecutionRunId": "e05e6386-204d-4c3d-8be7-25f39e2cfb4f",
+    "identity": "8023@c770c870d066",
+    "firstExecutionRunId": "e05e6386-204d-4c3d-8be7-25f39e2cfb4f",
+    "attempt": 1,
+    "firstWorkflowTaskBackoff": "0s",
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "2",
+   "eventTime": "2026-11-19T08:27:30.758Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "3",
+   "eventTime": "2026-11-19T08:27:30.805Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "2",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "597"
+   }
+  },
+  {
+   "eventId": "4",
+   "eventTime": "2026-11-19T08:27:30.891Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "2",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {
+     "coreUsedFlags": [
+      2,
+      1,
+      4,
+      3
+     ],
+     "sdkName": "temporal-python",
+     "sdkVersion": "1.35.0"
+    },
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "5",
+   "eventTime": "2026-11-19T08:27:30.891Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "1",
+    "activityType": {
+     "name": "update_run_mirror"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InJlY2hlY2siLCJsYXN0X2Vycm9yIjpudWxsfQ=="
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "30s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "3",
+    "retryPolicy": {
+     "initialInterval": "1s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "10s",
+     "maximumAttempts": 6
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "6",
+   "eventTime": "2026-11-19T08:27:56.025Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "5",
+    "identity": "8023@c770c870d066",
+    "attempt": 6
+   }
+  },
+  {
+   "eventId": "7",
+   "eventTime": "2026-11-19T08:27:56.041Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
+   "activityTaskFailedEventAttributes": {
+    "failure": {
+     "message": "mirror row not written yet",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "applicationFailureInfo": {
+      "type": "MirrorRowMissing"
+     }
+    },
+    "scheduledEventId": "5",
+    "startedEventId": "6",
+    "identity": "8023@c770c870d066",
+    "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
+   }
+  },
+  {
+   "eventId": "8",
+   "eventTime": "2026-11-19T08:27:56.041Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "9",
+   "eventTime": "2026-11-19T08:27:56.042Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "8",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "2541"
+   }
+  },
+  {
+   "eventId": "10",
+   "eventTime": "2026-11-19T08:27:56.067Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "8",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "11",
+   "eventTime": "2026-11-19T08:27:56.067Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "2",
+    "activityType": {
+     "name": "commit_recheck"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "300s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "9",
+    "retryPolicy": {
+     "initialInterval": "2s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "30s",
+     "maximumAttempts": 5
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "12",
+   "eventTime": "2026-11-19T08:27:56.067Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "11",
+    "identity": "8023@c770c870d066",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "13",
+   "eventTime": "2026-11-19T08:27:56.077Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+   "activityTaskCompletedEventAttributes": {
+    "result": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJpZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiJ9"
+      }
+     ]
+    },
+    "scheduledEventId": "11",
+    "startedEventId": "12",
+    "identity": "8023@c770c870d066"
+   }
+  },
+  {
+   "eventId": "14",
+   "eventTime": "2026-11-19T08:27:56.077Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "15",
+   "eventTime": "2026-11-19T08:27:56.077Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "14",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "3348"
+   }
+  },
+  {
+   "eventId": "16",
+   "eventTime": "2026-11-19T08:27:56.089Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "14",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "17",
+   "eventTime": "2026-11-19T08:27:56.089Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "3",
+    "activityType": {
+     "name": "update_run_mirror"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6ImZyZWV6ZSIsImxhc3RfZXJyb3IiOm51bGx9"
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "30s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "15",
+    "retryPolicy": {
+     "initialInterval": "1s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "10s",
+     "maximumAttempts": 6
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "18",
+   "eventTime": "2026-11-19T08:28:21.153Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "17",
+    "identity": "8023@c770c870d066",
+    "attempt": 6
+   }
+  },
+  {
+   "eventId": "19",
+   "eventTime": "2026-11-19T08:28:21.163Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
+   "activityTaskFailedEventAttributes": {
+    "failure": {
+     "message": "mirror row not written yet",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "applicationFailureInfo": {
+      "type": "MirrorRowMissing"
+     }
+    },
+    "scheduledEventId": "17",
+    "startedEventId": "18",
+    "identity": "8023@c770c870d066",
+    "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
+   }
+  },
+  {
+   "eventId": "20",
+   "eventTime": "2026-11-19T08:28:21.163Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "21",
+   "eventTime": "2026-11-19T08:28:21.163Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "20",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "5257"
+   }
+  },
+  {
+   "eventId": "22",
+   "eventTime": "2026-11-19T08:28:21.171Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "20",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "23",
+   "eventTime": "2026-11-19T08:28:21.171Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "4",
+    "activityType": {
+     "name": "commit_freeze"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "300s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "21",
+    "retryPolicy": {
+     "initialInterval": "2s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "30s",
+     "maximumAttempts": 5
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "24",
+   "eventTime": "2026-11-19T08:28:21.171Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "23",
+    "identity": "8023@c770c870d066",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "25",
+   "eventTime": "2026-11-19T08:28:21.176Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+   "activityTaskCompletedEventAttributes": {
+    "result": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJpZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiJ9"
+      }
+     ]
+    },
+    "scheduledEventId": "23",
+    "startedEventId": "24",
+    "identity": "8023@c770c870d066"
+   }
+  },
+  {
+   "eventId": "26",
+   "eventTime": "2026-11-19T08:28:21.176Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "27",
+   "eventTime": "2026-11-19T08:28:21.176Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "26",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "6063"
+   }
+  },
+  {
+   "eventId": "28",
+   "eventTime": "2026-11-19T08:28:21.185Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "26",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "29",
+   "eventTime": "2026-11-19T08:28:21.185Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "5",
+    "activityType": {
+     "name": "update_run_mirror"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InJlZ2lzdGVyIiwibGFzdF9lcnJvciI6bnVsbH0="
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "30s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "27",
+    "retryPolicy": {
+     "initialInterval": "1s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "10s",
+     "maximumAttempts": 6
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "30",
+   "eventTime": "2026-11-19T08:28:46.269Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "29",
+    "identity": "8023@c770c870d066",
+    "attempt": 6
+   }
+  },
+  {
+   "eventId": "31",
+   "eventTime": "2026-11-19T08:28:46.287Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
+   "activityTaskFailedEventAttributes": {
+    "failure": {
+     "message": "mirror row not written yet",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "applicationFailureInfo": {
+      "type": "MirrorRowMissing"
+     }
+    },
+    "scheduledEventId": "29",
+    "startedEventId": "30",
+    "identity": "8023@c770c870d066",
+    "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
+   }
+  },
+  {
+   "eventId": "32",
+   "eventTime": "2026-11-19T08:28:46.287Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "33",
+   "eventTime": "2026-11-19T08:28:46.288Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "32",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "7977"
+   }
+  },
+  {
+   "eventId": "34",
+   "eventTime": "2026-11-19T08:28:46.303Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "32",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "35",
+   "eventTime": "2026-11-19T08:28:46.303Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "6",
+    "activityType": {
+     "name": "commit_register"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "300s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "33",
+    "retryPolicy": {
+     "initialInterval": "2s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "30s",
+     "maximumAttempts": 5
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "36",
+   "eventTime": "2026-11-19T08:28:46.304Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "35",
+    "identity": "8023@c770c870d066",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "37",
+   "eventTime": "2026-11-19T08:28:46.310Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+   "activityTaskCompletedEventAttributes": {
+    "result": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJpZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiJ9"
+      }
+     ]
+    },
+    "scheduledEventId": "35",
+    "startedEventId": "36",
+    "identity": "8023@c770c870d066"
+   }
+  },
+  {
+   "eventId": "38",
+   "eventTime": "2026-11-19T08:28:46.310Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "39",
+   "eventTime": "2026-11-19T08:28:46.311Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "38",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "8791"
+   }
+  },
+  {
+   "eventId": "40",
+   "eventTime": "2026-11-19T08:28:46.325Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "38",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "41",
+   "eventTime": "2026-11-19T08:28:46.325Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "7",
+    "activityType": {
+     "name": "update_run_mirror"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJSVU5OSU5HIiwiY3VycmVudF9zdGFnZSI6InN0YXJ0X3N0YWdpbmciLCJsYXN0X2Vycm9yIjpudWxsfQ=="
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "30s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "39",
+    "retryPolicy": {
+     "initialInterval": "1s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "10s",
+     "maximumAttempts": 6
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "42",
+   "eventTime": "2026-11-19T08:29:11.403Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "41",
+    "identity": "8023@c770c870d066",
+    "attempt": 6
+   }
+  },
+  {
+   "eventId": "43",
+   "eventTime": "2026-11-19T08:29:11.420Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
+   "activityTaskFailedEventAttributes": {
+    "failure": {
+     "message": "mirror row not written yet",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "applicationFailureInfo": {
+      "type": "MirrorRowMissing"
+     }
+    },
+    "scheduledEventId": "41",
+    "startedEventId": "42",
+    "identity": "8023@c770c870d066",
+    "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
+   }
+  },
+  {
+   "eventId": "44",
+   "eventTime": "2026-11-19T08:29:11.420Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "45",
+   "eventTime": "2026-11-19T08:29:11.420Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "44",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "10713"
+   }
+  },
+  {
+   "eventId": "46",
+   "eventTime": "2026-11-19T08:29:11.435Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "44",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "47",
+   "eventTime": "2026-11-19T08:29:11.435Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "8",
+    "activityType": {
+     "name": "commit_start_staging"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwicnVuX2lkIjoiNWQ2M2QyMzYtNzE5YS00NGQ4LTgyMzItYjkzYjhlY2JmYTI1IiwiY29ycmVsYXRpb25faWQiOiJjaWQtd2cxOCIsIndvcmtmbG93X2lkIjoiZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwibWFuaWZlc3RfaGFzaCI6InNoYTI1NjpiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwiYWN0b3JfaWQiOiJmZGUtMSJ9"
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "300s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "45",
+    "retryPolicy": {
+     "initialInterval": "2s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "30s",
+     "maximumAttempts": 5
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "48",
+   "eventTime": "2026-11-19T08:29:11.436Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "47",
+    "identity": "8023@c770c870d066",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "49",
+   "eventTime": "2026-11-19T08:29:11.444Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+   "activityTaskCompletedEventAttributes": {
+    "result": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ3b3JrZmxvd19pZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiIsInZlcnNpb24iOiIxLjAuMCIsInJlZ2lzdHJ5X25hbWUiOiJ3Zl9sZWRnZXJfdjFfMF9zdGciLCJpbWFnZV9kaWdlc3QiOiJzaGEyNTY6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm1hbmlmZXN0X2hhc2giOiJzaGEyNTY6YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInN0YWdpbmciOnsic3RhdHVzIjoiUEVORElOR19SVU5USU1FIiwiZGV0YWlsIjpudWxsfX0="
+      }
+     ]
+    },
+    "scheduledEventId": "47",
+    "startedEventId": "48",
+    "identity": "8023@c770c870d066"
+   }
+  },
+  {
+   "eventId": "50",
+   "eventTime": "2026-11-19T08:29:11.444Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "51",
+   "eventTime": "2026-11-19T08:29:11.444Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "50",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "11832"
+   }
+  },
+  {
+   "eventId": "52",
+   "eventTime": "2026-11-19T08:29:11.463Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "50",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "53",
+   "eventTime": "2026-11-19T08:29:11.463Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+   "activityTaskScheduledEventAttributes": {
+    "activityId": "9",
+    "activityType": {
+     "name": "update_run_mirror"
+    },
+    "taskQueue": {
+     "name": "sbam-certify",
+     "kind": "TASK_QUEUE_KIND_NORMAL"
+    },
+    "header": {},
+    "input": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ0ZW5hbnRfaWQiOiI0YmE1MTMwYS04YzJjLTQ0NjctODM4ZC03NmM0OTdhM2UxZWUiLCJwcm9qZWN0X2lkIjoiODYwNmU5OTMtZmFlZC00YmZmLWFiZDYtMzk5YzQ0Mzk1MjU1IiwidGVtcG9yYWxfd29ya2Zsb3dfaWQiOiJ3b3JrZmxvdy1jb21taXQtZjgxN2RiMGUtM2U0YS00N2YwLTg3YWMtMWRhMjIzNzcwYjBmIiwidGVtcG9yYWxfcnVuX2lkIjoiZTA1ZTYzODYtMjA0ZC00YzNkLThiZTctMjVmMzllMmNmYjRmIiwic3RhdGUiOiJDT01QTEVURUQiLCJjdXJyZW50X3N0YWdlIjoiZG9uZSIsImxhc3RfZXJyb3IiOm51bGx9"
+      }
+     ]
+    },
+    "scheduleToCloseTimeout": "315360000s",
+    "scheduleToStartTimeout": "315360000s",
+    "startToCloseTimeout": "30s",
+    "heartbeatTimeout": "0s",
+    "workflowTaskCompletedEventId": "51",
+    "retryPolicy": {
+     "initialInterval": "1s",
+     "backoffCoefficient": 2.0,
+     "maximumInterval": "10s",
+     "maximumAttempts": 6
+    },
+    "priority": {}
+   }
+  },
+  {
+   "eventId": "54",
+   "eventTime": "2026-11-19T08:29:36.557Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+   "activityTaskStartedEventAttributes": {
+    "scheduledEventId": "53",
+    "identity": "8023@c770c870d066",
+    "attempt": 6
+   }
+  },
+  {
+   "eventId": "55",
+   "eventTime": "2026-11-19T08:29:36.574Z",
+   "eventType": "EVENT_TYPE_ACTIVITY_TASK_FAILED",
+   "activityTaskFailedEventAttributes": {
+    "failure": {
+     "message": "mirror row not written yet",
+     "stackTrace": "  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 379, in _handle_start_activity_task\n    result = await self._execute_activity(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 712, in _execute_activity\n    return await impl.execute_activity(input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 916, in execute_activity\n    return await loop.run_in_executor(input.executor, func, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/usr/local/lib/python3.12/concurrent/futures/thread.py\", line 59, in run\n    result = self.fn(*self.args, **self.kwargs)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/opt/venv/lib/python3.12/site-packages/temporalio/worker/_activity.py\", line 983, in _execute_sync_activity\n    return fn(*args)\n           ^^^^^^^^^\n\n  File \"/w766/server/workers/sbam_workers/mirror.py\", line 71, in update_run_mirror\n    raise ApplicationError(\"mirror row not written yet\", type=\"MirrorRowMissing\")\n",
+     "applicationFailureInfo": {
+      "type": "MirrorRowMissing"
+     }
+    },
+    "scheduledEventId": "53",
+    "startedEventId": "54",
+    "identity": "8023@c770c870d066",
+    "retryState": "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
+   }
+  },
+  {
+   "eventId": "56",
+   "eventTime": "2026-11-19T08:29:36.574Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+   "workflowTaskScheduledEventAttributes": {
+    "taskQueue": {
+     "name": "sbam-certify"
+    },
+    "startToCloseTimeout": "10s",
+    "attempt": 1
+   }
+  },
+  {
+   "eventId": "57",
+   "eventTime": "2026-11-19T08:29:36.575Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+   "workflowTaskStartedEventAttributes": {
+    "scheduledEventId": "56",
+    "identity": "8023@c770c870d066",
+    "historySizeBytes": "13747"
+   }
+  },
+  {
+   "eventId": "58",
+   "eventTime": "2026-11-19T08:29:36.583Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+   "workflowTaskCompletedEventAttributes": {
+    "scheduledEventId": "56",
+    "identity": "8023@c770c870d066",
+    "binaryChecksum": "d09501dda13373a496aeaaeaf4f32dc2",
+    "sdkMetadata": {},
+    "meteringMetadata": {}
+   }
+  },
+  {
+   "eventId": "59",
+   "eventTime": "2026-11-19T08:29:36.583Z",
+   "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
+   "workflowExecutionCompletedEventAttributes": {
+    "result": {
+     "payloads": [
+      {
+       "metadata": {
+        "encoding": "anNvbi9wbGFpbg=="
+       },
+       "data": "eyJ3b3JrZmxvd19pZCI6ImY4MTdkYjBlLTNlNGEtNDdmMC04N2FjLTFkYTIyMzc3MGIwZiIsInZlcnNpb24iOiIxLjAuMCIsInJlZ2lzdHJ5X25hbWUiOiJ3Zl9sZWRnZXJfdjFfMF9zdGciLCJpbWFnZV9kaWdlc3QiOiJzaGEyNTY6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm1hbmlmZXN0X2hhc2giOiJzaGEyNTY6YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInN0YWdpbmciOnsic3RhdHVzIjoiUEVORElOR19SVU5USU1FIiwiZGV0YWlsIjpudWxsfX0="
+      }
+     ]
+    },
+    "workflowTaskCompletedEventId": "57"
+   }
+  }
+ ]
+}

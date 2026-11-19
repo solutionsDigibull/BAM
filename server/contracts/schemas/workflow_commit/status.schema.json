@@ -1,0 +1,577 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:workflow_commit/status:0.1.0",
+  "$defs": {
+    "Blocker": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/BlockerReason"
+        }
+      },
+      "required": [
+        "name",
+        "reason"
+      ],
+      "title": "Blocker",
+      "type": "object"
+    },
+    "BlockerReason": {
+      "enum": [
+        "MISSING",
+        "NOT_TESTED",
+        "TEST_FAILED",
+        "INVALID_NAME"
+      ],
+      "title": "BlockerReason",
+      "type": "string"
+    },
+    "CommitCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/CommitCheckName"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "name",
+        "passed"
+      ],
+      "title": "CommitCheck",
+      "type": "object"
+    },
+    "CommitCheckName": {
+      "enum": [
+        "WORKFLOW_CERTIFIED",
+        "SUB_SKILLS_CERTIFIED",
+        "MCP_SERVER",
+        "UI_BUNDLE",
+        "SECRETS"
+      ],
+      "title": "CommitCheckName",
+      "type": "string"
+    },
+    "CommitState": {
+      "enum": [
+        "NOT_COMMITTED",
+        "COMMITTING",
+        "COMMITTED"
+      ],
+      "title": "CommitState",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "McpToolEntry": {
+      "additionalProperties": false,
+      "description": "One tool of the Workflow server: the Action or the Fixed Check tool of one Sub-Skill.",
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "pattern": "^MS\\d{2}_\\d+__(action|check)$",
+          "title": "Name",
+          "type": "string"
+        },
+        "skill_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "action",
+            "check"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "input_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Input Schema",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Output Schema",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "skill_id",
+        "role",
+        "input_schema",
+        "output_schema"
+      ],
+      "title": "McpToolEntry",
+      "type": "object"
+    },
+    "RegisteredWorkflow": {
+      "additionalProperties": false,
+      "properties": {
+        "workflow_id": {
+          "format": "uuid",
+          "title": "Workflow Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^\\d+\\.0\\.\\d+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "registry_name": {
+          "maxLength": 64,
+          "pattern": "^wf_[a-z0-9]+(_[a-z0-9]+)*$",
+          "title": "Registry Name",
+          "type": "string"
+        },
+        "registry_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Registry Id",
+          "type": "string"
+        },
+        "image_digest": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Image Digest",
+          "type": "string"
+        },
+        "manifest_hash": {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "title": "Manifest Hash",
+          "type": "string"
+        },
+        "certification_id": {
+          "format": "uuid",
+          "title": "Certification Id",
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "tools": {
+          "items": {
+            "$ref": "#/$defs/McpToolEntry"
+          },
+          "minItems": 2,
+          "title": "Tools",
+          "type": "array"
+        },
+        "ui_bundle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UiBundleEntry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "$ref": "#/$defs/RegistryKind"
+        },
+        "status": {
+          "$ref": "#/$defs/RegistryStatus"
+        },
+        "registered_at": {
+          "format": "date-time",
+          "title": "Registered At",
+          "type": "string"
+        },
+        "superseded_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Superseded At"
+        },
+        "superseded_by": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+\\.0\\.\\d+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Superseded By"
+        }
+      },
+      "required": [
+        "workflow_id",
+        "version",
+        "registry_name",
+        "registry_id",
+        "image_digest",
+        "manifest_hash",
+        "certification_id",
+        "owner",
+        "tools",
+        "kind",
+        "status",
+        "registered_at"
+      ],
+      "title": "RegisteredWorkflow",
+      "type": "object"
+    },
+    "RegistryKind": {
+      "enum": [
+        "staging",
+        "production"
+      ],
+      "title": "RegistryKind",
+      "type": "string"
+    },
+    "RegistryStatus": {
+      "enum": [
+        "REGISTERED",
+        "SUPERSEDED"
+      ],
+      "title": "RegistryStatus",
+      "type": "string"
+    },
+    "Run": {
+      "additionalProperties": false,
+      "description": "One Temporal execution as the API returns it (mirror of `temporal_runs`).",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "temporal_workflow_id": {
+          "pattern": "^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|request-change-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|workflow-commit-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+          "title": "Temporal Workflow Id",
+          "type": "string"
+        },
+        "temporal_run_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Temporal Run Id",
+          "type": "string"
+        },
+        "type": {
+          "description": "Workflow type name",
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "subject_type": {
+          "$ref": "#/$defs/SubjectType"
+        },
+        "subject_id": {
+          "format": "uuid",
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/RunState"
+        },
+        "current_stage": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Stage"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Error"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "temporal_workflow_id",
+        "temporal_run_id",
+        "type",
+        "subject_type",
+        "subject_id",
+        "state",
+        "started_at",
+        "updated_at"
+      ],
+      "title": "Run",
+      "type": "object"
+    },
+    "RunState": {
+      "description": "Execution state as mirrored in `temporal_runs` (Temporal's workflow execution status).",
+      "enum": [
+        "RUNNING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+        "TERMINATED",
+        "TIMED_OUT"
+      ],
+      "title": "RunState",
+      "type": "string"
+    },
+    "StagingStartResult": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/StagingStartStatus"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "StagingStartResult",
+      "type": "object"
+    },
+    "StagingStartStatus": {
+      "enum": [
+        "STARTED",
+        "PENDING_RUNTIME",
+        "FAILED"
+      ],
+      "title": "StagingStartStatus",
+      "type": "string"
+    },
+    "SubjectType": {
+      "description": "What a run works on; `subject_id` is that entity's id.",
+      "enum": [
+        "project",
+        "document_version",
+        "sub_skill"
+      ],
+      "title": "SubjectType",
+      "type": "string"
+    },
+    "UiBundleEntry": {
+      "additionalProperties": false,
+      "description": "The UI bundle BAM generated for the Workflow, packaged and certified with it. SRIM hosts and\nshows this bundle and nothing else (ADR 0033). `digest` covers the packaged files, `entry_file`\nis the page that loads first, `allowed_hosts` are the only hosts the UI may reach (it may be\nempty: the UI then talks to its own workflow server only), and `workflow_server` is the name of\nthe `mcp_server` it belongs to.",
+      "properties": {
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "entry_file": {
+          "maxLength": 200,
+          "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*\\.html$",
+          "title": "Entry File",
+          "type": "string"
+        },
+        "allowed_hosts": {
+          "items": {
+            "maxLength": 253,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Allowed Hosts",
+          "type": "array"
+        },
+        "workflow_server": {
+          "maxLength": 64,
+          "pattern": "^wf_[a-z0-9]+(_[a-z0-9]+)*$",
+          "title": "Workflow Server",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "digest",
+        "entry_file",
+        "workflow_server"
+      ],
+      "title": "UiBundleEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the Validation screen shows: the checks, the secrets gate, and what Commit did.",
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "anyOf": [
+        {
+          "pattern": "^(sha256:)?[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Manifest Hash"
+    },
+    "ready": {
+      "title": "Ready",
+      "type": "boolean"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/CommitCheck"
+      },
+      "maxItems": 500,
+      "title": "Checks",
+      "type": "array"
+    },
+    "blockers": {
+      "items": {
+        "$ref": "#/$defs/Blocker"
+      },
+      "maxItems": 500,
+      "title": "Blockers",
+      "type": "array"
+    },
+    "state": {
+      "$ref": "#/$defs/CommitState"
+    },
+    "registration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RegisteredWorkflow"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "staging": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StagingStartResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "committed_by": {
+      "anyOf": [
+        {
+          "maxLength": 255,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Committed By"
+    },
+    "committed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Committed At"
+    },
+    "run": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Run"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "workflow_id",
+    "ready",
+    "state"
+  ],
+  "title": "CommitStatus",
+  "type": "object"
+}

@@ -182,6 +182,12 @@ from sbam_contracts.sow_api import (
 )
 from sbam_contracts.state_machines import StateMachineStates
 from sbam_contracts.testgen import CasePost, CasePut, TestgenOutput, TestsResponse
+from sbam_contracts.workflow_commit import (
+    CommitAccepted,
+    CommitStatus,
+    StagingStartRequest,
+    StagingStartResult,
+)
 from sbam_contracts.workflow_registry import RegisteredWorkflow
 from sbam_contracts.workflow_repos import WorkflowRepositories
 
@@ -346,6 +352,10 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("repo_choice/answered", RepoAnswered),
     ("repo_choice/questions", RepoQuestions),
     ("workflow_registry/registration", RegisteredWorkflow),
+    ("workflow_commit/status", CommitStatus),
+    ("workflow_commit/accepted", CommitAccepted),
+    ("workflow_commit/staging_start_request", StagingStartRequest),
+    ("workflow_commit/staging_start_result", StagingStartResult),
     ("workflow/repositories", WorkflowRepositories),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
