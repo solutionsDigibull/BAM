@@ -46,6 +46,7 @@ from sbam_workers.build.codegen import (
 from sbam_workers.build.codegen import render as render_module
 from sbam_workers.build.codegen.render import docstring, environment, python_literal
 from sbam_workers.build.codegen.store import default_templates_dir, released_hash, tree_sha256
+from sbam_workers.build.ui_bundle import load_ui_template
 
 GOLDEN = Path(__file__).resolve().parents[1] / "golden"
 PY_FILES = (
@@ -209,7 +210,10 @@ def test_e11_1_registry_covers_every_template_version_and_nothing_else() -> None
     }
     assert on_disk == {(n, v) for n, versions in registry.items() for v in versions}
     for name, version in sorted(on_disk):
-        assert load_template(name, version).sha256 == registry[name][version]
+        loaded = (
+            load_ui_template(version) if name == "workflow-ui" else load_template(name, version)
+        )
+        assert loaded.sha256 == registry[name][version]
 
 
 def test_e11_1_template_yaml_context_lists_match_the_template_sources(

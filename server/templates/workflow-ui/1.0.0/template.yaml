@@ -1,0 +1,63 @@
+# Template manifest for workflow-ui 1.0.0 (WG-20, #768, ADR 0033). Owned by the platform team.
+# A released version is immutable: any byte change in this directory needs a new version directory
+# and a new entry in ../../registry.json (the loader verifies the tree hash).
+name: workflow-ui
+version: 1.0.0
+description: >-
+  The UI bundle of one Workflow: React 19 + Vite + TypeScript + Refine, three panes (skills rail,
+  assistant Q&A, sub-skill steps and output), BAM_UI tokens and Inter, a human review checkpoint
+  ending each skill. Every screen is built from the Workflow's own skills and tool schemas; the data
+  provider talks to the Workflow's own MCP server and nothing else.
+
+entry_file: index.html
+
+# `static/` is copied verbatim; `index.html.j2` is rendered; `package.json`, `bundle.json` and
+# `src/workflow.generated.ts` are written by code from the Workflow (see ui_bundle.py).
+rendered: [index.html]
+generated: [package.json, bundle.json, src/workflow.generated.ts]
+
+# The only libraries a bundle may depend on (the same set as BAM_UI). Anything else is drift.
+dependencies:
+  "@fontsource/inter": "^5.3.0"
+  "@refinedev/core": "^5.0.12"
+  "@tabler/icons-react": "^3.49.0"
+  "@tiptap/pm": "^3.31.4"
+  "@tiptap/react": "^3.31.4"
+  "@tiptap/starter-kit": "^3.31.4"
+  "@uppy/core": "^6.2.0"
+  "@uppy/dashboard": "^6.0.1"
+  "@uppy/react": "^6.0.0"
+  "ag-grid-community": "^36.2.0"
+  "ag-grid-react": "^36.2.0"
+  "react": "^19.3.0"
+  "react-dom": "^19.3.0"
+dev_dependencies:
+  "@types/react": "^19.3.0"
+  "@types/react-dom": "^19.3.0"
+  "@vitejs/plugin-react": "^6.1.2"
+  "typescript": "^6.0.3"
+  "vite": "^8.3.2"
+
+# The pattern the drift gate enforces on every bundle.
+required_files:
+  - index.html
+  - package.json
+  - bundle.json
+  - tsconfig.json
+  - vite.config.ts
+  - src/main.tsx
+  - src/App.tsx
+  - src/provider.ts
+  - src/mcp.ts
+  - src/types.ts
+  - src/theme.css
+  - src/icons.tsx
+  - src/Intake.tsx
+  - src/Grid.tsx
+  - src/Editor.tsx
+  - src/StepForm.tsx
+  - src/Outputs.tsx
+  - src/assets/bull-head.png
+  - src/workflow.generated.ts
+# Markers that must be present in src/App.tsx: the three panes.
+required_panes: [rail, assistant, steps]

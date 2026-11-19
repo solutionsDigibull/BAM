@@ -3,6 +3,9 @@
     "fastmcp-loopy": {
       "1.0.0": "d682984986e20c58d4cfdf3d7dd47bcb8469996882a868613aa69c9d6fdda3a6",
       "1.0.1": "8be343759f19c941ab5043419e489e9d0dc854ac47fc65d8363b547ce85076af"
+    },
+    "workflow-ui": {
+      "1.0.0": "23cb7861a34fa28998297b2bff43275e7a2df731ddc51fb55bc0f5518bf56eb1"
     }
   }
 }
