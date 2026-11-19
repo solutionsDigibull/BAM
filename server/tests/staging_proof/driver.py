@@ -473,7 +473,8 @@ class Seed:
     def commit(self, api: "Api", token: str, base: str, version: str) -> dict[str, Any]:
         """A real Commit, as the FDE does it: `POST .../commit` with the approved hash. The API starts
         `WorkflowCommit` on Temporal and the real worker runs recheck, freeze, start Staging and register
-        (the real Bifrost, at the container's own address). Waits for the run; returns the commit status."""
+        (the real Bifrost, at the container's own address). Waits for the run; returns the commit status.
+        """
         status = api.call("GET", f"{base}/commit", token).json()
         approved = str(status["manifest_hash"])
         accepted = api.call(
@@ -483,7 +484,10 @@ class Seed:
             headers={"If-Match": f'"{approved}"', "Idempotency-Key": uuid.uuid4().hex},
         )
         if accepted.status_code != 202:
-            print(f"commit {version} refused: {accepted.status_code} {accepted.text[:600]}", flush=True)
+            print(
+                f"commit {version} refused: {accepted.status_code} {accepted.text[:600]}",
+                flush=True,
+            )
             return {"state": f"HTTP {accepted.status_code}"}
         self.hashes[version] = approved
         deadline = time.monotonic() + 480
