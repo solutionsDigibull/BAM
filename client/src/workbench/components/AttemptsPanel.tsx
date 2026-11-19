@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { CodeAttemptSummary } from '@/contracts'
 import {
   attemptLabel, comparable, diffKind, inSlot, isForbidden, newestFirst, problemText, useAttemptDiff, useAttemptFile, useAttempts,
@@ -79,7 +79,6 @@ function Attempts({ workflowId, subId }: { workflowId: string; subId: string }) 
   const [compare, setCompare] = useState<number>()
   const list = useMemo(() => newestFirst(items ?? []), [items])
   const current = list.find(a => a.attempt === attempt) ?? list[0]
-  useEffect(() => { setAttempt(undefined); setPath(undefined); setCompare(undefined) }, [subId])
   if (error) return isForbidden(error) ? <Forbidden /> : <ErrorState title="Could not load the code attempts" action={retryAction(refetch)}>{problemText(error)}</ErrorState>
   if (isLoading || !items) return <Skeleton rows={5} label="Loading the code attempts" />
   if (list.length === 0 || !current) return <Empty icon="code" title="No code attempts yet">The build stores an attempt when it generates the Sub-Skill&apos;s code.</Empty>
@@ -131,7 +130,7 @@ export function AttemptsPanel({ workflowId }: { workflowId?: string }) {
         <label className="xs muted" htmlFor="att-sub">Sub-Skill</label>
         <select id="att-sub" value={id} onChange={e => setSub(e.target.value)}>{rows.map(r => <option key={r.sub_skill_id} value={r.sub_skill_id}>{r.skill_name} ({r.skill_id})</option>)}</select>
       </div>
-      <Attempts workflowId={workflowId} subId={id} />
+      <Attempts key={id} workflowId={workflowId} subId={id} />
       <p className="muted xs">Read only. The code is changed by retrying the build, never by editing it here.</p>
     </div>
   )
