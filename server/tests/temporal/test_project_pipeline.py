@@ -26,6 +26,7 @@ from pipeline_db import (
     state_of,
     workflow_rows,
 )
+from sbam_api.builds.repo_attached import AttachStatus
 from sbam_api.pipeline.service import (
     PipelineNotWaiting,
     pipeline_status,
@@ -58,6 +59,7 @@ from sbam_contracts.runs import MirrorUpdate, RunInput, TaskQueue, pipeline_work
 from sbam_workers import mirror, registry
 from sbam_workers.build import stubs as build_stubs
 from sbam_workers.build.plan import make_plan
+from sbam_workers.build.repo_attach import AttachRepoInput, AttachRepoResult
 from sbam_workers.certify import stubs as certify_stubs
 from sbam_workers.pipeline.project_pipeline import ProjectPipeline
 from sbam_workers.stub_ids import stage_stub_id, stub_id
@@ -162,6 +164,19 @@ async def workflow_manifest_stand_in(inp: WorkflowRef) -> IdResult:
     return IdResult(id=stub_id(inp, "workflow_manifest"))
 
 
+@activity.defn(name="build_workflow_server")
+async def workflow_server_stand_in(inp: WorkflowRef) -> IdResult:
+    """The real stage (#862) renders the server from the Sub-Skills' stored bundles and writes it
+    to storage; its tests are tests/unit/test_wg28_attach_and_server.py."""
+    return IdResult(id=stub_id(inp, "workflow_server"))
+
+
+@activity.defn(name="attach_repo")
+async def attach_repo_stand_in(inp: AttachRepoInput) -> AttachRepoResult:
+    """The real stage (#862) clones and scans the repository; see tests/unit/test_wg28_*.py."""
+    return AttachRepoResult(status=AttachStatus.REFUSED, report_sha256="0" * 64)
+
+
 @activity.defn(name="plan_builds")
 async def plan_stand_in(inp: BuildPlanInput) -> BuildPlan:
     """The real activity (E10.3 + E9.5 edges) reads the Sub-Skills' ISATVON from the database;
@@ -195,6 +210,8 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "check_libraries": libraries_stand_in,
     "carry_over_workflow": carry_over_stand_in,
     "build_workflow_manifest": workflow_manifest_stand_in,
+    "build_workflow_server": workflow_server_stand_in,
+    "attach_repo": attach_repo_stand_in,
     "plan_builds": plan_stand_in,
     # the real codegen stages (#355) need a database of manifests and an LLM; the stubs answer
     "generate_bodies": build_stubs.generate_bodies,
@@ -362,6 +379,43 @@ def test_e10_1_t01_end_to_end_reaches_frozen_in_order() -> None:
     ]
     row = mirror_row(sessions, project)
     assert (row.state, row.current_stage) == ("COMPLETED", "done")
+
+
+def test_wg28_t04_the_server_files_are_stored_once_after_the_manifest_draft() -> None:
+    """#862: the Workflow's generated server files are stored in their own activity, after the
+    manifest draft and before the macros are certified (the pipeline still ends DONE)."""
+    order: list[str] = []
+    workflows: list[uuid.UUID] = []
+
+    @activity.defn(name="build_workflow_manifest")
+    async def manifest(inp: WorkflowRef) -> IdResult:
+        order.append("manifest")
+        return IdResult(id=stub_id(inp, "workflow_manifest"))
+
+    @activity.defn(name="build_workflow_server")
+    async def server(inp: WorkflowRef) -> IdResult:
+        order.append("server")
+        workflows.append(inp.workflow_id)
+        return IdResult(id=stub_id(inp, "workflow_server"))
+
+    async def scenario(sessions: sessionmaker[Session]) -> PipelineStatus:
+        project = new_project(sessions, TENANT)
+        overrides = {
+            "build_workflow_manifest": manifest,
+            "build_workflow_server": server,
+        }
+        async with environment(overrides) as env:
+            handle = await start(env, sessions, project)
+            await until(handle, PipelineStage.WAIT_SOW_APPROVAL)
+            await approve(handle)
+            await until(handle, PipelineStage.WAIT_GENERATE)
+            await generate(handle)
+            return await finish(handle)
+
+    status = run(scenario)
+    assert status.stage is PipelineStage.DONE
+    assert order == ["manifest", "server"]  # the pipeline went on to certify and freeze
+    assert len(workflows) == 1
 
 
 def test_e10_1_t02_sow_approved_creates_exactly_one_workflow() -> None:

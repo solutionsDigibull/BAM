@@ -9,6 +9,8 @@ E10.3 (behind `workflow.patched(SCHEDULER_PATCH)`): the build limit and the Sub-
 graph come from `plan_builds`, read once per generate; upstream Sub-Skills build first.
 E9.5 (behind `workflow.patched(MANIFEST_DRAFT_PATCH)`): once every Sub-Skill is built, the Workflow
 manifest draft (`build_workflow_manifest`) before certify_macros.
+#862 (behind `workflow.patched(SERVER_FILES_PATCH)`): then the Workflow's generated server files are
+stored (`build_workflow_server`).
 
 Rules this file keeps (.claude/rules/temporal.md):
   * Deterministic: no clock, randomness, env or I/O here. Everything with side effects is an
@@ -71,6 +73,7 @@ with workflow.unsafe.imports_passed_through():
 
     from sbam_workers.build.plan import plan_builds
     from sbam_workers.build.schema_sql.activity import build_schema_sql
+    from sbam_workers.build.server_stage import build_workflow_server
     from sbam_workers.build.workflow_manifest import build_workflow_manifest
     from sbam_workers.certify.stubs import (
         certify_macros,
@@ -115,6 +118,7 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "build_schema_sql": (TaskQueue.BUILD, timedelta(minutes=5), 2),
     "plan_builds": (TaskQueue.BUILD, timedelta(minutes=1), 3),
     "build_workflow_manifest": (TaskQueue.BUILD, timedelta(minutes=2), 3),
+    "build_workflow_server": (TaskQueue.BUILD, timedelta(minutes=5), 3),
     "certify_macros": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "validate_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "certify_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
@@ -136,6 +140,10 @@ EXTRACTION_PATCH = "e8-3-bounded-extraction"
 CARRY_OVER_PATCH = "e7-2-scope-change-carry-over"
 # E9.5: the Workflow manifest draft once the Sub-Skills are built. Older runs: no draft.
 MANIFEST_DRAFT_PATCH = "e9-5-workflow-manifest-draft"
+# #862: after the manifest draft, store the Workflow's generated server files (server.py,
+# tools.json, Dockerfile, loop specs, schema.sql) so the code preview and the Staging runtime
+# can read them.
+SERVER_FILES_PATCH = "wg28-workflow-server-files"
 # #694: a failed schema.sql returns the Workflow to ISATVON_REVIEW and the Sub-Skills that Generate
 # sent to BUILDING back to VALID, and the notification names them. Older runs: nothing applied.
 SCHEMA_FAILURE_PATCH = "e10-1c-schema-failure-recovery"
@@ -440,6 +448,8 @@ class ProjectPipeline:
         await self._enter(PipelineStage.CERTIFY_MACROS)
         if workflow.patched(MANIFEST_DRAFT_PATCH):
             await self._attempt(build_workflow_manifest, self._workflow_ref(), IdResult, None)
+        if workflow.patched(SERVER_FILES_PATCH):
+            await self._attempt(build_workflow_server, self._workflow_ref(), IdResult, None)
         await self._attempt(certify_macros, self._workflow_ref(), IdsResult, None)
 
     async def _stage_validate_workflow(self) -> None:

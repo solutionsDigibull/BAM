@@ -34,6 +34,8 @@ from sbam_api.builds.code_view import _findings as attempt_findings
 from sbam_api.builds.code_view import _read_file as read_attempt_file
 from sbam_api.builds.models import CodeAttempt
 from sbam_api.builds.repository import CodeAttemptRepository
+from sbam_api.builds.workflow_server import newest as newest_server
+from sbam_api.builds.workflow_server import read_file as read_server_file
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.conventions import not_found
 from sbam_api.db.repository import TenantContext
@@ -161,6 +163,17 @@ def _workflow_files(
     return out
 
 
+def _server_files(
+    session: Session, ctx: TenantContext, workflow_id: uuid.UUID, taken: set[str]
+) -> list[tuple[str, str]]:
+    """(path, sha256) of the generated server files the build stored (#862), without the paths the
+    Workflow already lists (its manifest and its `schema.sql`, which has its own record)."""
+    record = newest_server(session, ctx.tenant_id, workflow_id)
+    if record is None:
+        return []
+    return [(p, h) for p, h in sorted(record.files.items()) if p not in taken]
+
+
 def tree(
     session: Session, user: CurrentUser, project_id: uuid.UUID, workflow_id: uuid.UUID
 ) -> WorkflowCodeTree:
@@ -175,15 +188,20 @@ def tree(
         found = manifests.get(sub.id)
         overlays = overlays_of(found.manifest if found is not None else None)
         groups.append(_sub_group(sub, row, overlays, gates))
+    own = [
+        WorkflowCodeFile(path=p, sha256=h, tag=t, findings=[])
+        for p, h, t, _ in _workflow_files(session, ctx, workflow_id)
+    ]
+    own += [
+        WorkflowCodeFile(path=p, sha256=h, tag=FileTag.GENERATED, findings=[])
+        for p, h in _server_files(session, ctx, workflow_id, {f.path for f in own})
+    ]
     groups.append(
         WorkflowCodeGroup(
             kind=GroupKind.WORKFLOW,
             group_id=WORKFLOW_GROUP,
             label="Workflow",
-            files=[
-                WorkflowCodeFile(path=p, sha256=h, tag=t, findings=[])
-                for p, h, t, _ in _workflow_files(session, ctx, workflow_id)
-            ],
+            files=own,
             gates=[],
             findings=[],
         )
@@ -242,7 +260,7 @@ def _workflow_file(
 ) -> WorkflowFileView:
     listed = {p: (h, t, k) for p, h, t, k in _workflow_files(session, ctx, workflow_id)}
     if path not in listed:
-        raise not_found()
+        return _server_file(session, storage, ctx, workflow_id, path)
     digest, tag, key = listed[path]
     if key is None:  # the manifest is rendered from the stored row
         manifests = WorkflowManifestRepository(session, ctx).history(workflow_id)
@@ -260,6 +278,29 @@ def _workflow_file(
         path=path,
         tag=tag,
         sha256=digest,
+        content=text,
+        truncated=truncated,
+        findings=[],
+    )
+
+
+def _server_file(
+    session: Session,
+    storage: StorageBackend,
+    ctx: TenantContext,
+    workflow_id: uuid.UUID,
+    path: str,
+) -> WorkflowFileView:
+    """One generated server file (#862); 404 unless the stored file map lists it."""
+    record = newest_server(session, ctx.tenant_id, workflow_id)
+    if record is None or path not in record.files:
+        raise not_found()
+    text, truncated = _cut(read_server_file(storage, record, path))
+    return WorkflowFileView(
+        group_id=WORKFLOW_GROUP,
+        path=path,
+        tag=FileTag.GENERATED,
+        sha256=record.files[path],
         content=text,
         truncated=truncated,
         findings=[],

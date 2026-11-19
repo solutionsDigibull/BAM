@@ -38,6 +38,7 @@ from functools import lru_cache
 from typing import Any, Final
 
 from sbam_api.audit.repository import record
+from sbam_api.builds.repo_attached import overlays as attached_overlays
 from sbam_api.core.conventions import ApiError
 from sbam_api.db.repository import TenantContext
 from sbam_api.isatvon.models import MacroSkill, SubSkill
@@ -75,6 +76,7 @@ from sbam_contracts.manifest import (
     TemplateRef,
 )
 from sbam_contracts.pipeline import IdResult
+from sbam_contracts.repo_overlay import RepoOverlay
 from sbam_contracts.runs import TaskQueue
 from sbam_contracts.state_machines import MANIFEST_STATUS, SubSkillState
 from sqlalchemy.orm import Session, sessionmaker
@@ -129,6 +131,9 @@ class BuildContext:
     schema_sql_sha256: str = EMPTY_SCHEMA_SQL_SHA256
     # the tenant's values, or the SBAM defaults if it set none (the router is always Temporal)
     srim: SrimRuntimeDefaults = SBAM_SRIM_DEFAULTS
+    # The vendored repositories the build attached (#862). Empty: `build.repos` stays unset, so
+    # the manifests of builds without a repository (and every one frozen earlier) hash as before.
+    repos: tuple[RepoOverlay, ...] = ()
 
 
 def _utc(moment: datetime) -> str:
@@ -178,6 +183,17 @@ def build_skill_manifest(
     # The router is fixed (ADR 0031): whatever a tenant row holds, the manifest gets Temporal.
     tables = ", ".join(definition.v_variables.tables)
     srim = ctx.srim.with_fixed_router().runtime_definition(tables)
+    build: dict[str, Any] = {
+        "template": ctx.template.model_dump(mode="json"),
+        "runtime_image_digest": ctx.runtime_digest,
+        "libraries": [
+            lib.model_dump(mode="json", exclude_unset=True)
+            for lib in definition.t_tech_stack.libraries
+        ],
+        "schema_sql_sha256": ctx.schema_sql_sha256,
+    }
+    if ctx.repos:
+        build["repos"] = [repo.model_dump(mode="json") for repo in ctx.repos]
     manifest = {
         "skill_metadata": {
             "macro_category": meta.macro_category,
@@ -208,15 +224,7 @@ def build_skill_manifest(
             "isatvon_detail": definition.model_dump(mode="json", exclude_unset=True),
             "ids": dict(ctx.ids),
             "provenance": dict(ctx.provenance),
-            "build": {
-                "template": ctx.template.model_dump(mode="json"),
-                "runtime_image_digest": ctx.runtime_digest,
-                "libraries": [
-                    lib.model_dump(mode="json", exclude_unset=True)
-                    for lib in definition.t_tech_stack.libraries
-                ],
-                "schema_sql_sha256": ctx.schema_sql_sha256,
-            },
+            "build": build,
         },
     }
     return SkillManifest.sealed(manifest), rejected
@@ -351,6 +359,7 @@ class SqlManifestStore:
                     provenance={**prov.fields, "sow_refs": list(sub.sow_refs)},
                     template=template,
                     runtime_digest=prov.runtime_digest,
+                    repos=attached_overlays(session, inp.tenant_id, inp.sub_skill_id, inp.build_no),
                 ),
             )
 
