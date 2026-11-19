@@ -1,6 +1,6 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
-  CommitAccepted, CommitStatus, Connection, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
+  CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
   RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
@@ -26,6 +26,8 @@ export interface BamApi {
   getCommitStatus(workflowId: string): Promise<CommitStatus>
   /** Commit: the FDE's final approval of exactly `manifestHash` (If-Match), with an Idempotency-Key. 409 when it changed or a check fails. */
   commitWorkflow(workflowId: string, manifestHash: string, key: string): Promise<CommitAccepted>
+  /** One entity of a knowledge version with its neighbours and the passages of the documents it came from (read only, #712). */
+  getKnowledgeNode(versionId: string, nodeId: string): Promise<KnowledgeNodeDetail>
   /** The project's secrets: names, status and masked tail, never a value (#764). */
   getConnections(): Promise<ConnectionList>
   /** Sets or replaces one value (`ifMatch` is the entry's row version; none for a name with no row yet). The value is never read back. */
@@ -112,6 +114,7 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'workflow-registration': q => api.getWorkflowRegistration(q.workflowId ?? '', q.version),
   'commit-status': q => api.getCommitStatus(q.workflowId ?? ''),
   connections: () => api.getConnections(),
+  'knowledge-node': q => api.getKnowledgeNode(q.versionId ?? '', q.nodeId ?? ''),
 }
 
 const unsupported = () => Promise.reject(new Error('Not used by the BAM workbench'))

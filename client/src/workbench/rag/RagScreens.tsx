@@ -1,5 +1,6 @@
 // Stage 2 (knowledge) screens. Everything shown comes from the knowledge version the host loaded into `ragPipeline`;
 // nothing here is sample data and nothing here approves or deploys.
+import { NodeSources } from './NodeSources'
 import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Background, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -364,6 +365,7 @@ const GraphExplorer = memo(function GraphExplorer() {
               {shownRels.slice(0, 12).map((r, i) => <li key={i}>{key && (r.from.includes(key) || key.includes(r.from)) ? r.to : r.from} <span className="muted">→ {r.label.replace(/_/g, ' ')}</span></li>)}
               {!shownRels.length && <li className="muted">{graph === 'done' ? 'No relations match.' : 'Relations appear after the graph build.'}</li>}
             </ul>
+            <NodeSources versionId={s.runId} nodeId={selected} />
           </aside>
         )}
         <div className="rg-zoom">

@@ -1069,3 +1069,6 @@
   gap: 4px;
 }
 
+
+.bam-wb .rg-insp blockquote { margin: 4px 0 8px; padding: 4px 10px; border-left: 3px solid var(--border-strong); color: var(--muted); }
+.bam-wb .rg-insp section[aria-label="Sources"] { margin-top: 10px; max-height: 240px; overflow: auto; }
