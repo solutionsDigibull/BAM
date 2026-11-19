@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 import test_e14_4_freeze_api as base
+import test_wg18_commit_api as wg18
 from sbam_api.isatvon.models import MacroSkill, SubSkill
 from sbam_api.workflows.models import Workflow
 from sqlalchemy import select
@@ -14,7 +15,7 @@ from test_auth import FDE_A2, TENANT_B, problem
 from test_project_workspace import Harness
 from test_wg16_connections_api import WORKFLOW
 
-h = base.h  # the fixtures of the freeze harness
+h = wg18.h  # the fixtures of the freeze harness
 hv = base.hv
 freeze, prepared, versions = base.freeze, base.prepared, base.versions
 
