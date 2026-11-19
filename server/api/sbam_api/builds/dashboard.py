@@ -20,6 +20,7 @@ from sbam_contracts.build_dashboard import (
     GatesResponse,
     GateStatus,
 )
+from sbam_contracts.promptfoo import LoopTestsBadge
 from sbam_contracts.runs import SubjectType
 from sbam_contracts.state_machines import SubSkillState, WorkflowState
 from sqlalchemy.orm import Session
@@ -31,6 +32,7 @@ from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.manifests.models import GateResultRow
 from sbam_api.manifests.repository import GateResultRepository
 from sbam_api.temporal.repository import TemporalRunRepository
+from sbam_api.testruns import service as testruns  # module import: testruns.models imports builds
 from sbam_api.workflows.repository import WorkflowRepository
 
 ACTIVE = frozenset({SubSkillState.BUILDING, SubSkillState.CORRECTING, SubSkillState.TESTING})
@@ -108,7 +110,8 @@ def builds(
     ui_bundle = GateResultRepository(session, ctx).latest_workflow_gate(
         workflow_id, GateName.UI_BUNDLE.value
     )
-    rows = [_row(s, newest.get(s.id), gates[s.id], runs) for s in subs]
+    badges = testruns.loop_tests_badges(session, ctx, [s.id for s in subs])
+    rows = [_row(s, newest.get(s.id), gates[s.id], runs, badges.get(s.id)) for s in subs]
     return BuildsResponse(
         workflow_id=workflow_id,
         workflow_state=WorkflowState(workflow.state),
@@ -123,6 +126,7 @@ def _row(
     key: tuple[int, int, int] | None,
     gates: dict[GateName, GateStatus],
     runs: TemporalRunRepository,
+    loop_tests: LoopTestsBadge | None,
 ) -> BuildRow:
     state = SubSkillState(sub.state)
     run = runs.latest_for_subject(SubjectType.SUB_SKILL.value, sub.id)
@@ -138,6 +142,7 @@ def _row(
         stage=stage,
         attempt=key[2] if key else 0,
         gates=gates,
+        loop_tests=loop_tests,
     )
 
 

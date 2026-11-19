@@ -56,6 +56,15 @@ def loop_tests_badge(
     return None if row is None else badge_of(run_out(row))
 
 
+def loop_tests_badges(
+    session: Session, ctx: TenantContext, sub_skill_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, LoopTestsBadge]:
+    """`loop_tests_badge` for every Sub-Skill of the grid, in one query; one without a run is
+    absent."""
+    rows = TestRunRepository(session, ctx).latest_of_sub_skills(sub_skill_ids)
+    return {sub_id: badge_of(run_out(row)) for sub_id, row in rows.items()}
+
+
 def _sub_skill(
     session: Session, ctx: TenantContext, workflow_id: uuid.UUID, sub_id: uuid.UUID
 ) -> SubSkill:

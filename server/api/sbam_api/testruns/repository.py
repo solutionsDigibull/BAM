@@ -3,6 +3,9 @@
 import uuid
 from typing import Any
 
+from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
+
 from sbam_api.db.repository import TenantScopedRepository
 from sbam_api.testruns.models import TestRunRow
 
@@ -26,6 +29,24 @@ class TestRunRepository(TenantScopedRepository[TestRunRow]):
     def latest(self, sub_skill_id: uuid.UUID) -> TestRunRow | None:
         rows = self.of_sub_skill(sub_skill_id, limit=1)
         return rows[0] if rows else None
+
+    def latest_of_sub_skills(self, sub_skill_ids: list[uuid.UUID]) -> dict[uuid.UUID, TestRunRow]:
+        """Each Sub-Skill's newest run, in one query for the whole Build & Test grid; a Sub-Skill
+        without a run is absent. Newest is the highest UUIDv7 id, as in `of_sub_skill`."""
+        if not sub_skill_ids:
+            return {}
+        newest_first = func.row_number().over(
+            partition_by=TestRunRow.sub_skill_id, order_by=TestRunRow.id.desc()
+        )
+        ranked = (
+            self._scoped()
+            .where(TestRunRow.sub_skill_id.in_(sub_skill_ids))
+            .add_columns(newest_first.label("newest"))
+            .subquery()
+        )
+        run = aliased(TestRunRow, ranked)
+        rows = self.session.scalars(select(run).where(ranked.c.newest == 1))
+        return {row.sub_skill_id: row for row in rows}
 
     def of_code_attempt(self, code_attempt_id: uuid.UUID) -> TestRunRow | None:
         """The newest run that judged this code attempt (E14.1 certifies on it)."""
