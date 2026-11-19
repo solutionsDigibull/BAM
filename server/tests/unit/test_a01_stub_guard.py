@@ -30,9 +30,6 @@ WF = WorkflowRef(**_COMMON)
 # every stub family: (activity, input)
 STUBS = [
     (build_stubs.render_skeleton, STAGE),
-    (certify_stubs.certify_macros, WF),
-    (certify_stubs.validate_workflow, WF),
-    (certify_stubs.certify_workflow, WF),
     (certify_stubs.freeze_and_version, WF),
 ]
 

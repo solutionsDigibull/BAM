@@ -22,6 +22,14 @@ class CertificationRepository(TenantScopedRepository[CertificationRow]):
         )
         return self.session.scalars(query).first()
 
+    def latest(self, level: str, subject_id: uuid.UUID) -> CertificationRow | None:
+        """The subject's newest certificate at `level` (E14.2: a Sub-Skill's, whatever its hash)."""
+        query = self._scoped().where(
+            CertificationRow.level == level, CertificationRow.subject_id == subject_id
+        )
+        newest = query.order_by(CertificationRow.certified_at.desc(), CertificationRow.id.desc())
+        return self.session.scalars(newest.limit(1)).first()
+
     def record(self, values: dict[str, Any]) -> CertificationRow:
         """Insert the certificate, or return the one an earlier attempt already wrote."""
         existing = self.find(values["level"], values["subject_id"], values["content_sha256"])
