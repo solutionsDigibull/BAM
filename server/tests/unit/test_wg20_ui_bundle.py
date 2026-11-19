@@ -253,7 +253,7 @@ def test_wg20_copy_fills_text_only(template: UiTemplate) -> None:
     assert skill["subs"][0]["inputs"][0]["description"] == "10 digits"
     assert skill["review"]["note"] == "Confirm the login result."
     hostile = UiCopy(
-        sub_skills={"MS01.1_Investor_Auth_Manager": SubCopy(summary='"</script> ${x} ')}
+        sub_skills={"MS01.1_Investor_Auth_Manager": SubCopy(summary='"</script> ${x}\u2028')}
     )
     out = build_ui_bundle(
         UiBundleInput("W", SERVER, [sealed(ms01())], copy=hostile), template=template
