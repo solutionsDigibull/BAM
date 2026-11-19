@@ -1,4 +1,4 @@
-"""The ordered freeze of a Workflow (#132, E14.4, TD §13.4, ADR 0036): the real `WorkflowFreezer`.
+"""The ordered freeze of a Workflow (#132, E14.4, TD §13.4, ADR 0037): the real `WorkflowFreezer`.
 
 Order, all idempotent so a crash anywhere is finished by running it again:
 

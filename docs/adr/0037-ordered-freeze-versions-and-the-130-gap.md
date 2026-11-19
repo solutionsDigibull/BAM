@@ -1,4 +1,4 @@
-# 0036 — The ordered freeze, MAJOR.0.PATCH versions, and what #130 still has to provide
+# 0037 — The ordered freeze, MAJOR.0.PATCH versions, and what #130 still has to provide
 
 - Status: Accepted
 - Date: 2026-11-19

@@ -42,6 +42,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0034](0034-enterprise-assistant-llm.md) | Enterprise Assistant: cited document and graph Q&A behind the middle-pane chat, on its own `sbam-assistant` alias; decline when ungrounded; history stays in the browser (#729) | Proposed | — |
 | [0035](0035-commit-to-staging-ports-and-the-132-gap.md) | Commit to Staging: `WorkflowCommit`, the `WorkflowFreezer` and `StagingRuntime` ports, and what Commit does while #132 and #765 are not built (#766) | Accepted | refines 0032 (decision 2), 0030 (decision 10) |
 | [0036](0036-staging-runtime-runs-on-the-deployers-docker-host.md) | The Staging runtime runs on the deployer's Docker host (digest start, secrets at start, allowlist egress proxy, one deployment per version, no time limit) (#765) | Accepted | refines 0032, 0035 |
+| [0037](0037-ordered-freeze-versions-and-the-130-gap.md) | The ordered freeze (`OrderedFreezer` behind `WorkflowFreezer`), MAJOR.0.PATCH versions, immutability triggers, and what #130 still has to provide (#132) | Accepted | refines 0035 (decision 4), 0032, 0033 |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 

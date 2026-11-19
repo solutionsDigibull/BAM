@@ -1,4 +1,4 @@
-"""Workflow versions MAJOR.0.PATCH and the patch route (#132, E14.4, TD §11.4, ADR 0036).
+"""Workflow versions MAJOR.0.PATCH and the patch route (#132, E14.4, TD §11.4, ADR 0037).
 
 - `GET W/versions` -> `WorkflowVersionList`: every frozen version of the Workflow, newest first. A
   frozen row is never edited, so `superseded` is derived: a newer version of the same Workflow
