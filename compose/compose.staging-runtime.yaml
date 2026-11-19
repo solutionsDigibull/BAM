@@ -1,0 +1,125 @@
+# SBAM `staging-runtime` profile (WG-31, #908, ADR 0038). Load with `make up PROFILES=staging-runtime`.
+# Turns the Staging runtime on: after Commit, the workflow's container starts by its certified digest on this
+# machine's Docker daemon, on an internal network, with outside access only through an allowlist proxy.
+# Off by default: without this file `STAGING_RUNTIME` is `none`, Commit answers PENDING_RUNTIME and `make up`
+# stays as it was. (The name differs from compose.staging.yaml, which is the staging VM's environment overlay.)
+#
+# What it adds:
+#   docker-socket-proxy   the ONLY holder of /var/run/docker.sock. It allows just the calls the deployer and the
+#                         image builder make (compose/docker-proxy/haproxy.cfg.template): no exec, no volumes,
+#                         no pull or push, `stg-*` containers only, no privileged, bind or host-network create.
+#                         Reached over the internal sbam_docker network by worker-certify and worker-build only.
+#   docker-cli-init       copies a pinned static `docker` client into a volume; the workers add it to PATH.
+#                         The worker image stays as it is (no docker client baked into production images).
+#   staging-egress-proxy  the allowlist proxy of ADR 0036 (sbam_workers.staging.egress_proxy). It is on the
+#                         Staging network and on sbam_edge (the only network with a route out).
+#   sbam-staging          internal network the Staging containers join. sbam-api joins it to reach them.
+# Secrets: names only. The real SECRETS_KEYS and BIFROST_SETUP_TOKEN come from compose/.env or the environment.
+# The IMAGE the Staging container runs is built on, or loaded into, THIS daemon (`docker image ls`): the
+# deployer never builds or pulls. `IMAGE_BUILDER=docker` + `STAGING_PROXY_ALLOW_BUILD=1` lets worker-build build
+# it through the same proxy (opt-in; build steps run on the host daemon).
+
+services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
+    environment:
+      LOG_LEVEL: info
+      STAGING_NETWORK: ${STAGING_NETWORK:-sbam-staging} # a create must name this network
+      BUILD: ${STAGING_PROXY_ALLOW_BUILD:-0} # 1 = also allow the legacy `POST /build` (IMAGE_BUILDER=docker)
+    volumes:
+      - ${STAGING_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      - ./docker-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    networks: [sbam_docker]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2375/_ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  docker-cli-init:
+    image: docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c
+    # One static client binary, no plugins: `docker build` uses the legacy builder, which is what the proxy allows.
+    entrypoint:
+      - sh
+      - -c
+      - cp /usr/local/bin/docker /out/docker && chmod 0555 /out/docker && chown 10001:10001 /egress && chmod 0770 /egress
+    volumes: [docker-cli:/out, staging-egress:/egress]
+    network_mode: none
+    restart: "no"
+
+  staging-egress-proxy:
+    image: sbam-egress-proxy:local # two stdlib modules in a slim image (compose/docker/egress-proxy.Dockerfile)
+    build:
+      context: ..
+      dockerfile: compose/docker/egress-proxy.Dockerfile
+    volumes: [staging-egress:/var/sbam/egress:ro] # the allowlists worker-certify writes
+    networks: [sbam_staging, sbam_edge]
+    depends_on:
+      docker-cli-init: { condition: service_completed_successfully } # gives the volume to uid 10001
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 3128), 2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    cpus: 0.5
+    mem_limit: 256m
+    restart: unless-stopped
+
+  # Commit runs on this worker: it starts and stops the Staging containers and registers the workflow in Bifrost.
+  worker-certify:
+    networks: [sbam_internal, sbam_docker]
+    environment:
+      STAGING_RUNTIME: docker
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      PATH: /opt/docker:/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      STAGING_DOCKER_TIMEOUT_SECONDS: ${STAGING_DOCKER_TIMEOUT_SECONDS:-120}
+      STAGING_NETWORK: ${STAGING_NETWORK:-sbam-staging}
+      STAGING_EGRESS_PROXY_URL: http://staging-egress-proxy:3128
+      STAGING_EGRESS_POLICY_DIR: /var/sbam/egress
+      # Opens a project's secrets at a Staging start (ADR 0030) and lets Commit register in Bifrost (ADR 0035).
+      SECRETS_KEYS: ${SECRETS_KEYS:-}
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+    volumes:
+      - docker-cli:/opt/docker:ro
+      - staging-egress:/var/sbam/egress
+    depends_on:
+      docker-socket-proxy: { condition: service_healthy }
+      docker-cli-init: { condition: service_completed_successfully }
+
+  # The image builder (#879) uses the same daemon. It stays off (`none`) unless IMAGE_BUILDER=docker is set.
+  worker-build:
+    networks: [sbam_internal, sbam_schema_check, sbam_docker]
+    environment:
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      PATH: /opt/docker:/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      IMAGE_BUILDER: ${IMAGE_BUILDER:-none}
+      IMAGE_BUILD_TIMEOUT_SECONDS: ${IMAGE_BUILD_TIMEOUT_SECONDS:-900}
+    volumes: [docker-cli:/opt/docker:ro]
+    depends_on:
+      docker-socket-proxy: { condition: service_healthy }
+      docker-cli-init: { condition: service_completed_successfully }
+
+  # The API reaches the running container (health, MCP forward) over the Staging network.
+  sbam-api:
+    networks: [sbam_edge, sbam_internal, sbam_staging]
+
+  # Bifrost's management API is locked by the setup token; the workers send it to register a workflow.
+  bifrost:
+    environment:
+      BIFROST_SETUP_TOKEN: ${BIFROST_SETUP_TOKEN:-}
+
+networks:
+  sbam_docker:
+    internal: true # worker-certify, worker-build <-> docker-socket-proxy only
+  sbam_staging:
+    name: ${STAGING_NETWORK:-sbam-staging}
+    internal: true # no route out: the egress proxy is the only way (ADR 0036)
+
+volumes:
+  docker-cli:
+  staging-egress:

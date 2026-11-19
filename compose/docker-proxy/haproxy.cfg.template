@@ -1,0 +1,98 @@
+# SBAM Staging docker socket proxy (WG-31, #908, ADR 0038).
+# Replaces the template of tecnativa/docker-socket-proxy, which can only allow whole API sections
+# (CONTAINERS=1 also allows `containers/<id>/exec`, and a create with `Privileged`). This one allows the
+# exact calls the Staging deployer and the image builder make and nothing else:
+#   deployer  GET _ping|version, GET images/<digest>/json, GET|POST networks, POST containers/create,
+#             POST containers/<id>/start|stop|wait, GET containers/<id>/json|logs, DELETE containers/<name>
+#   builder   POST build (legacy builder, only when BUILD=1; the client has no BuildKit plugin)
+# Containers: only names that start with `stg-` (or a 64-hex id, which `docker run` gets back from create).
+# A create is refused unless it names a `stg-` container on the Staging network and carries no bind,
+# mount, device, added capability, privileged flag, or host pid/ipc/network/user namespace.
+# Nothing else is reachable: no exec, no attach, no volumes, no push, no pull, no events, no swarm.
+# The daemon socket is mounted into THIS container only; the proxy listens on an internal network that only
+# worker-certify and worker-build join.
+
+global
+    log stdout format raw daemon "${LOG_LEVEL}"
+    pidfile /run/haproxy.pid
+    maxconn 200
+    server-state-file /var/lib/haproxy/server-state
+
+defaults
+    mode http
+    log global
+    option httplog
+    option dontlognull
+    option http-server-close
+    retries 3
+    timeout http-request 10s
+    timeout queue 1m
+    timeout connect 10s
+    timeout client 10m
+    timeout server 10m
+    timeout http-keep-alive 10s
+    timeout check 10s
+    maxconn 100
+    load-server-state-from-file global
+    errorfile 400 /usr/local/etc/haproxy/errors/400.http
+    errorfile 403 /usr/local/etc/haproxy/errors/403.http
+    errorfile 408 /usr/local/etc/haproxy/errors/408.http
+    errorfile 500 /usr/local/etc/haproxy/errors/500.http
+    errorfile 502 /usr/local/etc/haproxy/errors/502.http
+    errorfile 503 /usr/local/etc/haproxy/errors/503.http
+    errorfile 504 /usr/local/etc/haproxy/errors/504.http
+
+backend dockerbackend
+    server dockersocket $SOCKET_PATH
+
+frontend dockerfrontend
+    bind ${BIND_CONFIG}
+
+    acl get_or_head   method GET HEAD
+    acl post          method POST
+    acl delete        method DELETE
+
+    acl ping          path,url_dec -m reg -i ^(/v[0-9.]+)?/(_ping|version)$
+    acl image_inspect path,url_dec -m reg -i ^(/v[0-9.]+)?/images/(sha256:[0-9a-f]{64}|[a-z0-9][a-z0-9_.:/@-]{0,200})/json$
+    acl net_inspect   path,url_dec -m reg -i ^(/v[0-9.]+)?/networks/[a-z0-9][a-z0-9_.-]{0,63}$
+    acl net_create    path,url_dec -m reg -i ^(/v[0-9.]+)?/networks/create$
+    acl ctr_create    path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/create$
+    acl ctr_start     path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/(stg-[a-z0-9_.-]{1,59}|[0-9a-f]{64})/start$
+    acl ctr_stop      path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/(stg-[a-z0-9_.-]{1,59}|[0-9a-f]{64})/stop$
+    acl ctr_wait      path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/(stg-[a-z0-9_.-]{1,59}|[0-9a-f]{64})/wait$
+    acl ctr_inspect   path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/(stg-[a-z0-9_.-]{1,59}|[0-9a-f]{64})/(json|logs)$
+    acl ctr_remove    path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/stg-[a-z0-9_.-]{1,59}$
+    acl build         path,url_dec -m reg -i ^(/v[0-9.]+)?/build$
+
+    # Hijacked connections (attach, exec) are never needed.
+    http-request deny if { req.hdr(Upgrade) -m found }
+
+    http-request allow if get_or_head ping
+    http-request allow if get_or_head image_inspect
+    http-request allow if get_or_head net_inspect
+    http-request allow if get_or_head ctr_inspect
+    http-request allow if post ctr_start
+    http-request allow if post ctr_stop
+    http-request allow if post ctr_wait
+    http-request allow if delete ctr_remove
+
+    # An internal network only: the body must say so.
+    http-request wait-for-body time 5s at-least 16k if post net_create
+    http-request allow if post net_create { req.body -m reg -i '"internal"[[:space:]]*:[[:space:]]*true' }
+
+    # A create names a stg- container on the Staging network and asks for nothing that reaches the host.
+    http-request wait-for-body time 5s at-least 64k if post ctr_create
+    acl create_named query -m reg -i (^|&)name=stg-[a-z0-9_.-]{1,59}(&|$)
+    acl create_net   req.body -m reg -i "\"NetworkMode\"[[:space:]]*:[[:space:]]*\"${STAGING_NETWORK}\""
+    acl create_flag  req.body -m reg -i '"(Privileged|PublishAllPorts)"[[:space:]]*:[[:space:]]*true'
+    acl create_list  req.body -m reg -i '"(CapAdd|Devices|DeviceRequests|Mounts|VolumesFrom|Binds)"[[:space:]]*:[[:space:]]*[[][^]]'
+    acl create_map   req.body -m reg -i '"(Sysctls|Volumes)"[[:space:]]*:[[:space:]]*[{][^}]'
+    acl create_ns    req.body -m reg -i '"(PidMode|IpcMode|UTSMode|UsernsMode|CgroupnsMode|CgroupParent)"[[:space:]]*:[[:space:]]*"[^"]'
+    acl create_sec   req.body -m reg -i '(unconfined|label[=:]disable)'
+    http-request allow if post ctr_create create_named create_net !create_flag !create_list !create_map !create_ns !create_sec
+
+    # The image builder (opt-in with BUILD=1): the legacy /build call, never a remote context or host networking.
+    http-request allow if post build { env(BUILD) -m bool } !{ query -m reg -i (^|&)(remote=[^&]|networkmode=(host|container)|cgroupparent=[^&]|securityopt=|isolation=[^&]) }
+
+    http-request deny
+    default_backend dockerbackend
