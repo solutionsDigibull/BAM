@@ -10,6 +10,7 @@ import type {
   CommitStatus,
   Connection,
   ConnectionList,
+  KnowledgeNodeDetail,
   ConnectionTestResult,
   ConnectionValueResult,
   RegisteredWorkflow,
@@ -95,6 +96,9 @@ export function createSbamApi(projectId: string): BamApi {
           "If-Match": `"${manifestHash}"`,
         })
       ).body,
+    // One graph entity with the passages it was read from (#712): the node id is opaque, so it is encoded.
+    getKnowledgeNode: async (versionId, nodeId) =>
+      (await getJson<KnowledgeNodeDetail>(`projects/${projectId}/knowledge/${versionId}/nodes/${encodeURIComponent(nodeId)}`)).body,
     // The project's secrets (#764): the value goes out once in a PUT and is never returned.
     getConnections: async () => (await getJson<ConnectionList>(`projects/${projectId}/connections`)).body,
     setConnectionValue: async (name, value, ifMatch) =>
