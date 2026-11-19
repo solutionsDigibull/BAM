@@ -115,6 +115,11 @@ class WorkerSettings(BaseSettings):
     # SCHEMA_SQL gate (E9.4): the isolated `schema-check` PostgreSQL the build worker applies each
     # Workflow's schema.sql to, in a throwaway database. Never SBAM's own database (refused).
     schema_check_dsn: SecretStr | None = None
+    # Workflow server image (#867): `docker` builds it with the docker client against the daemon
+    # DOCKER_HOST names (a build host: the worker holds no socket by default); `none` records
+    # BUILDER_DISABLED and the pipeline goes on.
+    image_builder: Literal["none", "docker"] = "none"
+    image_build_timeout_seconds: int = Field(default=900, ge=60, le=3600)
     # Environment and product analytics (E16.2): every worker dispatches the outbox, so each one
     # sends the PostHog events of the rows it dispatches. Same checks as sbam-api.
     sbam_env: str = Field(default="development", min_length=1)

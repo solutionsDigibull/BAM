@@ -13,6 +13,8 @@ manifest draft (`build_workflow_manifest`) before certify_macros.
 stored (`build_workflow_server`).
 #768 (behind `workflow.patched(UI_BUNDLE_PATCH)`): then the Workflow's UI bundle is generated and
 stored (`build_workflow_ui`).
+#867 (behind `workflow.patched(IMAGE_BUILD_PATCH)`): after the server files, the Workflow server
+image is built and its digest recorded (`build_workflow_image`).
 
 Rules this file keeps (.claude/rules/temporal.md):
   * Deterministic: no clock, randomness, env or I/O here. Everything with side effects is an
@@ -73,6 +75,7 @@ with workflow.unsafe.imports_passed_through():
     from sbam_contracts.runs import MirrorUpdate, RunInput, RunState, TaskQueue, build_workflow_id
     from sbam_contracts.state_machines import Actor, MachineName
 
+    from sbam_workers.build.image_stage import build_workflow_image
     from sbam_workers.build.plan import plan_builds
     from sbam_workers.build.schema_sql.activity import build_schema_sql
     from sbam_workers.build.server_stage import build_workflow_server
@@ -122,6 +125,7 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "plan_builds": (TaskQueue.BUILD, timedelta(minutes=1), 3),
     "build_workflow_manifest": (TaskQueue.BUILD, timedelta(minutes=2), 3),
     "build_workflow_server": (TaskQueue.BUILD, timedelta(minutes=5), 3),
+    "build_workflow_image": (TaskQueue.BUILD, timedelta(minutes=20), 3),
     "build_workflow_ui": LLM,
     "certify_macros": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
     "validate_workflow": (TaskQueue.CERTIFY, timedelta(minutes=2), 5),
@@ -148,6 +152,9 @@ MANIFEST_DRAFT_PATCH = "e9-5-workflow-manifest-draft"
 # tools.json, Dockerfile, loop specs, schema.sql) so the code preview and the Staging runtime
 # can read them.
 SERVER_FILES_PATCH = "wg28-workflow-server-files"
+# #867: after the server files, build the Workflow server image from them and record its digest
+# (the `mcp_server` entry Commit puts into the frozen manifest).
+IMAGE_BUILD_PATCH = "wg29-workflow-image-build"
 # #768: after the server files, generate the Workflow's UI bundle from the UI template and store it
 # with its digest (the `ui_bundle` entry Commit puts into the frozen manifest).
 UI_BUNDLE_PATCH = "wg20-workflow-ui-bundle"
@@ -457,6 +464,8 @@ class ProjectPipeline:
             await self._attempt(build_workflow_manifest, self._workflow_ref(), IdResult, None)
         if workflow.patched(SERVER_FILES_PATCH):
             await self._attempt(build_workflow_server, self._workflow_ref(), IdResult, None)
+        if workflow.patched(IMAGE_BUILD_PATCH):
+            await self._attempt(build_workflow_image, self._workflow_ref(), IdResult, None)
         if workflow.patched(UI_BUNDLE_PATCH):
             await self._attempt(build_workflow_ui, self._workflow_ref(), IdResult, None)
         await self._attempt(certify_macros, self._workflow_ref(), IdsResult, None)
