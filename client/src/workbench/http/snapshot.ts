@@ -57,6 +57,22 @@ const NOT_WIRED = "The build has started. Its screens are not available in the w
  *  persisting and deploying (step 4) stay locked until those screens are wired. */
 const STEP_3_READ_ONLY = { state: "active" as const, reason: "The build has started. The generated code is shown read-only", editable: false };
 
+/** Step 4 (Validation, #766) opens once certification has begun: it shows the checks and the secrets, and Commit goes to Staging.
+ *  Before that, and while the build still runs, it stays locked. A frozen workflow stays open: a commit whose Staging start
+ *  did not finish is completed by Commit again. */
+export function validationStep(w: WorkflowSummary | undefined): Pick<StepInfo, "state" | "reason" | "editable"> | undefined {
+  switch (w?.state) {
+    case "CERTIFYING":
+      return { state: "active", reason: "Certification is running; the checks fill in as it ends", editable: false };
+    case "CERTIFIED":
+      return { state: "needs_review", reason: "Review the checks and the secrets, then Commit", editable: true };
+    case "FROZEN":
+      return { state: "done", reason: "Committed: the workflow is frozen and registered in Staging", editable: true };
+    default:
+      return undefined;
+  }
+}
+
 const FAILED: ProjectPipelineState[] = ["INGESTION_FAILED", "KNOWLEDGE_FAILED", "SOW_GENERATION_FAILED"];
 
 /** From these pipeline states on, the project has (or is making) a SOW; before that there is nothing to ask for. */
@@ -206,7 +222,9 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
           ? gridStep(workflow, state)
           : n === 3 && buildStarted(workflow)
             ? STEP_3_READ_ONLY
-            : { state: "locked" as const, reason: buildStarted(workflow) ? NOT_WIRED : LOCKED[n - 1]!, editable: false };
+            : n === 4 && validationStep(workflow)
+              ? validationStep(workflow)!
+              : { state: "locked" as const, reason: buildStarted(workflow) ? NOT_WIRED : LOCKED[n - 1]!, editable: false };
     return {
       id: n,
       title: TITLES[n - 1]!,

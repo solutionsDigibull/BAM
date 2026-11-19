@@ -1,0 +1,15 @@
+/* Validation (4.9): the project's secrets (#766). Tokens come from the workbench theme. */
+.bam-wb .cx { display: flex; flex-direction: column; gap: 10px; container-type: inline-size; }
+.bam-wb .cx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .cx-row { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .cx-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .cx-name { font-family: 'JetBrains Mono', monospace; font-size: 13px; overflow-wrap: anywhere; }
+.bam-wb .cx-purpose { margin: 0; }
+.bam-wb .cx-forms { display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .cx-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .cx-input { min-width: 180px; flex: 1 1 200px; max-width: 360px; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: inherit; font-size: 12px; }
+.bam-wb .cx-input.wide { max-width: 520px; }
+.bam-wb .cx-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .cx-msg { margin: 0; font-size: 12px; }
+.bam-wb .cx-msg.tone-err { color: var(--err); }
+.bam-wb .cx-msg.tone-ok { color: var(--ok); }

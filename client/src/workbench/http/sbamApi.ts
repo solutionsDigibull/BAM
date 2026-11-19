@@ -6,6 +6,12 @@ import type { IngestionRun } from "../api/types";
 import { ragPipeline, setRagActions } from "../rag/ragPipeline";
 import { API_BASE } from "@/providers/data-provider";
 import type {
+  CommitAccepted,
+  CommitStatus,
+  Connection,
+  ConnectionList,
+  ConnectionTestResult,
+  ConnectionValueResult,
   RegisteredWorkflow,
   RepoAnswered,
   RepoQuestions,
@@ -13,7 +19,7 @@ import type {
   WorkflowFileView,
   WorkflowRepositories,
 } from "@/contracts";
-import { ApiFailure, deleteJson, getJson, idempotencyKey, postJson } from "./http";
+import { ApiFailure, deleteJson, getJson, idempotencyKey, postJson, putJson } from "./http";
 import { buildSnapshot, resetSnapshotCache } from "./snapshot";
 import { uploadOne } from "./upload";
 
@@ -79,6 +85,39 @@ export function createSbamApi(projectId: string): BamApi {
       (await getJson<RegisteredWorkflow>(
         `projects/${projectId}/workflows/${workflowId}/registration${version ? `?version=${encodeURIComponent(version)}` : ""}`,
       )).body,
+    // Commit to Staging (#766): the checks, and the FDE's approval of exactly the hash they looked at.
+    getCommitStatus: async (workflowId) =>
+      (await getJson<CommitStatus>(`projects/${projectId}/workflows/${workflowId}/commit`)).body,
+    commitWorkflow: async (workflowId, manifestHash, key) =>
+      (
+        await postJson<CommitAccepted>(`projects/${projectId}/workflows/${workflowId}/commit`, undefined, {
+          "Idempotency-Key": key,
+          "If-Match": `"${manifestHash}"`,
+        })
+      ).body,
+    // The project's secrets (#764): the value goes out once in a PUT and is never returned.
+    getConnections: async () => (await getJson<ConnectionList>(`projects/${projectId}/connections`)).body,
+    setConnectionValue: async (name, value, ifMatch) =>
+      (
+        await putJson<ConnectionValueResult>(
+          `projects/${projectId}/connections/${encodeURIComponent(name)}/value`,
+          { value },
+          ifMatch ? { "If-Match": ifMatch } : undefined,
+        )
+      ).body,
+    clearConnectionValue: async (name, ifMatch) => {
+      await deleteJson(`projects/${projectId}/connections/${encodeURIComponent(name)}/value`, ifMatch ? { "If-Match": ifMatch } : undefined);
+    },
+    updateConnection: async (name, body, ifMatch) =>
+      (
+        await putJson<Connection>(
+          `projects/${projectId}/connections/${encodeURIComponent(name)}`,
+          body,
+          ifMatch ? { "If-Match": ifMatch } : undefined,
+        )
+      ).body,
+    testConnection: async (name) =>
+      (await postJson<ConnectionTestResult>(`projects/${projectId}/connections/${encodeURIComponent(name)}/test`)).body,
     // The choose-a-repository question of the builds and the FDE's answer (#756). The server validates the answer.
     getRepoQuestions: async (workflowId) =>
       (await getJson<RepoQuestions>(`projects/${projectId}/workflows/${workflowId}/repo-questions`)).body,

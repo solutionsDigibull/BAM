@@ -77,8 +77,10 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   screen('3.4', '3', 'Release prep', 'checklist', '/workbench/release', 'Manifest version, release prerequisites and version history.', { hidden: true, navAs: '4.3' }),
 
   stage('4', 'Validation', 'tb-shield-check', 'Run the isolated sandbox, check the results, certify the checked artifact and commit it to BAM_db.'),
-  screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4, mode: 'hitl' }),
-  screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4, mode: 'hitl' }),
+  screen('4.9', '4', 'Validation', 'circle-check', '/validation/commit', 'Automated checks, certification evidence and secrets, then Commit to Staging.', { step: 4, mode: 'hitl' }),
+  // Sandbox and Check have no backend yet (the sandbox run and the tests are not wired); the real Validation screen above replaces them.
+  screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4, hidden: true, navAs: '4.9', mode: 'hitl' }),
+  screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4, hidden: true, navAs: '4.9', mode: 'hitl' }),
   screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { hidden: true, step: 4, mode: 'hitl' }),
   screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { hidden: true, step: 4, mode: 'hitl' }),
   screen('4.1', '4', 'Validation activities', 'circle-check', '/workbench/validation', 'Check activities A–D with attempt history and findings.', { step: 3, hidden: true, navAs: '4.4' }),
@@ -116,7 +118,7 @@ export interface ScreenRoute { path: string; step?: StepId }
 export const SCREEN_ROUTES: Readonly<Record<string, ScreenRoute>> =
   Object.fromEntries(SUBTASKS.map(s => [s.id, { path: s.path!, ...(s.step ? { step: s.step } : {}) }]))
 /** The screen where each backend workbench step is worked on. */
-export const STEP_SCREEN: Readonly<Record<StepId, string>> = { 1: '3.1', 2: '3.2', 3: '4.2', 4: '4.8' }
+export const STEP_SCREEN: Readonly<Record<StepId, string>> = { 1: '3.1', 2: '3.2', 3: '4.2', 4: '4.9' }
 /** The goal screen's own address (#720). It is Upload's first stage (the goal box alone), so it opens screen 1.1:
  *  Upload sends a project without a goal here, and this address moves on to Upload once a goal is saved. */
 export const GOAL_PATH = '/goal'

@@ -1,5 +1,6 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
+  CommitAccepted, CommitStatus, Connection, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
   RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
@@ -21,6 +22,19 @@ export interface BamApi {
   getWorkflowRepositories(workflowId: string): Promise<WorkflowRepositories>
   /** The workflow's registry entry: the newest enabled one, or `version` (read only, #849). Rejects with 404 when none. */
   getWorkflowRegistration(workflowId: string, version?: string): Promise<RegisteredWorkflow>
+  /** The checks, the secrets gate and what Commit did for the workflow (#766). `manifest_hash` is the ETag a commit sends back. */
+  getCommitStatus(workflowId: string): Promise<CommitStatus>
+  /** Commit: the FDE's final approval of exactly `manifestHash` (If-Match), with an Idempotency-Key. 409 when it changed or a check fails. */
+  commitWorkflow(workflowId: string, manifestHash: string, key: string): Promise<CommitAccepted>
+  /** The project's secrets: names, status and masked tail, never a value (#764). */
+  getConnections(): Promise<ConnectionList>
+  /** Sets or replaces one value (`ifMatch` is the entry's row version; none for a name with no row yet). The value is never read back. */
+  setConnectionValue(name: string, value: string, ifMatch?: string): Promise<ConnectionValueResult>
+  clearConnectionValue(name: string, ifMatch?: string): Promise<void>
+  /** Where to test a key, or the FDE's statement that it has no remote service. A change makes the value untested. */
+  updateConnection(name: string, body: ConnectionUpdate, ifMatch?: string): Promise<Connection>
+  /** A real call to the service the FDE named (SSRF-guarded on the server); only `OK` marks the value tested. */
+  testConnection(name: string): Promise<ConnectionTestResult>
   /** The builds of the workflow that wait for the FDE to choose a repository, and the decisions taken (#756). */
   getRepoQuestions(workflowId: string): Promise<RepoQuestions>
   /** The FDE's answer to one waiting build: a repository of the short list, or none (the code is generated). `key` is its Idempotency-Key. */
@@ -94,6 +108,8 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'workflow-repos': q => api.getWorkflowRepositories(q.workflowId ?? ''),
   'repo-questions': q => api.getRepoQuestions(q.workflowId ?? ''),
   'workflow-registration': q => api.getWorkflowRegistration(q.workflowId ?? '', q.version),
+  'commit-status': q => api.getCommitStatus(q.workflowId ?? ''),
+  connections: () => api.getConnections(),
 }
 
 const unsupported = () => Promise.reject(new Error('Not used by the BAM workbench'))

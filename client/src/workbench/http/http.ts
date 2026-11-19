@@ -47,7 +47,7 @@ export const postJson = <T>(path: string, body?: unknown, headers?: Record<strin
   call<T>("POST", path, body ?? {}, headers);
 export const putJson = <T>(path: string, body: unknown, headers?: Record<string, string>) =>
   call<T>("PUT", path, body, headers);
-export const deleteJson = (path: string) => call<null>("DELETE", path);
+export const deleteJson = (path: string, headers?: Record<string, string>) => call<null>("DELETE", path, undefined, headers);
 
 /** Every row of a cursor-paged list (`{ items, next_cursor }`), up to a safety cap. */
 export async function listAll<T>(path: string, pageSize = 100, maxPages = 50): Promise<T[]> {
