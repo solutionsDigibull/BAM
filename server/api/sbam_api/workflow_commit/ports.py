@@ -46,6 +46,12 @@ class StagingRuntime(Protocol):
         the same version and digest again answers the running one."""
         ...
 
+    def abandon(self, request: StagingStartRequest, detail: str) -> None:
+        """Commit stopped after the start (the registry refused it): stop the container and record
+        the deployment FAILED with `detail`, so Staging does not show a server the registry does
+        not stand behind (ADR 0039). Idempotent; nothing running is fine."""
+        ...
+
 
 class PendingStagingRuntime:
     """Until #765 exists: nothing starts, and the answer says why."""
@@ -55,6 +61,9 @@ class PendingStagingRuntime:
             status=StagingStartStatus.PENDING_RUNTIME,
             detail="the Staging runtime (#765) is not available yet; the request is recorded",
         )
+
+    def abandon(self, request: StagingStartRequest, detail: str) -> None:
+        return None
 
 
 def default_runtime() -> StagingRuntime:

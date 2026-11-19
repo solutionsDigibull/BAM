@@ -213,3 +213,22 @@ def test_wg31_the_egress_proxy_url_carries_a_password_so_clients_send_the_token(
 class _Policies:
     def write(self, token: str, deployment: str, hosts: Any) -> None:
         return None
+
+
+def test_wg32_bifrost_and_the_commit_worker_join_the_staging_network_only_in_the_profile() -> None:
+    """#909, ADR 0039: Bifrost connects to the Staging container by name; the worker waits."""
+    found = services(PROFILE)
+    assert "sbam_staging" in found["bifrost"]["networks"]
+    assert "sbam_staging" in found["worker-certify"]["networks"]
+    assert found["worker-certify"]["environment"]["STAGING_READY_TIMEOUT_SECONDS"]
+    for name in BASE:  # the default stack is unchanged: nothing there is on the Staging network
+        for service, body in services(COMPOSE / name).items():
+            assert "sbam_staging" not in (body.get("networks") or []), f"{name}: {service}"
+    assert "sbam_staging" not in (load(COMPOSE / "compose.yaml").get("networks") or {})
+    assert not SECRETISH.search(
+        "".join(
+            str(v)
+            for v in (found["bifrost"].get("environment") or {}).values()
+            if "${" not in str(v)
+        )
+    )

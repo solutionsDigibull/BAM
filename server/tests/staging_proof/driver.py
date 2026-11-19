@@ -13,10 +13,11 @@ What is real: Keycloak logins, the API and its auth chain, the database, the sto
 network and the egress proxy. What is faked, because the product cannot do it yet (and never in production code):
 
 * the WORKFLOW certificate row (#130 is not merged; PR #902 is open). Seeded here, once per version.
-* the Bifrost registry (a stand-in that "exposes" the manifest's tools): Bifrost accepts a registration but
-  lists no tools unless the server is already reachable at the registry name, which it is not before Staging
-  starts. See docs/runbooks/staging-runtime.md, "Known gap".
 * the Workflow server: `workflow_server.py`, not a generated one.
+
+Commit itself is real since #909 (WG-32): the driver starts the `WorkflowCommit` workflow on Temporal and the real
+worker runs recheck, freeze, start Staging and register (the real Bifrost, at the container's own address). There
+is no stand-in registry any more.
 
 The output is one `CHECK <id> PASS|FAIL <detail>` line per check and a final `RESULT {json}` line. No token, key
 or password is printed. Exit 1 when any check fails.
@@ -47,8 +48,10 @@ sys.path.insert(0, "/app/server/tests")  # the `fixtures` package (golden manife
 from fixtures import fixture_path
 from sbam_api.audit import repository as audit
 from sbam_api.builds import workflow_ui
+from sbam_api.builds.models import CodeAttempt
 from sbam_api.certifications.models import CertificationLevel, CertificationRow
 from sbam_api.db.repository import TenantContext
+from sbam_api.isatvon.models import MacroSkill, SubSkill
 from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.manifests.models import WorkflowManifestRow
 from sbam_api.manifests.ui_bundle import record_ui_bundle_gate
@@ -56,9 +59,6 @@ from sbam_api.projects.models import Project
 from sbam_api.sow.models import Sow, SowVersion
 from sbam_api.storage.base import Kind, StorageScope
 from sbam_api.storage.factory import make_backend
-from sbam_api.workflow_commit import service as commit_service
-from sbam_api.workflow_registry import service as registry
-from sbam_api.workflow_registry.bifrost import RegistryEntry
 from sbam_api.workflows.models import Workflow
 from sbam_contracts.canonical import canonical_json
 from sbam_contracts.manifest import (
@@ -68,8 +68,7 @@ from sbam_contracts.manifest import (
     UiBundleEntry,
     WorkflowManifest,
 )
-from sbam_contracts.workflow_commit import StagingStartStatus, WorkflowCommitInput
-from sbam_contracts.workflow_registry import RegistryKind
+from sbam_contracts.workflow_commit import StagingStartStatus
 from sbam_workers import mirror
 from sbam_workers.commit.activities import make_runtime
 from sbam_workers.repo_fetch.report import bundle_tar
@@ -251,22 +250,6 @@ def ui_files(version: str) -> dict[str, bytes]:
     return files
 
 
-class ProofBifrost:
-    """TEST ONLY: a registry that lists the manifest's tools, because the real one cannot before the server runs."""
-
-    def register(self, name: str, address: str) -> RegistryEntry:
-        return RegistryEntry(f"proof-{name}", name, False, TOOLS)
-
-    def find(self, name: str) -> RegistryEntry | None:
-        return None
-
-    def disable(self, entry_id: str) -> None:
-        return None
-
-    def entries(self) -> list[RegistryEntry]:
-        return []
-
-
 class Seed:
     def __init__(self, tenant: uuid.UUID, project: uuid.UUID, actor: str) -> None:
         self.tenant, self.project, self.actor = tenant, project, actor
@@ -316,6 +299,68 @@ class Seed:
                     state="FROZEN",
                 )
             )
+            s.flush()
+            macro = MacroSkill(  # TEST ONLY: the certified Sub-Skill the Commit checks read
+                tenant_id=self.tenant,
+                project_id=self.project,
+                workflow_id=self.workflow,
+                sow_version_id=sow_version.id,
+                macro_category="MS01_Investor_Registration_Access",
+                name="Investor Registration & Access",
+                description="proof",
+                order=1,
+                sow_refs=[],
+                state="FROZEN",
+            )
+            s.add(macro)
+            s.flush()
+            sub = SubSkill(
+                tenant_id=self.tenant,
+                project_id=self.project,
+                macro_skill_id=macro.id,
+                workflow_id=self.workflow,
+                skill_id=SKILL,
+                skill_name="Investor Auth Manager",
+                order=1,
+                isatvon={
+                    "skill_metadata": {"skill_id": SKILL, "skill_name": "Investor Auth Manager"},
+                    "isatvon_definition": {"v_variables": {"secrets": []}},
+                },
+                sow_refs=[],
+                content_sha256="0" * 64,
+                state="FROZEN",
+            )
+            s.add(sub)
+            s.flush()
+            s.add(
+                CodeAttempt(
+                    tenant_id=self.tenant,
+                    project_id=self.project,
+                    workflow_id=self.workflow,
+                    sub_skill_id=sub.id,
+                    build_no=1,
+                    cycle=0,
+                    attempt=0,
+                    template_name="proof",
+                    template_version="1.0.0",
+                    template_sha256="0" * 64,
+                    status="ASSEMBLED",
+                    bodies={},
+                    trace_id="proof",
+                    bundle_sha256="e" * 64,
+                )
+            )
+            s.add(
+                CertificationRow(
+                    tenant_id=self.tenant,
+                    project_id=self.project,
+                    level=CertificationLevel.SUB_SKILL.value,
+                    subject_id=sub.id,
+                    content_sha256="sha256:" + "e" * 64,
+                    evidence={"seeded_by": "staging-proof (test only)"},
+                    certified_at=datetime.now(UTC),
+                )
+            )
             project = s.get(
                 Project, self.project
             )  # a project that has a workflow, as the workbench reads it
@@ -361,7 +406,22 @@ class Seed:
                 for name in TOOLS
             ],
         )
-        base = WorkflowManifest.sealed(workflow_manifest(version))
+        sql_bytes = f"-- staging proof schema {version}\n".encode()
+        sql = self.storage.put(  # the freeze reads every stored file back: the schema must really exist
+            sql_bytes,
+            StorageScope(self.tenant, self.project, self.workflow),
+            Kind.CODE,
+            "application/sql",
+        )
+        base = WorkflowManifest.sealed(
+            {
+                **workflow_manifest(version),
+                "schema_sql": {
+                    "artifact_key": sql.storage_key,
+                    "sha256": hashlib.sha256(sql_bytes).hexdigest(),
+                },
+            }
+        )
         sealed = WorkflowManifest.sealed(
             {**base.dump(), "mcp_server": server.dump(), "ui_bundle": ui_entry.dump()}
         )
@@ -410,50 +470,54 @@ class Seed:
             s.commit()
         return str(sha)
 
-    def commit_input(self, manifest_hash: str) -> WorkflowCommitInput:
-        return WorkflowCommitInput(
-            tenant_id=self.tenant,
-            project_id=self.project,
-            run_id=uuid.uuid4(),
-            correlation_id=f"proof-{uuid.uuid4().hex[:8]}",
-            workflow_id=self.workflow,
-            manifest_hash=manifest_hash,
-            actor_id=self.actor,
+    def commit(self, api: "Api", token: str, base: str, version: str) -> dict[str, Any]:
+        """A real Commit, as the FDE does it: `POST .../commit` with the approved hash. The API starts
+        `WorkflowCommit` on Temporal and the real worker runs recheck, freeze, start Staging and register
+        (the real Bifrost, at the container's own address). Waits for the run; returns the commit status."""
+        status = api.call("GET", f"{base}/commit", token).json()
+        approved = str(status["manifest_hash"])
+        accepted = api.call(
+            "POST",
+            f"{base}/commit",
+            token,
+            headers={"If-Match": f'"{approved}"', "Idempotency-Key": uuid.uuid4().hex},
         )
+        if accepted.status_code != 202:
+            print(f"commit {version} refused: {accepted.status_code} {accepted.text[:600]}", flush=True)
+            return {"state": f"HTTP {accepted.status_code}"}
+        self.hashes[version] = approved
+        deadline = time.monotonic() + 480
+        while time.monotonic() < deadline:
+            status = api.call("GET", f"{base}/commit", token).json()
+            run = status.get("run") or {}
+            if run.get("state") in ("COMPLETED", "FAILED", "CANCELLED", "TERMINATED"):
+                break
+            time.sleep(2)
+        run = status.get("run") or {}
+        print(
+            f"commit {version}: run {run.get('state')} stage={run.get('current_stage')} "
+            f"error={run.get('last_error')}",
+            flush=True,
+        )
+        return status  # type: ignore[no-any-return]
 
-    def register_staging(self, version: str, manifest_hash: str) -> None:
-        """What `commit_register` does: the STAGING entry, then the audit row of who committed what."""
-        with self.sessions() as s:
-            entry = registry.register(
-                s,
-                self.ctx,
-                self.workflow,
-                ProofBifrost(),
-                kind=RegistryKind.STAGING,
-                owner=self.actor,
-                version=version,
-            )
-            commit_service.record_committed(
-                s,
-                self.ctx,
-                self.workflow,
-                self.commit_input(manifest_hash),
-                entry.registry_name,
-                entry.image_digest,
-            )
-            s.commit()
-        self.hashes[version] = manifest_hash
 
-    def start(self, runtime: DeployerStagingRuntime, version: str) -> str:
-        """What `commit_start_staging` does: ask the runtime, record its answer for the workbench."""
-        with self.sessions() as s:
-            request = commit_service.staging_request(s, self.ctx, self.workflow, self.actor)
-            result = runtime.start(request)
-            commit_service.record_staging(
-                s, self.ctx, self.workflow, self.commit_input(self.hashes[version]), result
-            )
-            s.commit()
-        return f"{result.status.value} {result.detail or ''}".strip()
+def bifrost_entry(name: str) -> dict[str, Any] | None:
+    """The raw Bifrost entry of `name` (its tools and the address Bifrost connects to)."""
+    base = str(WorkerSettings().bifrost_url).rstrip("/")  # type: ignore[call-arg]
+    token = os.environ["BIFROST_SETUP_TOKEN"]
+    found = httpx.get(
+        f"{base}/api/mcp/clients",
+        params={"limit": 100},
+        headers={"X-Bifrost-Setup-Token": token},
+        timeout=30,
+    )
+    found.raise_for_status()
+    for item in found.json().get("clients", []):
+        if item.get("config", {}).get("name") == name:
+            entry: dict[str, Any] = item
+            return entry
+    return None
 
 
 # --- the checks ------------------------------------------------------------------------------------------------
@@ -553,12 +617,32 @@ def main() -> int:
     if not isinstance(runtime, DeployerStagingRuntime):
         return 1  # STAGING_RUNTIME is not docker: the profile is not loaded
 
-    sha1 = seed.freeze_version("1.0.0", args.image_v1)
-    seed.register_staging("1.0.0", sha1)
-    started = seed.start(runtime, "1.0.0")
-    check("WG31-T02a", started.startswith(StagingStartStatus.STARTED.value), started)
-
+    seed.freeze_version("1.0.0", args.image_v1)
     base = f"/projects/{project_id}/workflows/{seed.workflow}"
+    committed = seed.commit(api, token["fde"], base, "1.0.0")
+    registration = committed.get("registration") or {}
+    staging_result = committed.get("staging") or {}
+    started = f"{staging_result.get('status')} {staging_result.get('detail') or ''}".strip()
+    check("WG31-T02a", started.startswith(StagingStartStatus.STARTED.value), started)
+    registry_name = str(registration.get("registry_name", ""))
+    check(
+        "WG32-T01a",
+        committed.get("state") == "COMMITTED"
+        and registry_name.endswith("_stg")
+        and registration.get("image_digest") == args.image_v1,
+        f"Commit {committed.get('state')}: {registry_name} on {str(registration.get('image_digest'))[:19]}",
+    )
+    entry = bifrost_entry(registry_name) if registry_name else None
+    listed = sorted(str(t.get("name")) for t in (entry or {}).get("tools", []))
+    shown = ((entry or {}).get("config") or {}).get("connection_string", "")
+    address = str(shown.get("value", "") if isinstance(shown, dict) else shown)
+    container = f"stg-{seed.workflow.hex[:8]}-{registry_name.replace('_', '-')}"[:63]
+    check(
+        "WG32-T02",
+        listed == sorted(TOOLS) and (not address or container in address),
+        f"Bifrost lists {listed} at {address or '(address not shown by Bifrost)'}",
+    )
+
     status = wait_running(api, f"{base}/staging", token["fde"], "1.0.0")
     check(
         "WG31-T02",
@@ -610,9 +694,10 @@ def main() -> int:
         f"declared host {ALLOWED_HOST} -> {allowed.get('status')} (not refused by policy)",
     )
 
-    sha2 = seed.freeze_version("1.0.1", args.image_v2)
-    seed.register_staging("1.0.1", sha2)
-    started2 = seed.start(runtime, "1.0.1")
+    seed.freeze_version("1.0.1", args.image_v2)
+    committed2 = seed.commit(api, token["fde"], base, "1.0.1")
+    result2 = committed2.get("staging") or {}
+    started2 = f"{result2.get('status')} {result2.get('detail') or ''}".strip()
     check("WG31-T04a", started2.startswith(StagingStartStatus.STARTED.value), started2)
     status2 = wait_running(api, f"{base}/staging", token["fde"], "1.0.1")
     history = {d["version"]: d for d in status2.get("history", [])}

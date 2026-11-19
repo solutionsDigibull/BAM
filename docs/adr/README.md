@@ -44,6 +44,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0036](0036-staging-runtime-runs-on-the-deployers-docker-host.md) | The Staging runtime runs on the deployer's Docker host (digest start, secrets at start, allowlist egress proxy, one deployment per version, no time limit) (#765) | Accepted | refines 0032, 0035 |
 | [0037](0037-ordered-freeze-versions-and-the-130-gap.md) | The ordered freeze (`OrderedFreezer` behind `WorkflowFreezer`), MAJOR.0.PATCH versions, immutability triggers, and what #130 still has to provide (#132) | Accepted | refines 0035 (decision 4), 0032, 0033 |
 | [0038](0038-staging-compose-restricted-docker-access.md) | Staging in Compose: an opt-in `staging-runtime` profile, a filtered Docker socket proxy (no raw `docker.sock` in a worker), the internal Staging network, the egress proxy service and the Bifrost token (#908) | Accepted | refines 0036, 0035 |
+| [0039](0039-commit-starts-staging-before-it-registers.md) | Commit starts the Staging container first and registers it in Bifrost second, at the container's own address; Bifrost joins `sbam-staging` in the `staging-runtime` profile (#909) | Accepted | refines 0038, 0036 |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 

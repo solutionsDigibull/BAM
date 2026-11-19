@@ -1,19 +1,28 @@
-"""The activities of `WorkflowCommit` (#766, ADR 0032): recheck, freeze, register, start Staging.
+"""The activities of `WorkflowCommit` (#766, ADR 0032): recheck, freeze, start Staging, register.
 
 Each is idempotent, so a crash between any two is finished by running Commit again (WG18-T05):
 
 - `commit_recheck`  the same checks the API ran, on the hash the FDE approved (stale: refused);
 - `commit_freeze`   `WorkflowFreezer.freeze` (`OrderedFreezer`, #132; a re-run completes it);
+- `commit_start_staging` calls the `StagingRuntime` port (#765) with the certified digest of the
+                    frozen manifest and the secret NAMES. The values are never read here: the
+                    runtime asks `connections.inject.resolve_env` itself. A container that already
+                    runs is answered as running, so a re-run starts no second one;
 - `commit_register` `service.register(kind=STAGING)` on the manifest's certified digest: no rebuild,
-                    and the same version with the same digest is a no-op (Bifrost is not called);
-- `commit_start_staging` writes the audit row of who approved, then calls the `StagingRuntime` port
-                    (#765) with the registered digest and the secret NAMES. The values are never
-                    read here: the runtime asks `connections.inject.resolve_env` itself.
+                    and the same version with the same digest is a no-op (Bifrost is not called).
+                    Bifrost connects to the address the container really serves (#909, ADR 0039);
+                    a refusal (the server lacks the manifest's tools) stops the container and
+                    records it FAILED. It also writes the audit row of who approved.
+
+Since #909 the order is freeze, start, register: Bifrost can only list a server's tools when the
+server is running and reachable. Histories started before it (`workflow.patched`) ran register
+before start; both orders use these same activities.
 
 A refusal (a failed check, a stale hash, a digest conflict) is non-retryable and ends the run with
 its reason; Bifrost being down is retried.
 """
 
+import logging
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
@@ -23,6 +32,7 @@ from sbam_api.connections.crypto import KeyRing
 from sbam_api.core.conventions import ApiError
 from sbam_api.core.settings import deployed_env
 from sbam_api.db.repository import TenantContext
+from sbam_api.staging import records
 from sbam_api.storage.base import StorageBackend
 from sbam_api.storage.factory import make_backend
 from sbam_api.versioning.freezer import OrderedFreezer
@@ -40,6 +50,7 @@ from sbam_api.workflow_registry.bifrost import (
 )
 from sbam_contracts.pipeline import IdResult
 from sbam_contracts.runs import TaskQueue
+from sbam_contracts.staging import StagingState
 from sbam_contracts.workflow_commit import (
     StagingStartResult,
     StagingStartStatus,
@@ -118,7 +129,9 @@ class CommitSteps:
     def register(self, inp: WorkflowCommitInput) -> IdResult:
         with self.sessions() as session:
             ctx = self._ctx(inp)
+            address: str | None = None
             try:
+                address = self._container_address(session, ctx, inp)
                 entry = registry.register(
                     session,
                     ctx,
@@ -126,6 +139,7 @@ class CommitSteps:
                     self.bifrost(),
                     kind=RegistryKind.STAGING,
                     owner=inp.actor_id,
+                    address=address,
                 )
                 service.record_committed(
                     session, ctx, inp.workflow_id, inp, entry.registry_name, entry.image_digest
@@ -136,8 +150,47 @@ class CommitSteps:
                 raise  # Bifrost is down or refused the token: retried with backoff
             except ApiError as error:
                 session.rollback()
+                if address is not None:
+                    self._abandon(session, ctx, inp, error)
                 raise refused(error) from None
         return IdResult(id=inp.workflow_id)
+
+    @staticmethod
+    def _container_address(
+        session: Session, ctx: TenantContext, inp: WorkflowCommitInput
+    ) -> str | None:
+        """Where Bifrost connects: the MCP endpoint of this version's running Staging container.
+        None (no container: the runtime is not configured) keeps the registry's default address."""
+        planned = registry.plan(session, ctx, inp.workflow_id, RegistryKind.STAGING)
+        found = records.replay(session, ctx.tenant_id, inp.workflow_id).get(planned.version)
+        if (
+            found is None
+            or found.state is not StagingState.RUNNING
+            or found.started is None
+            or found.started.image_digest != planned.image_digest
+        ):
+            return None
+        return found.started.endpoint.rstrip("/") + "/mcp"
+
+    def _abandon(
+        self, session: Session, ctx: TenantContext, inp: WorkflowCommitInput, error: ApiError
+    ) -> None:
+        """The registry refused a server that was started for it: stop it, record it FAILED (the
+        freeze stays, ADR 0039). Never hides the refusal if this itself fails."""
+        try:
+            request = service.staging_request(session, ctx, inp.workflow_id, inp.actor_id)
+            why = f"{error.title}: {error.detail or ''}"[:250]
+            self.runtime.abandon(request, why)
+            service.record_staging(
+                session,
+                ctx,
+                inp.workflow_id,
+                inp,
+                StagingStartResult(status=StagingStartStatus.FAILED, detail=why),
+            )
+            session.commit()
+        except Exception:  # the refusal below is what the FDE must see
+            logging.getLogger(__name__).warning("commit: could not stop the refused Staging start")
 
     def start_staging(self, inp: WorkflowCommitInput) -> WorkflowCommitResult:
         with self.sessions() as session:
@@ -198,6 +251,7 @@ def make_runtime(
             network=settings.staging_network,
             proxy_url=settings.staging_egress_proxy_url,
             policy_dir=None if folder is None else PolicyDir(Path(folder)),
+            ready_timeout_seconds=settings.staging_ready_timeout_seconds,
         ),
     )
 
