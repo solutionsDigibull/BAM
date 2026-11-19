@@ -18,6 +18,7 @@ class ArtifactKind(StrEnum):
     SANDBOX_OUTPUTS = "SANDBOX_OUTPUTS"  # E13.2: the runner's outputs.json of one run
     SANDBOX_LOGS = "SANDBOX_LOGS"  # E13.2: stdout and stderr of one run
     SANDBOX_EGRESS = "SANDBOX_EGRESS"  # E13.2: the egress evidence of one run
+    EXPORT = "EXPORT"  # E14.5: the export zip of a frozen Workflow version (stored frozen)
 
 
 class Artifact(ProjectOwned, Base):
