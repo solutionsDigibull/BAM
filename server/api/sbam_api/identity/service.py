@@ -286,7 +286,10 @@ def update_user(
     user_id: uuid.UUID,
     body: UserPatch,
     if_match: str | None,
+    invalidate: Callable[[str], None] | None = None,
 ) -> User:
+    """`invalidate(keycloak_sub)` is called after a real role or status change commits: the caller
+    drops that user's auth-state cache entries (#670)."""
     repo = UserRepository(session, actor.context())
     repository.lock_tenant(session, repo.ctx.tenant_id)
     row = repo.get(user_id)
@@ -319,6 +322,8 @@ def update_user(
         action = "USER_DEACTIVATED" if status == UserStatus.DEACTIVATED else "USER_REACTIVATED"
         _audit(session, actor, action, row, {"status": old_status}, {"status": status})
     session.commit()  # the tenant lock ends here, before any Keycloak call
+    if invalidate is not None:  # roles_changed or status_changed: the no-op case returned above
+        invalidate(row.keycloak_sub)
     converge_user(sessionmaker(bind=session.get_bind()), users, row.id)  # False: the relay retries
     return row
 

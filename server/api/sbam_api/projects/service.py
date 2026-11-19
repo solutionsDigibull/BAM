@@ -15,6 +15,7 @@
 """
 
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 from sbam_contracts.api import ErrorCode, FieldError
@@ -229,8 +230,14 @@ def members(session: Session, user: CurrentUser, project_id: uuid.UUID) -> list[
 
 
 def set_members(
-    session: Session, user: CurrentUser, project_id: uuid.UUID, body: ProjectMembersPut
+    session: Session,
+    user: CurrentUser,
+    project_id: uuid.UUID,
+    body: ProjectMembersPut,
+    invalidate: Callable[[str], None] | None = None,
 ) -> list[User]:
+    """`invalidate(keycloak_sub)` is called for every user added or removed once the change
+    commits (#670); an unassigned user is the case that matters."""
     ctx = user.context()
     project: Project | None = _repo(session, user).get_for_update(project_id)
     if project is None:
@@ -262,6 +269,9 @@ def set_members(
             {"user_ids": sorted(map(str, after))},
         )
         session.commit()
+        if invalidate is not None:
+            for row in UserRepository(session, ctx).among(before ^ after).values():
+                invalidate(row.keycloak_sub)
     return _sorted(found.values())
 
 

@@ -141,7 +141,10 @@ def patch_user(
     response: Response,
     if_match: Annotated[str | None, Header()] = None,
 ) -> TenantUser:
-    row = service.update_user(session, _auth(request).users, user, user_id, body, if_match)
+    auth = _auth(request)
+    row = service.update_user(
+        session, auth.users, user, user_id, body, if_match, invalidate=auth.state_cache.invalidate
+    )
     return tenant_user(row, response)
 
 
