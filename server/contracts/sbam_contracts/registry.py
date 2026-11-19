@@ -180,6 +180,7 @@ from sbam_contracts.sow_api import (
     SowVersionDetail,
     SowVersionList,
 )
+from sbam_contracts.staging import StagingStatus
 from sbam_contracts.state_machines import StateMachineStates
 from sbam_contracts.testgen import CasePost, CasePut, TestgenOutput, TestsResponse
 from sbam_contracts.workflow_commit import (
@@ -352,6 +353,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("repo_choice/answered", RepoAnswered),
     ("repo_choice/questions", RepoQuestions),
     ("workflow_registry/registration", RegisteredWorkflow),
+    ("staging/status", StagingStatus),
     ("workflow_commit/status", CommitStatus),
     ("workflow_commit/accepted", CommitAccepted),
     ("workflow_commit/staging_start_request", StagingStartRequest),
