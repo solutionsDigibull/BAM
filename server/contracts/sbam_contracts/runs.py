@@ -38,7 +38,9 @@ WORKFLOW_ID_PATTERN: Final = (
     # request-change-: RequestChangeApply (#767), one FDE change note applied at a time per Workflow
     rf"|request-change-{_UUID}"
     # workflow-commit-: WorkflowCommit (#766), one Commit to Staging at a time per Workflow
-    rf"|workflow-commit-{_UUID})$"
+    rf"|workflow-commit-{_UUID}"
+    # export-: ExportVersion (#133), one per (version, Idempotency-Key)
+    rf"|export-{_UUID})$"
 )
 WORKFLOW_ID: Final = re.compile(WORKFLOW_ID_PATTERN)
 
