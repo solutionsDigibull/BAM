@@ -19,6 +19,7 @@ from sbam_api.audit.security import AuditLogSecurityAudit
 from sbam_api.core.api_docs import docs_options, install_docs_security
 from sbam_api.core.auth import POLICIES, Auth, Jwks, NoOrgs, NoUserAdmin, TokenVerifier
 from sbam_api.core.auth_cache import AuthStateCache
+from sbam_api.core.bulkhead import configure as configure_bulkheads
 from sbam_api.core.errors import install_error_handlers
 from sbam_api.core.health import Check, default_checks, health_router
 from sbam_api.core.logging import configure_logging
@@ -109,6 +110,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or load_settings()
     configure_logging(settings.log_level)
+    configure_bulkheads(settings)  # before the app serves: the limits are settings (#609)
     app = FastAPI(
         title="SBAM API",
         # The API's own map is for dev and CI; a deployed environment does not publish it (A-15).

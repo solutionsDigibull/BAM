@@ -84,6 +84,13 @@ class Settings(BaseSettings):
     # Seconds "which projects, which granted roles" is kept per (user, session). 0 = off, the
     # default: a role or assignment taken away is then gone on the very next request (A-04).
     auth_state_cache_seconds: float = Field(default=0, ge=0, le=60)
+    # How many request threads one blocking dependency may hold, and how long a call waits for a
+    # slot before it fails fast (audit N-02, #609). Keep each well under the 40-thread pool. The
+    # defaults are what the limits were as constants, so leaving these unset changes nothing.
+    bulkhead_clamd_limit: int = Field(default=8, ge=1, le=64)
+    bulkhead_keycloak_admin_limit: int = Field(default=8, ge=1, le=64)
+    bulkhead_keycloak_jwks_limit: int = Field(default=8, ge=1, le=64)
+    bulkhead_wait_seconds: float = Field(default=0.5, ge=0.0, le=30.0)
     # The masters workbook import (E3.3) scans the upload with clamd before reading it. Unreachable
     # clamd = the import answers 503 SCAN_UNAVAILABLE; nothing is read unscanned.
     clamav_host: str = Field(default="clamav", min_length=1)

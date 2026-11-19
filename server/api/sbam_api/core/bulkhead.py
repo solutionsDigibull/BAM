@@ -11,6 +11,8 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from sbam_api.core.settings import Settings
+
 
 class BulkheadFullError(Exception):
     """Every slot of the dependency is busy and none freed up in time. Retryable by the client."""
@@ -22,6 +24,12 @@ class Bulkhead:
         self._slots = threading.BoundedSemaphore(limit)
         self._lock = threading.Lock()
         self._in_use = 0
+
+    def resize(self, limit: int, wait: float) -> None:
+        """New limit and wait. Replaces the semaphore, so call it at startup before traffic: a slot
+        held across the call would release into the new one."""
+        self.limit, self.wait = limit, wait
+        self._slots = threading.BoundedSemaphore(limit)
 
     @contextmanager
     def slot(self) -> Iterator[None]:
@@ -51,3 +59,11 @@ CLAMD = Bulkhead("clamd", limit=8)
 KEYCLOAK_ADMIN = Bulkhead("keycloak_admin", limit=8)
 KEYCLOAK_JWKS = Bulkhead("keycloak_jwks", limit=8)  # the JWKS fetch on a cold cache or unknown kid
 REGISTRY: tuple[Bulkhead, ...] = (CLAMD, KEYCLOAK_ADMIN, KEYCLOAK_JWKS)
+
+
+def configure(settings: Settings) -> None:
+    """Apply the sizing settings to the registered bulkheads (called once at startup)."""
+    wait = settings.bulkhead_wait_seconds
+    CLAMD.resize(settings.bulkhead_clamd_limit, wait)
+    KEYCLOAK_ADMIN.resize(settings.bulkhead_keycloak_admin_limit, wait)
+    KEYCLOAK_JWKS.resize(settings.bulkhead_keycloak_jwks_limit, wait)
