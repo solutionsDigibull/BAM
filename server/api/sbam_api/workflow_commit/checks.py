@@ -27,7 +27,7 @@ from sbam_contracts.workflow_commit import CommitCheck, CommitCheckName
 from sqlalchemy.orm import Session
 
 from sbam_api.audit.repository import entity_history
-from sbam_api.builds import workflow_ui
+from sbam_api.builds import workflow_image, workflow_ui
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.certifications.models import CertificationLevel
 from sbam_api.certifications.repository import CertificationRepository
@@ -116,15 +116,34 @@ def _sub_skills(session: Session, ctx: TenantContext, workflow_id: uuid.UUID) ->
 
 
 def merged(
-    manifest: WorkflowManifest | None, record: workflow_ui.WorkflowUiRecord | None
+    manifest: WorkflowManifest | None,
+    record: workflow_ui.WorkflowUiRecord | None,
+    image: workflow_image.WorkflowImageRecord | None = None,
 ) -> WorkflowManifest | None:
-    """The manifest as Commit freezes it. The build keeps the `ui_bundle` entry in the audit row
-    `workflow_ui_built` (the draft has no `mcp_server` to hang it on), so it is merged in here."""
-    if manifest is None or manifest.mcp_server is None or manifest.ui_bundle is not None:
-        return manifest
-    if record is None:
-        return manifest
-    return WorkflowManifest.sealed({**manifest.dump(), "ui_bundle": record.entry.dump()})
+    """The manifest as Commit freezes it. The build keeps the `mcp_server` entry (#867, the image
+    digest) and the `ui_bundle` entry (#768) in the audit rows `workflow_image_built` and
+    `workflow_ui_built`, because the draft has no image yet; they are merged in here. Nothing is
+    rebuilt: the digest is the one the build recorded."""
+    if manifest is None:
+        return None
+    done = manifest
+    if done.mcp_server is None and image is not None:
+        done = workflow_image.manifest_with_image(manifest.dump(), image)
+    if done.mcp_server is not None and done.ui_bundle is None and record is not None:
+        done = WorkflowManifest.sealed({**done.dump(), "ui_bundle": record.entry.dump()})
+    return done
+
+
+def image_failure(session: Session, tenant_id: uuid.UUID, workflow_id: uuid.UUID) -> str | None:
+    """Why the image is not there, when the latest image row of the build is a failure."""
+    for logged in reversed(entity_history(session, tenant_id, "workflow", str(workflow_id))):
+        if logged.action == workflow_image.BUILT_ACTION:
+            return None
+        if logged.action == workflow_image.FAILED_ACTION:
+            after = logged.after or {}
+            code, message = after.get("code", "unknown"), after.get("message", "")
+            return f"the image build failed ({code}): {message}"[:300]
+    return None
 
 
 def evaluate(
@@ -140,9 +159,11 @@ def evaluate(
         None if row is None else WorkflowManifest.model_validate_json(json.dumps(row.manifest))
     )
     sha = None if row is None else row.sha256
-    server = None if manifest is None else manifest.mcp_server
     record = workflow_ui.newest(session, ctx.tenant_id, workflow_id)
-    effective = merged(manifest, record)
+    image = workflow_image.current(session, ctx.tenant_id, workflow_id)
+    effective = merged(manifest, record, image)
+    failure = image_failure(session, ctx.tenant_id, workflow_id)
+    server = None if effective is None else effective.mcp_server
     lineage = {sha} if sha else set()
     for logged in entity_history(session, ctx.tenant_id, "workflow", str(workflow_id)):
         after = logged.after or {}
@@ -175,7 +196,8 @@ def evaluate(
         _check(CommitCheckName.SUB_SKILLS_CERTIFIED, _sub_skills(session, ctx, workflow_id)),
         _check(
             CommitCheckName.MCP_SERVER,
-            None if server is not None else "the manifest has no built MCP server image",
+            failure
+            or (None if server is not None else "the manifest has no built MCP server image"),
         ),
         _check(CommitCheckName.UI_BUNDLE, bundle),
         _check(CommitCheckName.SECRETS, secrets),

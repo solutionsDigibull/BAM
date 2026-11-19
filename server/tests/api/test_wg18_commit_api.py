@@ -21,7 +21,7 @@ import pytest
 from pydantic import SecretStr
 from sbam_api.audit import repository as audit
 from sbam_api.audit.models import AuditLog
-from sbam_api.builds import workflow_ui
+from sbam_api.builds import workflow_image, workflow_server, workflow_ui
 from sbam_api.builds.models import CodeAttempt
 from sbam_api.certifications.models import CertificationLevel, CertificationRow
 from sbam_api.connections.models import ConnectionRow
@@ -74,6 +74,7 @@ from test_wg12_workflow_registry import (
     UI_DIGEST,
     FakeBifrost,
     sealed,
+    server_entry,
 )
 
 KEY = "commit-key-0001"
@@ -174,18 +175,58 @@ def store_bundle(h: Harness) -> workflow_ui.WorkflowUiRecord:
     )
 
 
-def certify(h: Harness, *, ui: bool = True, build_no: int = 1, recorded: bool = False) -> str:
+def store_image(h: Harness) -> workflow_image.WorkflowImageRecord:
+    """The server files and the image row `build_workflow_image` writes (#867)."""
+    server = workflow_server.WorkflowServerRecord(
+        server_name="wf_investor_onboarding",
+        bundle_sha256="9" * 64,
+        tar_key="none",
+        files={},
+        tools=list(TOOLS),
+        base_layer_key="b",
+        top_layer_key="t",
+    )
+    image = workflow_image.WorkflowImageRecord(
+        bundle_sha256="9" * 64, image_digest=DIGEST, builder="docker", entry=server_entry()
+    )
+    with h.sessions() as s:
+        for action, after in (
+            (workflow_server.BUILT_ACTION, server.model_dump(mode="json")),
+            (workflow_image.BUILT_ACTION, image.model_dump(mode="json")),
+        ):
+            audit.record(
+                s,
+                tenant_id=TENANT_A,
+                actor_id="SYSTEM",
+                action=action,
+                entity_type="workflow",
+                entity_id=str(WORKFLOW),
+                correlation_id="cid-867",
+                after=after,
+            )
+        s.commit()
+    return image
+
+
+def certify(
+    h: Harness, *, ui: bool = True, build_no: int = 1, recorded: bool = False, imaged: bool = False
+) -> str:
     """A CERTIFIED Workflow whose Sub-Skill is certified on its code, with a sealed manifest,
     the WORKFLOW certificate and the UI_BUNDLE evidence. Returns the combined manifest hash."""
     project = uuid.UUID(h.project)
     manifest = sealed("1.0.0", DIGEST)
     record: workflow_ui.WorkflowUiRecord | None = None
+    image: workflow_image.WorkflowImageRecord | None = None
     if (
-        recorded
-    ):  # as the build leaves it: the bundle entry is in `workflow_ui_built`, not the manifest
+        recorded or imaged
+    ):  # as the build leaves it: the entries are in audit rows, not the manifest
         record = store_bundle(h)
-        plain = {k: v for k, v in manifest.dump().items() if k != "ui_bundle"}
-        manifest = WorkflowManifest.sealed(plain)
+        drop = {"ui_bundle", "mcp_server"} if imaged else {"ui_bundle"}
+        manifest = WorkflowManifest.sealed(
+            {k: v for k, v in manifest.dump().items() if k not in drop}
+        )
+    if imaged:
+        image = store_image(h)
     sha = manifest.integrity.content_sha256
     with h.sessions() as s:
         workflow = s.get(Workflow, WORKFLOW)
@@ -238,7 +279,8 @@ def certify(h: Harness, *, ui: bool = True, build_no: int = 1, recorded: bool = 
                 )
             )
         if record is not None:
-            built = WorkflowManifest.sealed({**manifest.dump(), "ui_bundle": record.entry.dump()})
+            base = workflow_image.manifest_with_image(manifest.dump(), image) if image else manifest
+            built = WorkflowManifest.sealed({**base.dump(), "ui_bundle": record.entry.dump()})
             audit.record(
                 s,
                 tenant_id=TENANT_A,
@@ -646,3 +688,49 @@ def test_wg18_a_missing_bundle_record_blocks_commit(h: Harness, client: FakeClie
     sha = certify(h, recorded=True)
     storage(h).delete(workflow_ui.newest(h.sessions(), TENANT_A, WORKFLOW).tar_key)  # type: ignore[union-attr]
     problem(post(h, sha), 409, "CONFLICT")
+
+
+# --- the image of #867: Commit merges the recorded server entry and never rebuilds ----------------
+
+
+def test_wg18_the_recorded_image_and_bundle_are_both_merged_and_the_digest_is_not_rebuilt(
+    h: Harness, client: FakeClient
+) -> None:
+    seed(h)
+    sha = certify(h, imaged=True)
+    assert h.call("GET", commit_url(h), h.fde()).json()["ready"] is True
+    runtime = FakeRuntime()
+    result = run_all(steps(h, FakeBifrost(TOOLS), runtime), commit_input(h, sha))
+    assert result.image_digest == DIGEST and runtime.requests[0].image_digest == DIGEST
+    with h.sessions() as s:
+        rows = list(s.scalars(select(WorkflowManifestRow).order_by(WorkflowManifestRow.build_no)))
+        frozen = WorkflowManifest.model_validate_json(json.dumps(rows[-1].manifest))
+        assert frozen.mcp_server is not None and frozen.mcp_server.image_digest == DIGEST
+        assert frozen.ui_bundle is not None and rows[-1].is_frozen is True
+        [entry] = s.scalars(select(RegisteredWorkflowRow)).all()
+        assert entry.image_digest == DIGEST
+
+
+def test_wg18_a_failed_image_build_refuses_commit_with_its_reason(
+    h: Harness, client: FakeClient
+) -> None:
+    seed(h)
+    sha = certify(h, imaged=True)
+    with h.sessions() as s:
+        audit.record(
+            s,
+            tenant_id=TENANT_A,
+            actor_id="SYSTEM",
+            action=workflow_image.FAILED_ACTION,
+            entity_type="workflow",
+            entity_id=str(WORKFLOW),
+            correlation_id="cid-867",
+            after={"code": "BUILDER_DISABLED", "message": "no builder is configured"},
+        )
+        s.commit()
+    res = post(h, sha)
+    problem(res, 409, "CONFLICT")
+    assert "BUILDER_DISABLED" in res.json()["detail"]
+    assert client.started == []
+    with h.sessions() as s:
+        assert len(s.scalars(select(WorkflowManifestRow)).all()) == 1
