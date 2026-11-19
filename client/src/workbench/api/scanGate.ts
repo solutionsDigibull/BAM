@@ -94,9 +94,13 @@ export function triage<T extends { name: string; size: number }>(files: ArrayLik
   return r
 }
 
-export const MAX_MULTI_BATCH_WAVES = 1 // a project holds at most 20 active files, so there is one wave
-export const MAX_MULTI_BATCH_FILES = MAX_BATCH_FILES * MAX_MULTI_BATCH_WAVES // 20 files
-export const MAX_MULTI_BATCH_BYTES = MAX_BATCH_BYTES * MAX_MULTI_BATCH_WAVES // 300 MB
+export const MAX_MULTI_BATCH_WAVES = 1 // a project holds one batch of active files, so there is one wave
+export const MAX_MULTI_BATCH_FILES = MAX_BATCH_FILES * MAX_MULTI_BATCH_WAVES // waves x files per batch
+export const MAX_MULTI_BATCH_BYTES = MAX_BATCH_BYTES * MAX_MULTI_BATCH_WAVES // waves x bytes per batch
+
+/** "1 batch of 25" / "2 batches of 25": the wording follows the constants, never a number typed in a string. */
+export const multiBatchLimitText = (): string =>
+  `${MAX_MULTI_BATCH_WAVES} ${MAX_MULTI_BATCH_WAVES === 1 ? 'batch' : 'batches'} of ${MAX_BATCH_FILES}`
 
 export interface MultiBatchFit {
   ok: boolean
@@ -111,10 +115,10 @@ export function fitMultiBatch<T extends { size: number; name?: string }>(chosen:
   const bytes = chosen.reduce((n, f) => n + f.size, 0)
   if (!chosen.length) return { ok: false, count: 0, bytes: 0, batchCount: 0, waves: [], reason: 'Select at least one file' }
   if (chosen.length > MAX_MULTI_BATCH_FILES) {
-    return { ok: false, count: chosen.length, bytes, batchCount: 0, waves: [], reason: `${chosen.length} chosen; exceeds maximum limit of ${MAX_MULTI_BATCH_FILES} files (up to 9 batches of 25). Deselect ${chosen.length - MAX_MULTI_BATCH_FILES}.` }
+    return { ok: false, count: chosen.length, bytes, batchCount: 0, waves: [], reason: `${chosen.length} chosen; exceeds maximum limit of ${MAX_MULTI_BATCH_FILES} files (${multiBatchLimitText()}). Deselect ${chosen.length - MAX_MULTI_BATCH_FILES}.` }
   }
   if (bytes > MAX_MULTI_BATCH_BYTES) {
-    return { ok: false, count: chosen.length, bytes, batchCount: 0, waves: [], reason: `${mb(bytes)} chosen; exceeds maximum budget across 9 batches (${mb(MAX_MULTI_BATCH_BYTES)}). Deselect ${mb(bytes - MAX_MULTI_BATCH_BYTES)}.` }
+    return { ok: false, count: chosen.length, bytes, batchCount: 0, waves: [], reason: `${mb(bytes)} chosen; exceeds maximum budget across ${multiBatchLimitText()} (${mb(MAX_MULTI_BATCH_BYTES)}). Deselect ${mb(bytes - MAX_MULTI_BATCH_BYTES)}.` }
   }
   const waves: MultiBatchFit['waves'] = []
   const batchCount = Math.max(1, Math.ceil(chosen.length / MAX_BATCH_FILES))
