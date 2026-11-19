@@ -40,6 +40,35 @@ REQUIRED_GATES: Final = tuple(
     }
 )
 
+# The gates whose writers always record the hash of the bundle they judged: the AST gate
+# (build/gates/ast_gate.py `_record`), and every gate written through `record_verdicts`
+# (build/gates/stored_bundle.py): static (RUFF, BLACK, MYPY, BANDIT, CLAMAV), import, compliance
+# and review. A row of these without a hash is not about this bundle. ISATVON_CONTRACT, LIBRARIES
+# and SCHEMA_SQL run before there is a bundle and keep the plain rule (a hash, when present, must
+# match).
+BUNDLE_GATES: Final = frozenset(
+    {
+        GateName.AST_SYNTAX,
+        GateName.AST_SKELETON,
+        GateName.AST_CONFORMANCE,
+        GateName.AST_DECOUPLING,
+        GateName.AST_NO_MANUAL_LOOP,
+        GateName.AST_HANDOFF,
+        GateName.AST_IMPORTS,
+        GateName.AST_SQL_SAFETY,
+        GateName.RUFF,
+        GateName.BLACK,
+        GateName.MYPY,
+        GateName.BANDIT,
+        GateName.CLAMAV,
+        GateName.IMPORT_RESOLUTION,
+        GateName.REPO_LICENCE,
+        GateName.DEPENDENCY_VULN,
+        GateName.MCP_COMPLIANCE,
+        GateName.REVIEW,
+    }
+)
+
 
 class Reason(StrEnum):
     NON_CERTIFYING_RUN = "NON_CERTIFYING_RUN"
@@ -138,7 +167,10 @@ def _same_bundle(evidence: Evidence) -> bool:
     for g in evidence.gates:
         if g.code_attempt_id != evidence.code_attempt_id:
             return False
-        if g.bundle_sha256 is not None and g.bundle_sha256 != evidence.bundle_sha256:
+        if g.gate in BUNDLE_GATES:
+            if g.bundle_sha256 != evidence.bundle_sha256:  # None is a mismatch too
+                return False
+        elif g.bundle_sha256 is not None and g.bundle_sha256 != evidence.bundle_sha256:
             return False
     sandbox, test = evidence.sandbox, evidence.test
     return (
@@ -159,7 +191,8 @@ def _test_reasons(evidence: Evidence) -> list[str]:
     if test.state is TestRunState.NON_CERTIFYING:
         return [Reason.NON_CERTIFYING_RUN.value]
     reasons: list[str] = []
-    if test.state is not TestRunState.PASS or test.failed:
+    # every case must be accounted for: one that neither passed nor failed did not pass
+    if test.state is not TestRunState.PASS or test.failed or test.passed != test.total:
         reasons.append(Reason.TESTS_FAILED.value)
     if test.total < MIN_CASES:
         reasons.append(Reason.MIN_SCENARIOS.value)
