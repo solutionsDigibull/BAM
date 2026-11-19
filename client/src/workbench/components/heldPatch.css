@@ -1,0 +1,13 @@
+/* Translate (4.3): the held ISATVON patch of a Sub-Skill that waits for the FDE (#715). Tokens come from the workbench theme. */
+.bam-wb .hp-card { border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border)); border-radius: 10px; background: var(--warn-soft); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .hp-head { display: flex; gap: 8px; align-items: flex-start; }
+.bam-wb .hp-head h4 { margin: 0; font-size: 13px; }
+.bam-wb .hp-head p { margin: 2px 0 0; }
+.bam-wb .hp-why { margin: 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bam-wb .hp-chip { margin-left: 4px; font-size: 11.5px; }
+.bam-wb .hp-ops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.bam-wb .hp-ops li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.bam-wb .hp-path { font-family: 'JetBrains Mono', monospace; }
+.bam-wb .hp-value { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.bam-wb .hp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.bam-wb .hp-reason { width: 100%; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; resize: vertical; }

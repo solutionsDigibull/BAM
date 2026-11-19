@@ -5,6 +5,7 @@ import {
   canRetry, gateLabel, GATE_STATUS_LABEL, gateTone, hasFailedGate, isForbidden, MAX_REASON, newRetryKey, problemText, reachedGates,
   sendRetry, stateLabel, stateTone, summary, useBuilds, useGates,
 } from '../lib/workflowBuilds'
+import { HeldPatchCard } from './HeldPatchCard'
 import { Banner, Dialog, Empty, ErrorState, Icon, Section, Skeleton } from './ui'
 import './buildsPanel.css'
 
@@ -67,6 +68,7 @@ function Row({ workflowId, row, onRetry }: { workflowId: string; row: BuildRow; 
       {gates.length > 0
         ? <ul className="bld-chips" aria-label={`Gates of ${row.skill_name}`}>{gates.map(g => <li key={g.name}><span className={`pill tone-${gateTone(g.status)}`} title={`${g.label}: ${GATE_STATUS_LABEL[g.status]}`}>{g.label}</span></li>)}</ul>
         : <p className="muted xs">No gate has run yet.</p>}
+      {row.state === 'NEEDS_FDE_REVIEW' && <HeldPatchCard workflowId={workflowId} subId={row.sub_skill_id} name={row.skill_name} />}
       {open && (
         <div className="bld-detail">
           {attempts.length > 1 && (

@@ -14,6 +14,8 @@ import type {
   Connection,
   ConnectionList,
   GatesResponse,
+  HeldPatchResponse,
+  PatchDecided,
   KnowledgeNodeDetail,
   ConnectionTestResult,
   ConnectionValueResult,
@@ -119,6 +121,17 @@ export function createSbamApi(projectId: string): BamApi {
       (await getJson<GatesResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/gates${attempt === undefined ? "" : `?attempt=${attempt}`}`)).body,
     retrySubSkill: async (workflowId, subId, reason, key) =>
       (await postJson<RetryAccepted>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/retry`, { reason }, { "Idempotency-Key": key })).body,
+    // The held ISATVON patch of a Sub-Skill and the FDE's decision on it (#715): accepting is guarded by the Sub-Skill's hash (If-Match).
+    getHeldPatch: async (workflowId, subId) =>
+      (await getJson<HeldPatchResponse>(`projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/held-patch`)).body,
+    decideHeldPatch: async (workflowId, subId, decision, reason, key, ifMatch) =>
+      (
+        await postJson<PatchDecided>(
+          `projects/${projectId}/workflows/${workflowId}/sub-skills/${subId}/held-patch/${decision}`,
+          reason ? { reason } : {},
+          { "Idempotency-Key": key, ...(ifMatch ? { "If-Match": ifMatch } : {}) },
+        )
+      ).body,
     // The project's secrets (#764): the value goes out once in a PUT and is never returned.
     getConnections: async () => (await getJson<ConnectionList>(`projects/${projectId}/connections`)).body,
     setConnectionValue: async (name, value, ifMatch) =>

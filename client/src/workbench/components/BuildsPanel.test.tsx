@@ -32,6 +32,7 @@ const install = (over: Partial<BamApi> = {}) =>
   setBamApi({
     getWorkflowBuilds: async () => BUILDS(),
     getSubSkillGates: async () => GATES,
+    getHeldPatch: async () => ({ held: null }),
     retrySubSkill: async () => ({ sub_skill_id: SUB, build_no: 4 }),
     ...over,
   } as unknown as BamApi);
