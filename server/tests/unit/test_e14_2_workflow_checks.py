@@ -40,7 +40,7 @@ def _dag(edges: list[tuple[str, str, str]], extra: tuple[str, ...] = ()) -> Dag:
     ]
     return Dag(
         nodes=nodes,  # type: ignore[arg-type]
-        edges=[{"from": a, "to": b, "kind": k} for a, b, k in edges],  # type: ignore[misc]
+        edges=[{"from": a, "to": b, "kind": k} for a, b, k in edges],
     )
 
 
@@ -94,6 +94,20 @@ def test_e14_2_t03_cycle_detected() -> None:
     )
     verdict = workflow_verdict(_dag(edges), SCHEMA, DECLARED, _children())
     assert [f.check for f in verdict] == [Check.DAG_CYCLE]
+
+
+def test_e14_2_a_next_edge_back_to_its_own_macro_is_not_a_cycle() -> None:
+    """build_dag accepts a `next` naming the skill's own Macro; with `contains` it only looks like
+    a loop, and only data edges are build dependencies."""
+    edges = [*GOOD_EDGES, ("MS01.2_Bill", "MS01_Order", "next")]
+    assert dag_findings(_dag(edges)) == ()
+    assert workflow_verdict(_dag(edges), SCHEMA, DECLARED, _children()) == ()
+
+
+def test_e14_2_a_next_loop_between_skills_is_not_a_cycle() -> None:
+    edges = [*GOOD_EDGES, ("MS01.2_Bill", "MS01.1_Intake", "next")]
+    assert dag_findings(_dag(edges)) == ()
+    assert workflow_verdict(_dag(edges), SCHEMA, DECLARED, _children()) == ()
 
 
 def test_e14_2_find_cycle_is_generic_and_still_works_on_uuids() -> None:

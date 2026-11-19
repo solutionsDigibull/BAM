@@ -3,8 +3,11 @@ certifies, beyond each Sub-Skill's own certificate (E14.1).
 
 Every check is a pure function of what the certify activity loaded, so every rule is a unit test:
 
-  * `dag_findings`: every edge joins known nodes (DAG_UNKNOWN_NODE) and the edges never loop
-    (DAG_CYCLE, the subject is the path);
+  * `dag_findings`: every edge joins known nodes (DAG_UNKNOWN_NODE) and the data edges never loop
+    (DAG_CYCLE, the subject is the path). Only `data` edges count for a cycle, as in
+    `build.dag.build_dag`: they are the build dependencies. A `next` may loop or name the skill's
+    own Macro (with `contains` that would look like a cycle), and the build accepts it, so the
+    certification is not stricter than the build;
   * `schema_findings`: the Workflow's schema.sql parses and passes the allowlist (SCHEMA_INVALID)
     and has a CREATE TABLE for every table a Sub-Skill declares (SCHEMA_TABLE_MISSING);
   * `children_findings`: every Sub-Skill is certified on the bundle it has now
@@ -74,7 +77,8 @@ def _sorted(findings: Iterable[Finding]) -> tuple[Finding, ...]:
 
 
 def dag_findings(dag: DagLike) -> tuple[Finding, ...]:
-    """Unknown edge endpoints, then one cycle (if any) as `a -> b -> a`."""
+    """Unknown edge endpoints (any edge kind), then one cycle over the data edges (if any) as
+    `a -> b -> a`; `contains` and `next` edges never make a cycle (see the module docstring)."""
     known = {str(node.get("id")) for node in dag.nodes}
     findings: list[Finding] = []
     adjacency: dict[str, set[str]] = {}
@@ -89,7 +93,7 @@ def dag_findings(dag: DagLike) -> tuple[Finding, ...]:
                     f"{edge.get('kind', 'edge')} edge {ends[0]} -> {ends[1]} names an unknown node",
                 )
             )
-        if not unknown:
+        if not unknown and edge.get("kind") == "data":
             adjacency.setdefault(ends[0], set()).add(ends[1])
     cycle = find_cycle({node: sorted(targets) for node, targets in adjacency.items()})
     if cycle:
