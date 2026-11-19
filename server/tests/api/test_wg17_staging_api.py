@@ -197,7 +197,7 @@ def test_wg17_the_egress_proxy_and_allowlist_reach_the_container_when_configured
     run_all(steps_, commit_input(h, sha))
     [spec] = deployer.started
     proxy = spec.plain_env["HTTPS_PROXY"]
-    token = proxy.removeprefix("http://").split("@")[0]
+    token = proxy.removeprefix("http://").split("@")[0].split(":")[0]
     assert proxy.endswith("@egress:3128") and spec.plain_env["SBAM_EGRESS_ALLOWLIST"]
     found = policies.read(token)
     assert found is not None and found[1].decide("api.example.com").allowed

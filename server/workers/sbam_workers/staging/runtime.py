@@ -268,7 +268,9 @@ class DeployerStagingRuntime:
         token = secrets.token_hex(16)
         policies.write(token, name, hosts)
         parts = urlsplit(proxy)
-        url = f"{parts.scheme}://{token}@{parts.netloc}"
+        # `token:x`, not `token@`: urllib and requests send no Proxy-Authorization for a user name
+        # without a password: the proxy answered 403 "unknown deployment token" (live stack, #908).
+        url = f"{parts.scheme}://{token}:x@{parts.netloc}"
         no_proxy = f"localhost,127.0.0.1,{name}"
         return {
             "HTTP_PROXY": url,

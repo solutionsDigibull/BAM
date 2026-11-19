@@ -3,8 +3,8 @@
 
 # Compose stack (TD §20.3). ENV_FILE can point at another env file, e.g. `make up ENV_FILE=/tmp/ci.env`.
 ENV_FILE ?= compose/.env
-# Optional profiles on top of core, one file each: `make up PROFILES=obs,sandbox-local` (E1.11).
-VALID_PROFILES := obs analytics sandbox-local
+# Optional profiles on top of core, one file each: `make up PROFILES=obs,sandbox-local,staging-runtime` (E1.11).
+VALID_PROFILES := obs analytics sandbox-local staging-runtime
 comma := ,
 PROFILE_LIST := $(subst $(comma), ,$(PROFILES))
 ifneq ($(filter-out $(VALID_PROFILES),$(PROFILE_LIST)),)
