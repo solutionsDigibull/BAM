@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:a6aea38e8c0dd86f46e577e85a427222f93eb95f6d356bd68a406e46512e89d7
+// source-sha256:7a4b1d1368d01a9978135596843e35b2cd8e6841dfae1d1786a59f16a714369d
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -247,6 +247,30 @@ export type ReviewCategory =
   "SPEC_MISMATCH" | "MISSING_REQUIREMENT" | "WRONG_OUTPUT" | "HANDOFF" | "STATE_WRITE" | "SAFETY" | "OTHER";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ChangeNoteStatus".
+ */
+export type ChangeNoteStatus = "PROCESSING" | "REBUILDING" | "HELD_PATCH" | "PARKED" | "QUEUED";
+/**
+ * What a run works on; `subject_id` is that entity's id.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubjectType".
+ */
+export type SubjectType = "project" | "document_version" | "sub_skill";
+/**
+ * Execution state as mirrored in `temporal_runs` (Temporal's workflow execution status).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RunState".
+ */
+export type RunState = "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "TIMED_OUT";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ChangeNoteOutcome".
+ */
+export type ChangeNoteOutcome = "CODE" | "MEANING";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "SchemaSource".
  */
 export type SchemaSource = "UPLOADED" | "GENERATED";
@@ -287,20 +311,6 @@ export type GroupKind = "sub_skill" | "workflow";
  * via the `definition` "FileTag".
  */
 export type FileTag = "reused" | "customized" | "generated";
-/**
- * What a run works on; `subject_id` is that entity's id.
- *
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "SubjectType".
- */
-export type SubjectType = "project" | "document_version" | "sub_skill";
-/**
- * Execution state as mirrored in `temporal_runs` (Temporal's workflow execution status).
- *
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "RunState".
- */
-export type RunState = "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "TIMED_OUT";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "Actor".
@@ -694,6 +704,10 @@ export interface SbamContracts {
   HeldPatchResponse?: HeldPatchResponse;
   PatchDecision?: PatchDecision;
   PatchDecided?: PatchDecided;
+  RequestChangeCreate?: RequestChangeCreate;
+  RequestChangeAccepted?: RequestChangeAccepted;
+  ChangeNoteList?: ChangeNoteList;
+  ChangeNoteAnswer?: ChangeNoteAnswer;
   WorkflowSchemaSql?: WorkflowSchemaSql;
   SchemaSqlSourcePut?: SchemaSqlSourcePut;
   Isa14Manifest?: Isa14Manifest;
@@ -1816,6 +1830,81 @@ export interface PatchDecided {
   sub_skill_id: string;
   build_no: number;
   decision: "ACCEPTED" | "REJECTED";
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RequestChangeCreate".
+ */
+export interface RequestChangeCreate {
+  sub_skill_id: string;
+  note: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RequestChangeAccepted".
+ */
+export interface RequestChangeAccepted {
+  note: ChangeNote;
+  run?: Run | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ChangeNote".
+ */
+export interface ChangeNote {
+  id: string;
+  sub_skill_id: string;
+  workflow_version: string;
+  note: string;
+  status: ChangeNoteStatus;
+  reason?: string | null;
+  created_at: string;
+}
+/**
+ * One Temporal execution as the API returns it (mirror of `temporal_runs`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "Run".
+ */
+export interface Run {
+  id: string;
+  /**
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|request-change-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
+   */
+  temporal_workflow_id: string;
+  temporal_run_id: string;
+  /**
+   * Workflow type name
+   */
+  type: string;
+  subject_type: SubjectType;
+  subject_id: string;
+  state: RunState;
+  current_stage?: string | null;
+  last_error?: string | null;
+  started_at: string;
+  updated_at: string;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ChangeNoteList".
+ */
+export interface ChangeNoteList {
+  notes?: ChangeNote[];
+  used: number;
+  limit?: number;
+}
+/**
+ * What the classifier model answers. A MEANING answer carries the patch (RFC 6902, every
+ * path under `/isatvon_definition/`); a CODE answer carries none.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ChangeNoteAnswer".
+ */
+export interface ChangeNoteAnswer {
+  outcome: ChangeNoteOutcome;
+  rationale: string;
+  isatvon_patch?: HeldPatchOp[] | null;
 }
 /**
  * One version of a Workflow's schema.sql with its SCHEMA_SQL verdict. An uploaded base that no
@@ -3514,31 +3603,6 @@ export interface SowImpactMacroSkill {
 export interface SowImpactSubSkill {
   skill_id: string;
   reason: string;
-}
-/**
- * One Temporal execution as the API returns it (mirror of `temporal_runs`).
- *
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "Run".
- */
-export interface Run {
-  id: string;
-  /**
-   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
-   */
-  temporal_workflow_id: string;
-  temporal_run_id: string;
-  /**
-   * Workflow type name
-   */
-  type: string;
-  subject_type: SubjectType;
-  subject_id: string;
-  state: RunState;
-  current_stage?: string | null;
-  last_error?: string | null;
-  started_at: string;
-  updated_at: string;
 }
 /**
  * `202 Accepted` body of every long-running command.

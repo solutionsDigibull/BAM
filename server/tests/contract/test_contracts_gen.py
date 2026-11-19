@@ -48,6 +48,7 @@ from sbam_contracts import (
     repo_decision,
     repo_overlay,
     repo_scan,
+    request_change,
     review,
     runs,
     runtime_registry,
@@ -275,6 +276,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("workflow", workflow_repos),
             ("build", review),
             ("connections", connections),
+            ("request_change", request_change),
         )
         for stem in module.schemas()
     }

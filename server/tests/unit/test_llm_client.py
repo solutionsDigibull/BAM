@@ -425,6 +425,7 @@ def copy_prompts(tmp_path: Path) -> Path:
 def test_e6_1_shipped_prompts_match_their_manifest() -> None:
     registry = PromptRegistry()
     assert registry.ids() == [
+        "change-note",
         "codegen-bodies",
         "correct-code",
         "isatvon-macros",
