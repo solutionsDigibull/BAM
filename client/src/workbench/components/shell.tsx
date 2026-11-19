@@ -24,8 +24,9 @@ export function TopBar({ syncedAt, offline }: { snap?: Snapshot; syncedAt: numbe
   const theme = useUi(s => s.theme)
   const env = useUi(s => s.env)
   // Breadcrumb: Stage › Step (Admin › Masters keeps the workspace name).
-  const first = global === 'admin' ? 'Admin' : id ? stageOf(id)?.label ?? '' : env === 'FDE' ? 'FDE workspace' : 'Staging'
-  const current = global ? GLOBAL_ROUTES[global].label : id ? screenLabel(id) : ''
+  const staging = env === 'Staging' && !global // Staging mode shows the committed workflow's UI, not a step (#861)
+  const first = global === 'admin' ? 'Admin' : staging ? 'Staging' : id ? stageOf(id)?.label ?? '' : env === 'FDE' ? 'FDE workspace' : 'Staging'
+  const current = global ? GLOBAL_ROUTES[global].label : staging ? 'Workflow UI' : id ? screenLabel(id) : ''
   return (
     <header className="topbar">
       <div className="brand">

@@ -38,10 +38,14 @@ export const problemOf = (e: unknown, fallback = 'The request failed.'): string 
 /** A Commit run is going right now (the button waits for it). */
 export const isRunning = (s: CommitStatus | undefined): boolean => s?.run?.state === 'RUNNING'
 
+/** A committed workflow whose Staging start did not happen (no runtime yet, or it failed): Commit again runs the start again (#861). */
+export const canRestart = (s: CommitStatus | undefined): boolean =>
+  s?.state === 'COMMITTED' && (s.staging?.status === 'PENDING_RUNTIME' || s.staging?.status === 'FAILED')
+
 /** Why the Commit button is locked, or undefined when it may be pressed. The server checks again. */
 export function commitReason(s: CommitStatus | undefined): string | undefined {
   if (!s) return 'Loading the checks'
-  if (s.state === 'COMMITTED') return 'This version is already committed to Staging'
+  if (s.state === 'COMMITTED' && !canRestart(s)) return 'This version is already committed to Staging'
   if (isRunning(s)) return 'A commit is running'
   if (!s.manifest_hash) return 'There is no built workflow to commit yet'
   const failed = (s.checks ?? []).find(c => !c.passed)

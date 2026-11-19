@@ -35,6 +35,7 @@ import { prerequisite } from './lib/prereq'
 import { getDrafts } from './lib/drafts'
 import { projectIdOfPath } from './lib/evidence'
 import { CertEvidence } from './steps/CertEvidence'
+import { StagingCenter } from './steps/Staging'
 
 export interface StepProps { snap: Snapshot; info: StepInfo }
 
@@ -196,10 +197,13 @@ function WorkbenchBody() {
       </PanesContext.Provider>
     </>
   }
-  const title = screenLabel(screen!.id)
-  const hint = screen!.item.description
+  // Staging mode (#861, ADR 0032): the committed workflow's generated UI replaces the screen; FDE mode never shows it.
+  const staging = env === 'Staging'
+  if (staging) body = <PanesContext.Provider value><main className="panes" data-single=""><StagingCenter workflowId={snap.workflowId} /></main></PanesContext.Provider>
+  const title = staging ? 'Staging' : screenLabel(screen!.id)
+  const hint = staging ? 'The workflow you committed, running in Staging' : screen!.item.description
   // One primary action, pinned below the body; a footer that renders nothing (Review while waiting) draws no bar.
-  const foot = screen && FOOT[screen.id] && (info?.state !== 'locked' || templateReady) ? FOOT[screen.id]!({ snap, info }) : null
+  const foot = !staging && screen && FOOT[screen.id] && (info?.state !== 'locked' || templateReady) ? FOOT[screen.id]!({ snap, info }) : null
   // Back goes to the previous screen in the rail order; hidden detail views go back to the screen they belong to.
   const prev = !screen ? undefined
     : screen.item.hidden && screen.item.navAs ? NAV_ORDER.find(s => s.id === screen.item.navAs)

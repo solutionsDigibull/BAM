@@ -1,7 +1,7 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
-  CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
-  RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
+  BuildsResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
+  RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
 
@@ -28,6 +28,14 @@ export interface BamApi {
   commitWorkflow(workflowId: string, manifestHash: string, key: string): Promise<CommitAccepted>
   /** One entity of a knowledge version with its neighbours and the passages of the documents it came from (read only, #712). */
   getKnowledgeNode(versionId: string, nodeId: string): Promise<KnowledgeNodeDetail>
+  /** The workflow's Staging deployment: state, health, the version running and the history (FDE only; 404 = never committed or not yours, #861). */
+  getStagingStatus(workflowId: string): Promise<StagingStatus>
+  /** The change notes of the workflow's current version and how many of the allowed ones are used (#767). */
+  getChangeNotes(workflowId: string): Promise<ChangeNoteList>
+  /** Request change from Staging (ADR 0032 decision 5): a plain-words note on one Sub-Skill, with an Idempotency-Key. 409 once the version has its 3 notes. */
+  requestChange(workflowId: string, body: RequestChangeCreate, key: string): Promise<RequestChangeAccepted>
+  /** The Sub-Skill rows of the workflow's build (the choices of a change note). */
+  getWorkflowBuilds(workflowId: string): Promise<BuildsResponse>
   /** The project's secrets: names, status and masked tail, never a value (#764). */
   getConnections(): Promise<ConnectionList>
   /** Sets or replaces one value (`ifMatch` is the entry's row version; none for a name with no row yet). The value is never read back. */
@@ -74,6 +82,7 @@ export interface BamApi {
   runTests(): Promise<void>
   markTestsReviewed(): Promise<void>
   commitToPostgres(): Promise<void>
+  /** Staging is started by Commit (#766) and read with `getStagingStatus`; there is no separate deploy action. Kept for the old store API. */
   deployToStaging(): Promise<void>
 }
 
@@ -113,6 +122,9 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'repo-questions': q => api.getRepoQuestions(q.workflowId ?? ''),
   'workflow-registration': q => api.getWorkflowRegistration(q.workflowId ?? '', q.version),
   'commit-status': q => api.getCommitStatus(q.workflowId ?? ''),
+  'staging-status': q => api.getStagingStatus(q.workflowId ?? ''),
+  'change-notes': q => api.getChangeNotes(q.workflowId ?? ''),
+  'workflow-builds': q => api.getWorkflowBuilds(q.workflowId ?? ''),
   connections: () => api.getConnections(),
   'knowledge-node': q => api.getKnowledgeNode(q.versionId ?? '', q.nodeId ?? ''),
 }

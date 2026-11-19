@@ -6,6 +6,8 @@ import type { IngestionRun } from "../api/types";
 import { ragPipeline, setRagActions } from "../rag/ragPipeline";
 import { API_BASE } from "@/providers/data-provider";
 import type {
+  BuildsResponse,
+  ChangeNoteList,
   CommitAccepted,
   CommitStatus,
   Connection,
@@ -16,6 +18,8 @@ import type {
   RegisteredWorkflow,
   RepoAnswered,
   RepoQuestions,
+  RequestChangeAccepted,
+  StagingStatus,
   WorkflowCodeTree,
   WorkflowFileView,
   WorkflowRepositories,
@@ -99,6 +103,15 @@ export function createSbamApi(projectId: string): BamApi {
     // One graph entity with the passages it was read from (#712): the node id is opaque, so it is encoded.
     getKnowledgeNode: async (versionId, nodeId) =>
       (await getJson<KnowledgeNodeDetail>(`projects/${projectId}/knowledge/${versionId}/nodes/${encodeURIComponent(nodeId)}`)).body,
+    // Staging (#861): the deployment's state and history, and Request change from Staging (#767).
+    getStagingStatus: async (workflowId) =>
+      (await getJson<StagingStatus>(`projects/${projectId}/workflows/${workflowId}/staging`)).body,
+    getChangeNotes: async (workflowId) =>
+      (await getJson<ChangeNoteList>(`projects/${projectId}/workflows/${workflowId}/request-change`)).body,
+    requestChange: async (workflowId, body, key) =>
+      (await postJson<RequestChangeAccepted>(`projects/${projectId}/workflows/${workflowId}/request-change`, body, { "Idempotency-Key": key })).body,
+    getWorkflowBuilds: async (workflowId) =>
+      (await getJson<BuildsResponse>(`projects/${projectId}/workflows/${workflowId}/builds`)).body,
     // The project's secrets (#764): the value goes out once in a PUT and is never returned.
     getConnections: async () => (await getJson<ConnectionList>(`projects/${projectId}/connections`)).body,
     setConnectionValue: async (name, value, ifMatch) =>
@@ -163,7 +176,7 @@ export function createSbamApi(projectId: string): BamApi {
     runTests: notWired("Running the tests"),
     markTestsReviewed: notWired("Marking the tests reviewed"),
     commitToPostgres: notWired("Committing"),
-    deployToStaging: notWired("Deploying"),
+    deployToStaging: notWired("A separate deploy (Commit starts Staging)"),
   };
 }
 
