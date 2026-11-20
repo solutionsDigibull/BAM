@@ -28,7 +28,8 @@ from sbam_contracts.testgen import MIN_CASES, REQUIRED_KINDS, CaseKind
 # a build that predates the review pass has no row and still certifies, but a row that is on record
 # must have PASSED (see `_gate_reasons`). IMPORT_RESOLUTION (#922, ADR 0040) is no longer evidence:
 # SBAM does not resolve or block imports. Its enum value stays so rows frozen before the change
-# still read and validate; a row on record is ignored here, a missing one is not a reason.
+# still read and validate; a missing row is not a reason and a row on record is not judged (its
+# bundle hash is still checked below, like any gate on record).
 REQUIRED_GATES: Final = tuple(
     g
     for g in GateName
