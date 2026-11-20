@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:c5240ad715c46f322c59f6ad77fd11d1a39087d3b2b5932bf67bd20b1af99cc9
+// source-sha256:38fb5dd692beb4dbb9f86aad88e52925ec77bf50037c2befd2a0cb58bee853d0
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -454,6 +454,16 @@ export type RouteSource = "DEFAULT_BY_FILETYPE" | "ADMIN_OVERRIDE" | "CLASSIFIER
 export type ParseStatus = "PENDING" | "PARSING" | "PARSED" | "FAILED";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MastersScanKind".
+ */
+export type MastersScanKind = "IMPORT" | "DOCUMENT";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MastersScanState".
+ */
+export type MastersScanState = "QUEUED" | "RUNNING" | "DONE" | "FAILED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "AgentKind".
  */
 export type AgentKind = "Agent" | "Assistant";
@@ -826,6 +836,8 @@ export interface SbamContracts {
   MasterDocumentPatch?: MasterDocumentPatch;
   MasterDocumentOut?: MasterDocumentOut;
   MasterDocumentList?: MasterDocumentList;
+  MastersImportAccepted?: MastersImportAccepted;
+  MastersScanStatus?: MastersScanStatus;
   OrganizationPayloadV03?: OrganizationPayloadV03;
   RulesPayloadV03?: RulesPayloadV03;
   AgentsPayloadV03?: AgentsPayloadV03;
@@ -2033,7 +2045,7 @@ export interface ChangeNote {
 export interface Run {
   id: string;
   /**
-   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|request-change-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|workflow-commit-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
+   * Pattern: `^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|request-change-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|workflow-commit-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|masters-scan-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`
    */
   temporal_workflow_id: string;
   temporal_run_id: string;
@@ -4729,6 +4741,38 @@ export interface MasterDocumentOut {
  */
 export interface MasterDocumentList {
   items: MasterDocumentOut[];
+}
+/**
+ * `202 Accepted` body of the two masters upload routes when the client asked to respond
+ * asynchronously. Poll `GET /admin/masters/scans/{scan_id}`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MastersImportAccepted".
+ */
+export interface MastersImportAccepted {
+  scan_id: string;
+  kind: MastersScanKind;
+  state: MastersScanState;
+  run: Run;
+}
+/**
+ * The state of one scan, and its result once DONE (exactly one of `import_report` /
+ * `document` for the kind) or its problem once FAILED.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "MastersScanStatus".
+ */
+export interface MastersScanStatus {
+  scan_id: string;
+  kind: MastersScanKind;
+  state: MastersScanState;
+  run?: Run | null;
+  import_report?: ImportReport | null;
+  document?: MasterDocumentOut | null;
+  created?: boolean | null;
+  error?: ProblemDetail | null;
+  created_at: string;
+  updated_at: string;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
