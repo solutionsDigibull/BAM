@@ -25,15 +25,15 @@ for (const width of [320, 390]) {
     await page.goto("/admin/projects");
     const burger = page.getByRole("button", { name: "Open navigation" });
     await expect(burger).toBeVisible();
-    expect(await noOverflow(page)).toBe(true);
+    await expect.poll(() => noOverflow(page)).toBe(true); // the sider's collapse animates on first load
     await burger.click(); // the open nav overlays the page, it doesn't widen it
     await expect(page.getByRole("button", { name: "Close navigation" })).toBeVisible();
-    expect(await noOverflow(page)).toBe(true);
+    await expect.poll(() => noOverflow(page)).toBe(true); // the sider's collapse animates on first load
 
     await page.context().clearCookies();
     await page.goto("/login-admin");
     await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
-    expect(await noOverflow(page)).toBe(true);
+    await expect.poll(() => noOverflow(page)).toBe(true); // the sider's collapse animates on first load
   });
 }
 

@@ -4,7 +4,7 @@ const signInAs = async (page: Page, roles: string, baseURL: string) => {
   await page.context().addCookies([{ name: "sbam_dev_roles", value: roles, url: baseURL }]);
 };
 
-test("e1_13_t01 admin shell shows projects, masters, users, registry, tenants", async ({
+test("e1_13_t01 admin shell shows projects, users, registry, tenants and the Admin Masters switch", async ({
   page,
   baseURL,
 }) => {
@@ -12,9 +12,16 @@ test("e1_13_t01 admin shell shows projects, masters, users, registry, tenants", 
   await page.goto("/");
   await expect(page).toHaveURL(/\/admin\/projects$/);
   const nav = page.locator(".ant-layout-sider");
-  for (const item of ["Projects", "Masters", "Users & Roles", "Registry", "Tenants"]) {
+  for (const item of ["Projects", "Users & Roles", "Registry", "Tenants"]) {
     await expect(nav.getByRole("link", { name: item })).toBeVisible();
   }
+  // Masters moved to its own mode (#869): the switch in the header, not a sidebar item
+  await expect(nav.getByRole("link", { name: "Masters" })).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Admin mode" })
+      .getByRole("link", { name: "Admin Masters" }),
+  ).toBeVisible();
 });
 
 test("e1_13_t02 FDE shell lists projects and has no Workflow create action", async ({
