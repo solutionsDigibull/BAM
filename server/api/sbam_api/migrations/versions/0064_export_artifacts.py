@@ -1,7 +1,7 @@
 """artifacts kind EXPORT
 
-Revision ID: 0063_export_artifacts
-Revises: 0062_workflow_versions
+Revision ID: 0064_export_artifacts
+Revises: 0063_workflow_versions_uq_name
 Create Date: 2026-11-19
 
 Rules (.claude/rules/shared-files.md): one revision per PR, generated after rebasing on dev; touch
@@ -16,8 +16,8 @@ from collections.abc import Sequence
 from alembic import op
 from sbam_api.db.frozen import create_frozen_trigger, drop_frozen_trigger
 
-revision: str = "0063_export_artifacts"
-down_revision: str | Sequence[str] | None = "0062_workflow_versions"
+revision: str = "0064_export_artifacts"
+down_revision: str | Sequence[str] | None = "0063_workflow_versions_uq_name"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

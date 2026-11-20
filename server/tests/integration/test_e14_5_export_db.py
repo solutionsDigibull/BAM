@@ -1,4 +1,4 @@
-"""E14.5 (#133) against the Compose Postgres: migration 0063 up and down, and a frozen EXPORT
+"""E14.5 (#133) against the Compose Postgres: migration 0064 up and down, and a frozen EXPORT
 artifact row that the frozen trigger keeps immutable. A scratch database is created and dropped.
 Needs `make up`; not part of the unit run."""
 
@@ -17,7 +17,7 @@ from .test_db import url
 
 pytestmark = pytest.mark.integration
 
-PREVIOUS = "0062_workflow_versions"
+PREVIOUS = "0063_workflow_versions_uq_name"
 DB = f"sbam_e145_{uuid.uuid4().hex[:10]}"
 
 
