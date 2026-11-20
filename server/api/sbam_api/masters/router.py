@@ -27,19 +27,39 @@ from sbam_contracts.masters_api import (
     MasterVersionCreate,
     RoutedMasterType,
 )
+from sbam_contracts.masters_scan import (
+    MastersImportAccepted,
+    MastersScanKind,
+    MastersScanStatus,
+)
 from sbam_contracts.masters_v03 import MasterBulkReport, MasterBulkRequest, MasterList
 from sbam_contracts.masters_workbook import MAX_WORKBOOK_BYTES
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from sbam_api.core.auth import CurrentUser, admin
-from sbam_api.core.conventions import ApiError, content_disposition, etag
+from sbam_api.core.conventions import (
+    ApiError,
+    content_disposition,
+    etag,
+    validate_idempotency_key,
+)
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.request_session import request_scoped
 from sbam_api.db.session import app_sessions
-from sbam_api.masters import bulk, documents, exporter, importer, ingestion, lists, models, service
+from sbam_api.masters import (
+    bulk,
+    documents,
+    exporter,
+    importer,
+    ingestion,
+    lists,
+    models,
+    scans,
+    service,
+)
 from sbam_api.storage.router import backend
-from sbam_api.temporal.deps import temporal_client
+from sbam_api.temporal.deps import session_factory, temporal_client
 
 router = APIRouter(tags=["masters"])
 
@@ -52,6 +72,10 @@ def db(request: Request) -> Iterator[Session]:
 
 
 Db = Annotated[Session, Depends(db)]
+Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
+Prefer = Annotated[str | None, Header()]
+IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key")]
+PREFERENCE_APPLIED = {"Preference-Applied": "respond-async"}
 
 
 def _out(
@@ -98,20 +122,59 @@ def get_snapshot(snapshot_id: uuid.UUID, user: Admin, session: Db) -> MastersSna
     return _snapshot(service.get_snapshot(session, user, snapshot_id))
 
 
-@router.post("/admin/masters/import")
-def import_workbook(
+@router.get("/admin/masters/scans/{scan_id}")
+def get_scan(scan_id: uuid.UUID, request: Request, user: Admin, session: Db) -> MastersScanStatus:
+    """The state of a scan started with `Prefer: respond-async` and, once DONE or FAILED, its
+    result (#609); 404 for another tenant's scan."""
+    return scans.status(session, user, backend(request), scan_id)
+
+
+@router.post(
+    "/admin/masters/import",
+    response_model=ImportReport | MastersImportAccepted,
+    responses={202: {"model": MastersImportAccepted, "description": "Scan and import run started"}},
+)
+async def import_workbook(
     request: Request,
     file: UploadFile,
     user: Admin,
     session: Db,
+    sessions: Sessions,
+    response: Response,
+    prefer: Prefer = None,
+    idempotency_key: IdempotencyKey = None,
     mode: Annotated[ImportMode, Form()] = ImportMode.VALIDATE_ONLY,
     project_id: Annotated[uuid.UUID | None, Form()] = None,
-) -> ImportReport:
-    """Validate or upsert the BAM 0.2 masters workbook (E3.3); see `importer`."""
-    data = file.file.read(MAX_WORKBOOK_BYTES + 1)  # one byte over is enough to answer 413
+) -> ImportReport | MastersImportAccepted:
+    """Validate or upsert the BAM 0.2 masters workbook (E3.3); see `importer`.
+
+    With `Prefer: respond-async` and an `Idempotency-Key` the scan and the import run in Temporal
+    and the answer is 202 `MastersImportAccepted` (#609); read the result at
+    `GET /admin/masters/scans/{scan_id}`. Without `Prefer` the report is the answer, as before.
+    """
+    data = await file.read(MAX_WORKBOOK_BYTES + 1)  # one byte over is enough to answer 413
+    if scans.wants_async(prefer):
+        key = validate_idempotency_key(idempotency_key)
+        upload = scans.Upload(
+            MastersScanKind.IMPORT, file.filename or "", data, project_id, mode=mode
+        )
+        accepted = await scans.accept(
+            sessions, lambda: temporal_client(request), user, backend(request), upload, key
+        )
+        response.status_code = 202
+        response.headers.update(PREFERENCE_APPLIED)
+        return accepted
     settings = request.app.state.settings
-    return importer.import_workbook(
-        session, user, settings, backend(request), file.filename or "", data, mode, project_id
+    return await asyncio.to_thread(
+        importer.import_workbook,
+        session,
+        user,
+        settings,
+        backend(request),
+        file.filename or "",
+        data,
+        mode,
+        project_id,
     )
 
 
@@ -272,18 +335,43 @@ def _document(row: models.MasterDocument, response: Response | None = None) -> M
     return documents.to_out(row)
 
 
-@router.post("/admin/master-documents", status_code=201)
+@router.post(
+    "/admin/master-documents",
+    status_code=201,
+    response_model=MasterDocumentOut | MastersImportAccepted,
+    responses={202: {"model": MastersImportAccepted, "description": "Scan run started"}},
+)
 async def attach_document(
     request: Request,
     file: UploadFile,
     user: Admin,
     session: Db,
+    sessions: Sessions,
     response: Response,
+    prefer: Prefer = None,
+    idempotency_key: IdempotencyKey = None,
     project_id: Annotated[uuid.UUID | None, Form()] = None,
     master_type: Annotated[RoutedMasterType | None, Form()] = None,
-) -> MasterDocumentOut:
-    """Attach a context file: scan, route by its Filetype, 201 (or 200 for a file already there)."""
+) -> MasterDocumentOut | MastersImportAccepted:
+    """Attach a context file: scan, route by its Filetype, 201 (or 200 for a file already there).
+
+    With `Prefer: respond-async` and an `Idempotency-Key` the scan runs in Temporal and the answer
+    is 202 `MastersImportAccepted` (#609); the document is in the result of
+    `GET /admin/masters/scans/{scan_id}`. Without `Prefer` the document is the answer, as before.
+    """
     data = await file.read(MAX_FILE_BYTES + 1)  # one byte over is enough to answer 413
+    chosen = MasterType(master_type) if master_type else None
+    if scans.wants_async(prefer):
+        key = validate_idempotency_key(idempotency_key)
+        upload = scans.Upload(
+            MastersScanKind.DOCUMENT, file.filename or "", data, project_id, master_type=chosen
+        )
+        accepted = await scans.accept(
+            sessions, lambda: temporal_client(request), user, backend(request), upload, key
+        )
+        response.status_code = 202
+        response.headers.update(PREFERENCE_APPLIED)
+        return accepted
     done = await asyncio.to_thread(
         documents.attach,
         session,
@@ -293,7 +381,7 @@ async def attach_document(
         file.filename or "",
         data,
         project_id,
-        MasterType(master_type) if master_type else None,
+        chosen,
     )
     if not done.created:
         response.status_code = 200

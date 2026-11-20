@@ -9,6 +9,7 @@ comes from `fixtures.eicar_bytes()`, which assembles it at run time, so no file 
 import socket
 import struct
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from types import TracebackType
 
@@ -33,11 +34,13 @@ class FakeClamd:
         version: str | None = None,
         behaviour: str = "normal",
         version_after_reload: str | None = None,
+        delay: float = 0.0,
     ) -> None:
         self.version = version if version is not None else version_string()
         self.version_after_reload = version_after_reload  # what VERSION says once RELOAD is sent
         self.reloads = 0
         self.behaviour = behaviour
+        self.delay = delay  # seconds INSTREAM waits before it answers: a slow clamd
         self.scans = 0
         self.sizes: list[int] = []
         self.host = "127.0.0.1"
@@ -107,6 +110,7 @@ class FakeClamd:
             body += chunk
             if self.behaviour == "drop":
                 return  # closes the connection with the upload half done
+        time.sleep(self.delay)
         self.scans += 1
         self.sizes.append(len(body))
         if self.behaviour == "garbage":

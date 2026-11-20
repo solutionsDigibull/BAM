@@ -14,10 +14,24 @@ import struct
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import BinaryIO
+from typing import BinaryIO, Protocol
 
 CHUNK = 64 * 1024
 _END = b"\0\0\0\0"
+
+
+class ClamdSettings(Protocol):
+    """Where clamd is: the API's `Settings` has these three, and so does the masters scan activity
+    (the worker's own settings use other names, `masters_scan` builds one of these)."""
+
+    @property
+    def clamav_host(self) -> str: ...
+
+    @property
+    def clamav_port(self) -> int: ...
+
+    @property
+    def clamav_timeout(self) -> float: ...
 
 
 class ClamdError(Exception):

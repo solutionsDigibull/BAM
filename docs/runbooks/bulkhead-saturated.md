@@ -4,7 +4,7 @@ Alert: **An API dependency bulkhead has been saturated for 5 minutes** (`sbam-bu
 
 ## Symptoms
 - `GET /api/v1/health/ready` lists the bulkhead as `saturated` (the status code does not change).
-- Calls that need that dependency answer 503 at once: `SCAN_UNAVAILABLE` (clamd, uploads of masters and documents), `IDP_UNAVAILABLE` (Keycloak admin calls, and a JWKS fetch on a cold cache or an unknown key id).
+- Calls that need that dependency answer 503 at once: `SCAN_UNAVAILABLE` (clamd, uploads of masters and documents that do not send `Prefer: respond-async`; with it the scan runs in the ingest worker, ADR 0042, and a stuck clamd shows as a slow run, not a held request thread), `IDP_UNAVAILABLE` (Keycloak admin calls, and a JWKS fetch on a cold cache or an unknown key id).
 - Everything else keeps working: that is what a bulkhead is for.
 
 ## Impact

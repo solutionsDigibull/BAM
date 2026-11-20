@@ -301,6 +301,13 @@ routes:
       admin_a: "422 VALIDATION_ERROR"
       admin_b: "422 VALIDATION_ERROR"
 
+  get_scan_api_v1_admin_masters_scans__scan_id__get:  # #609 status of a scan + import run
+    request:
+      method: GET
+      path: /api/v1/admin/masters/scans/{scan_id}
+      params: {scan_id: "@scan_a"}
+    expect: *tenant_admin_a_resource
+
   list_documents_api_v1_admin_master_documents_get:  # E3.8
     request: {method: GET, path: /api/v1/admin/master-documents}
     expect: *tenant_admin_list

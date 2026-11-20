@@ -46,6 +46,7 @@ ADRs record decisions that change how SBAM is built. Issue **E0.1** seeds this f
 | [0038](0038-staging-compose-restricted-docker-access.md) | Staging in Compose: an opt-in `staging-runtime` profile, a filtered Docker socket proxy (no raw `docker.sock` in a worker), the internal Staging network, the egress proxy service and the Bifrost token (#908) | Accepted | refines 0036, 0035 |
 | [0039](0039-commit-starts-staging-before-it-registers.md) | Commit starts the Staging container first and registers it in Bifrost second, at the container's own address; Bifrost joins `sbam-staging` in the `staging-runtime` profile (#909) | Accepted | refines 0038, 0036 |
 | [0040](0040-imports-are-a-suggestion-not-a-restriction.md) | Imports are a suggestion, not a restriction: a short deny list replaces the import allowlist, and `IMPORT_RESOLUTION` stops being certification evidence (#922) | Accepted | refines 0026, 0028 |
+| [0042](0042-masters-scan-as-a-run.md) | The masters scan and import run in Temporal; the request answers 202 when the client asks (`Prefer: respond-async`), the synchronous path is deprecated (#609) | Accepted | refines 0029 |
 
 Every C-01…C-55 is owned by exactly one ADR (a row in its Decision table, copied verbatim from PLAN §3). Each open item carries its PLAN §30 default, marked *default, pending owner answer* until the owner decides. Check with `python docs/adr/check_coverage.py`; a unit test runs it in CI.
 
