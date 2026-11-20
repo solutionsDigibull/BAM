@@ -214,13 +214,13 @@ jobs:
             type=gha,scope=${{ matrix.name }}-${{ github.head_ref || github.ref_name }}
             type=gha,scope=${{ matrix.name }}-${{ github.base_ref || 'dev' }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}-${{ github.head_ref || github.ref_name }}
-      - name: Trivy (fails on fixable CRITICAL)
+      - name: Trivy (fails on CRITICAL unless .trivyignore.yaml has an unexpired exception)
         run: |
           mkdir -p reports
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/reports:/reports" "$TRIVY_IMAGE" \
             image --scanners vuln --format json --output "/reports/trivy-${{ matrix.name }}.json" "$IMAGE:${{ github.sha }}"
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
-            image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE:${{ github.sha }}"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/.trivyignore.yaml:/trivyignore.yaml:ro" "$TRIVY_IMAGE" \
+            image --scanners vuln --severity CRITICAL --ignorefile /trivyignore.yaml --exit-code 1 "$IMAGE:${{ github.sha }}"
       - name: SBOM (SPDX)
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$SYFT_IMAGE" \
