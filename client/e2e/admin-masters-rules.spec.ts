@@ -117,11 +117,15 @@ for (const width of [320, 390]) {
     await openTab(page, "Rules");
     const { by, offenders } = await pageOverflow(page);
     expect(by, offenders.join(" | ")).toBeLessThanOrEqual(0);
-    // the actions column is off screen on a phone: scroll the grid to it
-    await page
-      .locator(".ag-body-horizontal-scroll-viewport")
-      .evaluate((e) => (e.scrollLeft = 99999));
-    await page.getByRole("button", { name: "Edit RULE-1" }).click();
+    // the actions column is off screen on a phone: scroll the grid until it is rendered
+    const edit = page.getByRole("button", { name: "Edit RULE-1" });
+    await expect(async () => {
+      await page
+        .locator(".ag-body-horizontal-scroll-viewport")
+        .evaluate((e) => (e.scrollLeft = 99999));
+      await expect(edit).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await edit.click();
     await expect(page.getByRole("dialog")).toBeVisible();
     expect((await pageOverflow(page)).by).toBeLessThanOrEqual(0);
   });
