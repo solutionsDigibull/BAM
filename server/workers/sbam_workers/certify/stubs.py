@@ -19,6 +19,12 @@ async def certify_sub_skill(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "certify_sub_skill"))
 
 
+@activity.defn(name="reuse_certifications")  # registered by `certify/reuse_step.py`; a typed handle
+async def reuse_certifications(inp: WorkflowRef) -> IdsResult:
+    """Real (E14.3): an unchanged carried-over Sub-Skill's certificate is reused or refused."""
+    return IdsResult(ids=[])
+
+
 @activity.defn(name="certify_macros")  # registered by `certify/workflow.py`; a typed handle
 async def certify_macros(inp: WorkflowRef) -> IdsResult:
     """Real (E14.2): a MACRO_SKILL certificate per Macro whose Sub-Skills are all certified."""

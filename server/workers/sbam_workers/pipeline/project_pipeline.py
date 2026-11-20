@@ -85,6 +85,7 @@ with workflow.unsafe.imports_passed_through():
         certify_macros,
         certify_workflow,
         freeze_and_version,
+        reuse_certifications,
         validate_workflow,
     )
     from sbam_workers.ingest.stubs import ingest_documents
@@ -119,6 +120,7 @@ PLAN: dict[str, tuple[TaskQueue, timedelta, int]] = {
     "generate_sow": LLM,
     "create_workflow": (TaskQueue.LLM, timedelta(minutes=2), 5),
     "carry_over_workflow": (TaskQueue.LLM, timedelta(minutes=2), 5),
+    "reuse_certifications": (TaskQueue.CERTIFY, timedelta(minutes=5), 3),
     "extract_macro_skills": LLM,
     "extract_sub_skills": LLM,
     "build_schema_sql": (TaskQueue.BUILD, timedelta(minutes=5), 2),
@@ -146,6 +148,10 @@ EXTRACTION_PATCH = "e8-3-bounded-extraction"
 # E7.2: after creating the Workflow, copy what a scope change left untouched from the previous
 # version (a no-op on a first approval). Older runs: nothing copied.
 CARRY_OVER_PATCH = "e7-2-scope-change-carry-over"
+# E14.3 (#131): right after the carry-over, an unchanged carried Sub-Skill's certificate is reused
+# (its key compared, the source's evidence re-verified) or the Sub-Skill goes back to VALID to be
+# built. Not a stage: the same stage, its own activity. Older runs: carried Sub-Skills as before.
+REUSE_CERTIFICATIONS_PATCH = "e14-3-reuse-certifications"
 # E9.5: the Workflow manifest draft once the Sub-Skills are built. Older runs: no draft.
 MANIFEST_DRAFT_PATCH = "e9-5-workflow-manifest-draft"
 # #862: after the manifest draft, store the Workflow's generated server files (server.py,
@@ -360,6 +366,8 @@ class ProjectPipeline:
                 **self._base(), workflow_id=self.workflow_id, sow_version_id=approval.sow_version_id
             )
             await self._attempt(carry_over_workflow, carry, IdsResult, None)
+            if workflow.patched(REUSE_CERTIFICATIONS_PATCH):
+                await self._attempt(reuse_certifications, self._workflow_ref(), IdsResult, None)
         await self._project("workflow_created")
         if self.inp.search_attributes:
             workflow.upsert_search_attributes([SBAM_WORKFLOW_ID.value_set(str(self.workflow_id))])

@@ -244,6 +244,7 @@ DEFAULT_OVERRIDES: "Overrides" = {
     "correct": build_stubs.correct,
     "certify_sub_skill": certify_stubs.certify_sub_skill,  # the real one (E14.1) needs the evidence
     # the real ones (E14.2) need the Workflow's macros, certificates, manifest and schema.sql
+    "reuse_certifications": certify_stubs.reuse_certifications,  # E14.3: needs the source's evidence
     "certify_macros": certify_stubs.certify_macros,
     "validate_workflow": certify_stubs.validate_workflow,
     "certify_workflow": certify_stubs.certify_workflow,

@@ -103,10 +103,15 @@ def _built_router(manifest: Mapping[str, Any]) -> str | None:
 
 
 def approved_manifest(
-    manifest: Mapping[str, Any], evidence: Mapping[str, Any], certified_at: datetime
+    manifest: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+    certified_at: datetime,
+    reused_from: str | None = None,
 ) -> SkillManifest:
     """The manifest as certification leaves it: APPROVED, immutable, with its evidence and
-    certification blocks, and a deterministic hash recomputed over the approved document."""
+    certification blocks, and a deterministic hash recomputed over the approved document.
+    `reused_from` (E14.3) names the certificate a reused Sub-Skill carries over; the block is
+    outside the hash, so it never changes one."""
     stamp = certified_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     data = copy.deepcopy(dict(manifest))
     data["skill_metadata"]["status"] = "APPROVED"
@@ -118,7 +123,11 @@ def approved_manifest(
     }
     record = data["sbam_build_record"]
     record["evidence"] = dict(evidence)
-    record["certification"] = {"state": "CERTIFIED", "certified_at": stamp, "reused_from": None}
+    record["certification"] = {
+        "state": "CERTIFIED",
+        "certified_at": stamp,
+        "reused_from": reused_from,
+    }
     return SkillManifest.sealed(data)
 
 
