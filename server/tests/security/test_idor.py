@@ -105,6 +105,41 @@ def test_e2_7_t03_admin_project_of_other_tenant_404_same_shape_as_random_id(
     assert shape(foreign) == shape(random)
 
 
+def test_mui_3_retire_of_other_tenant_master_404_same_shape_and_nothing_retired(
+    world: World,
+) -> None:
+    """#782: admin-B retiring tenant A's entry with its real ETag leaks nothing, changes nothing."""
+    headers = {"if-match": f'"{world.version("master_a")}"'}
+    foreign = world.call(
+        "POST", f"/admin/masters/RULES/{world.master_a}/retire", "admin_b", headers=headers
+    )
+    random = world.call(
+        "POST", f"/admin/masters/RULES/{uuid7()}/retire", "admin_b", headers=headers
+    )
+
+    assert foreign.status_code == 404
+    assert shape(foreign) == shape(random)
+    entry = world.call("GET", f"/admin/masters/RULES/{world.master_a}", "admin_a").json()
+    assert entry["status"] != "RETIRED"
+
+
+def test_mui_3_bulk_into_other_tenant_project_404_same_shape_and_nothing_written(
+    world: World,
+) -> None:
+    body = {"mode": "upsert", "rows": [{"skill": "Quote"}]}
+    foreign = world.call(
+        "POST", f"/admin/masters/SKILLS/bulk?project_id={world.project_a}", "admin_b", json=body
+    )
+    random = world.call(
+        "POST", f"/admin/masters/SKILLS/bulk?project_id={uuid7()}", "admin_b", json=body
+    )
+
+    assert foreign.status_code == 404
+    assert shape(foreign) == shape(random)
+    listed = world.call("GET", f"/admin/masters/SKILLS?project_id={world.project_a}", "admin_a")
+    assert listed.json()["items"] == []
+
+
 # --- E2.7-T04: unassigned project write ----------------------------------------------------
 
 

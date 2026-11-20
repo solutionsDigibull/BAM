@@ -9,7 +9,7 @@ import re
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from sbam_api.db.repository import TenantScopedRepository
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion, MasterSnapshot
@@ -59,6 +59,29 @@ class MasterEntryRepository(TenantScopedRepository[MasterEntry]):
             if (m := _LABEL_NUMBER.search(label))
         ]
         return max([1, *numbers]) + 1
+
+    def lock_ids(self, master_type: str, prefix: str) -> None:
+        """Serialise id assignment of (tenant, type, prefix) until commit (Postgres; SQLite, which
+        the API tests use, runs one writer at a time anyway)."""
+        if self.session.get_bind().dialect.name == "postgresql":
+            self.session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                {"key": f"{self.ctx.tenant_id}{master_type}{prefix}"},
+            )
+
+    def max_id_number(self, master_type: str, prefix: str) -> int:
+        """The highest `<prefix><n>` stable id of this type in the tenant, any project, retired and
+        deleted rows included (0 when none), so a server-assigned id is never handed out twice."""
+        query = self._scoped(include_deleted=True).where(
+            MasterEntry.master_type == master_type, MasterEntry.stable_id.startswith(prefix)
+        )
+        pattern = re.compile(rf"{re.escape(prefix)}(\d+)")
+        numbers = [
+            int(m.group(1))
+            for sid in self.session.scalars(query.with_only_columns(MasterEntry.stable_id))
+            if (m := pattern.fullmatch(sid))
+        ]
+        return max([0, *numbers])
 
     # --- versions and snapshots (append-only, tenant filtered here) -------------------------
 

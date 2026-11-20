@@ -42,6 +42,7 @@ def engine_with_masters() -> Engine:
             t["sbam.master_snapshots"],
             t["sbam.master_documents"],  # a snapshot also pins the parsed master documents
             t["sbam.filetype_row_versions"],  # the platform rows every import compares to
+            t["sbam.master_lists"],  # the template lists (#782)
         ],
     )
     return engine
@@ -127,10 +128,8 @@ def test_e3_2_the_id_column_is_the_row_label_and_the_stable_id(h: MastersHarness
     agent = h.entry("AGENTS", payload={"agent_id": "AG-INTAKE", "agent_name": "Intake"})
     assert (agent["row_label"], agent["stable_id"]) == ("AG-INTAKE", "AG-INTAKE")
     assert agent["payload"]["kind"] == "Agent"  # the default kind
-    res = h.post("SKILLS", {"payload": {"skill": "no id yet"}})  # #782 assigns ids
-    assert [e["path"] for e in problem(res, 422, "VALIDATION_ERROR")["errors"]] == [
-        "payload.skill_id"
-    ]
+    res = h.post("SKILLS", {"payload": {"skill": "no id yet"}})  # #782 assigns the id
+    assert res.status_code == 201 and res.json()["stable_id"] == "SK-01"
 
 
 def test_e3_2_duplicate_stable_id_in_the_same_scope_is_409(h: MastersHarness) -> None:

@@ -5,6 +5,8 @@
 * `master_entry_versions`: the payloads, append-only. A change is a new version n+1.
 * `master_snapshots`: the versions a project used, pinned with their hash, append-only.
 * `master_documents`: context files an Admin attaches to a master (E3.8), routed by Filetype.
+* `master_lists`: the tenant's template lists (Employees, Customers, Assets, Systems; #782), one row
+  per list, replaced as a whole.
 
 The append-only guard is a trigger on both tables. Postgres gets it from the migration; the DDL
 hooks below add the same guard wherever the tables are created with `create_all` (the SQLite test
@@ -17,6 +19,7 @@ from datetime import datetime
 from sbam_contracts.documents import ScanStatus
 from sbam_contracts.masters import MasterStatus, MasterType, SourceKind
 from sbam_contracts.masters_api import ParseStatus, RouteSource
+from sbam_contracts.masters_v03 import MasterListKey
 from sqlalchemy import (
     JSON,
     Connection,
@@ -180,6 +183,17 @@ Index(
     postgresql_where=_DOC_PROJECT,
     sqlite_where=_DOC_PROJECT,
 )
+
+
+class MasterListRow(TenantOwned, Base):
+    """One template list of a tenant: its headers and rows, replaced as a whole (#782)."""
+
+    __tablename__ = "master_lists"
+    __table_args__ = (status_check(MasterListKey, "key"), UniqueConstraint("tenant_id", "key"))
+
+    key: Mapped[str] = mapped_column(String(20))
+    headers: Mapped[list[str]] = mapped_column(Json)
+    rows: Mapped[list[list[str]]] = mapped_column(Json)
 
 
 # --- Append-only guard (Postgres: migration, see sql.py) -------------------------------------

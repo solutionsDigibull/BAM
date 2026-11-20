@@ -61,6 +61,10 @@ UNSCOPED: dict[tuple[str, str], str] = {
     # caller's own tenant. Cross-tenant entries are .../{master_type}/{entry_id}, scoped below.
     ("GET", f"{API}/admin/masters/{{master_type}}"): "enum parameter, caller's own tenant",
     ("POST", f"{API}/admin/masters/{{master_type}}"): "enum parameter, caller's own tenant",
+    # key is an enum (employees, customers, assets, systems): one row per (tenant, key), the
+    # caller's own tenant (#782). Their RBAC rows are in rbac_matrix.yaml.
+    ("GET", f"{API}/admin/master-lists/{{key}}"): "enum parameter, caller's own tenant",
+    ("PUT", f"{API}/admin/master-lists/{{key}}"): "enum parameter, caller's own tenant",
 }
 
 # Placeholders (World.value) that name another tenant's or the caller's own data: a cross-tenant
