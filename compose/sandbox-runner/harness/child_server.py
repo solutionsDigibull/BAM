@@ -27,9 +27,15 @@ import importlib
 import json
 import os
 import sys
+from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit
 
 MAX_REQUEST: int = 1 << 20
+RUN_HEADER: str = (
+    "X-Sbam-Run-Id"  # sbam_contracts.mocks.RUN_HEADER (not importable here)
+)
+CASE_HEADER: str = "X-Sbam-Case"  # sbam_contracts.mocks.CASE_HEADER
 
 
 def memory_error_in(exc: BaseException | None) -> bool:
@@ -43,6 +49,65 @@ def memory_error_in(exc: BaseException | None) -> bool:
         seen.add(id(exc))
         exc = exc.__cause__ or exc.__context__
     return False
+
+
+def route_mock_calls(environ: Mapping[str, str] = os.environ) -> bool:
+    """Every HTTP call this process makes to the mock API carries the run and the case (E13.5b, #545).
+
+    The tool calls the API itself, so the headers are added here, in the trusted harness that wraps
+    the tool, and not in generated code: nothing a model wrote has to remember them, and nothing it
+    wrote can choose another run's namespace, because the values are *set* over whatever the tool
+    sent. Only calls to `SBAM_MOCK_BASE_URL`'s host and port get them; a call to any other host loses
+    these two headers if the tool set them (the egress policy decides what it may reach). Covers `urllib` and
+    `http.client`, and `httpx` (sync and async), which FastMCP brings; a tool that opens a raw
+    socket sends no header and the mock answers MOCK_UNMATCHED, a visible finding.
+    Returns False when the run has no mock API."""
+    base, run = environ.get("SBAM_MOCK_BASE_URL"), environ.get("SBAM_RUN_ID")
+    if not base or not run:
+        return False
+    parts = urlsplit(base)
+    mock_host, mock_port = (parts.hostname or "").lower(), parts.port or 80
+    stamp = {RUN_HEADER: run}
+    if environ.get("SBAM_CASE"):
+        stamp[CASE_HEADER] = environ["SBAM_CASE"]
+    ours = {name.lower() for name in stamp} | {RUN_HEADER.lower(), CASE_HEADER.lower()}
+
+    def is_mock(host: Any, port: Any) -> bool:
+        return str(host or "").lower() == mock_host and int(port or 80) == mock_port
+
+    import http.client
+
+    original_send = http.client.HTTPConnection._send_request  # type: ignore[attr-defined]
+
+    def send_request(
+        self: Any, method: Any, url: Any, body: Any, headers: Any, *args: Any
+    ) -> Any:
+        kept = {k: v for k, v in dict(headers).items() if k.lower() not in ours}
+        headers = {**kept, **stamp} if is_mock(self.host, self.port) else kept
+        return original_send(self, method, url, body, headers, *args)
+
+    http.client.HTTPConnection._send_request = send_request  # type: ignore[attr-defined]
+
+    import httpx
+
+    def stamped(original: Any) -> Any:
+        def single(
+            self: Any, request: Any
+        ) -> Any:  # once per hop, so a redirect is checked too
+            for name in ours:
+                request.headers.pop(
+                    name, None
+                )  # never the tool's own, never for another host
+            if is_mock(request.url.host, request.url.port or 80):
+                for name, value in stamp.items():
+                    request.headers[name] = value
+            return original(self, request)
+
+        return single
+
+    httpx.Client._send_single_request = stamped(httpx.Client._send_single_request)  # type: ignore[method-assign]
+    httpx.AsyncClient._send_single_request = stamped(httpx.AsyncClient._send_single_request)  # type: ignore[method-assign]
+    return True
 
 
 def add_memory_marker(mcp: Any) -> None:
@@ -148,6 +213,7 @@ def main(argv: list[str]) -> int:
         conn = psycopg.connect(
             host="127.0.0.1", user="postgres", dbname=database, autocommit=True
         )
+        route_mock_calls()
         mcp, state, handoff = import_bundle(bundle_dir, tool_module)
         add_memory_marker(mcp)
         state.configure(conn)

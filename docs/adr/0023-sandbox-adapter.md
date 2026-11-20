@@ -145,3 +145,16 @@ Every row has the test that failed before the fix and passes now.
 | 23 | backend | a VM started with an epoch timestamp could never be reaped | the SDK's own parser |
 | 24 | backend | the template, not the call, sets a VM's size: a big template voids the limits | refused, VM destroyed |
 | 25 | activity | a loop bound over the policy ceiling was a retryable infrastructure error | final `INPUT_MISMATCH` |
+
+## Addendum (2026-11-21, #545): where the mock API's headers are added
+
+The tool calls the mock API itself, so something must put `X-Sbam-Run-Id` and `X-Sbam-Case` on every call.
+Decision (the recommended option): the **runner's child process** (`child_server.route_mock_calls`, trusted
+harness code outside the bundle) stamps them on every HTTP call to `SBAM_MOCK_BASE_URL`'s host and port, through
+`urllib`/`http.client` and `httpx` (sync and async), from `SBAM_RUN_ID` and a new `SBAM_CASE` (the case's name,
+given to the child per case). Why not generated code: a model would have to remember it, and a template change
+bumps every bundle's hash. The values are *set* over what the tool sent, so a tool cannot choose another run's
+namespace, and a call to any other host loses these two headers. A tool that opens a raw socket sends none and the
+mock answers `MOCK_UNMATCHED`, a visible finding. The control token is still never in the tool's environment
+(`CHILD_ENV_KEYS`), and the control surface answers a tool with 401. Local-docker runs still never certify.
+
