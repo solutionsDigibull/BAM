@@ -19,7 +19,7 @@ model's answer. Nothing in this folder calls a model.
 | `correction` | **ready**, 20 items, baseline recorded |
 | `codegen` | **ready**, 20 items, baseline recorded |
 | `review` | **ready**, 20 items, **no baseline yet** (needs a real call, see below) |
-| `sow`, `isatvon` | `todo`: each lands in its own change |
+| `sow`, `isatvon`, `ui-copy` | `todo`: each lands in its own change; no real-model baseline is recorded without an owner-stated spend cap |
 
 `sow` has one hand-written case so far, `golden/sow-rule-labels.json` (documents that name rules R-xx while the Rules master is empty). It is replayed on a fake gateway by `tests/unit/test_wg37_sow_rule_refs.py`, so it runs in CI with no model; it is not a scored set and has no baseline.
 
@@ -172,3 +172,12 @@ the page when the gate runs, so the repo holds no binaries.
 1. Add the items in `golden/<task>.json` and a loader and checks in `sbam_workers/evals/`.
 2. Set the task to `ready` in `tasks.json`. `check_golden` then holds it to 20 items.
 3. Tests for the loader and the checks go next to `test_e15_5_golden_sets.py`.
+
+## End-to-end chain scorer (#926)
+
+`python -m sbam_workers.evals.chain --build build.json [--key /private/key.json] [--min 0.8]` scores a build's
+structure (its Sub-Skills in order and their output fields) against an answer key: step recall, order (longest common
+subsequence), output recall and precision, averaged. It calls no model and needs no baseline, so it runs on any build
+that exists, including a parked one. The repository holds only the synthetic key `golden/chain-answer-key.json`; a
+customer key stays outside the repository and is passed by path (it is read, never copied, and only names and ratios
+are printed). Exit codes: 0 reached `--min`, 1 below it, 2 a file could not be read. Tests: `tests/unit/test_wg39_chain_eval.py`.

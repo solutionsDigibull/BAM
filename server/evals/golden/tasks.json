@@ -25,7 +25,7 @@
       "isatvon-sub-skills"
     ],
     "status": "todo",
-    "note": "Needs 20 approved-SOW fragments with the Macro and Sub-Skill structure each must produce."
+    "note": "Needs 20 approved-SOW fragments with the Macro and Sub-Skill structure each must produce. The structure check exists model-free as sbam_workers.evals.chain (answer key in chain-answer-key.json, a private key by path); the scored set and its baseline wait for an owner-stated spend cap (about $0.35 for a full ISATVON run)."
   },
   {
     "task": "codegen",
@@ -62,5 +62,14 @@
     ],
     "status": "ready",
     "note": "20 items: the MS01.1 login bodies, 12 with one defect no gate can see (inverted condition, wrong handoff value, unenforced limit, secret in the record) and 8 clean variants (review.json, from sbam_workers.evals.review_set). No baseline yet: it needs a real call."
+  },
+  {
+    "task": "ui-copy",
+    "alias": "sbam-codegen",
+    "prompt_ids": [
+      "ui-copy"
+    ],
+    "status": "todo",
+    "note": "Needs 20 invented Workflow specs (categories and Sub-Skills) with the checks the stage already enforces: every category and Sub-Skill id covered, no invented ids (build/ui_stage.py problems()). No real-model baseline without an owner-stated spend cap."
   }
 ]

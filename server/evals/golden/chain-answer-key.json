@@ -1,0 +1,11 @@
+{
+  "key_id": "synthetic-order-desk",
+  "note": "Invented data. A real customer key is private: pass its path to `python -m sbam_workers.evals.chain --key`.",
+  "steps": [
+    { "order": 1, "name": "check_order" },
+    { "order": 2, "name": "price_items" },
+    { "order": 3, "name": "total_order" },
+    { "order": 4, "name": "approve_and_send" }
+  ],
+  "outputs": ["order_total", "unpriced_items", "complete_flag"]
+}

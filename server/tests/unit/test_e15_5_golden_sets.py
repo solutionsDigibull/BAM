@@ -61,6 +61,7 @@ def test_e15_5_every_llm_task_is_listed_once_with_real_prompts() -> None:
         Task.TESTGEN: "sbam-testgen",
         Task.CORRECTION: "sbam-corrector",
         Task.REVIEW: "sbam-reviewer",
+        Task.UI_COPY: "sbam-codegen",
     }
 
 
@@ -165,7 +166,7 @@ def test_e15_5_an_unknown_prompt_or_a_missing_task_is_a_problem(tmp_path: Path) 
     directory = copy_dir(tmp_path)
     tasks = json.loads((directory / "tasks.json").read_text(encoding="utf-8"))
     tasks[0]["prompt_ids"] = ["no-such-prompt"]
-    del tasks[-2]  # correction (review follows it)
+    tasks = [t for t in tasks if t["task"] != "correction"]
     (directory / "tasks.json").write_text(json.dumps(tasks), encoding="utf-8")
     problems = check_golden(directory, prompt_ids())
     assert any("unknown prompt 'no-such-prompt'" in p for p in problems)
