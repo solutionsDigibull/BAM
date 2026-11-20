@@ -39,6 +39,7 @@ from sbam_workers.build.codegen.bodies import (
 )
 from sbam_workers.build.codegen.params import GATES_PARAM, SCHEMA_PARAM
 from sbam_workers.build.codegen.render import RenderedSkeleton
+from sbam_workers.build.codegen.schema_outline import outline
 from sbam_workers.build.codegen.store import LoadedTemplate
 from sbam_workers.isatvon.loop_spec import compile_definition
 from sbam_workers.llm.client import LlmClient
@@ -226,6 +227,8 @@ def request_context(
         context["loop_gates"] = gates
     if schema_sql:
         context["workflow_schema_sql"] = schema_sql
+        if tables := outline(schema_sql):
+            context["workflow_tables"] = tables
     context["findings"] = json.dumps(intake(findings), indent=1, ensure_ascii=False)
     if trace:
         context["harness_trace"] = _cap(trace, MAX_TRACE_BYTES)

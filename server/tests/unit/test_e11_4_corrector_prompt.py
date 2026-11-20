@@ -23,8 +23,8 @@ def codes(**over: str) -> set[str]:
     return {f.code.value for f in precheck(bodies, ENV.allowlist, ENV.params, ENV.skeleton)}
 
 
-def test_e11_4_the_newest_corrector_prompt_is_1_4_0_and_1_0_0_is_untouched() -> None:
-    assert PROMPT.version == "1.4.0"  # 1.2.0 loop_gates, 1.3.0 (#922) imports, 1.4.0 (#928) state
+def test_e11_4_the_newest_corrector_prompt_is_1_5_0_and_1_0_0_is_untouched() -> None:
+    assert PROMPT.version == "1.5.0"  # 1.2.0 loop_gates, 1.3.0 (#922), 1.4.0 (#928), 1.5.0 (#923)
     assert REGISTRY.get("correct-code", "1.0.0").sha256 == (
         "5013b740498265f3bb9b79b65aa8c22725cdc1eb3296ea18a3d1e5778cb641c7"
     )  # a released version is never edited

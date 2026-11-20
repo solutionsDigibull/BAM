@@ -163,4 +163,4 @@ def test_wg40_t09_the_prompts_say_it() -> None:
     assert "attempt" not in re.search(r"Declared here[^\n]*\n[^\n]*", isatvon.text).group(0)  # type: ignore[union-attr]
     assert "list `attempt`" in registry.get("isatvon-sub-skills", "1.4.0").text  # history kept
     corrector = registry.get("correct-code")
-    assert corrector.version == "1.4.0" and "Never `remove` that key" in corrector.text
+    assert corrector.version == "1.5.0" and "Never `remove` that key" in corrector.text
