@@ -398,7 +398,7 @@ class World:
                     action="MASTERS_SCAN_ACCEPTED",
                     entity_type="masters_scan",
                     entity_id=str(scan_id),
-                    after={"kind": "IMPORT"},
+                    after={"kind": "IMPORT", "project_id": str(uuid.UUID(int=0))},
                     correlation_id="cid-rbac-scan",
                 )
             )

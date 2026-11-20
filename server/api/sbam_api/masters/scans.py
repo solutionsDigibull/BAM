@@ -261,9 +261,12 @@ def status(
     if accepted is None:
         raise not_found()
     outcome = next((r for r in reversed(rows) if r.action in OUTCOMES), None)
-    run_row = TemporalRunRepository(session, TenantContext(tenant_id)).latest_for_workflow_id(
-        masters_scan_workflow_id(scan_id)
-    )
+    run_project = uuid.UUID(
+        str((accepted.after or {}).get("project_id", TENANT_SCOPE_PROJECT))
+    )  # zero: tenant-wide masters
+    run_row = TemporalRunRepository(
+        session, TenantContext(tenant_id, run_project)
+    ).latest_for_workflow_id(masters_scan_workflow_id(scan_id))
     run = to_run(run_row) if run_row is not None else None
     out = MastersScanStatus(
         scan_id=scan_id,
