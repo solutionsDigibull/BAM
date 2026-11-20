@@ -3,6 +3,7 @@ Workflow in ISATVON_REVIEW with the pass-2 rows stored, a fake Bifrost and SQLit
 in place (id, skill_id and order stay), the old definition goes to `sub_skill_edits`."""
 
 import asyncio
+import json
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -13,13 +14,19 @@ from knowledge_db import World
 from llm_db import FakeBifrost, completion
 from sbam_api.audit.models import AuditLog
 from sbam_api.isatvon.models import SubSkill, SubSkillEdit
+from sbam_api.llm.models import LlmCall
+from sbam_contracts.isatvon_macros import SubSkillExtraction
 from sbam_contracts.isatvon_workbench import RegenerateInput
 from sbam_workers.isatvon.regenerate import (
     NO_MATCH,
     NOT_EDITABLE,
     SUB_SKILL_IS_LOCKED,
+    _blocks,
     regenerate,
+    regenerate_scope,
 )
+from sbam_workers.llm.client import DERIVATIVE_MODEL, cache_key, compose
+from sbam_workers.llm.registry import PromptRegistry
 from sqlalchemy import select
 from sub_skills_db import Pass2, answer, proposal
 from temporalio.exceptions import ApplicationError
@@ -193,3 +200,84 @@ def test_e8_4_t09_a_certified_sub_skill_is_refused_without_a_model_call(p: Pass2
     bifrost = FakeBifrost([completion(answer(AUTH, KYC))])
     assert fails(p, bifrost, regen_input(p)).type == SUB_SKILL_IS_LOCKED
     assert bifrost.requests == []
+
+
+# -- #930: a regenerate with a new hint asks the model; the same request is a cache hit -----------
+
+
+def _scope_of(p: Pass2, run_id: str) -> Any:
+    """The scope the activity builds: the same Temporal workflow id and activity id every time."""
+    return regenerate_scope(regen_input(p), "isatvon-regen-fixed", run_id, "1", 1)
+
+
+def _run_as(p: Pass2, bifrost: FakeBifrost, inp: Any, run_id: str) -> list[uuid.UUID]:
+    return asyncio.run(regenerate(p.deps(bifrost), inp, _scope_of(p, run_id)))
+
+
+def _llm_rows(p: Pass2) -> list[Any]:
+    with p.w.sessions() as s:
+        return list(s.scalars(select(LlmCall).order_by(LlmCall.id)))
+
+
+def _sent_blocks(p: Pass2, inp: Any, current: Any, feedback: Any) -> str:
+    prompt = PromptRegistry().get("isatvon-sub-skills")
+    messages, _ = compose(prompt, SubSkillExtraction, _blocks(inp, current, feedback))
+    return cache_key("sbam-isatvon", messages)
+
+
+def test_wg42_t01_two_hints_give_two_cache_keys_and_the_same_hint_the_same_key(p: Pass2) -> None:
+    current = [{"id": "1", "skill_id": "MS1", "name": "A"}]
+    one = _sent_blocks(p, regen_input(p, hint="Be strict"), current, {})
+    other = _sent_blocks(p, regen_input(p, hint="Allow retries"), current, {})
+    again = _sent_blocks(p, regen_input(p, hint="Be strict"), current, {})
+    assert one != other and one == again
+
+
+def test_wg42_t02_the_validator_feedback_is_part_of_the_key(p: Pass2) -> None:
+    current = [{"id": "1", "skill_id": "MS1", "name": "A"}]
+    inp = regen_input(p)
+    plain = _sent_blocks(p, inp, current, {})
+    flagged = _sent_blocks(p, inp, current, {"MS1": [{"code": "X", "path": "a.b"}]})
+    other = _sent_blocks(p, inp, current, {"MS1": [{"code": "Y", "path": "a.b"}]})
+    assert len({plain, flagged, other}) == 3
+    assert "feedback" not in _blocks(inp, current, {}) and "hint" in _blocks(inp, current, {})
+
+
+def test_wg42_t03_a_new_hint_in_a_new_run_calls_the_model_and_records_it(p: Pass2) -> None:
+    first = FakeBifrost([completion(answer(AUTH, KYC))])
+    _run_as(p, first, regen_input(p, hint="Be strict"), "run-1")
+    second = FakeBifrost([completion(answer(NEW_AUTH, KYC))])
+    _run_as(p, second, regen_input(p, hint="Rename the first one"), "run-2")
+    assert len(first.requests) == 1 and len(second.requests) == 1  # not the cached answer
+    assert p.sub_skills()[0].skill_name == "Investor Sign-in Gate"  # the new hint took effect
+    real = [r for r in _llm_rows(p) if r.model != DERIVATIVE_MODEL and r.output is not None]
+    assert len(real) == 3  # pass 2 of the fixture, then both regenerations
+    assert all(r.tokens_in > 0 for r in real)  # what the budget counts
+
+
+def test_wg42_t04_the_same_hint_again_is_served_from_the_cache(p: Pass2) -> None:
+    # the answer changes nothing, so the second run asks the same question (same names, hint)
+    _run_as(p, FakeBifrost([completion(answer(AUTH, KYC))]), regen_input(p), "run-1")
+    again = FakeBifrost([completion(answer(AUTH, KYC))])
+    _run_as(p, again, regen_input(p), "run-2")
+    assert again.requests == []  # no model call
+    assert any(r.model == DERIVATIVE_MODEL for r in _llm_rows(p))  # recorded as a cache hit
+
+
+def test_wg42_t05_an_activity_retry_in_the_same_run_still_replays(p: Pass2) -> None:
+    inp = regen_input(p)
+    _run_as(p, FakeBifrost([completion(answer(NEW_AUTH, KYC))]), inp, "run-1")
+    retry = FakeBifrost([completion(answer(AUTH, KYC))])
+    _run_as(p, retry, inp, "run-1")
+    assert retry.requests == []
+    scopes = {_scope_of(p, "run-1"), _scope_of(p, "run-1")}
+    assert len(scopes) == 1 and _scope_of(p, "run-2") not in scopes
+
+
+def test_wg42_t06_without_a_hint_or_findings_the_blocks_are_what_they_always_were(
+    p: Pass2,
+) -> None:
+    current = [{"id": "1", "skill_id": "MS1", "name": "A"}]
+    assert _blocks(regen_input(p, hint=None), current, {}) == {
+        "current": json.dumps(current, sort_keys=True)
+    }

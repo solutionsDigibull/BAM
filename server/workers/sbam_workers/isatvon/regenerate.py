@@ -80,8 +80,9 @@ def _ref(inp: RegenerateInput) -> MacroRef:
     )
 
 
-def _guard(deps: SowDeps, inp: RegenerateInput) -> list[dict[str, str]]:
-    """What is in place now (id, name, skill_id, in order), or why it may not be regenerated."""
+def _guard(deps: SowDeps, inp: RegenerateInput) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    """What is in place now (id, name, skill_id, in order) and the validator's findings on it (codes
+    and paths, by skill_id; only rows that have any), or why it may not be regenerated."""
     ctx = _ctx(inp)
     with deps.sessions() as session:
         workflow: Workflow | None = WorkflowRepository(session, ctx).get(inp.workflow_id)
@@ -92,14 +93,28 @@ def _guard(deps: SowDeps, inp: RegenerateInput) -> list[dict[str, str]]:
             raise ExtractionError(SUB_SKILL_IS_LOCKED, "SUB_SKILL_LOCKED")
         if inp.sub_skill_id is not None and inp.sub_skill_id not in {r.id for r in rows}:
             raise ExtractionError(NO_MATCH, "NO_MATCHING_SUB_SKILL")
-        return [{"id": str(r.id), "skill_id": r.skill_id, "name": r.skill_name} for r in rows]
+        current = [{"id": str(r.id), "skill_id": r.skill_id, "name": r.skill_name} for r in rows]
+        feedback = {
+            r.skill_id: [
+                {"code": e.get("code"), "path": e.get("path")} for e in (r.validation_errors or [])
+            ]
+            for r in rows
+            if r.validation_errors and (inp.sub_skill_id is None or r.id == inp.sub_skill_id)
+        }
+        return current, feedback
 
 
-def _blocks(inp: RegenerateInput, current: list[dict[str, str]]) -> dict[str, str]:
-    """The hint is the FDE's own text and goes to the model as a data block, never into a prompt."""
+def _blocks(
+    inp: RegenerateInput, current: list[dict[str, str]], feedback: dict[str, Any]
+) -> dict[str, str]:
+    """The hint is the FDE's own text and goes to the model as a data block, never into a prompt.
+    The validator's findings on what is in place go as a `feedback` block (only when there are
+    any), so the model sees what was wrong and the cache key changes with them (#930)."""
     blocks = {"current": json.dumps(current, sort_keys=True)}
     if inp.hint:
         blocks["hint"] = inp.hint
+    if feedback:
+        blocks["feedback"] = json.dumps(feedback, sort_keys=True)
     if inp.sub_skill_id is not None:
         one = next(c for c in current if c["id"] == str(inp.sub_skill_id))
         blocks["focus"] = json.dumps({"skill_id": one["skill_id"], "name": one["name"]})
@@ -300,13 +315,13 @@ async def regenerate(deps: SowDeps, inp: RegenerateInput, scope: LlmScope) -> li
     """The Macro Skill's Sub-Skill ids, in order; see the module docstring."""
     ref = _ref(inp)
     try:
-        current = await asyncio.to_thread(_guard, deps, inp)
+        current, feedback = await asyncio.to_thread(_guard, deps, inp)
         loaded = await asyncio.to_thread(_load, deps, ref, False)
     except ExtractionError as exc:
         raise await asyncio.to_thread(_failed, deps, ref, exc.kind, exc.reason) from None
     if not isinstance(loaded, Source):  # pragma: no cover - reuse_stored is off
         raise ApplicationError("unexpected", type="Unexpected", non_retryable=True)
-    result = await ask_sub_skills(deps, ref, scope, loaded, _blocks(inp, current))
+    result = await ask_sub_skills(deps, ref, scope, loaded, _blocks(inp, current, feedback))
     try:
         ids = await asyncio.to_thread(_store, deps, inp, loaded, result.output)
     except ExtractionError as exc:
@@ -325,17 +340,30 @@ async def regenerate(deps: SowDeps, inp: RegenerateInput, scope: LlmScope) -> li
     return ids
 
 
+def regenerate_scope(
+    inp: RegenerateInput, workflow_id: str, run_id: str, activity_id: str, attempt: int
+) -> LlmScope:
+    """The replay scope of one regeneration. Every regeneration of an entity starts the same
+    Temporal workflow id (`isatvon-regen-<id>`) whose activity is always "1", attempt 1, so the
+    replay key alone would hand the previous run's answer to the next one (a new hint changed
+    nothing, #930). The workflow run id makes it per run; an activity retry (same run) still
+    replays, and an identical request is still served by the derivative cache."""
+    return LlmScope(
+        tenant_id=inp.tenant_id,
+        project_id=inp.project_id,
+        correlation_id=inp.correlation_id,
+        temporal_workflow_id=workflow_id,
+        activity_id=f"{run_id}:{activity_id}",
+        attempt=attempt,
+    )
+
+
 @activity_for(TaskQueue.LLM)
 @activity.defn(name="regenerate_skills")
 async def regenerate_skills(inp: RegenerateInput) -> IdsResult:
     """The regenerated Macro Skill's Sub-Skill ids, in order."""
     info = activity.info()
-    scope = LlmScope(
-        tenant_id=inp.tenant_id,
-        project_id=inp.project_id,
-        correlation_id=inp.correlation_id,
-        temporal_workflow_id=info.workflow_id or "",
-        activity_id=info.activity_id,
-        attempt=info.attempt,
+    scope = regenerate_scope(
+        inp, info.workflow_id or "", info.workflow_run_id or "", info.activity_id, info.attempt
     )
     return IdsResult(ids=await regenerate(_deps(), inp, scope))
