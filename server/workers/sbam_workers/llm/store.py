@@ -50,6 +50,11 @@ class CallStore(Protocol):
         """Recorded spend of the scope's project, or of its whole tenant."""
         ...
 
+    def spent_build(self, scope: LlmScope) -> Decimal:
+        """Recorded spend of the build workflow in the scope (`temporal_workflow_id`), failed
+        attempts included (#926)."""
+        ...
+
     def tokens(self, scope: LlmScope, aliases: frozenset[str], *, inside: bool) -> int:
         """Tokens (in + out) recorded for the scope's project, for these aliases or all others."""
         ...
@@ -113,6 +118,11 @@ class SqlCallStore:
         with self.sessions() as session:
             ctx = TenantContext(scope.tenant_id, None if tenant else scope.project_id)
             return LlmCallRepository(session, ctx).spent()
+
+    def spent_build(self, scope: LlmScope) -> Decimal:
+        with self.sessions() as session:
+            ctx = TenantContext(scope.tenant_id, scope.project_id)
+            return LlmCallRepository(session, ctx).spent_for_workflow(scope.temporal_workflow_id)
 
     def tokens(self, scope: LlmScope, aliases: frozenset[str], *, inside: bool) -> int:
         with self.sessions() as session:

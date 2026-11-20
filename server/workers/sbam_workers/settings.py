@@ -69,6 +69,11 @@ class WorkerSettings(BaseSettings):
     # Infinity is a limit that never trips; both are refused at start. Compose passes "" when unset.
     llm_project_budget_usd: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
     llm_tenant_budget_usd: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    # One build's own cap (#926): the model spend recorded under one build workflow id
+    # (`build-<sub_skill>-<n>`: code, corrections, tests, review) may not pass it. The next model
+    # call of that build is refused (`BudgetExceeded`), which parks the Sub-Skill in
+    # NEEDS_FDE_REVIEW with a precise reason. Opt-in like the others; "" means no cap.
+    llm_build_budget_usd: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
     # What a call costs when Bifrost reports none (a model its catalogue has no price for): USD per
     # million tokens, per alias, as JSON: {"sbam-sow": {"in": 2.5, "out": 10}}. Only read while a
     # budget is set. Without an entry such a call is refused from then on (`BudgetCostUnknown`).
@@ -164,7 +169,11 @@ class WorkerSettings(BaseSettings):
         return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator(
-        "llm_project_budget_usd", "llm_tenant_budget_usd", "sow_context_max_tokens", mode="before"
+        "llm_project_budget_usd",
+        "llm_tenant_budget_usd",
+        "llm_build_budget_usd",
+        "sow_context_max_tokens",
+        mode="before",
     )
     @classmethod
     def _empty_budget_is_unset(cls, value: object) -> object:

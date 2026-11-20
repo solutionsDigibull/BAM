@@ -38,6 +38,7 @@ x-worker: &worker
     LLM_DERIVATIVE_CACHE: ${LLM_DERIVATIVE_CACHE:-true}
     LLM_PROJECT_BUDGET_USD: ${LLM_PROJECT_BUDGET_USD:-}
     LLM_TENANT_BUDGET_USD: ${LLM_TENANT_BUDGET_USD:-}
+    LLM_BUILD_BUDGET_USD: ${LLM_BUILD_BUDGET_USD:-}
     LLM_PRICE_USD_PER_MTOK: ${LLM_PRICE_USD_PER_MTOK:-}
     # Most document tokens in one SOW / ISATVON prompt; over it the bundle is ranked per section. Empty = 80000.
     SOW_CONTEXT_MAX_TOKENS: ${SOW_CONTEXT_MAX_TOKENS:-}
