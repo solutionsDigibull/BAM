@@ -1,0 +1,759 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:masters_scan/status:0.1.0",
+  "$defs": {
+    "DiffKind": {
+      "enum": [
+        "renamed",
+        "added",
+        "removed",
+        "reordered"
+      ],
+      "title": "DiffKind",
+      "type": "string"
+    },
+    "ErrorCode": {
+      "description": "Stable machine-readable error codes. Add new codes here; never rename or reuse one.",
+      "enum": [
+        "VALIDATION_ERROR",
+        "UNAUTHENTICATED",
+        "FORBIDDEN",
+        "WRONG_PORTAL",
+        "NOT_FOUND",
+        "CONFLICT",
+        "PRECONDITION_FAILED",
+        "PRECONDITION_REQUIRED",
+        "PAYLOAD_TOO_LARGE",
+        "UNSUPPORTED_MEDIA_TYPE",
+        "RESOURCE_LOCKED",
+        "RATE_LIMITED",
+        "SERVICE_UNAVAILABLE",
+        "INTERNAL_ERROR",
+        "IDEMPOTENCY_KEY_REUSED",
+        "INVALID_CURSOR",
+        "VERSION_CONFLICT",
+        "INVALID_TRANSITION",
+        "READ_ONLY",
+        "GONE",
+        "TENANT_MISMATCH",
+        "TENANT_SUSPENDED",
+        "IDP_UNAVAILABLE",
+        "LAST_ADMIN",
+        "USER_EXISTS",
+        "DUPLICATE_NAME",
+        "PROJECT_ARCHIVED",
+        "DRAFT_EXISTS",
+        "STRUCTURE_MISMATCH",
+        "FILETYPE_FROZEN",
+        "SNAPSHOT_PROJECT_MISMATCH",
+        "SECRET_VALUE_NOT_ALLOWED",
+        "FILE_TOO_LARGE",
+        "FILE_LIMIT_REACHED",
+        "UNSUPPORTED_TYPE",
+        "INVALID_ENCODING",
+        "NESTED_ARCHIVE",
+        "ARCHIVE_LIMIT",
+        "PATH_UNSAFE",
+        "HASH_MISMATCH",
+        "NO_DOCUMENTS",
+        "PARSE_ERROR",
+        "DOCUMENT_NOT_RELEASED",
+        "CORRUPT",
+        "ENCRYPTED",
+        "EMPTY",
+        "TIMEOUT",
+        "SCAN_UNAVAILABLE",
+        "OCR_UNAVAILABLE",
+        "MALWARE",
+        "KNOWLEDGE_BUILDING",
+        "KNOWLEDGE_NOT_READY",
+        "COGNEE_ACL_DISABLED",
+        "SOW_STALE",
+        "SOW_LOCKED",
+        "SOW_APPROVED",
+        "SOW_NOT_APPROVED",
+        "SOW_NOT_LATEST",
+        "SOW_VERSION_CONFLICT",
+        "SOW_GENERATING",
+        "EXPORT_TIMEOUT",
+        "NO_APPROVED_SOW",
+        "NOT_IN_REVIEW",
+        "PIPELINE_RUNNING",
+        "PIPELINE_NOT_WAITING",
+        "TEMPORAL_UNAVAILABLE",
+        "ORCHESTRATOR_UNAVAILABLE",
+        "ISATVON_CONTRACT",
+        "SKILL_ID_PREFIX_MISMATCH",
+        "MACRO_REQUIRES_SUB_SKILL",
+        "GATE_PARSE_ERROR",
+        "UNRESOLVED_IDENTIFIER",
+        "TYPE_MISMATCH",
+        "SCHEMA_PARSE_ERROR",
+        "LIBRARY_NOT_IN_REGISTRY",
+        "TOOLS_NOT_DECOUPLED",
+        "WORKFLOW_BUILDING",
+        "DAG_CYCLE",
+        "SCHEMA_SQL_MISSING",
+        "MIN_TEST_CASES",
+        "MOCK_UNMATCHED",
+        "WORKFLOW_FROZEN",
+        "NOT_FROZEN"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
+    "FieldError": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Dotted path of the offending field, e.g. 'limit'",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StructureDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "path",
+        "message"
+      ],
+      "title": "FieldError",
+      "type": "object"
+    },
+    "ImportMode": {
+      "enum": [
+        "validate-only",
+        "upsert"
+      ],
+      "title": "ImportMode",
+      "type": "string"
+    },
+    "ImportReport": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/ImportMode"
+        },
+        "applied": {
+          "title": "Applied",
+          "type": "boolean"
+        },
+        "sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "tabs": {
+          "items": {
+            "$ref": "#/$defs/ImportTabReport"
+          },
+          "title": "Tabs",
+          "type": "array"
+        },
+        "stable_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Stable Ids",
+          "type": "array"
+        },
+        "statuses": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/MasterStatus"
+          },
+          "title": "Statuses",
+          "type": "object"
+        }
+      },
+      "required": [
+        "mode",
+        "applied",
+        "sha256",
+        "tabs",
+        "stable_ids",
+        "statuses"
+      ],
+      "title": "ImportReport",
+      "type": "object"
+    },
+    "ImportRowError": {
+      "additionalProperties": false,
+      "properties": {
+        "tab": {
+          "title": "Tab",
+          "type": "string"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tab",
+        "message"
+      ],
+      "title": "ImportRowError",
+      "type": "object"
+    },
+    "ImportTabReport": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "created": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Created",
+          "type": "integer"
+        },
+        "updated": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Updated",
+          "type": "integer"
+        },
+        "unchanged": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Unchanged",
+          "type": "integer"
+        },
+        "missing": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Missing",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ImportRowError"
+          },
+          "title": "Errors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ImportTabReport",
+      "type": "object"
+    },
+    "MasterDocumentOut": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project Id"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "filetype_row_label": {
+          "title": "Filetype Row Label",
+          "type": "string"
+        },
+        "intent_class": {
+          "title": "Intent Class",
+          "type": "string"
+        },
+        "master_type": {
+          "enum": [
+            "ORGANIZATION",
+            "RULES",
+            "AGENTS",
+            "SKILLS"
+          ],
+          "title": "Master Type",
+          "type": "string"
+        },
+        "master_entry_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Master Entry Id"
+        },
+        "route_source": {
+          "$ref": "#/$defs/RouteSource"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "title": "Size",
+          "type": "integer"
+        },
+        "scan_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScanStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parse_status": {
+          "$ref": "#/$defs/ParseStatus"
+        },
+        "parse_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ErrorCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "filetype_row_label",
+        "intent_class",
+        "master_type",
+        "route_source",
+        "sha256",
+        "size",
+        "parse_status",
+        "created_at"
+      ],
+      "title": "MasterDocumentOut",
+      "type": "object"
+    },
+    "MasterStatus": {
+      "enum": [
+        "PROPOSED",
+        "ILLUSTRATIVE",
+        "APPROVED",
+        "RETIRED"
+      ],
+      "title": "MasterStatus",
+      "type": "string"
+    },
+    "MastersScanKind": {
+      "enum": [
+        "IMPORT",
+        "DOCUMENT"
+      ],
+      "title": "MastersScanKind",
+      "type": "string"
+    },
+    "MastersScanState": {
+      "enum": [
+        "QUEUED",
+        "RUNNING",
+        "DONE",
+        "FAILED"
+      ],
+      "title": "MastersScanState",
+      "type": "string"
+    },
+    "ParseStatus": {
+      "enum": [
+        "PENDING",
+        "PARSING",
+        "PARSED",
+        "FAILED"
+      ],
+      "title": "ParseStatus",
+      "type": "string"
+    },
+    "ProblemDetail": {
+      "additionalProperties": false,
+      "description": "`application/problem+json` body returned for every 4xx/5xx response.",
+      "properties": {
+        "type": {
+          "default": "about:blank",
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "status": {
+          "maximum": 599,
+          "minimum": 400,
+          "title": "Status",
+          "type": "integer"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/FieldError"
+          },
+          "title": "Errors",
+          "type": "array"
+        },
+        "correlation_id": {
+          "minLength": 1,
+          "title": "Correlation Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "status",
+        "code",
+        "correlation_id"
+      ],
+      "title": "ProblemDetail",
+      "type": "object"
+    },
+    "RouteSource": {
+      "enum": [
+        "DEFAULT_BY_FILETYPE",
+        "ADMIN_OVERRIDE",
+        "CLASSIFIER"
+      ],
+      "title": "RouteSource",
+      "type": "string"
+    },
+    "Run": {
+      "additionalProperties": false,
+      "description": "One Temporal execution as the API returns it (mirror of `temporal_runs`).",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "temporal_workflow_id": {
+          "pattern": "^(?:pipeline-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ingest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|build-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[1-9][0-9]*|ping-sbam-(?:ingest|knowledge|llm|build|test|certify)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|knowledge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|sow-export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(?:pdf|docx|md)|isatvon-regen-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|relevance-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|request-change-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|workflow-commit-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|masters-scan-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|export-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+          "title": "Temporal Workflow Id",
+          "type": "string"
+        },
+        "temporal_run_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Temporal Run Id",
+          "type": "string"
+        },
+        "type": {
+          "description": "Workflow type name",
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "subject_type": {
+          "$ref": "#/$defs/SubjectType"
+        },
+        "subject_id": {
+          "format": "uuid",
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/RunState"
+        },
+        "current_stage": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Stage"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Error"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "temporal_workflow_id",
+        "temporal_run_id",
+        "type",
+        "subject_type",
+        "subject_id",
+        "state",
+        "started_at",
+        "updated_at"
+      ],
+      "title": "Run",
+      "type": "object"
+    },
+    "RunState": {
+      "description": "Execution state as mirrored in `temporal_runs` (Temporal's workflow execution status).",
+      "enum": [
+        "RUNNING",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+        "TERMINATED",
+        "TIMED_OUT"
+      ],
+      "title": "RunState",
+      "type": "string"
+    },
+    "ScanStatus": {
+      "enum": [
+        "CLEAN",
+        "INFECTED",
+        "SCAN_FAILED"
+      ],
+      "title": "ScanStatus",
+      "type": "string"
+    },
+    "StructureDiff": {
+      "additionalProperties": false,
+      "description": "How an uploaded layout differs from the frozen one (workbook import, E3.3).",
+      "properties": {
+        "tab": {
+          "minLength": 1,
+          "title": "Tab",
+          "type": "string"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected"
+        },
+        "actual": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actual"
+        },
+        "kind": {
+          "$ref": "#/$defs/DiffKind"
+        }
+      },
+      "required": [
+        "tab",
+        "expected",
+        "actual",
+        "kind"
+      ],
+      "title": "StructureDiff",
+      "type": "object"
+    },
+    "SubjectType": {
+      "description": "What a run works on; `subject_id` is that entity's id.",
+      "enum": [
+        "project",
+        "document_version",
+        "sub_skill"
+      ],
+      "title": "SubjectType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The state of one scan, and its result once DONE (exactly one of `import_report` /\n`document` for the kind) or its problem once FAILED.",
+  "properties": {
+    "scan_id": {
+      "format": "uuid",
+      "title": "Scan Id",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/MastersScanKind"
+    },
+    "state": {
+      "$ref": "#/$defs/MastersScanState"
+    },
+    "run": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Run"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "import_report": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImportReport"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "document": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MasterDocumentOut"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "created": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Created"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProblemDetail"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "scan_id",
+    "kind",
+    "state",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "MastersScanStatus",
+  "type": "object"
+}

@@ -39,6 +39,8 @@ WORKFLOW_ID_PATTERN: Final = (
     rf"|request-change-{_UUID}"
     # workflow-commit-: WorkflowCommit (#766), one Commit to Staging at a time per Workflow
     rf"|workflow-commit-{_UUID}"
+    # masters-scan-: MastersScanImport (#609), one scan + import per tenant and Idempotency-Key
+    rf"|masters-scan-{_UUID}"
     # export-: ExportVersion (#133), one per (version, Idempotency-Key)
     rf"|export-{_UUID})$"
 )
