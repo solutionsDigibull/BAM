@@ -34,6 +34,9 @@ import type {
   RequestChangeAccepted,
   KnowledgeVersionList,
   LlmUsage,
+  BudgetState,
+  RaiseCap,
+  TokenMeter,
   Preflight,
   StagingStatus,
   WorkflowCodeTree,
@@ -126,6 +129,9 @@ export function createSbamApi(projectId: string): BamApi {
     getKnowledgeVersions: async () => (await getJson<KnowledgeVersionList>(`projects/${projectId}/knowledge`)).body,
     getPreflight: async () => (await getJson<Preflight>("preflight")).body,
     getLlmUsage: async () => (await getJson<LlmUsage>(`projects/${projectId}/llm-usage`)).body,
+    // The token meter and the one raise per build (#776).
+    getTokenBudget: async () => (await getJson<TokenMeter>(`projects/${projectId}/token-budget`)).body,
+    raiseTokenCap: async (body) => (await postJson<BudgetState>(`projects/${projectId}/token-budget/raise`, body)).body,
     getStagingStatus: async (workflowId) =>
       (await getJson<StagingStatus>(`projects/${projectId}/workflows/${workflowId}/staging`)).body,
     getChangeNotes: async (workflowId) =>

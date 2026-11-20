@@ -1,0 +1,18 @@
+/* Translate: the token meter (#776). Tokens come from the workbench theme. */
+.bam-wb .tm { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px 12px; container-type: inline-size; }
+.bam-wb .tm-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.bam-wb .tm-title h4 { margin: 0; font-size: 13px; }
+.bam-wb .tm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bam-wb .tm-row { display: flex; flex-direction: column; gap: 5px; }
+.bam-wb .tm-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.bam-wb .tm-head .mono { margin-left: auto; }
+.bam-wb .tm-bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.bam-wb .tm-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--ok); transition: width 0.2s ease; }
+.bam-wb .tm-row[data-level='FIRST_ALERT'] .tm-bar > span, .bam-wb .tm-row[data-level='SECOND_ALERT'] .tm-bar > span { background: var(--warn); }
+.bam-wb .tm-row[data-level='STOPPED'] .tm-bar > span { background: var(--err); }
+.bam-wb .tm-note { display: flex; align-items: center; gap: 6px; margin: 0; }
+.bam-wb .tm-raise { display: flex; flex-direction: column; gap: 4px; }
+.bam-wb .tm-raise-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bam-wb .tm-raise input { width: 160px; max-width: 100%; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: inherit; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.bam-wb .tm-raise input[aria-invalid='true'] { border-color: var(--err); }
+.bam-wb .tm-error { color: var(--err); }
