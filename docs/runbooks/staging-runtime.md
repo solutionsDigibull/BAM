@@ -137,3 +137,21 @@ and remove one with `docker rm -f <name>`. `make reset CONFIRM=yes` removes the 
 
 A deployed staging VM (its own Docker host decision and Docker secret files for `SECRETS_KEYS` and
 `BIFROST_SETUP_TOKEN`), a CubeSandbox host (#762), and a policy-aware gateway instead of the HAProxy filter.
+
+## Recording mock fixtures from one live run (WG-33, #914)
+
+The mock answers only prompts it has a fixture for (key: alias, `prompt_id`, sha256 of the messages), so a real build
+cannot run on it until its prompts were recorded once. Recording is the only paid step and replay is free.
+`scripts/llm_record_proxy.py` sits between the workers and Bifrost, forwards every call unchanged and writes the
+messages and the model's text as a mock fixture, `<LLM_RECORD_DIR>/<alias>/<prompt_id>_<hash12>.json`.
+
+- It is OFF by default and refuses to start without `LLM_RECORD=1` and `LLM_RECORD_SPEND_CAP_USD`; once the cost Bifrost
+  reports reaches the cap it answers 402. Do not rely on it alone: read `total_usage` from the OpenRouter credits
+  endpoint (from inside the `bifrost` container, which holds the key) before and after every stage, and set
+  `LLM_PROJECT_BUDGET_USD` low. Spend is the delta of `total_usage` (an auto top-up changes `total_credits` only).
+- Run it as an extra Compose service on a separate project and ports with `LLM_PROVIDER=bifrost`, and point the
+  `BIFROST_URL` of `worker-llm`, `worker-build` and `worker-test` at it. Cognee calls the gateway directly and is not recorded.
+- A fixture holds only the messages and the answer, never the request metadata. Fixtures made from customer documents
+  stay out of the repository. Commit only fixtures of the public synthetic pack in `server/tests/fixtures`.
+- Copy the files into `server/tests/llm-mock/<alias>/`; `test_wg33_record_fixtures.py` checks that each is found by the
+  mock and holds no key-like string.
