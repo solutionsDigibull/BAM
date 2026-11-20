@@ -29,6 +29,7 @@ from sbam_workers.knowledge.cognee_adapter import CogneeAdapter
 from sbam_workers.llm import meter
 from sbam_workers.llm.budget import BudgetExceeded
 from sbam_workers.llm.store import SqlCallStore
+from sbam_workers.llm.trace import LangfuseTracer
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 from test_cognee_adapter import SECRET, FakeGuard
@@ -301,7 +302,7 @@ def test_420_t20_every_cognee_call_is_a_langfuse_generation(
     async def record(self: Any, generation: Any) -> None:
         sent.append(generation)
 
-    monkeypatch.setattr(meter.LangfuseTracer, "record", record)
+    monkeypatch.setattr(LangfuseTracer, "record", record)
     w = world()
     [row] = asyncio.run(with_rows(w, 1, chat()))
     deadline = time.monotonic() + 5
