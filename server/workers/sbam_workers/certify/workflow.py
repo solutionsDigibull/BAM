@@ -11,7 +11,8 @@ of `workflow_checks`; this module only loads what they judge and writes what the
   the state-machine service (`build_started` from PENDING, then `all_sub_skills_certified`). A
   blocked Macro stays as it is: the Workflow validation names it next.
 * `validate_workflow`: the newest Workflow manifest (its DAG and its stored schema.sql), the tables
-  every Sub-Skill declares and the children, through `workflow_verdict`. A finding is the
+  every Sub-Skill declares, each Sub-Skill's interface (`build_contracts` on its stored ISATVON)
+  and the children, through `workflow_verdict`. A finding is the
   non-retryable `WorkflowValidationFailed` (the pipeline maps it to `workflow_validation_failed`);
   its message names `check:subject` only. The findings, with their messages, are written to the
   Workflow's audit trail (`WORKFLOW_VALIDATION_FAILED`): no notification store carries more than
@@ -25,8 +26,8 @@ of `workflow_checks`; this module only loads what they judge and writes what the
 Every certificate goes through `CertificationRepository.record`, so a retried activity finds the
 row it wrote. Messages and logs carry ids, names and hashes, never code or SQL text.
 
-TODO(#130): the Workflow smoke run through the loop harness in CubeSandbox and the field-level DAG
-checks (dangling input, interface mismatch) are not built yet; see the issue.
+TODO(#130): the Workflow smoke run through the loop harness in CubeSandbox is not built yet; see
+the issue.
 """
 
 import asyncio
@@ -34,7 +35,7 @@ import hashlib
 import json
 import logging
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Final
@@ -54,6 +55,8 @@ from sbam_api.state_machine import SYSTEM_ACTOR_ID, TransitionCommand, apply_tra
 from sbam_api.storage.base import StorageBackend
 from sbam_api.workflows.repository import WorkflowRepository
 from sbam_contracts.canonical import sha256_of
+from sbam_contracts.isatvon14 import SubSkill as SubSkillModel
+from sbam_contracts.isatvon14 import build_contracts
 from sbam_contracts.manifest import WorkflowManifest
 from sbam_contracts.pipeline import IdResult, IdsResult, WorkflowRef
 from sbam_contracts.runs import TaskQueue
@@ -70,6 +73,7 @@ from sbam_workers.certify.workflow_checks import (
     Check,
     ChildSkill,
     Finding,
+    Interface,
     macro_verdicts,
     workflow_verdict,
 )
@@ -139,6 +143,7 @@ class Facts:
     schema_sql: str | None = None  # None: missing, unreadable or not the manifest's hash
     declared: dict[str, set[str]] = field(default_factory=dict)  # skill_id -> tables
     extra: tuple[Finding, ...] = ()  # what only loading could see (no / an invalid manifest)
+    interfaces: dict[str, Interface] = field(default_factory=dict)  # skill_id -> its interface
 
 
 def _digest(value: str) -> str:
@@ -210,6 +215,7 @@ class SqlFacts:
             manifest,
             self._schema(manifest),
             tables,
+            interfaces={s.skill_id: interface_of(s.isatvon) for s in subs},
         )
 
     def _schema(self, manifest: WorkflowManifest) -> str | None:
@@ -225,6 +231,39 @@ class SqlFacts:
             return data.decode("utf-8")
         except UnicodeDecodeError:
             return None
+
+
+def interface_of(isatvon: Mapping[str, Any]) -> Interface:
+    """The Sub-Skill's contracts as its Skill Manifest has them; none when its stored ISATVON is
+    not a valid ISATVON 1.4 Sub-Skill (a data edge to or from it is then a finding). Its required
+    inputs and external_data names are read as `build.dag` reads the inputs, leniently."""
+    definition = isatvon.get("isatvon_definition")
+    source = definition.get("s_source") if isinstance(definition, Mapping) else None
+    source = source if isinstance(source, Mapping) else {}
+    inputs = source.get("required_inputs")
+    external = source.get("external_data")
+    names = (
+        [e.get("name") for e in external if isinstance(e, Mapping)]
+        if isinstance(external, list)
+        else []
+    )
+    try:
+        contracts: dict[str, Any] | None = build_contracts(SubSkillModel.model_validate(isatvon))
+    except ValueError:  # pydantic's ValidationError too
+        contracts = None
+    variables = definition.get("v_variables") if isinstance(definition, Mapping) else None
+    parameters = variables.get("parameters") if isinstance(variables, Mapping) else None
+    typed = (
+        [p.get("name") for p in parameters if isinstance(p, Mapping)]
+        if isinstance(parameters, list)
+        else []
+    )
+    return Interface(
+        contracts,
+        inputs=tuple(i for i in inputs if isinstance(i, str)) if isinstance(inputs, list) else (),
+        external=frozenset(n for n in names if isinstance(n, str)),
+        typed=frozenset(n for n in typed if isinstance(n, str)),
+    )
 
 
 FactsLoader = Callable[[Session, TenantContext, uuid.UUID], Facts]
@@ -246,7 +285,11 @@ def findings_of(facts: Facts) -> tuple[Finding, ...]:
         )
     dag = _EmptyDag() if facts.manifest is None else facts.manifest.dag
     verdict = workflow_verdict(
-        dag, facts.schema_sql or "", facts.declared, [c.skill for c in facts.tree.children]
+        dag,
+        facts.schema_sql or "",
+        facts.declared,
+        [c.skill for c in facts.tree.children],
+        interfaces=facts.interfaces,
     )
     return tuple(sorted(set(verdict) | set(extra)))
 

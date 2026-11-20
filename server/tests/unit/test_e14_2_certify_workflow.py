@@ -5,8 +5,11 @@ test_e14_2_workflow_checks.py; schema.sql is read from an in-memory storage fake
 
 import asyncio
 import hashlib
+import json
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -73,7 +76,10 @@ class World:
     """A Workflow in CERTIFYING with 2 Macros and 3 Sub-Skills, each certified on its bundle, a
     manifest draft over those bundles and the stored schema.sql; each test spoils one thing."""
 
-    def __init__(self, sql: str = FULL_SQL) -> None:
+    def __init__(
+        self, sql: str = FULL_SQL, isatvon_of: Callable[[str], dict[str, Any]] = isatvon
+    ) -> None:
+        self.isatvon_of = isatvon_of
         self.sessions: sessionmaker[Session] = pipeline_sessions()
         bind = self.sessions.kw["bind"]
         for table in (
@@ -153,7 +159,7 @@ class World:
                 skill_id=skill_id,
                 skill_name=skill_id,
                 order=order,
-                isatvon=isatvon(skill_id),
+                isatvon=self.isatvon_of(skill_id),
                 isatvon_framework_version="1.4",
                 sow_refs=[],
                 validation_errors=[],
@@ -219,7 +225,7 @@ class World:
     def manifest(self, bundle: int = 1) -> WorkflowManifest:
         skills = [
             Skill(
-                node=Node(self.subs[sid], sid, SKILLS[sid][0], isatvon(sid)),
+                node=Node(self.subs[sid], sid, SKILLS[sid][0], self.isatvon_of(sid)),
                 manifest_sha256="sha256:" + "a" * 64,
                 bundle_sha256=self.bundle_of(sid, bundle),
             )
@@ -594,3 +600,102 @@ def test_e14_2_the_freeze_only_applies_freeze_to_a_macro_certify_macros_certifie
             select(AuditLog).where(AuditLog.entity_type == "agent", AuditLog.action == "freeze")
         )
         assert sorted(r.entity_id for r in rows if r.entity_id in macro_ids) == sorted(macro_ids)
+
+
+# --- field-level checks on full ISATVON Sub-Skills ------------------------------------------------
+
+ISA14 = Path(__file__).parents[1] / "fixtures/isa14/ms01_1_structured.json"
+HANDOFF_SQL = FULL_SQL + "CREATE TABLE auth_event_audit_handoff (id bigserial PRIMARY KEY);\n"
+
+
+def full_isatvon(
+    skill_id: str,
+    inputs: list[str],
+    outputs: dict[str, Any],
+    parameters: list[dict[str, Any]],
+    external: list[str] | None = None,
+) -> dict[str, Any]:
+    """The MS01.1 reference Sub-Skill, renamed into the World and given these S and O sides."""
+    data: dict[str, Any] = json.loads(ISA14.read_text("utf-8"))
+    macro, tables, nxt = SKILLS[skill_id]
+    data["skill_metadata"] |= {"skill_id": skill_id, "macro_category": macro}
+    definition = data["isatvon_definition"]
+    definition["s_source"]["required_inputs"] = inputs
+    if external is not None:
+        definition["s_source"]["external_data"] = [
+            {"name": name, "kind": "API", "ref": f"partner/{name}"} for name in external
+        ]
+    definition["o_outcome"]["json_schema"] = outputs
+    definition["v_variables"] |= {"tables": tables, "parameters": parameters}
+    definition["n_notification"]["next"] = nxt
+    return data
+
+
+def typed_world(
+    amount_out: str, verify_needs: tuple[str, ...] = (), external: list[str] | None = None
+) -> World:
+    """MS01.1 outputs `amount` as `amount_out`; MS01.2 (after MS01.1 by `next`) takes `amount`
+    as a number, plus `verify_needs`, with `external` as its s_source.external_data."""
+    io: dict[str, tuple[list[str], dict[str, Any], list[dict[str, Any]]]] = {
+        "MS01.1_Login": (["email"], {"amount": amount_out}, []),
+        "MS01.2_Verify": (
+            ["amount", *verify_needs],
+            {"investor_id": "string"},
+            [{"name": "amount", "type": "number"}],
+        ),
+        "MS02.1_Quote": (["investor_id"], {"quote": "number"}, []),
+    }
+    ext = {"MS01.2_Verify": external}
+    return World(
+        sql=HANDOFF_SQL,
+        isatvon_of=lambda sid: full_isatvon(sid, *io[sid], external=ext.get(sid)),
+    )
+
+
+def test_e14_2_t05_an_integer_output_feeds_a_number_input() -> None:
+    w = typed_world("integer")
+    w.certify_macros()
+    assert w.validate() is not None
+    assert w.audit(VALIDATION_ACTION) == []
+
+
+def test_e14_2_t05_a_string_output_into_a_number_input_fails_validation() -> None:
+    w = typed_world("string")
+    w.certify_macros()
+    error = failure(w.validate)
+    assert error.type == VALIDATION_FAILED
+    assert error.message == "workflow validation failed: INTERFACE_INCOMPATIBLE:MS01.2_Verify"
+    [row] = w.audit(VALIDATION_ACTION)
+    assert row.after is not None
+    assert row.after["findings"] == [
+        {
+            "check": "INTERFACE_INCOMPATIBLE",
+            "subject": "MS01.2_Verify",
+            "message": "MS01.1_Login outputs amount as string; "
+            "MS01.2_Verify takes amount as number",
+        }
+    ]
+    assert failure(w.certify_workflow).type == CERTIFICATION_REFUSED
+
+
+def test_e14_2_t04_a_mid_chain_input_nobody_provides_fails_validation() -> None:
+    w = typed_world("integer", verify_needs=("account_id",))
+    w.certify_macros()
+    error = failure(w.validate)
+    assert error.message == "workflow validation failed: DAG_DANGLING_INPUT:MS01.2_Verify"
+    [row] = w.audit(VALIDATION_ACTION)
+    assert row.after is not None
+    assert row.after["findings"] == [
+        {
+            "check": "DAG_DANGLING_INPUT",
+            "subject": "MS01.2_Verify",
+            "message": "required input account_id has no upstream output and is not in "
+            "s_source.external_data",
+        }
+    ]
+
+
+def test_e14_2_t04_external_data_provides_a_mid_chain_input() -> None:
+    w = typed_world("integer", verify_needs=("account_id",), external=["account_id"])
+    w.certify_macros()
+    assert w.validate() is not None

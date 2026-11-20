@@ -11,7 +11,20 @@ Every check is a pure function of what the certify activity loaded, so every rul
   * `schema_findings`: the Workflow's schema.sql parses and passes the allowlist (SCHEMA_INVALID)
     and has a CREATE TABLE for every table a Sub-Skill declares (SCHEMA_TABLE_MISSING);
   * `children_findings`: every Sub-Skill is certified on the bundle it has now
-    (SUB_SKILL_NOT_CERTIFIED): a certificate on an older bundle does not count.
+    (SUB_SKILL_NOT_CERTIFIED): a certificate on an older bundle does not count;
+  * `interface_findings`: across every field-level data edge, the upstream's
+    `contracts.output_schema` property and the downstream's `contracts.input_schema` property
+    (`build_contracts`) have compatible types: equal, or integer into number
+    (INTERFACE_INCOMPATIBLE). An output the upstream marks optional (its output schema has a
+    `required` list without the field) into a required input is one too. `build_contracts` never
+    writes `required` on an output schema, so today every output counts as present: optionality
+    is judged only where the schema states it, never assumed. A data edge with no `field` (not
+    from `build_dag`) links nothing to compare;
+  * `dangling_findings` (#130 option B): a Sub-Skill that another Sub-Skill's `next` leads to runs
+    mid-chain, so each of its required inputs comes from an upstream output (a data edge with
+    that field) or is named in its `s_source.external_data` (DAG_DANGLING_INPUT). A Sub-Skill no
+    Sub-Skill `next` leads to is an entry point: its inputs are inputs of the Workflow (or, for a
+    `next` that names a Macro, of that Agent), which the stored ISATVON does not declare.
 
 A failing Sub-Skill blocks its Macro and the Workflow, never another Macro (`macro_verdicts`).
 Findings are sorted, so the same inputs in any order give the same tuple. They name ids, tables
@@ -21,7 +34,8 @@ and hashes, never code or SQL text.
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Final, Protocol
+from types import MappingProxyType
+from typing import Any, Final, Protocol
 
 from sbam_api.schema_sql.validate import check
 from sbam_contracts.state_machines import SubSkillState
@@ -39,6 +53,8 @@ class Check(StrEnum):
     SCHEMA_TABLE_MISSING = "SCHEMA_TABLE_MISSING"
     SCHEMA_INVALID = "SCHEMA_INVALID"
     SUB_SKILL_NOT_CERTIFIED = "SUB_SKILL_NOT_CERTIFIED"
+    INTERFACE_INCOMPATIBLE = "INTERFACE_INCOMPATIBLE"
+    DAG_DANGLING_INPUT = "DAG_DANGLING_INPUT"
 
 
 @dataclass(frozen=True, order=True)
@@ -67,6 +83,25 @@ class ChildSkill:
     state: str  # SubSkillState
     certified_content_sha256: str | None  # "sha256:<hex>" of its latest certificate, or None
     bundle_sha256: str | None  # hex of its current code bundle, or None before codegen
+
+
+@dataclass(frozen=True)
+class Interface:
+    """One Sub-Skill's boundary as its stored ISATVON declares it."""
+
+    # `build_contracts`: {"input_schema": ..., "output_schema": ...}; None when the stored
+    # ISATVON can't give them (a data edge to or from it is then a finding)
+    contracts: Mapping[str, Any] | None
+    inputs: tuple[str, ...] = ()  # s_source.required_inputs
+    external: frozenset[str] = frozenset()  # s_source.external_data[].name
+    # v_variables.parameters[].name: the inputs whose type the ISATVON declares. `build_contracts`
+    # writes every other input as "string" only as a placeholder, so its type is not compared.
+    typed: frozenset[str] = frozenset()
+
+
+NO_INTERFACES: Final[Mapping[str, Interface]] = MappingProxyType({})
+# The one widening a link may make (TD §14.5): every integer is a number, not the other way.
+_WIDENS: Final = frozenset({("integer", "number")})
 
 
 def _sorted(findings: Iterable[Finding]) -> tuple[Finding, ...]:
@@ -100,6 +135,125 @@ def dag_findings(dag: DagLike) -> tuple[Finding, ...]:
         path = " -> ".join(cycle)
         findings.append(Finding(Check.DAG_CYCLE, path, f"the Workflow DAG loops: {path}"))
     return _sorted(findings)
+
+
+# --- interfaces -----------------------------------------------------------------------------------
+
+
+def _field_links(dag: DagLike) -> list[tuple[str, str, str]]:
+    """(upstream, downstream, field) of every data edge that names its field, sorted."""
+    return sorted(
+        {
+            (str(e.get("from")), str(e.get("to")), field)
+            for e in dag.edges
+            if e.get("kind") == "data" and isinstance(field := e.get("field"), str)
+        }
+    )
+
+
+def _schema(interface: Interface | None, name: str) -> Mapping[str, Any] | None:
+    if interface is None or interface.contracts is None:
+        return None
+    schema = interface.contracts.get(name)
+    return schema if isinstance(schema, Mapping) else None
+
+
+def _property(schema: Mapping[str, Any], field: str) -> Mapping[str, Any] | None:
+    properties = schema.get("properties")
+    spec = properties.get(field) if isinstance(properties, Mapping) else None
+    return spec if isinstance(spec, Mapping) else None
+
+
+def _required(schema: Mapping[str, Any]) -> list[str] | None:
+    required = schema.get("required")
+    return [str(r) for r in required] if isinstance(required, list) else None
+
+
+def _link_findings(
+    up: str, down: str, field: str, interfaces: Mapping[str, Interface]
+) -> list[Finding]:
+    output = _schema(interfaces.get(up), "output_schema")
+    inp = _schema(interfaces.get(down), "input_schema")
+    missing = [skill for skill, schema in ((up, output), (down, inp)) if schema is None]
+    if output is None or inp is None:
+        names = " and ".join(missing)
+        return [
+            Finding(
+                Check.INTERFACE_INCOMPATIBLE,
+                down,
+                f"{up} -> {down}: no interface contract for {names}",
+            )
+        ]
+    out_spec, in_spec = _property(output, field), _property(inp, field)
+    if out_spec is None or in_spec is None:
+        sides = [
+            f"the {side} of {skill}"
+            for skill, side, spec in (
+                (up, "output_schema", out_spec),
+                (down, "input_schema", in_spec),
+            )
+            if spec is None
+        ]
+        return [
+            Finding(
+                Check.INTERFACE_INCOMPATIBLE,
+                down,
+                f"{up} -> {down}: {field} is not in " + " and not in ".join(sides),
+            )
+        ]
+    out_type, in_type = out_spec.get("type"), in_spec.get("type")
+    declared = field in interfaces[down].typed
+    findings = []
+    if declared and out_type != in_type and (out_type, in_type) not in _WIDENS:
+        findings.append(
+            Finding(
+                Check.INTERFACE_INCOMPATIBLE,
+                down,
+                f"{up} outputs {field} as {out_type}; {down} takes {field} as {in_type}",
+            )
+        )
+    produced, needed = _required(output), _required(inp) or []
+    if produced is not None and field not in produced and field in needed:
+        findings.append(
+            Finding(
+                Check.INTERFACE_INCOMPATIBLE,
+                down,
+                f"{up} output {field} is optional; {down} input {field} is required",
+            )
+        )
+    return findings
+
+
+def interface_findings(dag: DagLike, interfaces: Mapping[str, Interface]) -> tuple[Finding, ...]:
+    """`interfaces` is skill_id -> its `Interface`; see the module docstring for the rules."""
+    return _sorted(
+        finding
+        for up, down, field in _field_links(dag)
+        for finding in _link_findings(up, down, field, interfaces)
+    )
+
+
+def dangling_findings(dag: DagLike, interfaces: Mapping[str, Interface]) -> tuple[Finding, ...]:
+    """Required inputs of a mid-chain Sub-Skill that nothing provides (module docstring)."""
+    skills = {str(n.get("id")) for n in dag.nodes if n.get("kind") == "skill"}
+    mid_chain = {
+        str(e.get("to"))
+        for e in dag.edges
+        if e.get("kind") == "next" and str(e.get("from")) in skills and str(e.get("to")) in skills
+    }
+    provided = {(down, field) for _, down, field in _field_links(dag)}
+    return _sorted(
+        Finding(
+            Check.DAG_DANGLING_INPUT,
+            skill,
+            f"required input {field} has no upstream output and is not in "
+            "s_source.external_data",
+        )
+        for skill in mid_chain
+        if (interface := interfaces.get(skill)) is not None
+        for field in interface.inputs
+        if (skill, field) not in provided and field not in interface.external
+    )
 
 
 # --- schema.sql -----------------------------------------------------------------------------------
@@ -184,14 +338,19 @@ def workflow_verdict(
     schema_sql: str,
     declared: Mapping[str, Iterable[str]],
     skills: Iterable[ChildSkill],
+    *,
+    interfaces: Mapping[str, Interface] = NO_INTERFACES,
 ) -> tuple[Finding, ...]:
     """Every finding that blocks the Workflow; empty: it may certify. It never certifies
     vacuously: every skill node of the DAG needs a Sub-Skill record, every record a DAG node,
-    and a Workflow with no Sub-Skills at all is blocked."""
+    a Workflow with no Sub-Skills at all is blocked, and a field-level data edge between skills
+    with no `interfaces` is a finding."""
     children = list(skills)
     return _sorted(
         [
             *dag_findings(dag),
+            *interface_findings(dag, interfaces),
+            *dangling_findings(dag, interfaces),
             *schema_findings(schema_sql, declared),
             *children_findings(children),
             *_coverage_findings(dag, children),
