@@ -94,6 +94,9 @@ class Interface:
     contracts: Mapping[str, Any] | None
     inputs: tuple[str, ...] = ()  # s_source.required_inputs
     external: frozenset[str] = frozenset()  # s_source.external_data[].name
+    # v_variables.parameters[].name: the inputs whose type the ISATVON declares. `build_contracts`
+    # writes every other input as "string" only as a placeholder, so its type is not compared.
+    typed: frozenset[str] = frozenset()
 
 
 NO_INTERFACES: Final[Mapping[str, Interface]] = MappingProxyType({})
@@ -199,8 +202,9 @@ def _link_findings(
             )
         ]
     out_type, in_type = out_spec.get("type"), in_spec.get("type")
+    declared = field in interfaces[down].typed
     findings = []
-    if out_type != in_type and (out_type, in_type) not in _WIDENS:
+    if declared and out_type != in_type and (out_type, in_type) not in _WIDENS:
         findings.append(
             Finding(
                 Check.INTERFACE_INCOMPATIBLE,

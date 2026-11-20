@@ -242,9 +242,14 @@ def test_e14_2_an_empty_workflow_never_certifies() -> None:
 
 
 def _iface(
-    inputs: dict[str, str], outputs: dict[str, str], *, output_required: list[str] | None = None
+    inputs: dict[str, str],
+    outputs: dict[str, str],
+    *,
+    output_required: list[str] | None = None,
+    untyped: frozenset[str] = frozenset(),
 ) -> Interface:
-    """Contracts shaped like `build_contracts`; `output_required` only when the test sets it."""
+    """Contracts shaped like `build_contracts`; `output_required` only when the test sets it.
+    Every input is declared in `v_variables.parameters` unless it is in `untyped`."""
     output: dict[str, Any] = {
         "type": "object",
         "properties": {k: {"type": t} for k, t in outputs.items()},
@@ -259,7 +264,8 @@ def _iface(
                 "required": list(inputs),
             },
             "output_schema": output,
-        }
+        },
+        typed=frozenset(inputs) - untyped,
     )
 
 
@@ -306,6 +312,20 @@ def test_e14_2_t05_interface_mismatch_string_into_number() -> None:
 def test_e14_2_t05_compatible_types(out: str, into: str, ok: bool) -> None:
     findings = interface_findings(_linked(), _ifaces(out, into))
     assert (findings == ()) is ok, findings
+
+
+def test_e14_2_t05_an_untyped_input_takes_any_output_type() -> None:
+    """`build_contracts` writes "string" for an input the ISATVON does not type in
+    `v_variables.parameters`; that placeholder is not compared (a boolean `otp_match` output feeds
+    an untyped `otp_match` input). A typed input still is."""
+    ifaces = _ifaces("boolean", "string")
+    ifaces["MS01.2_Bill"] = _iface(
+        {"amount": "string"}, {"invoice_id": "string"}, untyped=frozenset({"amount"})
+    )
+    assert interface_findings(_linked(), ifaces) == ()
+    assert [f.check for f in interface_findings(_linked(), _ifaces("boolean", "string"))] == [
+        Check.INTERFACE_INCOMPATIBLE
+    ]
 
 
 def test_e14_2_t05_optional_output_into_a_required_input() -> None:
@@ -443,3 +463,13 @@ def test_e14_2_t04_the_reference_and_existing_multi_skill_fixtures_have_no_dangl
     sources = {n.skill_id: interface_of(n.isatvon) for n in nodes}
     assert sources["MS02.1_Quote"].inputs == ("investor_id", "rfq_file")
     assert dangling_findings(graph, sources) == ()
+
+
+def test_e14_2_t05_interface_of_reads_the_typed_inputs_from_v_variables_parameters() -> None:
+    """The reference MS01.1 types only `max_device_limit`; its three required inputs are untyped,
+    so `build_contracts`' "string" for them is never compared."""
+    from sbam_workers.certify.workflow import interface_of
+
+    interface = interface_of(json.loads(ISA14.read_text("utf-8")))
+    assert interface.typed == frozenset({"max_device_limit"})
+    assert set(interface.inputs) == {"mobile_number", "otp_payload", "device_fingerprint"}

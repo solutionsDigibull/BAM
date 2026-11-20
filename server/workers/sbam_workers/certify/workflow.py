@@ -251,10 +251,18 @@ def interface_of(isatvon: Mapping[str, Any]) -> Interface:
         contracts: dict[str, Any] | None = build_contracts(SubSkillModel.model_validate(isatvon))
     except ValueError:  # pydantic's ValidationError too
         contracts = None
+    variables = definition.get("v_variables") if isinstance(definition, Mapping) else None
+    parameters = variables.get("parameters") if isinstance(variables, Mapping) else None
+    typed = (
+        [p.get("name") for p in parameters if isinstance(p, Mapping)]
+        if isinstance(parameters, list)
+        else []
+    )
     return Interface(
         contracts,
         inputs=tuple(i for i in inputs if isinstance(i, str)) if isinstance(inputs, list) else (),
         external=frozenset(n for n in names if isinstance(n, str)),
+        typed=frozenset(n for n in typed if isinstance(n, str)),
     )
 
 
