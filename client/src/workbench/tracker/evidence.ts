@@ -59,12 +59,12 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
     '1.6': 'not_started',
     // Quarantine: clear once no file in the batch is held (held files are removed from the batch, never released).
     '1.7': !uploads ? 'not_started' : scanning ? 'in_progress' : held ? 'needs_review' : 'done',
-    // Context follows the knowledge build; schema drafts, context testing and readiness review have no backend.
+    // Context follows the knowledge build; readiness (2.4) is the built version; schema drafts and context testing have no backend.
     '2.5': graph,
     '2.1': graph,
     '2.2': 'not_started',
     '2.3': 'not_started',
-    '2.4': 'not_started',
+    '2.4': graph,
     '3.1': sow?.status === 'approved' ? 'done'
       : gen.some(s => s.status === 'failed') ? 'blocked'
       : sow?.status === 'regenerating' || gen.some(s => s.status === 'running' || s.status === 'queued') ? 'in_progress'
@@ -115,7 +115,7 @@ export const DONE_RULE: Record<string, string> = {
   '2.1': 'Done when the context graph build of the current run finishes.',
   '2.2': 'Done when a schema from the current RAG run is sent to the Workbench.',
   '2.3': 'Done when the verified context of the current run is approved.',
-  '2.4': 'Done when a schema from the current RAG run is sent to the Workbench.',
+  '2.4': 'Done when the newest knowledge version is ready (graph, chunks and the OKF bundle).',
   '3.1': 'Done when the current SOW version is approved.',
   '3.2': 'Done when the grid is reviewed and Start generates the ISATVON Contract.',
   '3.3': 'Done when manifest and code are approved for the current hash (Approve in Translate). Opening Skill review is not required.',

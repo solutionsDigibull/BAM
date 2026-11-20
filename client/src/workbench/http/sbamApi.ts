@@ -32,6 +32,7 @@ import type {
   RepoAnswered,
   RepoQuestions,
   RequestChangeAccepted,
+  KnowledgeVersionList,
   StagingStatus,
   WorkflowCodeTree,
   WorkflowFileView,
@@ -120,6 +121,7 @@ export function createSbamApi(projectId: string): BamApi {
     // Staging (#861): the deployment's state and history, and Request change from Staging (#767).
     getWorkflowVersions: async (workflowId) =>
       (await getJson<WorkflowVersionList>(`projects/${projectId}/workflows/${workflowId}/versions`)).body,
+    getKnowledgeVersions: async () => (await getJson<KnowledgeVersionList>(`projects/${projectId}/knowledge`)).body,
     getStagingStatus: async (workflowId) =>
       (await getJson<StagingStatus>(`projects/${projectId}/workflows/${workflowId}/staging`)).body,
     getChangeNotes: async (workflowId) =>
