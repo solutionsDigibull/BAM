@@ -81,8 +81,8 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   // Sandbox and Check have no backend yet (the sandbox run and the tests are not wired); the real Validation screen above replaces them.
   screen('4.8', '4', 'Sandbox', 'tb-box', '/validation/sandbox', 'Create and run the isolated validation environment.', { step: 4, hidden: true, navAs: '4.9', mode: 'hitl' }),
   screen('4.4', '4', 'Check', 'tb-list-check', '/sandbox/results', 'Validation results and evidence for the current artifact.', { step: 4, hidden: true, navAs: '4.9', mode: 'hitl' }),
-  screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Record approval of the checked artifact. Commit comes next.', { hidden: true, step: 4, mode: 'hitl' }),
-  screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Save the certified artifact to BAM_db, then deploy it to Staging.', { hidden: true, step: 4, mode: 'hitl' }),
+  screen('4.5', '4', 'Certify', 'tb-certificate', '/sandbox/certification', 'Automatic certification of the workflow and every Sub-Skill, with its evidence. Commit comes next.', { step: 4 }),
+  screen('4.6', '4', 'Commit', 'tb-database-import', '/sandbox/handover', 'Your approval: freeze this version and start it in Staging.', { step: 4, mode: 'hitl' }),
   screen('4.1', '4', 'Validation activities', 'circle-check', '/workbench/validation', 'Check activities A–D with attempt history and findings.', { step: 3, hidden: true, navAs: '4.4' }),
   screen('4.7', '4', 'Staging complete', 'rocket', '/sandbox/staging', 'What is live on Staging. Staging complete never means production.', { step: 4, hidden: true, navAs: '4.6' }),
 ]

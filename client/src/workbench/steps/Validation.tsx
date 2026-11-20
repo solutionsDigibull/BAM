@@ -20,8 +20,8 @@ import './validation.css'
 // them, and the Commit that freezes the workflow, registers it in Staging on the digest that was certified (no rebuild)
 // and asks the Staging runtime to start it. The workbench's switch to the Staging toggle is #861, not this screen.
 
-function Checks({ s }: { s: CommitStatus }) {
-  const checks = s.checks ?? []
+export function Checks({ s, only }: { s: CommitStatus; only?: readonly string[] }) {
+  const checks = (s.checks ?? []).filter(c => !only || only.includes(c.name))
   return (
     <ol className="cert-list" aria-label="Automated checks">
       {checks.map(c => (
@@ -37,7 +37,7 @@ function Checks({ s }: { s: CommitStatus }) {
   )
 }
 
-function Entry({ s }: { s: CommitStatus }) {
+export function Entry({ s }: { s: CommitStatus }) {
   const r = s.registration
   if (!r) return null
   return (
@@ -53,7 +53,7 @@ function Entry({ s }: { s: CommitStatus }) {
   )
 }
 
-function Summary({ s }: { s: CommitStatus }) {
+export function Summary({ s }: { s: CommitStatus }) {
   if (s.state === 'COMMITTED') {
     const staging = s.staging
     return (

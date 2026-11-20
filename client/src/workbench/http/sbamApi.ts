@@ -35,6 +35,7 @@ import type {
   WorkflowCodeTree,
   WorkflowFileView,
   WorkflowRepositories,
+  WorkflowVersionList,
 } from "@/contracts";
 import { ApiFailure, deleteJson, getJson, idempotencyKey, postJson, putJson } from "./http";
 import { buildSnapshot, resetSnapshotCache } from "./snapshot";
@@ -116,6 +117,8 @@ export function createSbamApi(projectId: string): BamApi {
     getKnowledgeNode: async (versionId, nodeId) =>
       (await getJson<KnowledgeNodeDetail>(`projects/${projectId}/knowledge/${versionId}/nodes/${encodeURIComponent(nodeId)}`)).body,
     // Staging (#861): the deployment's state and history, and Request change from Staging (#767).
+    getWorkflowVersions: async (workflowId) =>
+      (await getJson<WorkflowVersionList>(`projects/${projectId}/workflows/${workflowId}/versions`)).body,
     getStagingStatus: async (workflowId) =>
       (await getJson<StagingStatus>(`projects/${projectId}/workflows/${workflowId}/staging`)).body,
     getChangeNotes: async (workflowId) =>

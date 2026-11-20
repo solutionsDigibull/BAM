@@ -1,7 +1,7 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
   BuildsResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
-  CodeAttemptList, CodeDiff, CodeFileView, GatesResponse, HeldPatchResponse, TestRunTraces, TestRunsResponse, TestsResponse, ManifestVersionList, ManifestView, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowFileView, WorkflowRepositories,
+  CodeAttemptList, CodeDiff, CodeFileView, GatesResponse, HeldPatchResponse, TestRunTraces, TestRunsResponse, TestsResponse, ManifestVersionList, ManifestView, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowVersionList, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
 import type { RetryAccepted } from '../lib/workflowBuilds'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
@@ -29,6 +29,8 @@ export interface BamApi {
   commitWorkflow(workflowId: string, manifestHash: string, key: string): Promise<CommitAccepted>
   /** One entity of a knowledge version with its neighbours and the passages of the documents it came from (read only, #712). */
   getKnowledgeNode(versionId: string, nodeId: string): Promise<KnowledgeNodeDetail>
+  /** The frozen versions of the workflow, newest first (MAJOR.0.PATCH; read only, #132). */
+  getWorkflowVersions(workflowId: string): Promise<WorkflowVersionList>
   /** The workflow's Staging deployment: state, health, the version running and the history (FDE only; 404 = never committed or not yours, #861). */
   getStagingStatus(workflowId: string): Promise<StagingStatus>
   /** The change notes of the workflow's current version and how many of the allowed ones are used (#767). */
@@ -148,6 +150,7 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'workflow-registration': q => api.getWorkflowRegistration(q.workflowId ?? '', q.version),
   'commit-status': q => api.getCommitStatus(q.workflowId ?? ''),
   'staging-status': q => api.getStagingStatus(q.workflowId ?? ''),
+  'workflow-versions': q => api.getWorkflowVersions(q.workflowId ?? ''),
   'change-notes': q => api.getChangeNotes(q.workflowId ?? ''),
   'workflow-builds': q => api.getWorkflowBuilds(q.workflowId ?? ''),
   'code-attempts': q => api.getCodeAttempts(q.workflowId ?? '', q.subId ?? ''),

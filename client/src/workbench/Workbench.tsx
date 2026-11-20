@@ -17,6 +17,7 @@ import { Intake } from './steps/Intake'
 import { HostSlot } from './host/slots'
 import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
+import * as Release from './steps/Release'
 import * as Validation from './steps/Validation'
 import { FileDetail, IngestReviewFooter, IngestionReview, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
 import { StandardizeFooter, StandardizeView } from './steps/Standardize'
@@ -53,6 +54,10 @@ const PANES: Record<string, { Left?: (p: StepProps) => React.ReactNode; Center: 
   '4.9': { Center: Validation.ValidationCenter },
   '4.8': { Center: Step4.SandboxCenter },
   '4.4': { Center: Step4.TestCenter },
+  // Certify · Commit · Staging complete (#824): real certification, freeze and Staging state.
+  '4.5': { Center: Release.CertifyCenter },
+  '4.6': { Center: Release.CommitCenter },
+  '4.7': { Center: Release.StagingCompleteCenter },
 }
 // Gated single-column screens (Upload and Scan share one intake component, state and run).
 const SINGLE: Record<string, (p: StepProps) => React.ReactNode> = {
@@ -66,6 +71,8 @@ const FOOT: Record<string, (p: { snap: Snapshot; info?: StepInfo }) => React.Rea
   '4.2': p => <Step3.TemplateFooter snap={p.snap} info={p.info!} />, '4.3': p => <Step3.TranslateFooter snap={p.snap} info={p.info!} />,
   '4.9': p => <Validation.ValidationFooter snap={p.snap} info={p.info!} />,
   '4.8': p => <Step4.SandboxFooter snap={p.snap} info={p.info!} />, '4.4': p => <Step4.CheckFooter snap={p.snap} info={p.info!} />,
+  '4.5': p => <Release.CertifyFooter snap={p.snap} info={p.info!} />, '4.6': p => <Release.CommitFooter snap={p.snap} info={p.info!} />,
+  '4.7': p => <Release.StagingCompleteFooter snap={p.snap} info={p.info!} />,
 }
 // Back button order (5 Nov 2026, per user): the visible screens as the rail lists them; Back opens the previous one.
 const NAV_ORDER = TASKS.flatMap(t => subtasksOf(t.id))
