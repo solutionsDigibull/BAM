@@ -43,7 +43,7 @@ too_big = blob(15 * 1024 * 1024 + 1)                              # exact size, 
 
 | File | What it is | Expected outcome |
 |---|---|---|
-| `masters/BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx` | Unmodified copy of the consolidated masters workbook (MSC, BAM 0.2) from `docs/reference` | Byte-identical to the original; since #781 the input of the 0.2 -> 0.3 migration tests (no longer importable) |
+| `masters/BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx` | Unmodified copy of the consolidated masters workbook (MSC, BAM 0.2) from `docs/reference` | Byte-identical to the original; since #781 the input of the 0.2 -> 0.3 migration tests. **Not importable by design** (#915): the importer expects Masters 0.3 and answers 422 `STRUCTURE_MISMATCH` ("does not have the Masters 0.3 structure"); import `masters/masters_0_3.xlsx` or the template from Admin > Masters (`test_915_*` in `tests/api/test_masters_import.py`) |
 | `masters/masters_0_3.xlsx` | Masters 0.3 workbook (#781): the export template with synthetic rows on every master (`scripts/build_masters_reference_0_3.py fixture`) | Imports with no row errors: 13 entries + the 43 frozen Filetype rows; an Assistant, Active / Archived / Proposed statuses, a Restricted tool, formula-like and multi-line text |
 | `masters/structure_changed_rules.xlsx` | `masters_0_3.xlsx` with the Rules header `Owner / version` renamed to `Owner` (openpyxl) | Import is 422 `STRUCTURE_MISMATCH` (renamed); used by the E15.1 E03 scenario |
 

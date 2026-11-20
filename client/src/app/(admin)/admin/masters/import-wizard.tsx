@@ -29,7 +29,7 @@ function StructureDiffTable({ error }: { error: ApiError }) {
       <Alert
         type="error"
         showIcon
-        message={error.problem?.title ?? "The workbook does not have the BAM 0.2 structure"}
+        message={error.problem?.title ?? "The workbook does not have the Masters 0.3 structure"}
         description={error.problem?.detail}
         style={{ marginBottom: 12 }}
       />

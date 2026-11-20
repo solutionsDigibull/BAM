@@ -189,6 +189,20 @@ def test_mui_2_t05_reimport_keeps_the_rules_engine_fields(h: ImportHarness) -> N
 # --- T02 / T03 / T04 / T09: structure, rows and the frozen Filetype -----------------------------
 
 
+def test_915_the_masters_0_3_fixture_imports_and_the_bam_0_2_workbook_is_refused_by_name(
+    h: ImportHarness,
+) -> None:
+    """#915: `masters_0_3.xlsx` is the importable fixture (Masters 0.3, #781). The MSC consolidated
+    workbook is BAM 0.2 on purpose (the input of the 0.2 -> 0.3 migration tests); importing it is a
+    422 that names the structure the importer expects, not the one the file has."""
+    assert h.upload(workbook(), mode="validate-only").status_code == 200
+    legacy = fixture_path("masters", "BuLLM - Admin Masters (One Sheet) - Consolidated.xlsx")
+    body = problem(h.upload(legacy.read_bytes()), 422, "STRUCTURE_MISMATCH")
+    assert body["title"] == "The workbook does not have the Masters 0.3 structure"
+    assert "BAM 0.2" in body["detail"] and "Download the template" in body["detail"]
+    assert h.counts() == (0, 0)
+
+
 def test_e3_3_t02_renamed_rules_column_is_422_with_a_diff(h: ImportHarness) -> None:
     def rename(book: Workbook) -> None:
         book["Rules"].cell(2, column(book, "Rules", "Owner / version")).value = "Owner"
