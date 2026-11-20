@@ -21,6 +21,7 @@ from sbam_api.masters.models import MasterEntry, MasterEntryVersion, MasterSnaps
 from sbam_api.notifications.models import Notification
 from sbam_api.sow.models import Sow, SowImpactRecord, SowVersion
 from sbam_api.sow.service import canonical_sha256
+from sbam_api.token_budget.models import ProjectTokenCapsRow
 from sbam_api.workflows.models import Workflow
 from sbam_contracts.pipeline import WorkflowRef
 from sbam_workers.isatvon.macros import EXTRACT_ATTEMPTS, extract_macros
@@ -87,6 +88,7 @@ class Pass1:
         tables = (
             LlmCall,
             LlmDerivative,
+            ProjectTokenCapsRow,
             Sow,
             SowVersion,
             Workflow,
