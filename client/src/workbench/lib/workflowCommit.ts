@@ -2,7 +2,7 @@
 // everything (the checks, the secrets gate, the stale hash); these helpers only name it. `manifest_hash` is the ETag a
 // Commit sends back as If-Match, so a hash that changed since the FDE looked is refused with 409.
 import { useCustom } from '@refinedev/core'
-import type { CommitStatus, StagingStartResult } from '@/contracts'
+import type { CommitStatus, StagingStartResult, WorkflowVersionList } from '@/contracts'
 
 export type Tone = 'ok' | 'warn' | 'err' | 'muted'
 
@@ -61,6 +61,25 @@ export function useCommitStatus(workflowId: string | undefined) {
       enabled: !!workflowId, retry: false,
       refetchInterval: q => (q.state.data?.data?.state === 'COMMITTING' && isRunning(q.state.data.data) ? 3000 : false),
     },
+  })
+  return { data: query.data?.data, error: query.error, isLoading: query.isLoading, refetch: query.refetch }
+}
+
+/** The checks that are the certification (#824 Certify, 4.5): automatic and all-or-nothing (ADR 0032), never an FDE action. */
+export const CERTIFICATION_CHECKS = ['WORKFLOW_CERTIFIED', 'SUB_SKILLS_CERTIFIED'] as const
+export const certificationChecks = (s: CommitStatus | undefined) =>
+  (s?.checks ?? []).filter(c => (CERTIFICATION_CHECKS as readonly string[]).includes(c.name))
+/** Certified only when every certification check is reported and passes. */
+export const isCertified = (s: CommitStatus | undefined): boolean => {
+  const c = certificationChecks(s)
+  return c.length === CERTIFICATION_CHECKS.length && c.every(x => x.passed)
+}
+
+/** The frozen versions of the workflow (#132, MAJOR.0.PATCH), newest first. Read only (#824 Commit, 4.6). */
+export function useWorkflowVersions(workflowId: string | undefined) {
+  const { query } = useCustom<WorkflowVersionList>({
+    url: 'workflow-versions', method: 'get', config: { query: { workflowId } },
+    queryOptions: { enabled: !!workflowId, retry: false },
   })
   return { data: query.data?.data, error: query.error, isLoading: query.isLoading, refetch: query.refetch }
 }

@@ -36,9 +36,8 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
   const t = currentTests(snap)
   const m = wf?.manifest
   const testing = !!t && [t.sandbox, t.promptfoo].some(x => x.status === 'running' || x.status === 'queued')
-  const committed = !!m && snap.persist.committed?.hash === m.hash
-  const deployed = !!m && snap.persist.deployed?.hash === m.hash
-  const deploying = snap.persist.deploy?.status === 'running' || snap.persist.deploy?.status === 'queued'
+  // Step 4 (Validation, #766): active while CERTIFYING, needs_review once CERTIFIED, done once FROZEN (http/snapshot.ts).
+  const v4 = snap.steps[3]!.state
   // Human-gated Workbench and Validation (18 Oct 2026): Template, Sandbox and Check are done only with the FDE's Approve.
   const tplOk = templateApproved(approvals, wf ?? undefined)
   const sandboxOk = !!t && !!m && approvals.sandbox === m.hash && t.sandbox.status === 'succeeded'
@@ -84,13 +83,12 @@ export function evidenceStatuses(snap: Snapshot, rag: RagState, approvals: StepA
     '4.8': !t ? 'not_started' : running(t.sandbox) ? 'in_progress' : t.sandbox.status === 'failed' ? 'blocked' : sandboxOk ? 'done' : 'needs_review',
     // Check: after the sandbox is approved, the results for the current hash are clean and approved by the FDE.
     '4.4': !t || !sandboxOk ? 'not_started' : testing ? 'in_progress' : t.promptfoo.status === 'failed' ? 'blocked' : checkOk ? 'done' : 'needs_review',
-    // Certify: the FDE's sign-off on the approved, clean results is recorded for this hash.
-    '4.5': t?.reviewedAt && t.promptfoo.status === 'succeeded' ? 'done' : checkOk ? 'needs_review' : 'not_started',
-    // Commit: the certified version is saved (frozen) in BAM_db for the current hash.
-    '4.6': committed ? 'done' : t?.reviewedAt ? 'needs_review' : 'not_started',
-    // Staging complete: the backend reports step 4 done and the current manifest is live on Staging.
-    '4.7': snap.steps[3]!.state === 'done' && deployed ? 'done' : deploying ? 'in_progress' : 'not_started',
-    // Deploy to Staging lives in Commit's details; it is shown, never counted (4.7 is hidden).
+    // Certify (#824): automatic; running while the workflow is CERTIFYING, done once it is CERTIFIED or FROZEN.
+    '4.5': v4 === 'active' ? 'in_progress' : v4 === 'needs_review' || v4 === 'done' ? 'done' : 'not_started',
+    // Commit: the FDE's approval; open once certified, done once the workflow is FROZEN.
+    '4.6': v4 === 'done' ? 'done' : v4 === 'needs_review' ? 'needs_review' : 'not_started',
+    // Staging complete: reached from Commit (hidden in the rail); the screen reads the Staging state itself.
+    '4.7': v4 === 'done' ? 'done' : 'not_started',
   }
   // Work built on an earlier RAG run is kept but shows as not started (marked "from previous run" by previousRun()).
   for (const id of previousRun(snap, rag)) ev[id] = 'not_started'

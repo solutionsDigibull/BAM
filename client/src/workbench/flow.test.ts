@@ -13,15 +13,22 @@ const sources = (dir: string) =>
     .filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\./.test(f))
     .map((f) => ({ file: `${dir}/${f}`, text: readFileSync(join(root, dir, f), "utf8") }));
 
-// Screens with no backend are hidden in the tracker, so no screen may send the FDE into one. Step 4's footers
-// still point at Certify and Commit until Step 4 is wired (#715): the one known exception.
-const HIDDEN = ["2.2", "2.3", "4.5", "4.6"];
+// Screens with no backend are hidden in the tracker, so no screen may send the FDE into one. Certify (4.5) and
+// Commit (4.6) have one since #824 and are listed in the rail.
+const HIDDEN = ["2.2", "2.3"];
 const KNOWN = new Set(["steps/Step4.tsx"]);
 
 describe("the workbench flow never leads into a hidden screen (#711)", () => {
   test("test_711_the_hidden_screens_are_the_ones_without_a_backend", () => {
     const hidden = SUBTASKS.filter((s) => s.hidden).map((s) => s.id);
     for (const id of HIDDEN) expect(hidden).toContain(id);
+  });
+
+  test("test_824_certify_and_commit_are_in_the_rail_and_staging_complete_is_reached_from_commit", () => {
+    const visible = SUBTASKS.filter((s) => s.parentId === "4" && !s.hidden).map((s) => s.id);
+    expect(visible).toEqual(expect.arrayContaining(["4.9", "4.5", "4.6"]));
+    const staging = SUBTASKS.find((s) => s.id === "4.7")!;
+    expect(staging.hidden && staging.navAs).toBe("4.6");
   });
 
   test("test_711_no_screen_navigates_into_a_hidden_screen", () => {
