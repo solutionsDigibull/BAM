@@ -155,3 +155,8 @@ messages and the model's text as a mock fixture, `<LLM_RECORD_DIR>/<alias>/<prom
   stay out of the repository. Commit only fixtures of the public synthetic pack in `server/tests/fixtures`.
 - Copy the files into `server/tests/llm-mock/<alias>/`; `test_wg33_record_fixtures.py` checks that each is found by the
   mock and holds no key-like string.
+- Document ids are not part of the key (WG-44, #932). Prompts render `[chunk c1 doc=<uuid> line=1]`, and the same
+  documents uploaded again get new ids. The mock and the recorder both hash the messages with the ids in such a
+  header (`[chunk|entity <ref> doc=<uuid>`) replaced by a placeholder, so a recording replays on a second upload. Any
+  other uuid in a prompt, and any change in the text, still changes the hash. The stored `messages` keep the real ids;
+  only `input_hash` is normalised. Fixtures without a chunk header keep their old hash.

@@ -70,11 +70,30 @@ def check_env(env: str, provider: str) -> None:
         raise SystemExit(f"LLM_PROVIDER=mock is forbidden when ENV={env}")
 
 
+UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+# WG-44 (#932): the one place a document id enters a prompt is the header of a rendered chunk or entity,
+# `[chunk <ref> doc=<uuid> <where>]` (sow/context.py). The same documents uploaded twice get new ids, so the key
+# hashes those headers with the ids replaced. Strict on purpose: only the `doc=` value (and a ref that is itself
+# a uuid) inside such a header; a uuid anywhere else in a prompt still changes the hash.
+DOC_HEADER = re.compile(
+    rf"(\[(?:chunk|entity) )(?:{UUID}|[A-Za-z0-9_.:-]+)( doc=){UUID}(?=[ \]])"
+)
+
+
+def normalise_ids(text: str) -> str:
+    def repl(m: re.Match[str]) -> str:
+        ref = m.group(0)[len(m.group(1)) :].split(" doc=", 1)[0]
+        keep = "<REF_UUID>" if re.fullmatch(UUID, ref) else ref
+        return f"{m.group(1)}{keep}{m.group(2)}<DOC_UUID>"
+
+    return DOC_HEADER.sub(repl, text)
+
+
 def input_hash(messages: Any) -> str:
     canonical = json.dumps(
         messages, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    return hashlib.sha256(normalise_ids(canonical).encode()).hexdigest()
 
 
 def load_fixtures(root: Path) -> dict[tuple[str, str, str], dict[str, Any]]:
