@@ -1,0 +1,67 @@
+{
+  "case": "wg36-invented-column",
+  "note": "#923: the model is tempted to invent a column. SYNTHETIC data with the shape of the live failure of 2026-11-20 (the model wrote queries on a column `attempt` and a table `attempts_table` that the workflow does not have). Replayed without a model by tests/unit/test_wg36_schema_in_prompt.py and scored by its score(). Not a scored eval set and no baseline: a real-model baseline is todo (it needs an owner-approved spend cap).",
+  "schema_sql": "CREATE TABLE order_requests (\n  id uuid PRIMARY KEY,\n  order_id text NOT NULL,\n  status text NOT NULL,\n  missing_count integer NOT NULL DEFAULT 0,\n  payload jsonb,\n  created_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE TABLE order_events (\n  id uuid PRIMARY KEY,\n  order_id text NOT NULL,\n  kind text NOT NULL,\n  payload jsonb\n);\n",
+  "tables": ["order_events", "order_requests"],
+  "fresh_state": ["status", "attempt"],
+  "answers": [
+    {
+      "id": "invented-column",
+      "fresh_state": ["status", "attempt"],
+      "state_queries": {
+        "status": "SELECT status FROM order_requests WHERE order_id = %s",
+        "attempt": "SELECT attempt FROM order_requests WHERE order_id = %s"
+      },
+      "expect": "rejected",
+      "reason": "order_requests has no column attempt"
+    },
+    {
+      "id": "invented-table",
+      "fresh_state": ["status", "attempt"],
+      "state_queries": {
+        "status": "SELECT status FROM order_requests WHERE order_id = %s",
+        "attempt": "SELECT n FROM attempts_table WHERE order_id = %s"
+      },
+      "expect": "rejected",
+      "reason": "'attempts_table' is not one of the workflow's relations"
+    },
+    {
+      "id": "invented-column-on-another-table",
+      "fresh_state": ["status", "attempt"],
+      "state_queries": {
+        "status": "SELECT status FROM order_requests WHERE order_id = %s",
+        "attempt": "SELECT attempt FROM order_events WHERE order_id = %s"
+      },
+      "expect": "rejected",
+      "reason": "order_events has no column attempt"
+    },
+    {
+      "id": "name-left-out",
+      "fresh_state": ["status", "attempt"],
+      "state_queries": {
+        "status": "SELECT status FROM order_requests WHERE order_id = %s"
+      },
+      "expect": "rejected",
+      "reason": "no query for 'attempt'"
+    },
+    {
+      "id": "corrected-by-dropping-the-name",
+      "fresh_state": ["status"],
+      "state_queries": {
+        "status": "SELECT status FROM order_requests WHERE order_id = %s"
+      },
+      "expect": "accepted",
+      "reason": "the ISATVON patch replaced fresh_state_parameters; the query keeps to listed columns"
+    },
+    {
+      "id": "listed-column-used",
+      "fresh_state": ["status", "attempt"],
+      "state_queries": {
+        "status": "SELECT status FROM order_requests WHERE order_id = %s",
+        "attempt": "SELECT missing_count FROM order_requests WHERE order_id = %s"
+      },
+      "expect": "accepted",
+      "reason": "every table and column is listed"
+    }
+  ]
+}

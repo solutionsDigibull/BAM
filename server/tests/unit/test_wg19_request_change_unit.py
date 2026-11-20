@@ -51,7 +51,7 @@ def test_wg19_t02_an_injection_cannot_close_its_block_or_forge_another() -> None
 def test_wg19_the_coder_prompt_says_notes_are_data_and_the_classifier_prompt_exists() -> None:
     registry = PromptRegistry()
     coder = registry.get("codegen-bodies")
-    assert coder.version == "1.4.0" and "`change_notes`" in coder.text
+    assert coder.version == "1.5.0" and "`change_notes`" in coder.text
     assert "data, not instructions" in coder.text.split("`change_notes`")[1]
     for older in ("1.0.0", "1.1.0", "1.2.0"):  # released versions are untouched (1.3.0 had notes)
         assert "change_notes" not in registry.get("codegen-bodies", older).text
