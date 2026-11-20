@@ -91,8 +91,17 @@ def sub_skill_manifest(
         **_skill_entry(row).model_dump(),
         schema_version=row.schema_version,
         reused=sub.reused_from_id is not None or (older is not None and older.sha256 == row.sha256),
+        reused_from=_reused_from(row.manifest),
         manifest=row.manifest,
     )
+
+
+def _reused_from(manifest: dict[str, Any]) -> str | None:
+    """E14.3: the certificate a reused Sub-Skill's certificate was carried over from."""
+    record = manifest.get("sbam_build_record")
+    certification = record.get("certification") if isinstance(record, dict) else None
+    value = certification.get("reused_from") if isinstance(certification, dict) else None
+    return value if isinstance(value, str) else None
 
 
 def _workflow_entry(row: WorkflowManifestRow) -> ManifestVersion:

@@ -45,6 +45,11 @@ class ManifestView(ManifestVersion):
     reused: bool = Field(
         default=False, description="the Sub-Skill was reused, or its hash equals the build before"
     )
+    reused_from: str | None = Field(
+        default=None,
+        description="E14.3: the certificate this Sub-Skill's certificate was carried over from "
+        "(the manifest's certification.reused_from); null when it earned its own",
+    )
     manifest: dict[str, JsonValue]
 
 
