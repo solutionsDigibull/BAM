@@ -18,6 +18,7 @@ import { HostSlot } from './host/slots'
 import * as Step3 from './steps/Step3'
 import * as Step4 from './steps/Step4'
 import * as Release from './steps/Release'
+import { ContextReadiness } from './rag/ContextReadiness'
 import * as Validation from './steps/Validation'
 import { FileDetail, IngestReviewFooter, IngestionReview, ParseFooter, ParseView, Quarantine, UploadFooter } from './steps/Ingestion'
 import { StandardizeFooter, StandardizeView } from './steps/Standardize'
@@ -80,7 +81,7 @@ const NAV_ORDER = TASKS.flatMap(t => subtasksOf(t.id))
 // Ungated screens: always viewable, with honest empty/unavailable states.
 const VIEWS: Record<string, (p: { snap: Snapshot; path: string }) => React.ReactNode> = {
   '1.3': FileDetail, '1.7': Quarantine, '1.8': StandardizeView, '1.9': ParseView, '1.4': IngestionReview,
-  '2.5': SyncView, '2.1': RagScreen,
+  '2.5': SyncView, '2.1': RagScreen, '2.4': ContextReadiness,
   '3.3': SkillReview, '3.4': ReleasePrep,
 }
 

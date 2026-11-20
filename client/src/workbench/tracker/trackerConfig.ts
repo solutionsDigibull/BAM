@@ -66,7 +66,7 @@ export const TRACKER_ITEMS: readonly TrackerItem[] = [
   screen('2.1', '2', 'Index', 'tb-search', '/rag/graph', 'Graph nodes · current graph explorer.', { mode: 'automated' }),
   screen('2.2', '2', 'Placeholder', 'tb-schema', '/rag/schemas', 'Reserved screen. The editor is in Workbench > Template.', { hidden: true, mode: 'automated', optional: true }),
   screen('2.3', '2', 'Verify', 'tb-shield-check', '/rag/quality', 'Context testing · Questions only.', { hidden: true, mode: 'hitl' }),
-  screen('2.4', '2', 'Context readiness', 'doccheck', '/rag/review', 'Graph, schema and retrieval readiness, the knowledge bundle and provenance.', { hidden: true, navAs: '2.3' }),
+  screen('2.4', '2', 'Context readiness', 'doccheck', '/rag/review', 'Graph and retrieval readiness, document coverage and the knowledge bundle.', { mode: 'automated' }),
 
   stage('3', 'Workbench', 'tb-briefcase', 'Approve the scope, review the skills grid, then the manifest and the translated code.'),
   screen('3.1', '3', 'Scope', 'tb-target', '/workbench/sow', 'SOW review and FDE approval.', { step: 1, mode: 'hitl' }),
