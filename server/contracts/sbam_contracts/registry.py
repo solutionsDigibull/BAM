@@ -11,7 +11,13 @@ from pydantic import BaseModel
 
 from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
-from sbam_contracts.budget import BudgetCaps, BudgetState
+from sbam_contracts.budget import (
+    BudgetCaps,
+    BudgetState,
+    ProjectTokenCaps,
+    RaiseCap,
+    TokenMeter,
+)
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
 from sbam_contracts.build_timeline import BuildTimelineResponse
 from sbam_contracts.code_view import (
@@ -373,6 +379,9 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("exports/accepted", ExportAccepted),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
+    ("budget/project_caps", ProjectTokenCaps),
+    ("budget/meter", TokenMeter),
+    ("budget/raise", RaiseCap),
     ("connections/connection", Connection),
     ("connections/connection_list", ConnectionList),
     ("connections/value_in", ConnectionValueIn),

@@ -26,6 +26,7 @@ import httpx
 from pydantic import AnyHttpUrl
 from sbam_api.db.session import make_engine
 from sbam_api.llm.models import LlmCall, LlmDerivative
+from sbam_api.token_budget.models import ProjectTokenCapsRow
 from sbam_contracts.pipeline import StageRef
 from sbam_contracts.review import ReviewAnswer
 from sbam_contracts.testgen import TestgenOutput
@@ -186,7 +187,10 @@ def _live_client(bifrost_url: str | None) -> tuple[LlmClient, sessionmaker[Sessi
         connect_args={"check_same_thread": False},
         execution_options={"schema_translate_map": {"sbam": None}},
     )
-    LlmCall.metadata.create_all(engine, tables=[LlmCall.__table__, LlmDerivative.__table__])  # type: ignore[list-item]
+    LlmCall.metadata.create_all(
+        engine,
+        tables=[LlmCall.__table__, LlmDerivative.__table__, ProjectTokenCapsRow.__table__],  # type: ignore[list-item]
+    )
     sessions: sessionmaker[Session] = sessionmaker(bind=engine)
     extra = {"bifrost_url": AnyHttpUrl(bifrost_url)} if bifrost_url else {}
     conf = WorkerSettings(

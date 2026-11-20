@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_api.llm.repository import LlmCallRepository
+from sbam_api.token_budget.models import ProjectTokenCapsRow
 from sbam_workers.llm.client import LlmClient
 from sbam_workers.llm.registry import PromptRegistry
 from sbam_workers.llm.store import LlmScope, SqlCallStore
@@ -37,7 +38,7 @@ def llm_sessions() -> sessionmaker[Session]:
     sessions = pipeline_sessions()
     LlmCall.metadata.create_all(
         sessions.kw["bind"],
-        tables=[LlmCall.__table__, LlmDerivative.__table__],  # type: ignore[list-item]
+        tables=[LlmCall.__table__, LlmDerivative.__table__, ProjectTokenCapsRow.__table__],  # type: ignore[list-item]
     )
     return sessions
 

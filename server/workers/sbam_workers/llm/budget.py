@@ -15,7 +15,13 @@ import asyncio
 import logging
 from decimal import Decimal
 
-from sbam_contracts.budget import BudgetCaps, BudgetLevel, BudgetScope
+from sbam_contracts.budget import (
+    BUILD_PREFIX,
+    KNOWLEDGE_ALIASES,
+    BudgetCaps,
+    BudgetLevel,
+    BudgetScope,
+)
 from sbam_contracts.notifications import NotificationType
 
 from sbam_workers.llm.store import CallStore, LlmScope
@@ -23,11 +29,7 @@ from sbam_workers.settings import WorkerSettings
 
 log = logging.getLogger("sbam_workers.llm")
 MILLION = Decimal(1_000_000)
-# Aliases whose tokens count against the knowledge build's cap (Cognee's own two, ADR 0028); every
-# other alias counts against the Workflow build's. A Sub-Skill's own cap needs the Sub-Skill id in
-# the call scope and comes with the per-project settings (#776).
-KNOWLEDGE_ALIASES = frozenset({"sbam-knowledge", "sbam-embed"})
-BUILD_PREFIX = "build-"  # `runs.build_workflow_id`: the Temporal workflow id of one Sub-Skill build
+RANK = {level: n for n, level in enumerate(BudgetLevel)}  # OK < FIRST < SECOND < STOPPED
 PERCENT = {BudgetLevel.FIRST_ALERT: "first", BudgetLevel.SECOND_ALERT: "second"}
 
 
@@ -46,7 +48,9 @@ class Budget:
     ) -> None:
         self.settings = settings
         self.store = store
-        self.caps = caps or BudgetCaps()  # per-project caps arrive with #776
+        # An explicit `caps` wins (tests, a fixed deployment); else each check reads the project's
+        # own row, falling back to the platform defaults (#776).
+        self.caps = caps
         # Aliases whose calls used tokens but came back with no cost and no configured price while
         # a budget is set: their spend cannot be counted, so the budget refuses them.
         self.blind: set[str] = set()
@@ -109,18 +113,33 @@ class Budget:
         """Refuse the call when the build's recorded tokens reached the cap, and alert once at
         each level. The count is a query over `llm_calls` (failed attempts included), so a retry
         that reuses an activity id cannot step around it."""
+        caps: BudgetCaps = (
+            self.caps if self.caps is not None else await asyncio.to_thread(self.store.caps, scope)
+        )
         kind = BudgetScope.KNOWLEDGE if alias in KNOWLEDGE_ALIASES else BudgetScope.WORKFLOW
         used = await asyncio.to_thread(
             self.store.tokens, scope, KNOWLEDGE_ALIASES, inside=kind is BudgetScope.KNOWLEDGE
         )
-        level = self.caps.level(kind, used)
+        level = caps.level(kind, used)
+        sub_key = ""
+        if kind is BudgetScope.WORKFLOW and scope.temporal_workflow_id.startswith(BUILD_PREFIX):
+            # One Sub-Skill build has its own, smaller cap; the worse of the two levels rules.
+            sub_used = await asyncio.to_thread(self.store.tokens_build, scope)
+            sub_level = caps.level(BudgetScope.SUB_SKILL, sub_used)
+            if RANK[sub_level] > RANK[level]:
+                kind, used, level = BudgetScope.SUB_SKILL, sub_used, sub_level
+                sub_key = f":{scope.temporal_workflow_id}"
         if level is BudgetLevel.OK:
             return
-        cap = self.caps.cap(kind)
-        what = "knowledge build" if kind is BudgetScope.KNOWLEDGE else "workflow build"
+        cap = caps.cap(kind)
+        what = {
+            BudgetScope.KNOWLEDGE: "knowledge build",
+            BudgetScope.WORKFLOW: "workflow build",
+            BudgetScope.SUB_SKILL: "sub-skill build",
+        }[kind]
         pct = {
-            BudgetLevel.FIRST_ALERT: self.caps.first_alert_pct,
-            BudgetLevel.SECOND_ALERT: self.caps.second_alert_pct,
+            BudgetLevel.FIRST_ALERT: caps.first_alert_pct,
+            BudgetLevel.SECOND_ALERT: caps.second_alert_pct,
             BudgetLevel.STOPPED: 100,
         }[level]
         type_ = (
@@ -138,7 +157,7 @@ class Budget:
                 self.store.alert,
                 scope,
                 type_,
-                f"{kind.value}:{level.value}",
+                f"{kind.value}:{level.value}{sub_key}",
                 {
                     "percent": f"{pct}%",
                     "what": what,

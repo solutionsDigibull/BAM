@@ -10,6 +10,8 @@ from typing import Any, Protocol
 from sbam_api.db.repository import TenantContext
 from sbam_api.llm.repository import LlmCallRepository, LlmDerivativeRepository
 from sbam_api.notifications.service import Source, notify_project
+from sbam_api.token_budget.repository import effective_caps
+from sbam_contracts.budget import BudgetCaps
 from sbam_contracts.notifications import NotificationType
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -59,6 +61,15 @@ class CallStore(Protocol):
 
     def tokens(self, scope: LlmScope, aliases: frozenset[str], *, inside: bool) -> int:
         """Tokens (in + out) recorded for the scope's project, for these aliases or all others."""
+        ...
+
+    def tokens_build(self, scope: LlmScope) -> int:
+        """Tokens (in + out) recorded under the build workflow in the scope: one Sub-Skill build's
+        own count (#776)."""
+        ...
+
+    def caps(self, scope: LlmScope) -> BudgetCaps:
+        """The project's token caps: its own row, else the platform defaults (#776)."""
         ...
 
     def alert(
@@ -131,6 +142,15 @@ class SqlCallStore:
         with self.sessions() as session:
             ctx = TenantContext(scope.tenant_id, scope.project_id)
             return LlmCallRepository(session, ctx).tokens(aliases, inside=inside)
+
+    def tokens_build(self, scope: LlmScope) -> int:
+        with self.sessions() as session:
+            ctx = TenantContext(scope.tenant_id, scope.project_id)
+            return LlmCallRepository(session, ctx).tokens_for_workflow(scope.temporal_workflow_id)
+
+    def caps(self, scope: LlmScope) -> BudgetCaps:
+        with self.sessions() as session:
+            return effective_caps(session, scope.tenant_id, scope.project_id)
 
     def alert(
         self, scope: LlmScope, type: NotificationType, key: str, params: dict[str, object]

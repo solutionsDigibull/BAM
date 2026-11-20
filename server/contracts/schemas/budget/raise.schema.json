@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:budget/raise:0.1.0",
+  "$defs": {
+    "BudgetScope": {
+      "enum": [
+        "SUB_SKILL",
+        "WORKFLOW",
+        "KNOWLEDGE"
+      ],
+      "title": "BudgetScope",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`POST .../token-budget/raise` (#776): a new cap for one scope, once per build.\n\n`build_id` is the build the meter names for that scope (the Temporal workflow id of its calls).",
+  "properties": {
+    "scope": {
+      "$ref": "#/$defs/BudgetScope"
+    },
+    "build_id": {
+      "maxLength": 255,
+      "minLength": 1,
+      "title": "Build Id",
+      "type": "string"
+    },
+    "tokens": {
+      "maximum": 1000000000,
+      "minimum": 1,
+      "title": "Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "scope",
+    "build_id",
+    "tokens"
+  ],
+  "title": "RaiseCap",
+  "type": "object"
+}

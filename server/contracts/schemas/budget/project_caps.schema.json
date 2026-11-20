@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:budget/project_caps:0.1.0",
+  "$defs": {
+    "BudgetCaps": {
+      "additionalProperties": false,
+      "description": "A project's caps.\n\nEvery field has the ADR 0028 default, so `BudgetCaps()` is the platform default.",
+      "properties": {
+        "sub_skill_tokens": {
+          "default": 200000,
+          "maximum": 1000000000,
+          "minimum": 1,
+          "title": "Sub Skill Tokens",
+          "type": "integer"
+        },
+        "workflow_tokens": {
+          "default": 2000000,
+          "maximum": 1000000000,
+          "minimum": 1,
+          "title": "Workflow Tokens",
+          "type": "integer"
+        },
+        "knowledge_tokens": {
+          "default": 30000000,
+          "maximum": 1000000000,
+          "minimum": 1,
+          "title": "Knowledge Tokens",
+          "type": "integer"
+        },
+        "first_alert_pct": {
+          "default": 50,
+          "maximum": 98,
+          "minimum": 1,
+          "title": "First Alert Pct",
+          "type": "integer"
+        },
+        "second_alert_pct": {
+          "default": 80,
+          "maximum": 99,
+          "minimum": 2,
+          "title": "Second Alert Pct",
+          "type": "integer"
+        }
+      },
+      "title": "BudgetCaps",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET`/`PUT /admin/projects/{id}/token-caps` (#776): the caps of one project.\n\n`row_version` is the ETag (`If-Match` on PUT); it is 0 while nothing is stored, and then\n`is_default` is true and `caps` are the platform defaults.",
+  "properties": {
+    "caps": {
+      "$ref": "#/$defs/BudgetCaps"
+    },
+    "row_version": {
+      "minimum": 0,
+      "title": "Row Version",
+      "type": "integer"
+    },
+    "is_default": {
+      "title": "Is Default",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "caps",
+    "row_version",
+    "is_default"
+  ],
+  "title": "ProjectTokenCaps",
+  "type": "object"
+}

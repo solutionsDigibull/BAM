@@ -821,6 +821,56 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"
 
+  # ---- token caps and the meter (#776, WG-23) ----------------------------------------------------
+  # An Admin reads and sets one project's caps (PUT carries the ETag; "0" while nothing is stored);
+  # the FDE reads the meter. Both may raise a cap once per build, from their own portal. The world
+  # has no model calls, so the raises name an unknown build: the assigned caller gets 404 too, and
+  # the success path is in tests/api/test_wg23_token_caps.py.
+  get_caps_api_v1_admin_projects__project_id__token_caps_get:
+    request:
+      method: GET
+      path: /api/v1/admin/projects/{project_id}/token-caps
+      params: {project_id: "@project_a"}
+    expect: *tenant_admin_a_resource
+
+  put_caps_api_v1_admin_projects__project_id__token_caps_put:
+    request:
+      method: PUT
+      path: /api/v1/admin/projects/{project_id}/token-caps
+      params: {project_id: "@project_a"}
+      headers: {if-match: '"0"'}
+      json: {sub_skill_tokens: 100000, workflow_tokens: 1000000, knowledge_tokens: 5000000}
+    expect: *tenant_admin_a_resource
+
+  token_meter_api_v1_projects__project_id__token_budget_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/token-budget
+      params: {project_id: "@project_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  raise_cap_fde_api_v1_projects__project_id__token_budget_raise_post:
+    request:
+      method: POST
+      path: /api/v1/projects/{project_id}/token-budget/raise
+      params: {project_id: "@project_a"}
+      json: {scope: WORKFLOW, build_id: build-unknown-1, tokens: 5000000}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "404 NOT_FOUND"
+
+  raise_cap_admin_api_v1_admin_projects__project_id__token_budget_raise_post:
+    request:
+      method: POST
+      path: /api/v1/admin/projects/{project_id}/token-budget/raise
+      params: {project_id: "@project_a"}
+      json: {scope: WORKFLOW, build_id: build-unknown-1, tokens: 5000000}
+    expect:
+      <<: *tenant_admin_a_resource
+      admin_a: "404 NOT_FOUND"
+
   workflows_api_v1_projects__project_id__workflows_get:
     request:
       method: GET

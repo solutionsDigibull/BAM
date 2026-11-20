@@ -19,6 +19,10 @@ DEFAULT_SUB_SKILL_TOKENS: Final = 200_000
 DEFAULT_WORKFLOW_TOKENS: Final = 2_000_000
 DEFAULT_KNOWLEDGE_TOKENS: Final = 30_000_000
 MAX_CAP: Final = 1_000_000_000
+# Aliases whose tokens count against the knowledge build's cap (Cognee's own two, ADR 0028); every
+# other alias counts against the Workflow build's.
+KNOWLEDGE_ALIASES: Final = frozenset({"sbam-knowledge", "sbam-embed"})
+BUILD_PREFIX: Final = "build-"  # the Temporal workflow id of one Sub-Skill build
 
 Tokens = Annotated[int, Field(strict=True, ge=1, le=MAX_CAP)]
 
@@ -90,6 +94,8 @@ class BudgetState(_Strict):
     raised_once: bool = (
         False  # the cap was raised for this build already; it cannot be raised again
     )
+    # The build whose calls were last counted in this scope: the one a raise names (#776).
+    build_id: Annotated[str, Field(min_length=1, max_length=255)] | None = None
 
     @model_validator(mode="after")
     def _level_matches_usage(self) -> Self:
@@ -98,9 +104,42 @@ class BudgetState(_Strict):
         return self
 
 
+class ProjectTokenCaps(_Strict):
+    """`GET`/`PUT /admin/projects/{id}/token-caps` (#776): the caps of one project.
+
+    `row_version` is the ETag (`If-Match` on PUT); it is 0 while nothing is stored, and then
+    `is_default` is true and `caps` are the platform defaults."""
+
+    caps: BudgetCaps
+    row_version: Annotated[int, Field(strict=True, ge=0)]
+    is_default: bool
+
+
+class TokenMeter(_Strict):
+    """`GET /projects/{id}/token-budget` (#776): used against the cap per scope, for the meter."""
+
+    scopes: list[BudgetState]
+    first_alert_pct: Annotated[int, Field(strict=True, ge=1, le=98)]
+    second_alert_pct: Annotated[int, Field(strict=True, ge=2, le=99)]
+
+
+class RaiseCap(_Strict):
+    """`POST .../token-budget/raise` (#776): a new cap for one scope, once per build.
+
+    `build_id` is the build the meter names for that scope (the Temporal workflow id of its calls).
+    """
+
+    scope: Annotated[BudgetScope, Field(strict=False)]
+    build_id: Annotated[str, Field(min_length=1, max_length=255)]
+    tokens: Tokens
+
+
 def schemas() -> dict[str, dict[str, Any]]:
     """File stem -> JSON Schema, for the committed files under `schemas/budget/`."""
     return {
         "caps": contract_schema(BudgetCaps, "budget/caps"),
         "state": contract_schema(BudgetState, "budget/state"),
+        "project_caps": contract_schema(ProjectTokenCaps, "budget/project_caps"),
+        "meter": contract_schema(TokenMeter, "budget/meter"),
+        "raise": contract_schema(RaiseCap, "budget/raise"),
     }
