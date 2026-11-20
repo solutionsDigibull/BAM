@@ -44,9 +44,7 @@ srv = load("llm_mock_server_wg33", REPO / "compose/docker/llm-mock/server.py")
 rec = load("llm_record_proxy_wg33", REPO / "scripts/llm_record_proxy.py")
 
 
-def exchange(
-    alias: str, prompt_id: str, turns: int = 0
-) -> tuple[dict[str, Any], dict[str, Any]]:
+def exchange(alias: str, prompt_id: str, turns: int = 0) -> tuple[dict[str, Any], dict[str, Any]]:
     messages: list[dict[str, str]] = [
         {"role": "system", "content": f"system for {prompt_id}"},
         {
@@ -97,8 +95,7 @@ def test_wg33_t01_every_chain_stage_finds_its_fixture_on_the_mock(
         status, answer = mock.chat(body)
         assert status == 200, (alias, prompt_id, answer)
         assert (
-            answer["choices"][0]["message"]["content"]
-            == reply["choices"][0]["message"]["content"]
+            answer["choices"][0]["message"]["content"] == reply["choices"][0]["message"]["content"]
         )
 
 
@@ -109,19 +106,14 @@ def test_wg33_t01b_the_answer_of_the_deepest_reask_replaces_the_earlier_one(
     first_body, first_reply = exchange("sbam-sow", "sow-generate")
     again_body, again_reply = exchange("sbam-sow", "sow-generate", turns=1)
     again_reply["choices"][0]["message"]["content"] = '{"final": true}'
-    assert recorder.record(first_body, first_reply) == recorder.record(
-        again_body, again_reply
-    )
+    assert recorder.record(first_body, first_reply) == recorder.record(again_body, again_reply)
     assert recorder.record(
         first_body, first_reply
     )  # a late shallow answer must not undo the deeper one
     mock = mock_on(tmp_path)
     first_body["model"] = "sbam-sow-primary"
     status, answer = mock.chat(first_body)
-    assert (
-        status == 200
-        and answer["choices"][0]["message"]["content"] == '{"final": true}'
-    )
+    assert status == 200 and answer["choices"][0]["message"]["content"] == '{"final": true}'
 
 
 def test_wg33_t02_the_mock_still_refuses_an_unknown_prompt(tmp_path: Path) -> None:
@@ -153,9 +145,7 @@ def test_wg33_t04_recording_is_off_without_the_switch_and_a_cap() -> None:
         rec.check_opt_in({"LLM_RECORD": "1", "LLM_RECORD_SPEND_CAP_USD": "0"})
     with pytest.raises(SystemExit):
         rec.check_opt_in({"LLM_RECORD": "1", "LLM_RECORD_SPEND_CAP_USD": "abc"})
-    assert (
-        rec.check_opt_in({"LLM_RECORD": "1", "LLM_RECORD_SPEND_CAP_USD": "3.6"}) == 3.6
-    )
+    assert rec.check_opt_in({"LLM_RECORD": "1", "LLM_RECORD_SPEND_CAP_USD": "3.6"}) == 3.6
 
 
 def test_wg33_t05_the_spend_cap_stops_further_calls(tmp_path: Path) -> None:
@@ -211,9 +201,7 @@ def test_wg33_t07_no_key_like_string_in_any_committed_fixture() -> None:
 def test_wg33_t08_every_committed_fixture_is_found_by_the_mock() -> None:
     mock = srv.build(FIXTURES, ALIASES_FILE)
     for (alias, prompt_id, digest), data in mock.fixtures.items():
-        assert (
-            srv.input_hash(data["messages"]) == digest
-        ), f"{alias}/{prompt_id}: stale input_hash"
+        assert srv.input_hash(data["messages"]) == digest, f"{alias}/{prompt_id}: stale input_hash"
         body = {
             "model": f"{alias}-primary",
             "messages": data["messages"],
