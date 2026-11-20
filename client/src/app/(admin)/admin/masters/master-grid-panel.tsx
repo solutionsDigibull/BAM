@@ -48,6 +48,7 @@ export function MasterGridPanel({
   duplicate = false,
   label = info.tab,
   extra,
+  renderDrawer,
 }: {
   info: MasterTypeInfo;
   projectId?: string;
@@ -57,6 +58,12 @@ export function MasterGridPanel({
   duplicate?: boolean;
   label?: string;
   extra?: React.ReactNode;
+  /** A master with its own editor (Rules, #784) replaces the generic entry drawer. */
+  renderDrawer?: (d: {
+    entryId?: string;
+    onClose: () => void;
+    onSaved: (e: MasterEntry) => void;
+  }) => React.ReactNode;
 }) {
   const { message } = App.useApp();
   const invalidate = useInvalidate();
@@ -202,22 +209,28 @@ export function MasterGridPanel({
       Add Row
     </Button>
   );
-  const drawerView = drawer && (
-    <EntryDrawer
-      info={info}
-      projectId={projectId}
-      entryId={drawer.id}
-      defaults={defaults}
-      onClose={() => setDrawer(null)}
-      onSaved={(e) => {
-        setDrawer(null);
-        void reload();
-        message.success(
-          drawer.id ? `Saved ${e.row_label} (version ${e.version})` : `Created ${e.row_label}`,
-        );
-      }}
-    />
-  );
+  const onDrawerClose = () => setDrawer(null);
+  const onDrawerSaved = (e: MasterEntry) => {
+    setDrawer(null);
+    void reload();
+    message.success(
+      drawer?.id ? `Saved ${e.row_label} (version ${e.version})` : `Created ${e.row_label}`,
+    );
+  };
+  const drawerView =
+    drawer &&
+    (renderDrawer ? (
+      renderDrawer({ entryId: drawer.id, onClose: onDrawerClose, onSaved: onDrawerSaved })
+    ) : (
+      <EntryDrawer
+        info={info}
+        projectId={projectId}
+        entryId={drawer.id}
+        defaults={defaults}
+        onClose={onDrawerClose}
+        onSaved={onDrawerSaved}
+      />
+    ));
 
   if (query.isLoading) return <LoadingState />;
   if (query.isError) return <ApiErrorState error={query.error} onRetry={() => query.refetch()} />;

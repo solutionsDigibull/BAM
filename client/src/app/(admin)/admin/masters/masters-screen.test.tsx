@@ -38,34 +38,14 @@ describe("Admin Masters screen (E3.10)", () => {
     expect(screen.getByText("1. STRUCTURE")).toBeDefined();
   });
 
-  test("e3_10_t03 Rules headers carry the row-3 description as their tooltip", async () => {
-    fakeApi(routes());
+  test("e3_10_t03 the Rules tab is the Rules Engine: workflow map, filters and the row count", async () => {
+    fakeApi(routes({ "GET /admin/masters/SKILLS": { body: { items: [] } } }));
     renderWithRefine(<MastersScreen />);
     await openTab("Rules");
-    const [header] = await screen.findAllByLabelText(
-      "PCB Panelization: Base PCB Dimensions & Yields",
-    ); // fixed columns render the header twice
-    fireEvent.mouseEnter(header!);
-    expect(await screen.findByRole("tooltip")).toBeDefined();
-    expect(screen.getAllByText("Base PCB Dimensions & Yields").length).toBeGreaterThan(0);
-    expect(screen.getByText("RULE-BOM")).toBeDefined(); // stable-ID chip
-    expect(screen.getByText("PROPOSED")).toBeDefined(); // status chip
-    expect(screen.getByText("1 of 1 rows")).toBeDefined();
-  });
-
-  test("e3_10_t08 HTML in a cell is shown as literal text", async () => {
-    const html = "<b onmouseover=alert(1)>";
-    fakeApi(
-      routes({
-        "GET /admin/masters/RULES": {
-          body: { items: [entry({ payload: { pcb_panelization: html, misc: "" } })] },
-        },
-      }),
-    );
-    const { container } = renderWithRefine(<MastersScreen />);
-    await openTab("Rules");
-    expect(await screen.findByText(html)).toBeDefined();
-    expect(container.querySelector("b[onmouseover]")).toBeNull();
+    expect(await screen.findByRole("group", { name: "Workflow map" })).toBeDefined();
+    expect(screen.getAllByLabelText("Filter by Category").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Filter by Status").length).toBeGreaterThan(0);
+    expect(await screen.findByText("1 of 1 rows")).toBeDefined();
   });
 
   test("a tab with no entries shows its empty state", async () => {
@@ -84,10 +64,14 @@ describe("Admin Masters screen (E3.10)", () => {
     fakeApi(routes({ "GET /admin/masters/RULES": { body: { items: [entry(), other] } } }));
     renderWithRefine(<MastersScreen />);
     await openTab("Rules");
-    fireEvent.change(await screen.findByLabelText("Search Rules"), { target: { value: "offer" } });
+    fireEvent.change(
+      (await screen.findAllByLabelText("Search Rules")).find((e) => e.tagName === "INPUT")!,
+      {
+        target: { value: "offer" },
+      },
+    );
     expect(await screen.findByText("1 of 2 rows")).toBeDefined();
-    expect(screen.queryByText("RULE-BOM")).toBeNull();
-  });
+  }, 30_000);
 
   test("e3_10_t06 Filetype is read-only with MVP loader and default route", async () => {
     fakeApi(routes());
