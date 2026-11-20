@@ -2,6 +2,7 @@ import type { DataProvider } from '@refinedev/core'
 import type {
   BuildsResponse, BuildTimelineResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
   CodeAttemptList, CodeDiff, CodeFileView, GatesResponse, HeldPatchResponse, TestRunTraces, TestRunsResponse, TestsResponse, ManifestVersionList, ManifestView, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowVersionList, WorkflowFileView, WorkflowRepositories, KnowledgeVersionList, LlmUsage, Preflight,
+  BudgetState, RaiseCap, TokenMeter,
 } from '@/contracts'
 import type { RetryAccepted } from '../lib/workflowBuilds'
 import type { CodeFile, IngestionRun, IsatvonField, SkillRow, Snapshot, StepId, UploadRecord } from './types'
@@ -84,6 +85,10 @@ export interface BamApi {
   getRepoQuestions(workflowId: string): Promise<RepoQuestions>
   /** The FDE's answer to one waiting build: a repository of the short list, or none (the code is generated). `key` is its Idempotency-Key. */
   answerRepoQuestion(workflowId: string, subSkillId: string, body: RepoAnswerRequest, key: string): Promise<RepoAnswered>
+  /** Tokens used against the cap per scope, with the alert level (#776). */
+  getTokenBudget(): Promise<TokenMeter>
+  /** Raises one scope's cap for one build, once; the FDE presses Retry after (#776). A second raise is refused (409). */
+  raiseTokenCap(body: RaiseCap): Promise<BudgetState>
   /** stageUpload: stores the file in private quarantine staging and starts an async virus scan (ClamAV in production). */
   uploadFile(file: { name: string; size: number; type?: string; data: Blob; batchId?: string }, onProgress: (loaded: number, total: number) => void): Promise<UploadRecord>
   /** Removes a file from the active intake batch once the service confirms. A blocked object stays in quarantine (audit). Refused while scanning. */
@@ -162,6 +167,7 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'knowledge-versions': () => api.getKnowledgeVersions(),
   preflight: () => api.getPreflight(),
   'llm-usage': () => api.getLlmUsage(),
+  'token-budget': () => api.getTokenBudget(),
   'change-notes': q => api.getChangeNotes(q.workflowId ?? ''),
   'workflow-builds': q => api.getWorkflowBuilds(q.workflowId ?? ''),
   'build-timeline': q => api.getBuildTimeline(q.workflowId ?? ''),
