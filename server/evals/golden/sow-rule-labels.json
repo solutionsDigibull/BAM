@@ -1,0 +1,33 @@
+{
+  "case": "wg37-rfq-r-labels",
+  "note": "#924: documents name rules R-xx; the project has no Rules master, so rule_refs is [] and the labels live in constraints text. Excerpts of the owner's RFQ set, shortened.",
+  "documents": [
+    "Step 1 Validate. Action: read the fields listed in R-01. Look up customer_code in the customers table (R-03) and check its status (R-02). Bound: clarification requests are limited by R-04.",
+    "Step 2 Price. Compute line_cost_inr using R-06. Apply discount_amount (R-10) and gst_amount (R-11). Rounding follows R-12. Approval is decided by R-13 and waits as defined in R-14."
+  ],
+  "masters": "(none)",
+  "expect": {
+    "rule_refs": [],
+    "constraints_keep_labels": [
+      "R-01",
+      "R-03",
+      "R-13"
+    ],
+    "max_attempts": 2,
+    "rejected_answers": [
+      {
+        "rule_refs": [
+          "R-01",
+          "R-03"
+        ],
+        "code": "UNKNOWN_RULE_REF"
+      },
+      {
+        "rule_refs": [
+          "RULE-03"
+        ],
+        "code": "UNKNOWN_RULE_REF"
+      }
+    ]
+  }
+}

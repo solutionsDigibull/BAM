@@ -102,6 +102,7 @@ class Gen:
             "location": {"page": 99},
         }
         doc = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        doc["rules_constraints"]["rule_refs"] = []  # this world has no Rules master (WG37)
 
         def walk(node: Any) -> None:
             if isinstance(node, dict):

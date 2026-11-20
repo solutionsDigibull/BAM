@@ -15,6 +15,7 @@ Pure apart from `embed`, which the caller passes (Bifrost `sbam-embed`; a fake i
 
 import hashlib
 import heapq
+import json
 import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
@@ -90,10 +91,25 @@ class SowContext:
     locations: dict[tuple[str, UUID], dict[str, Any]]  # the real location of each citable pair
     manifest: dict[str, Any] = field(default_factory=dict)  # LlmClient.run(manifest_extra=...)
     refs: dict[str, str] = field(default_factory=dict)  # the short id the model saw -> the OKF id
+    rule_ids: frozenset[str] = frozenset()  # the Rules master ids the model was shown (WG37)
 
     def resolve(self, okf_ref_id: str) -> str:
         """The OKF id behind an id the model cited (itself when it is not one of our short ids)."""
         return self.refs.get(okf_ref_id, okf_ref_id)
+
+
+def rule_ids_of(masters: str) -> frozenset[str]:
+    """The ids of the Rules master entries in `masters.jsonl`: the only ids `rule_refs` may hold
+    (WG37). A line that is not a master node (or not a rule) is skipped."""
+    found: set[str] = set()
+    for line in masters.splitlines():
+        try:
+            node = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(node, dict) and node.get("master_type") == "RULES":
+            found |= {v for k in ("node_id", "stable_id") if isinstance(v := node.get(k), str)}
+    return frozenset(found)
 
 
 def tokens(text: str) -> int:
@@ -188,7 +204,13 @@ def _assemble(
         **manifest,
     }
     return SowContext(
-        mode, blocks, {k: frozenset(v) for k, v in citable.items()}, locations, manifest, refs
+        mode,
+        blocks,
+        {k: frozenset(v) for k, v in citable.items()},
+        locations,
+        manifest,
+        refs,
+        rule_ids_of(bundle.masters),
     )
 
 
