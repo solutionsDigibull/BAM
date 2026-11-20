@@ -22,6 +22,7 @@ from sbam_contracts import (
     code_view,
     connections,
     documents,
+    exports,
     harness,
     held_patch,
     identity,
@@ -283,6 +284,7 @@ def test_e1_2_registry_covers_every_module_schema() -> None:
             ("workflow_commit", workflow_commit),
             ("staging", staging),
             ("workflow_versions", workflow_versions),
+            ("exports", exports),
         )
         for stem in module.schemas()
     }

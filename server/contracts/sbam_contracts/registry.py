@@ -44,6 +44,7 @@ from sbam_contracts.documents import (
     UploadRequest,
     UploadToken,
 )
+from sbam_contracts.exports import ExportAccepted
 from sbam_contracts.harness import TestRunTraces
 from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDecision
 from sbam_contracts.identity import (
@@ -367,6 +368,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("workflow_versions/list", WorkflowVersionList),
     ("workflow_versions/new_request", NewVersionRequest),
     ("workflow_versions/new_started", NewVersionStarted),
+    ("exports/accepted", ExportAccepted),
     ("budget/caps", BudgetCaps),
     ("budget/state", BudgetState),
     ("connections/connection", Connection),

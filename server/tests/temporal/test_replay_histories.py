@@ -32,6 +32,7 @@ from sbam_contracts.documents import (
     PURGE_DELETED,
     PURGE_SCHEDULE_ID,
 )
+from sbam_contracts.exports import EXPORT_VERSION, export_workflow_id
 from sbam_contracts.pipeline import (
     PROJECT_PIPELINE,
     SUB_SKILL_BUILD,
@@ -87,6 +88,7 @@ def workflow_id(path: Path) -> str:
         MASTER_DOCUMENT_INGESTION: lambda: master_document_workflow_id(anyone),
         PURGE_DELETED: lambda: f"{PURGE_SCHEDULE_ID}-replay",  # started by the daily schedule
         WORKFLOW_COMMIT: lambda: workflow_commit_id(anyone),
+        EXPORT_VERSION: lambda: export_workflow_id(anyone),
         "PingWorkflow": lambda: ping_workflow_id(
             TaskQueue(started(path)["taskQueue"]["name"]), anyone
         ),
