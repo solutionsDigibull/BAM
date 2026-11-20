@@ -86,6 +86,7 @@ RUNTIME_FILE: Final = "/etc/sbam-runtime"
 TEMPLATE_DB: Final = "sbam_tpl"
 MAX_DUMPED_ROWS: Final = 1000
 STATEMENT_TIMEOUT_MS: Final = 10_000
+STATE_READER: Final = "sbam_state_reader"  # the role the runner reads fresh state as (#428)
 SQL_STEP_KEY: Final = "sql"  # a state_script change: {"sql": [statements]}
 
 
@@ -167,8 +168,10 @@ class PgStore:
         inputs: Mapping[str, Any],
         queries: Mapping[str, str],
         required: list[str],
+        reader: Any | None = None,
     ) -> None:
         self.conn, self.table, self.required = conn, table, required
+        self.reader = reader if reader is not None else conn  # the bundle's SQL runs here
         self.key, self.queries, self.seen = inputs.get(key_field), queries, 0
 
     def read_state(self, names: list[str]) -> dict[str, Any]:
@@ -179,7 +182,7 @@ class PgStore:
                     f"state query {name!r} must be a SELECT with exactly one %s"
                 )
             try:
-                row = self.conn.execute(sql, (self.key,)).fetchone()
+                row = self.reader.execute(sql, (self.key,)).fetchone()
             except Exception as exc:
                 raise StateQueryError(self._why(name, exc)) from None
             values[name] = row[0] if row else None
@@ -539,10 +542,24 @@ class Database:
             host="127.0.0.1", user="postgres", dbname="postgres", autocommit=True
         )
         self.admin.execute(f"CREATE DATABASE {TEMPLATE_DB}")
+        # The bundle's fresh-state SELECTs run as a role that can only read the case's tables, in a
+        # read-only session with a statement timeout: no pg_read_file, no large objects, no writes
+        # through a function, whatever the static check let through (ADR 0026, decision 5).
+        self.admin.execute(
+            f"CREATE ROLE {STATE_READER} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE"
+            " NOREPLICATION NOBYPASSRLS"
+        )
+        self.admin.execute(
+            f"ALTER ROLE {STATE_READER} SET statement_timeout = {STATEMENT_TIMEOUT_MS}"
+        )
+        self.admin.execute(f"ALTER ROLE {STATE_READER} SET default_transaction_read_only = on")
+        self.admin.execute(f"ALTER ROLE {STATE_READER} SET search_path = public")
         with psycopg.connect(
             host="127.0.0.1", user="postgres", dbname=TEMPLATE_DB, autocommit=True
         ) as conn:
             conn.execute(self.schema_sql)
+            conn.execute(f"GRANT USAGE ON SCHEMA public TO {STATE_READER}")
+            conn.execute(f"GRANT SELECT ON ALL TABLES IN SCHEMA public TO {STATE_READER}")
 
     @staticmethod
     def case_name(number: int) -> str:
@@ -560,6 +577,18 @@ class Database:
             host="127.0.0.1",
             user="postgres",
             dbname=name,
+            autocommit=True,
+            options=f"-c statement_timeout={STATEMENT_TIMEOUT_MS}",
+        )
+
+    def reader(self, number: int) -> Any:
+        """The connection fresh-state queries run on: `STATE_READER`, SELECT only, read-only."""
+        import psycopg
+
+        return psycopg.connect(
+            host="127.0.0.1",
+            user=STATE_READER,
+            dbname=self.case_name(number),
             autocommit=True,
             options=f"-c statement_timeout={STATEMENT_TIMEOUT_MS}",
         )
@@ -603,6 +632,7 @@ async def run_case_in_db(
     bundle_dir: Path,
 ) -> tuple[HarnessTrace, list[dict[str, Any]]]:
     conn = db.case(number)
+    reader = db.reader(number)
     child: ChildProcess | None = None
     case_id = str(raw["case_id"])
     try:
@@ -631,6 +661,7 @@ async def run_case_in_db(
             raw["input"],
             queries,
             request.harness.handoff_fields,
+            reader,
         )
         spec = load_loop_spec(request.loop_spec)
         config = request.harness
@@ -664,6 +695,7 @@ async def run_case_in_db(
     finally:
         if child is not None:
             child.stop(db.postmaster_pid())
+        reader.close()
         conn.close()
 
 
