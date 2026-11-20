@@ -1,7 +1,7 @@
 """WG-39 (#926): a per-build spend cap. `LLM_BUILD_BUDGET_USD` stops the next model call of one
-build workflow (`build-<sub_skill>-<n>`) once the spend recorded under that workflow id reaches it. The
-refusal is a `BudgetExceeded`, which the SubSkillBuild workflow already turns into generation_failed
-and NEEDS_FDE_REVIEW (MODEL_FAILURES), so the Sub-Skill parks with a precise reason."""
+build workflow (`build-<sub_skill>-<n>`) once the spend recorded under that workflow id reaches
+it. The refusal is a `BudgetExceeded`, which the SubSkillBuild workflow already turns into
+generation_failed and NEEDS_FDE_REVIEW (MODEL_FAILURES): the Sub-Skill parks with a reason."""
 
 import asyncio
 import json
