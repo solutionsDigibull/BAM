@@ -40,3 +40,22 @@ export function signedFileUpstream(
   }
   return `/api/v1/files/${segments.join("/")}?${forwarded.toString()}`;
 }
+
+const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Upstream path and query of a signed document link (`/api/v1/document-access/<id>?t=&p=&exp=&sig=`,
+ * #895), or null. Only the document id, the tenant and project ids (UUIDs), `exp` (digits) and `sig`
+ * (the API's hex HMAC) are passed on, nothing else from the request: the API checks that they are
+ * the ones that were signed.
+ */
+export function signedDocumentUpstream(id: string, query: URLSearchParams): string | null {
+  const t = query.get("t");
+  const p = query.get("p");
+  const exp = query.get("exp");
+  const sig = query.get("sig");
+  if (!UUID_SEGMENT.test(id) || !t || !UUID_SEGMENT.test(t) || !p || !UUID_SEGMENT.test(p))
+    return null;
+  if (!exp || !/^\d{1,12}$/.test(exp) || !sig || !/^[0-9a-f]{64}$/.test(sig)) return null;
+  return `/api/v1/document-access/${id}?${new URLSearchParams({ t, p, exp, sig }).toString()}`;
+}

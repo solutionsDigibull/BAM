@@ -3,6 +3,7 @@
 import type { DocumentOut, DocumentVersionState } from "@/contracts";
 
 import type { DeletedFile, ParseInfo, ScanEvent, UploadRecord } from "../api/types";
+import { isReleased } from "../api/scanGate";
 import { ApiFailure } from "./http";
 
 /** What the FDE reads for each reason the server refuses or rejects a file. */
@@ -113,4 +114,22 @@ export function restoreReason(error: unknown): string {
   if (f?.statusCode === 403) return "You are not allowed to restore files in this project.";
   if (f?.statusCode === 404) return "This file no longer exists.";
   return f?.problem?.detail ?? f?.message ?? "The file could not be restored.";
+}
+
+/** Why a file cannot be opened yet, or undefined when it can: only a clean, released file has a link. */
+export function openBlock(u: UploadRecord): string | undefined {
+  if (isReleased(u)) return undefined;
+  if (u.scanError) return "The scan did not finish. Retry the scan to open this file.";
+  if (u.scan === "blocked" || u.clamavVerdict === "threat") return "Blocked by the scan and quarantined. This file cannot be opened.";
+  return "Still being checked. This file can be opened once the scan is clean.";
+}
+
+/** What the FDE reads when the server refuses a link (409 deleted, blocked or not scanned; 410 purged). */
+export function accessReason(error: unknown): string {
+  const f = error as Partial<ApiFailure> | null;
+  if (f?.statusCode === 404) return "This file no longer exists.";
+  if (f?.statusCode === 403) return "You are not allowed to open files in this project.";
+  if (f?.statusCode === 410) return "This file was permanently deleted and cannot be opened.";
+  if (f?.statusCode === 409) return f.problem?.detail ?? "This file cannot be opened right now.";
+  return f?.problem?.detail ?? f?.message ?? "The file could not be opened.";
 }

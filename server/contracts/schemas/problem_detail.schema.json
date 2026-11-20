@@ -57,6 +57,7 @@
         "HASH_MISMATCH",
         "NO_DOCUMENTS",
         "PARSE_ERROR",
+        "DOCUMENT_NOT_RELEASED",
         "CORRUPT",
         "ENCRYPTED",
         "EMPTY",

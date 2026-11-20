@@ -4,7 +4,8 @@
 // All three entry points (+ Add files, the left-pane drop, the middle drop zone) go through Intake's existing pick
 // handler: triage, the review dialog, then the existing resumable uploader.
 import { RecycleBin } from './RecycleBin'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { OpenFileButton } from './OpenFile'
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUppyState } from '@uppy/react'
 import { api } from '../api/adapter'
 import { ACCEPTED_TYPES, MAX_BATCH_BYTES, type Snapshot, type UploadRecord } from '../api/types'
@@ -287,6 +288,9 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
   const all = useUploadRows(snap)
   const rows = all.filter(isAdded), failed = all.filter(r => r.state === 'failed')
   const review = useReviewFiles(snap).ids
+  const stored = (id: string) => snap.uploads.find(u => u.id === id)
+  const [openErrors, setOpenErrors] = useState<Record<string, string>>({})
+  const reportOpen = (id: string) => (message?: string) => setOpenErrors(e => { const { [id]: _drop, ...rest } = e; return message ? { ...rest, [id]: message } : rest })
   const hasGoal = useGoal(s => !!s.text)
   const archived = useUi(s => s.archived)
   const { busy: acting, run } = useAction()
@@ -334,6 +338,7 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
             <Icon name="tb-alert-triangle" size={16} />
             <div className="up-attn-body"><strong title={r.name}>{r.name}</strong><p><b>{f.title}</b> {f.line}</p></div>
             <div className="up-attn-act">
+              {stored(r.id) && <OpenFileButton upload={stored(r.id)!} className="btn btn-ghost sm" />}
               {f.retry ? <button className="btn btn-outline sm" disabled={!!acting} onClick={r.retry}><Icon name="tb-refresh" size={14} />Retry</button>
                 : <button className="btn btn-primary sm" disabled={!!acting || closed} onClick={() => void run('Replace', async () => { await discard(snap, r); openPicker('files') }, { step: 1 })}>Replace</button>}
               <button className="btn btn-ghost sm" disabled={!!acting} onClick={() => void run('Discard', () => discard(snap, r), { step: 1 })}>Discard</button>
@@ -343,13 +348,14 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
       {rows.length > 0 && <div className="up-table-wrap">
         {failed.length > 0 && <h3 className="up-sec up-sec-in">Uploaded</h3>}
         <table className="table up-table">
-          <colgroup><col style={{ width: '2.5em' }} /><col /><col className="up-col-type" /><col className="up-col-conf" /></colgroup>
+          <colgroup><col style={{ width: '2.5em' }} /><col /><col className="up-col-type" /><col className="up-col-conf" /><col className="up-col-act" /></colgroup>
           <thead><tr><th scope="col" className="up-num">#</th><th scope="col">File name</th><th scope="col">Type</th>
-            <th scope="col" className="up-conf"><Tip text="How useful each file is for the goal, judged by SBAM from the file's content"><span className="up-th-tip" tabIndex={0}>Confidence</span></Tip></th></tr></thead>
+            <th scope="col" className="up-conf"><Tip text="How useful each file is for the goal, judged by SBAM from the file's content"><span className="up-th-tip" tabIndex={0}>Confidence</span></Tip></th>
+            <th scope="col" className="up-act"><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>{rows.map((r, i) => {
             const held = review.has(r.id), cell = relevanceCell(r, hasGoal)
             const m = rowMenu(r)
-            return <tr key={r.id} {...m} className={[held ? 'up-low' : '', m.className].filter(Boolean).join(' ') || undefined}>
+            return <Fragment key={r.id}><tr {...m} className={[held ? 'up-low' : '', m.className].filter(Boolean).join(' ') || undefined}>
               <td className="up-num">{i + 1}</td>
               <th scope="row" title={r.name}><span className="up-fname"><Icon name="tb-file" size={14} /><span>{r.name}</span></span>
                 {held && <span className="up-review" role="note" aria-label="Needs review before parse" title="Held for review before parse"><Icon name="alert" size={12} /><span aria-hidden>Needs review</span></span>}</th>
@@ -357,7 +363,8 @@ export function UploadResults({ snap }: { snap: Snapshot }) {
               <td className="up-conf" title={cell ? (cell.kind === 'score' ? cell.reason : cell.title) : undefined}>
                 {!cell ? '-' : cell.kind === 'note' ? <span className="up-cnote">{cell.label}</span>
                   : <span className={`up-cbar lvl-${cell.level.toLowerCase()}`} aria-label={`${cell.label} relevance: ${cell.reason}`}><i aria-hidden><i style={{ width: `${cell.score}%` }} /></i><span>{cell.label} · {cell.score}</span></span>}</td>
-            </tr>
+              <td className="up-act">{stored(r.id) ? <OpenFileButton upload={stored(r.id)!} compact report={reportOpen(r.id)} /> : <span className="muted xs">-</span>}</td>
+            </tr>{openErrors[r.id] && <tr className="up-open-err"><td colSpan={5} role="alert">{openErrors[r.id]}</td></tr>}</Fragment>
           })}
           </tbody>
         </table>

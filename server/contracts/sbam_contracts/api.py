@@ -67,6 +67,8 @@ class ErrorCode(StrEnum):
     HASH_MISMATCH = "HASH_MISMATCH"
     NO_DOCUMENTS = "NO_DOCUMENTS"
     PARSE_ERROR = "PARSE_ERROR"
+    # 409: the original is not open to the FDE (still being scanned, rejected, scan failed, deleted)
+    DOCUMENT_NOT_RELEASED = "DOCUMENT_NOT_RELEASED"
     # Why a document version is PARSE_FAILED (E4.5): the loader's own verdict.
     CORRUPT = "CORRUPT"  # the file cannot be read as its type
     ENCRYPTED = "ENCRYPTED"  # password-protected: no password is ever asked for

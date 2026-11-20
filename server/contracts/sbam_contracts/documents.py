@@ -376,6 +376,20 @@ class DocumentOut(BaseModel):
     relevance: DocumentRelevance | None = None
 
 
+class DocumentAccess(BaseModel):
+    """`GET .../documents/{id}/access` (#895): a short-lived signed link to the stored original.
+
+    `url` is relative to the API origin and is the credential, so it is never logged or stored.
+    The signature binds the tenant, the project, the document and `expires_at`; the file is always
+    served as an attachment. Only a released (scanned clean) document gets one: any other state is
+    409 `DOCUMENT_NOT_RELEASED`, a purged one 410 `GONE`."""
+
+    url: str
+    expires_at: datetime
+    filename: str
+    mime: str
+
+
 class PurgeTarget(BaseModel):
     """One deleted document that is due for purging (IDs only, like every workflow input)."""
 
@@ -425,6 +439,7 @@ def schemas() -> dict[str, dict[str, Any]]:
         "ocr_page": OcrPage,
         "relevance_answer": RelevanceAnswer,
         "document": DocumentOut,
+        "document_access": DocumentAccess,
         "purge_target": PurgeTarget,
         "purge_request": PurgeRequest,
         "purge_result": PurgeResult,

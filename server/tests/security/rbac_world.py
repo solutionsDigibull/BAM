@@ -44,6 +44,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.db.session import make_engine, make_sessionmaker
 from sbam_api.identity.models import Tenant, User
 from sbam_api.identity.service import SqlUserDirectory
+from sbam_api.ingest import access as document_access
 from sbam_api.ingest.models import Document, DocumentVersion
 from sbam_api.knowledge.models import KnowledgeVersion
 from sbam_api.main import create_app
@@ -292,11 +293,19 @@ class World:
                 doc = Document(tenant_id=tenant, project_id=project, title=f"spec-{name}.pdf")
                 s.add(doc)
                 s.flush()
+                storage_key = f"{tenant}/{project}/uploads/spec-{name}"
+                if name == "a":  # a real stored original: the signed document link serves it (#895)
+                    storage_key = (
+                        LocalDiskBackend(self.tmp)
+                        .put(b"alpha spec", StorageScope(tenant, project), Kind.UPLOADS, "")
+                        .storage_key
+                    )
                 version = DocumentVersion(
                     tenant_id=tenant,
                     project_id=project,
                     document_id=doc.id,
-                    storage_key=f"{tenant}/{project}/uploads/spec-{name}",
+                    storage_key=storage_key,
+                    scan_status="CLEAN",
                     sha256=f"{name:0>64}",
                     size=1024,
                     mime="application/pdf",
@@ -352,6 +361,15 @@ class World:
             signed_url(SIGNING_KEY, self.file_key, TenantContext(self.tenant_a), 600)
         ).query
         self.file_query = dict(part.split("=", 1) for part in query.split("&"))
+        expires = int(time.time()) + 3600
+        self.doc_query = {
+            "t": str(self.tenant_a),
+            "p": str(self.project_a),
+            "exp": str(expires),
+            "sig": document_access.sign(
+                SIGNING_KEY, self.tenant_a, self.project_a, self.docs["a"], expires
+            ),
+        }
         self.kv_a = self._seed_knowledge()
         self.sow_a, self.sow_a_tiptap = self._seed_sow()
         self._seed_export()
@@ -572,6 +590,8 @@ class World:
             return str(self.actors[name.removeprefix("user_")].id)
         if name.startswith("file_"):
             return self.file_query[name.removeprefix("file_")]
+        if name.startswith("doclink_"):  # the signed document link of document `a` (#895)
+            return self.doc_query[name.removeprefix("doclink_")]
         if name.startswith("etag_"):
             return f'"{self.version(name.removeprefix("etag_"))}"'
         raise KeyError(f"unknown placeholder @{name}")

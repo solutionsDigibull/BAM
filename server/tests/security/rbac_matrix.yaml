@@ -484,6 +484,27 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "409 CONFLICT"  # the seeded document has not failed
 
+  # #895: a short-lived signed link to the stored original of a released document. The seeded
+  # document is PARSED and CLEAN, so the assigned FDE gets a link.
+  document_access_api_v1_projects__project_id__documents__document_id__access_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/documents/{document_id}/access
+      params: {project_id: "@project_a", document_id: "@doc_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
+  # #895: the link is the credential (it binds tenant, project, document and expiry), not the
+  # bearer token, so the answer must not depend on who is logged in. test_895 covers tampering.
+  document_content_api_v1_document_access__document_id__get:
+    request:
+      method: GET
+      path: /api/v1/document-access/{document_id}
+      params: {document_id: "@doc_a"}
+      query: {t: "@doclink_t", p: "@doclink_p", exp: "@doclink_exp", sig: "@doclink_sig"}
+    expect: *open
+
   # #802: re-score every parsed document against the goal.
   rescore_relevance_api_v1_projects__project_id__documents_relevance_rescore_post:
     request:

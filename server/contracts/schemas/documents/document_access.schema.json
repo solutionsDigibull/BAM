@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:documents/document_access:0.1.0",
+  "description": "`GET .../documents/{id}/access` (#895): a short-lived signed link to the stored original.\n\n`url` is relative to the API origin and is the credential, so it is never logged or stored.\nThe signature binds the tenant, the project, the document and `expires_at`; the file is always\nserved as an attachment. Only a released (scanned clean) document gets one: any other state is\n409 `DOCUMENT_NOT_RELEASED`, a purged one 410 `GONE`.",
+  "properties": {
+    "url": {
+      "title": "Url",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "filename": {
+      "title": "Filename",
+      "type": "string"
+    },
+    "mime": {
+      "title": "Mime",
+      "type": "string"
+    }
+  },
+  "required": [
+    "url",
+    "expires_at",
+    "filename",
+    "mime"
+  ],
+  "title": "DocumentAccess",
+  "type": "object"
+}

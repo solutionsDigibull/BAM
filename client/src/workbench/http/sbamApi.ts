@@ -13,6 +13,7 @@ import type {
   CommitAccepted,
   CommitStatus,
   Connection,
+  DocumentAccess,
   ConnectionList,
   CodeAttemptList,
   CodeDiff,
@@ -222,7 +223,11 @@ export function createSbamApi(projectId: string): BamApi {
         throw new Error(problemMessage(e));
       }
     },
-    getVerifiedFileAccess: notWired("Opening an uploaded file"),
+    // A short-lived signed link, answered only for a released file; the server's refusal (409/410/404) is kept as it came.
+    getVerifiedFileAccess: async (id) => {
+      const { body } = await getJson<DocumentAccess>(`projects/${projectId}/documents/${id}/access`);
+      return { url: body.url, expiresAt: body.expires_at };
+    },
     startIngestionRun: () => startRun(),
     startSowGeneration: notWired("Starting the SOW generation (the pipeline starts it)"),
     saveSowDraft: notWired("Saving the SOW"),
