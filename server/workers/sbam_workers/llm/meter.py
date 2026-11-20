@@ -19,7 +19,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -27,8 +27,9 @@ from sbam_api.core.logging import correlation_id_var
 from temporalio import activity
 
 from sbam_workers.llm.budget import Budget
+from sbam_workers.llm.client import _cost
 from sbam_workers.llm.store import CallStore, LlmScope
-from sbam_workers.llm.trace import new_trace_id
+from sbam_workers.llm.trace import Generation, LangfuseTracer, new_trace_id
 from sbam_workers.settings import WorkerSettings
 
 log = logging.getLogger("sbam_workers.llm.meter")
@@ -76,6 +77,7 @@ async def record_call(
     reported_cost: float | None,
     started: datetime,
     ended: datetime,
+    tracer: LangfuseTracer | None = None,
 ) -> bool:
     """Write the row for one finished call; False when it was not attributable (not recorded)."""
     scope = _scope.get()
@@ -86,6 +88,7 @@ async def record_call(
         return False
     cost = budget.cost_of(alias, tokens_in, tokens_out, Decimal(str(reported_cost or 0)))
     budget.note(alias, cost, tokens_in, tokens_out)
+    trace_id = new_trace_id()
     await asyncio.to_thread(
         store.add,
         scope,
@@ -101,10 +104,29 @@ async def record_call(
             "latency_ms": int((ended - started).total_seconds() * 1000),
             "attempt": 1,
             "status": "SUCCEEDED",
-            "trace_id": new_trace_id(),
+            "trace_id": trace_id,
             "context_manifest": {"cognee": {"call_type": call_type}},
         },
     )
+    if tracer is not None:  # Cognee's calls never pass LlmClient: trace them here (never raises)
+        await tracer.record(
+            Generation(
+                trace_id=trace_id,
+                alias=alias,
+                model=model,
+                prompt_id=f"cognee.{call_type}",
+                prompt_version="-",
+                tenant_id=str(scope.tenant_id),
+                project_id=str(scope.project_id),
+                attempt=1,
+                status="SUCCEEDED",
+                started_at=started,
+                ended_at=ended,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                cost_usd=float(cost),
+            )
+        )
     return True
 
 
@@ -116,6 +138,7 @@ def install(store: CallStore, settings: WorkerSettings) -> Budget:
     from litellm.integrations.custom_logger import CustomLogger
 
     budget = Budget(settings, store)
+    tracer = LangfuseTracer(settings)
 
     class CogneeMeter(CustomLogger):
         async def async_log_success_event(
@@ -136,9 +159,16 @@ def install(store: CallStore, settings: WorkerSettings) -> Budget:
                     call_type=str(detail.get("call_type") or kwargs.get("call_type") or "call"),
                     tokens_in=int(getattr(usage, "prompt_tokens", 0) or 0),
                     tokens_out=int(getattr(usage, "completion_tokens", 0) or 0),
-                    reported_cost=kwargs.get("response_cost") or detail.get("response_cost"),
-                    started=start_time,
-                    ended=end_time,
+                    # Bifrost's own figure rides in `usage.cost` (what LlmClient reads); it wins
+                    # over LiteLLM's estimate, which cannot price `sbam-knowledge` at all. Without
+                    # it the budget saw $0 and refused the alias after the first call.
+                    reported_cost=_cost(getattr(usage, "cost", None))
+                    or kwargs.get("response_cost")
+                    or detail.get("response_cost"),
+                    # LiteLLM's times are naive local datetimes; Langfuse refuses those
+                    started=start_time.astimezone(UTC),
+                    ended=end_time.astimezone(UTC),
+                    tracer=tracer,
                 )
             except Exception:
                 log.exception("could not record a Cognee model call")
