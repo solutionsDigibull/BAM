@@ -14,7 +14,6 @@ import {
   RAG_TEMPLATE,
   ragError,
   STATUS_COLOR,
-  statusField,
   versionsUrl,
   withStatus,
 } from "./masters-api";
@@ -24,10 +23,14 @@ const RAG = "rag_reference";
 
 type Values = Record<string, string>;
 
-const toValues = (info: MasterTypeInfo, entry?: MasterEntry): Values =>
+const toValues = (
+  info: MasterTypeInfo,
+  entry?: MasterEntry,
+  defaults?: Record<string, string>,
+): Values =>
   Object.fromEntries(
     info.columns.map((c) => {
-      const v = entry?.payload[c.field];
+      const v = entry ? entry.payload[c.field] : defaults?.[c.field];
       return [c.field, c.field === RAG && v ? JSON.stringify(v, null, 2) : cellText(v)];
     }),
   );
@@ -40,6 +43,11 @@ const toPayload = (values: Values) =>
     ]),
   );
 
+// The column holding the status: the 0.3 Status column (Rules, Tools) or the 0.2 trailer text.
+const statusColumn = (info: MasterTypeInfo) =>
+  ["record_status", "misc", "misc_audit"].find((f) => info.columns.some((c) => c.field === f));
+const title = (s: MasterStatus) => s[0] + s.slice(1).toLowerCase();
+
 const isStale = (e: ApiError) =>
   e.statusCode === 412 || (e.statusCode === 409 && e.problem?.code === "VERSION_CONFLICT");
 
@@ -50,15 +58,18 @@ export function EntryDrawer({
   onClose,
   onSaved,
   projectId,
+  defaults,
 }: {
   projectId?: string;
+  /** Prefilled values of a new entry (Tool Factory: the Agent / Assistant kind). */
+  defaults?: Record<string, string>;
   info: MasterTypeInfo;
   entryId?: string;
   onClose: () => void;
   onSaved: (entry: MasterEntry) => void;
 }) {
   const resource = entriesResource(info.master_type);
-  const misc = statusField(info.master_type);
+  const misc = statusColumn(info);
   const [form] = Form.useForm<Values>();
   const [stale, setStale] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -71,10 +82,10 @@ export function EntryDrawer({
   const { mutateAsync, mutation } = useCustomMutation<MasterEntry, ApiError>();
 
   useEffect(() => {
-    if (!entryId || entry) form.setFieldsValue(toValues(info, entry));
-  }, [entry, entryId, form, info]);
+    if (!entryId || entry) form.setFieldsValue(toValues(info, entry, defaults));
+  }, [entry, entryId, form, info, defaults]);
 
-  const miscText = Form.useWatch(misc, form) ?? "";
+  const miscText = Form.useWatch(misc ?? "", form) ?? "";
   const ragText = Form.useWatch(RAG, form) ?? "";
   const ragProblem = info.columns.some((c) => c.field === RAG) ? ragError(ragText) : null;
   const sample = entry?.source_kind === "BAM_0_2_SAMPLE";
@@ -99,7 +110,7 @@ export function EntryDrawer({
       if (err.statusCode === 422 && err.errors) {
         form.setFields(
           Object.entries(err.errors).map(([path, msgs]) => ({
-            name: path.split(".")[1] ?? misc, // `payload.<field>`; a bare `payload` is the status
+            name: path.split(".")[1] ?? misc ?? "", // `payload.<field>`; a bare `payload` is the status
             errors: [msgs].flat().map(String),
           })),
         );
@@ -144,25 +155,38 @@ export function EntryDrawer({
               <Meta>version {entry.version}</Meta>
             </Flex>
           )}
-          <Form.Item label="Status" style={{ marginBottom: 20 }}>
-            <Tooltip title={sample ? "Sample rows (#1) are always Illustrative" : undefined}>
-              <Select<MasterStatus>
-                aria-label="Status"
-                disabled={sample}
-                style={{ width: 220 }}
-                value={sample ? "ILLUSTRATIVE" : statusOf(miscText)}
-                onChange={(s) => form.setFieldValue(misc, withStatus(miscText, s))}
-                options={STATUSES.map((s) => ({
-                  value: s,
-                  label: <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
-                }))}
-              />
-            </Tooltip>
-            <Typography.Paragraph type="secondary" style={{ margin: "6px 0 0", fontSize: 12 }}>
-              Saved as <code>Status: …</code> at the end of{" "}
-              {misc === "misc" ? "Misc" : "Misc / Audit"}.
-            </Typography.Paragraph>
-          </Form.Item>
+          {misc && (
+            <Form.Item label="Status" style={{ marginBottom: 20 }}>
+              <Tooltip title={sample ? "Sample rows (#1) are always Illustrative" : undefined}>
+                <Select<MasterStatus>
+                  aria-label="Status"
+                  disabled={sample}
+                  style={{ width: 220 }}
+                  value={sample ? "ILLUSTRATIVE" : statusOf(miscText, misc)}
+                  onChange={(s) =>
+                    form.setFieldValue(
+                      misc,
+                      misc === "record_status" ? title(s) : withStatus(miscText, s),
+                    )
+                  }
+                  options={STATUSES.map((s) => ({
+                    value: s,
+                    label: <Tag color={STATUS_COLOR[s]}>{s}</Tag>,
+                  }))}
+                />
+              </Tooltip>
+              <Typography.Paragraph type="secondary" style={{ margin: "6px 0 0", fontSize: 12 }}>
+                {misc === "record_status" ? (
+                  "Saved as the Status column."
+                ) : (
+                  <>
+                    Saved as <code>Status: …</code> at the end of{" "}
+                    {misc === "misc" ? "Misc" : "Misc / Audit"}.
+                  </>
+                )}
+              </Typography.Paragraph>
+            </Form.Item>
+          )}
           <Form form={form} layout="vertical" onFinish={save} requiredMark={false}>
             {info.columns.map((c) => (
               <Form.Item
@@ -209,8 +233,10 @@ export function EntryDrawer({
 }
 
 // The status a Misc text means, as the server reads it (a trailing `Status: X`, else Proposed).
-function statusOf(misc: string): MasterStatus {
-  const m = /(?:^|[\s;])Status:\s*(\S+?)\.?\s*$/i.exec(misc.trim());
+function statusOf(misc: string, field?: string): MasterStatus {
+  const m =
+    /(?:^|[\s;])Status:\s*(\S+?)\.?\s*$/i.exec(misc.trim()) ??
+    (field === "record_status" ? /^\s*([A-Za-z]+)/.exec(misc) : null); // 0.3: the leading word
   const value = m?.[1]?.toUpperCase();
   return STATUSES.find((s) => s === value) ?? "PROPOSED";
 }

@@ -21,7 +21,7 @@ const openTab = async (name: string) => fireEvent.click(await screen.findByRole(
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Admin Masters screen (E3.10)", () => {
-  test("tabs: README, the four editable masters, Documents and Filetype (no Tooling yet)", async () => {
+  test("tabs: README, Organization, Rules, Skills, Tool Factory, Documents and Filetype", async () => {
     fakeApi(routes());
     renderWithRefine(<MastersScreen />);
     await screen.findByText(LAYOUT.readme.title);
@@ -30,8 +30,8 @@ describe("Admin Masters screen (E3.10)", () => {
       "README",
       "Organization",
       "Rules",
-      "Agents",
       "Skills",
+      "Tool Factory",
       "Documents",
       "Filetype",
     ]);
