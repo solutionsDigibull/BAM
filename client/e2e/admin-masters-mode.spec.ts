@@ -201,11 +201,16 @@ for (const width of [320, 390]) {
     ] as const) {
       await page.goto(path);
       await slow(page.getByRole("navigation", { name: "Admin mode" })).toBeVisible();
-      await page.waitForTimeout(500);
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      slow(overflow, `${path} at ${width}px`).toBeLessThanOrEqual(0);
+      // the sider's collapse animates on first load: wait for it to settle, then it must stay within the viewport
+      await slow
+        .poll(
+          () =>
+            page.evaluate(
+              () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            ),
+          { message: `${path} at ${width}px` },
+        )
+        .toBeLessThanOrEqual(0);
       await shot(page, `10-${name}-${width}`);
     }
   });
