@@ -4,6 +4,7 @@ import { fileCount, findingText, firstFile, groupHasProblem, isForbidden, placeF
 import { RegistryPanel } from './RegistryPanel'
 import { RepositoryPanel } from './RepositoryPanel'
 import { RepoQuestionCard } from './RepoQuestionCard'
+import { WaitingNotice } from './BuildsPanel'
 import { EVIDENCE_VIEWS, EvidenceBody, isEvidenceView, type EvidenceView } from './BuildEvidence'
 import { Banner, Copy, Empty, ErrorState, Icon, Pane, Skeleton } from './ui'
 import './workflowCode.css'
@@ -163,6 +164,7 @@ export function WorkflowFilesCenter({ workflowId }: { workflowId?: string }) {
   return (
     <Pane id="center-title" kicker="Translation" title="Translate" className="center"
       actions={<CodeViewSwitch view={view} set={v => setView(v === 'repos' || v === 'registry' || isEvidenceView(v) ? v : 'files')} runless />}>
+      {workflowId && view !== 'builds' && <WaitingNotice workflowId={workflowId} />}
       {workflowId && <RepoQuestionCard workflowId={workflowId} quiet={view !== 'repos'} />}
       {view === 'repos' ? <RepositoryPanel workflowId={workflowId} />
         : view === 'registry' ? <RegistryPanel workflowId={workflowId} />

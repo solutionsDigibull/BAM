@@ -14,7 +14,7 @@ not the code is generated. These are the bodies of that step:
   decisions already taken.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Annotated, Any, Final, Self
 from uuid import UUID
@@ -34,6 +34,7 @@ REMINDER_NOTIFICATION: Final = "sub_skill.repo_choice_reminder"
 ANSWER_INVALID: Final = "RepoAnswerInvalid"  # ApplicationError.type: an answer the API let through
 QUESTION_MISSING: Final = "RepoQuestionMissing"  # ApplicationError.type: an answer, nothing asked
 MAX_SHORT_LIST: Final = 5
+REPO_REMINDER_EVERY: Final = timedelta(days=3)  # how often the build reminds the FDE (#931)
 
 
 class _Strict(BaseModel):

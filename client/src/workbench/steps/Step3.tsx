@@ -17,6 +17,7 @@ import { CodeFileTree } from '../components/CodeFileTree'
 import { RegistryPanel } from '../components/RegistryPanel'
 import { RepositoryPanel } from '../components/RepositoryPanel'
 import { RepoQuestionCard } from '../components/RepoQuestionCard'
+import { WaitingNotice } from '../components/BuildsPanel'
 import { EvidenceBody, isEvidenceView } from '../components/BuildEvidence'
 import { CodeViewSwitch, WorkflowCodePreview, WorkflowFilesCenter, type CodeView } from '../components/WorkflowCodePreview'
 import { tips } from '../lib/actionTips'
@@ -292,6 +293,7 @@ export function CodeCenter({ snap, info }: StepProps) {
   return (
     <Pane id="center-title" kicker="Translation" title="Translate" className="center"
       actions={<span className="row">{workflowId && <CodeViewSwitch view={view} set={setView} />}<ChangesSwitch on={showChanges} set={setShowChanges} title="Colour-code edits against the generated code" /><RunPill r={r} /></span>}>
+      {workflowId && view !== 'builds' && <WaitingNotice workflowId={workflowId} />}
       {workflowId && <RepoQuestionCard workflowId={workflowId} quiet={view !== 'repos'} />}
       {view === 'files' && workflowId ? <WorkflowCodePreview workflowId={workflowId} />
         : view === 'repos' && workflowId ? <RepositoryPanel workflowId={workflowId} />

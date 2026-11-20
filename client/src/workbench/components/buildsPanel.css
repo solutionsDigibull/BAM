@@ -19,3 +19,9 @@
 .bam-wb .bld-reason { width: 100%; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; resize: vertical; }
 /* More views than fit one line on a narrow pane: the switch wraps instead of clipping. */
 .bam-wb .wcp-switch { flex-wrap: wrap; max-width: 100%; border-radius: 16px; }
+
+/* #931: a build parked on the FDE's answer. */
+.bam-wb .bld-waiting { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border)); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+.bam-wb .bld-waiting > div { flex: 1 1 240px; min-width: 0; }
+.bam-wb .bld-waiting p { margin: 2px 0 0; }
+.bam-wb .bld-notice { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }

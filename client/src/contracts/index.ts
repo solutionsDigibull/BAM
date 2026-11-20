@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:c18427d9d9d010c65ff6da79b068b7c113185e3b60126497fc3957e2c2a2b09a
+// source-sha256:5df9a8f4d91fe54557c8378b3146446c1c9f8e547442608fc2a32d4471261979
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -192,6 +192,16 @@ export type GateStatus = "PENDING" | "RUNNING" | "PASSED" | "FAILED" | "SKIPPED"
  * via the `definition` "TestRunState".
  */
 export type TestRunState = "PASS" | "FAIL" | "NON_CERTIFYING" | "BLOCKED";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WaitingKind".
+ */
+export type WaitingKind = "REPO_QUESTION";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RepoQuestionKind".
+ */
+export type RepoQuestionKind = "CLOSE_CANDIDATES" | "WEAK_MATCH" | "NO_CANDIDATE";
 /**
  * The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the
  * dashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).
@@ -591,11 +601,6 @@ export type LicenceVerdict = "ALLOWED" | "REFUSED" | "UNKNOWN";
  * via the `definition` "sbam_contracts__repo_scan__Severity".
  */
 export type SbamContracts_RepoScan__Severity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
-/**
- * This interface was referenced by `SbamContracts`'s JSON-Schema
- * via the `definition` "RepoQuestionKind".
- */
-export type RepoQuestionKind = "CLOSE_CANDIDATES" | "WEAK_MATCH" | "NO_CANDIDATE";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "RepoAnswerAction".
@@ -1509,6 +1514,7 @@ export interface BuildRow {
     [k: string]: GateStatus | undefined;
   };
   loop_tests?: LoopTestsBadge | null;
+  waiting_for?: WaitingFor | null;
 }
 /**
  * The 'Loop tests' cell of the Build & Test grid: `passed/total` and a state.
@@ -1520,6 +1526,23 @@ export interface LoopTestsBadge {
   state: TestRunState;
   passed: number;
   total: number;
+}
+/**
+ * #931: what a build that is parked on the FDE waits for. Without it a Sub-Skill that waits
+ * for the repository answer looks like BUILDING for days. Derived from the audit row
+ * `repo_question_asked`; `reminders_sent` and `next_reminder_at` follow the build's own 3-day
+ * reminder timer. `link` is the API resource that holds the question (`GET W/repo-questions`).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "WaitingFor".
+ */
+export interface WaitingFor {
+  kind: WaitingKind;
+  since: string;
+  question_kind?: RepoQuestionKind | null;
+  reminders_sent?: number;
+  next_reminder_at: string;
+  link: string;
 }
 /**
  * `GET W/sub-skills/{sub_id}/gates?attempt=`: one attempt's gate results, in GateName order.

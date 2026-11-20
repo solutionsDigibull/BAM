@@ -52,6 +52,17 @@
             }
           ],
           "default": null
+        },
+        "waiting_for": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WaitingFor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -158,6 +169,15 @@
       "title": "LoopTestsBadge",
       "type": "object"
     },
+    "RepoQuestionKind": {
+      "enum": [
+        "CLOSE_CANDIDATES",
+        "WEAK_MATCH",
+        "NO_CANDIDATE"
+      ],
+      "title": "RepoQuestionKind",
+      "type": "string"
+    },
     "SubSkillState": {
       "enum": [
         "DRAFT",
@@ -186,6 +206,62 @@
         "BLOCKED"
       ],
       "title": "TestRunState",
+      "type": "string"
+    },
+    "WaitingFor": {
+      "additionalProperties": false,
+      "description": "#931: what a build that is parked on the FDE waits for. Without it a Sub-Skill that waits\nfor the repository answer looks like BUILDING for days. Derived from the audit row\n`repo_question_asked`; `reminders_sent` and `next_reminder_at` follow the build's own 3-day\nreminder timer. `link` is the API resource that holds the question (`GET W/repo-questions`).",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/WaitingKind"
+        },
+        "since": {
+          "format": "date-time",
+          "title": "Since",
+          "type": "string"
+        },
+        "question_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RepoQuestionKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reminders_sent": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reminders Sent",
+          "type": "integer"
+        },
+        "next_reminder_at": {
+          "format": "date-time",
+          "title": "Next Reminder At",
+          "type": "string"
+        },
+        "link": {
+          "maxLength": 300,
+          "title": "Link",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "since",
+        "next_reminder_at",
+        "link"
+      ],
+      "title": "WaitingFor",
+      "type": "object"
+    },
+    "WaitingKind": {
+      "enum": [
+        "REPO_QUESTION"
+      ],
+      "title": "WaitingKind",
       "type": "string"
     },
     "WorkflowState": {

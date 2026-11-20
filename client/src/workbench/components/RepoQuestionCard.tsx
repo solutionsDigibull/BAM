@@ -4,6 +4,7 @@ import {
   candidates, isForbidden, KIND_HELP, KIND_TITLE, looksLikeRepoUrl, newAnswerKey, percent, problemText, reasonsOf, repoName, scoreTone,
   sendAnswer, SOURCE_LABEL, useRepoQuestions,
 } from '../lib/repoQuestion'
+import { questionCardId } from '../lib/workflowBuilds'
 import { Banner, Empty, ErrorState, Icon, Skeleton } from './ui'
 import './repoQuestion.css'
 
@@ -56,7 +57,7 @@ function Question({ item, workflowId, onDone }: { item: PendingRepoQuestion; wor
   }
 
   return (
-    <section className="rq-card" aria-label={`Repository for ${name}`} data-sub-skill={q.sub_skill_id}>
+    <section className="rq-card" id={questionCardId(q.sub_skill_id)} tabIndex={-1} aria-label={`Repository for ${name}`} data-sub-skill={q.sub_skill_id}>
       <header className="rq-head">
         <Icon name="alert" />
         <div>

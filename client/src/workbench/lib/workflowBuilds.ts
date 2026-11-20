@@ -2,7 +2,7 @@
 // of one attempt's gates, and the FDE's Retry of a Sub-Skill that waits for them. The server decides every state and every
 // refusal (409 NOT_IN_REVIEW); this file only reads, shows and sends. The gate list mirrors `sbam_contracts.build_dashboard`.
 import { useCustom } from '@refinedev/core'
-import type { BuildRow, BuildsResponse, GateName, GateStatus, GatesResponse, SubSkillState } from '@/contracts'
+import type { BuildRow, BuildsResponse, GateName, GateStatus, GatesResponse, SubSkillState, WaitingFor } from '@/contracts'
 import { api } from '../api/adapter'
 import { idempotencyKey } from '../http/http'
 
@@ -65,6 +65,48 @@ export const stateLabel = (s: string): string => STATE_LABEL[s as SubSkillState]
 export const stateTone = (s: string): Tone =>
   s === 'NEEDS_FDE_REVIEW' || s === 'TESTING_BLOCKED' || s === 'CORRECTING' ? 'warn'
     : s === 'INVALID' || s === 'BUILD_ERROR' || s === 'DEPENDENCY_FAILED' ? 'err' : s === 'CERTIFIED' || s === 'FROZEN' ? 'ok' : 'muted'
+
+// ---- a build that waits for the FDE's answer (#931) ---------------------------------------------------------------
+// The Sub-Skill stays BUILDING in the state machine, so the server adds `waiting_for`; the panel must not say "Building".
+
+/** The row's status in plain words: "Waiting for your answer" while it is parked on the FDE, else the state. */
+export const rowStatusLabel = (row: Pick<BuildRow, 'state' | 'waiting_for'>): string => (row.waiting_for ? 'Waiting for your answer' : stateLabel(row.state))
+export const rowStatusTone = (row: Pick<BuildRow, 'state' | 'waiting_for'>): Tone => (row.waiting_for ? 'warn' : stateTone(row.state))
+
+export const waitingRows = (rows: readonly BuildRow[] | undefined): BuildRow[] => (rows ?? []).filter(r => !!r.waiting_for)
+
+const DAY_MS = 86_400_000
+/** "2 days ago", "5 hours ago", "just now": how long the build has waited. */
+export function waitedFor(since: string, now: number = Date.now()): string {
+  const ms = Math.max(0, now - Date.parse(since))
+  if (Number.isNaN(ms)) return 'a while ago'
+  const days = Math.floor(ms / DAY_MS)
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'} ago`
+  const hours = Math.floor(ms / 3_600_000)
+  if (hours >= 1) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  return ms < 60_000 ? 'just now' : `${Math.floor(ms / 60_000)} minutes ago`
+}
+
+export const sinceDate = (since: string): string => { const d = new Date(since); return Number.isNaN(d.getTime()) ? since : d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC' }
+
+/** The reminder line: nothing sent yet, or how many were sent; the next one is due at `next_reminder_at`. */
+export function reminderText(w: Pick<WaitingFor, 'reminders_sent' | 'next_reminder_at'>): string {
+  const n = w.reminders_sent ?? 0
+  const sent = n === 0 ? 'No reminder sent yet' : `${n} reminder${n === 1 ? '' : 's'} sent`
+  return `${sent}. You are reminded every 3 days; the next is due ${sinceDate(w.next_reminder_at)}.`
+}
+
+/** The id of the question card of a Sub-Skill, so a button can go to it. */
+export const questionCardId = (subId: string): string => `rq-${subId}`
+
+/** Scroll to the question card and put the focus on it. False when the card is not on the page. */
+export function goToQuestion(subId: string): boolean {
+  const el = document.getElementById(questionCardId(subId))
+  if (!el) return false
+  el.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  el.focus({ preventScroll: true })
+  return true
+}
 
 /**
  * Retry is offered only to a Sub-Skill that waits for the FDE (TD §13.2); the server still answers 409. TESTING_BLOCKED

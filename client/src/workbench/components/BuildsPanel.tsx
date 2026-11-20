@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { BuildRow, GateResult } from '@/contracts'
 import {
   canRetry, gateLabel, GATE_STATUS_LABEL, gateTone, hasFailedGate, isForbidden, MAX_REASON, newRetryKey, problemText, reachedGates,
-  sendRetry, stateLabel, stateTone, summary, useBuilds, useGates,
+  goToQuestion, reminderText, rowStatusLabel, rowStatusTone, sendRetry, sinceDate, stateLabel, summary, useBuilds, useGates, waitedFor, waitingRows,
 } from '../lib/workflowBuilds'
 import { HeldPatchCard } from './HeldPatchCard'
 import { Banner, Dialog, Empty, ErrorState, Icon, Section, Skeleton } from './ui'
@@ -47,6 +47,25 @@ function GateRows({ workflowId, row, attempt }: { workflowId: string; row: Build
   )
 }
 
+/** #931: which question the build waits for, since when, the reminder, and the way to the question card. */
+export function WaitingNote({ row }: { row: BuildRow }) {
+  const w = row.waiting_for
+  const [missing, setMissing] = useState(false)
+  if (!w) return null
+  return (
+    <div className="bld-waiting" role="status" data-testid={`waiting-${row.sub_skill_id}`}>
+      <Icon name="alert" size={14} />
+      <div>
+        <strong>{row.skill_name} is waiting for your answer</strong>
+        <p className="xs">Question: which repository should it start from? Waiting since {sinceDate(w.since)} ({waitedFor(w.since)}).</p>
+        <p className="muted xs">{reminderText(w)} There is no time limit; the build carries on as soon as you answer.</p>
+        {missing && <p className="xs">The question card is not on this page yet. Open the Repositories view of Translate.</p>}
+      </div>
+      <button type="button" className="btn btn-primary sm" aria-label={`Answer the question for ${row.skill_name}`} onClick={() => setMissing(!goToQuestion(row.sub_skill_id))}>Answer the question</button>
+    </div>
+  )
+}
+
 function Row({ workflowId, row, onRetry }: { workflowId: string; row: BuildRow; onRetry: (r: BuildRow) => void }) {
   const [open, setOpen] = useState(false)
   const [attempt, setAttempt] = useState<number>(row.attempt ?? 0)
@@ -60,11 +79,12 @@ function Row({ workflowId, row, onRetry }: { workflowId: string; row: BuildRow; 
           <strong>{row.skill_name}</strong>
           <span className="mono xs muted">{row.skill_id}</span>
         </button>
-        <span className={`pill tone-${stateTone(row.state)}`}>{stateLabel(row.state)}</span>
-        <span className="muted xs">Stage: {row.stage.replace(/_/g, ' ')} · attempt {row.attempt ?? 0}</span>
+        <span className={`pill tone-${rowStatusTone(row)}`}>{rowStatusLabel(row)}</span>
+        <span className="muted xs">{row.waiting_for ? 'Paused until you answer' : `Stage: ${row.stage.replace(/_/g, ' ')}`} · attempt {row.attempt ?? 0}</span>
         {row.loop_tests && <span className={`pill tone-${row.loop_tests.state === 'PASS' ? 'ok' : row.loop_tests.state === 'FAIL' ? 'err' : 'muted'}`} title="Loop tests passed of total">Tests {row.loop_tests.passed}/{row.loop_tests.total}</span>}
         {canRetry(row.state) && <button type="button" className="btn btn-secondary sm" onClick={() => onRetry(row)} aria-label={`Retry ${row.skill_name}`}><Icon name="refresh" size={12} />Retry</button>}
       </div>
+      {row.waiting_for && <WaitingNote row={row} />}
       {gates.length > 0
         ? <ul className="bld-chips" aria-label={`Gates of ${row.skill_name}`}>{gates.map(g => <li key={g.name}><span className={`pill tone-${gateTone(g.status)}`} title={`${g.label}: ${GATE_STATUS_LABEL[g.status]}`}>{g.label}</span></li>)}</ul>
         : <p className="muted xs">No gate has run yet.</p>}
@@ -128,6 +148,7 @@ export function BuildsPanel({ workflowId }: { workflowId?: string }) {
   const rows = data.sub_skills
   if (rows.length === 0) return <Empty icon="file" title="Nothing is building">This workflow has no Sub-Skills to build yet.</Empty>
   const s = summary(rows)
+  const asked = waitingRows(rows)
   const wg = Object.entries(data.workflow_gates ?? {}).filter(([, v]) => v && v !== 'PENDING')
   return (
     <div className="bld" aria-label="Builds" data-testid="builds">
@@ -136,6 +157,7 @@ export function BuildsPanel({ workflowId }: { workflowId?: string }) {
         <span className="pill tone-muted">{stateLabel(data.workflow_state)}</span>
         {s.failed > 0 && <span className="pill tone-err">{s.failed} with a failed gate</span>}
         {s.review > 0 && <span className="pill tone-warn">{s.review} waiting for you</span>}
+        {asked.length > 0 && <span className="pill tone-warn">{asked.length} waiting for your answer</span>}
         {data.active && <span className="muted xs"><Icon name="spinner" size={11} spin /> Updating while the build runs</span>}
       </div>
       {sent && <Banner tone="ok" icon="check">{sent}</Banner>}
@@ -151,6 +173,23 @@ export function BuildsPanel({ workflowId }: { workflowId?: string }) {
       </ul>
       <RetryDialog workflowId={workflowId} row={retrying} onClose={m => { setRetrying(undefined); if (m) { setSent(m); void qc.invalidateQueries() } }} />
       <p className="muted xs">Read only, except Retry on a Sub-Skill that waits for you. The server decides every state.</p>
+    </div>
+  )
+}
+
+/**
+ * #931: a notice above the Translate views while a build waits for the FDE's answer, so the wait is visible on every view.
+ * Quiet by design (it is not a screen): nothing while loading, with nothing waiting, or when the builds cannot be read;
+ * the Builds view shows those states in full.
+ */
+export function WaitingNotice({ workflowId }: { workflowId?: string }) {
+  const { data, error } = useBuilds(workflowId)
+  if (!workflowId || error || !data) return null
+  const rows = waitingRows(data.sub_skills)
+  if (rows.length === 0) return null
+  return (
+    <div className="bld-notice" aria-label="Builds waiting for your answer" data-testid="waiting-notice">
+      {rows.map(r => <WaitingNote key={r.sub_skill_id} row={r} />)}
     </div>
   )
 }

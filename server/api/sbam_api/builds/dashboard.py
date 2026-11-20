@@ -19,6 +19,7 @@ from sbam_contracts.build_dashboard import (
     GateResult,
     GatesResponse,
     GateStatus,
+    WaitingFor,
 )
 from sbam_contracts.promptfoo import LoopTestsBadge
 from sbam_contracts.runs import SubjectType
@@ -31,6 +32,7 @@ from sbam_api.isatvon.models import SubSkill
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.manifests.models import GateResultRow
 from sbam_api.manifests.repository import GateResultRepository
+from sbam_api.repo_choice.waiting import waiting_for
 from sbam_api.temporal.models import TemporalRun
 from sbam_api.temporal.repository import TemporalRunRepository
 from sbam_api.testruns import service as testruns  # module import: testruns.models imports builds
@@ -114,7 +116,11 @@ def builds(
         workflow_id, GateName.UI_BUNDLE.value
     )
     badges = testruns.loop_tests_badges(session, ctx, [s.id for s in subs])
-    rows = [_row(s, newest.get(s.id), gates[s.id], runs.get(s.id), badges.get(s.id)) for s in subs]
+    waiting = waiting_for(session, ctx, project_id, workflow_id, subs)
+    rows = [
+        _row(s, newest.get(s.id), gates[s.id], runs.get(s.id), badges.get(s.id), waiting.get(s.id))
+        for s in subs
+    ]
     return BuildsResponse(
         workflow_id=workflow_id,
         workflow_state=WorkflowState(workflow.state),
@@ -130,9 +136,12 @@ def _row(
     gates: dict[GateName, GateStatus],
     run: TemporalRun | None,
     loop_tests: LoopTestsBadge | None,
+    waiting: WaitingFor | None = None,
 ) -> BuildRow:
     state = SubSkillState(sub.state)
     stage = _stage(sub.state, run.current_stage if run else None)
+    if waiting is not None:  # #931: parked on the FDE's answer, not building
+        stage = BuildStage.WAIT_REPO
     running = RUNNING_GATE.get(stage)
     if state in ACTIVE and running is not None and running not in gates:
         gates = {**gates, running: GateStatus.RUNNING}
@@ -145,6 +154,7 @@ def _row(
         attempt=key[2] if key else 0,
         gates=gates,
         loop_tests=loop_tests,
+        waiting_for=waiting,
     )
 
 
