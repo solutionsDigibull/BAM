@@ -48,6 +48,7 @@ from sbam_api.db.repository import TenantContext
 from sbam_api.isatvon.models import SubSkill
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.repo_catalog.parse import parse_cell
+from sbam_api.repo_choice.waiting import pending_row
 from sbam_api.temporal.client import RPC_TIMEOUT, OrchestratorUnavailable
 from sbam_api.workflows.repository import WorkflowRepository
 
@@ -80,14 +81,6 @@ def _build_no(row: AuditLog) -> int | None:
     return int(tail) if tail.isdigit() else None
 
 
-def _pending(rows: dict[str, AuditLog]) -> AuditLog | None:
-    """The question row, when no decision came after it."""
-    asked, decided = rows.get(QUESTION_ASKED), rows.get(DECIDED)
-    if asked is None or asked.after is None:
-        return None
-    return asked if decided is None or decided.id < asked.id else None
-
-
 def questions(
     session: Session, user: CurrentUser, project_id: uuid.UUID, workflow_id: uuid.UUID
 ) -> RepoQuestions:
@@ -104,7 +97,7 @@ def questions(
                 decisions.append(RepoDecision.model_validate(decided.after, strict=False))
             except ValidationError:
                 pass  # a row this version cannot read is skipped, never shown half-way
-        asked = _pending(mine)
+        asked = pending_row(mine)
         if asked is None or sub.state != SubSkillState.BUILDING:
             continue
         try:
@@ -152,7 +145,7 @@ def _pending_question(
     sub = next((s for s in subs if s.id == sub_id), None)
     if sub is None:
         raise not_found()
-    asked = _pending(_newest_rows(session, ctx, [sub]).get(str(sub.id), {}))
+    asked = pending_row(_newest_rows(session, ctx, [sub]).get(str(sub.id), {}))
     if asked is None:
         return None
     try:

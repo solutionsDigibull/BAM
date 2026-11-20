@@ -10,6 +10,7 @@ until the endpoints and the `gate_results` table land (#117 / #119).
 - Retry is `POST W/sub-skills/{sub_id}/retry` (`sbam_contracts.build.RetryRequest`, E10.2).
 """
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any
 from uuid import UUID
@@ -19,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sbam_contracts._jsonschema import contract_schema
 from sbam_contracts.build import MAX_CORRECTIONS, BuildStage
 from sbam_contracts.promptfoo import LoopTestsBadge
+from sbam_contracts.repo_choice import RepoQuestionKind
 from sbam_contracts.state_machines import SubSkillState, WorkflowState
 
 Attempt = Annotated[int, Field(ge=0, le=MAX_CORRECTIONS)]
@@ -92,6 +94,26 @@ class Finding(BaseModel):
     severity: Severity | None = None  # static gates (E12.4): what the gate blocks on is HIGH
 
 
+class WaitingKind(StrEnum):
+    REPO_QUESTION = "REPO_QUESTION"  # #756: the build waits for the FDE's repository answer
+
+
+class WaitingFor(BaseModel):
+    """#931: what a build that is parked on the FDE waits for. Without it a Sub-Skill that waits
+    for the repository answer looks like BUILDING for days. Derived from the audit row
+    `repo_question_asked`; `reminders_sent` and `next_reminder_at` follow the build's own 3-day
+    reminder timer. `link` is the API resource that holds the question (`GET W/repo-questions`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: WaitingKind
+    since: datetime
+    question_kind: RepoQuestionKind | None = None
+    reminders_sent: int = Field(default=0, ge=0)
+    next_reminder_at: datetime
+    link: str = Field(max_length=300)
+
+
 class BuildRow(BaseModel):
     """One Sub-Skill's latest build: where it is, which attempt, and every gate's status."""
 
@@ -106,6 +128,7 @@ class BuildRow(BaseModel):
     # a gate missing from the map is PENDING; keys are only ever GateName values
     gates: dict[GateName, GateStatus] = Field(default_factory=dict)
     loop_tests: LoopTestsBadge | None = None  # E13.6: absent until a Promptfoo run exists
+    waiting_for: WaitingFor | None = None  # #931: set while the build waits for the FDE's answer
 
 
 class BuildsResponse(BaseModel):
