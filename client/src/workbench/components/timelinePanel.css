@@ -1,0 +1,17 @@
+/* Translate (4.3): the build timeline of the workflow (#926). Tokens come from the workbench theme. */
+.bam-wb .tl { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; overflow: auto; container-type: inline-size; }
+.bam-wb .tl-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.bam-wb .tl-subs, .bam-wb .tl-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bam-wb .tl-sub { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.bam-wb .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bam-wb .tl-toggle { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 200px; min-width: 0; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0; font-size: 13px; }
+.bam-wb .tl-totals { margin: 0; }
+.bam-wb .tl-failure { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 8px; background: var(--err-soft); font-size: 12.5px; }
+.bam-wb .tl-steps { border-left: 2px solid var(--border); padding-left: 10px; }
+.bam-wb .tl-step { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.bam-wb .tl-step.tone-err { border-left: 2px solid var(--err); margin-left: -12px; padding-left: 10px; }
+.bam-wb .tl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bam-wb .tl-when { margin-left: auto; }
+.bam-wb .tl-step p { margin: 0; }
+.bam-wb .tl-findings { list-style: none; margin: 0; padding: 6px 8px; border-radius: 8px; background: var(--err-soft); display: flex; flex-direction: column; gap: 4px; }
+.bam-wb .tl-findings li { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }

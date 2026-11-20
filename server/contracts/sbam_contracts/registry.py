@@ -13,6 +13,7 @@ from sbam_contracts.api import ProblemDetail
 from sbam_contracts.audit import AuditEntry
 from sbam_contracts.budget import BudgetCaps, BudgetState
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
+from sbam_contracts.build_timeline import BuildTimelineResponse
 from sbam_contracts.code_view import (
     CodeAttemptList,
     CodeDiff,
@@ -218,6 +219,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("isatvon/sub_skill_extraction", SubSkillExtraction),
     ("build/builds_response", BuildsResponse),
     ("build/gates_response", GatesResponse),
+    ("build/timeline_response", BuildTimelineResponse),
     ("build/review_answer", ReviewAnswer),
     ("held_patch/held_patch_response", HeldPatchResponse),
     ("held_patch/patch_decision", PatchDecision),

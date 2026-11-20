@@ -1095,6 +1095,17 @@ routes:
       <<: *fde_project_resource
       fde_a_assigned: "200"
 
+  # #926: the build timeline of a Workflow; the seeded Workflow has no Sub-Skills, so an assigned
+  # FDE reads an empty list.
+  build_timeline_api_v1_projects__project_id__workflows__workflow_id__timeline_get:
+    request:
+      method: GET
+      path: /api/v1/projects/{project_id}/workflows/{workflow_id}/timeline
+      params: {project_id: "@project_a", workflow_id: "@workflow_a"}
+    expect:
+      <<: *fde_project_resource
+      fde_a_assigned: "200"
+
   gates_api_v1_projects__project_id__workflows__workflow_id__sub_skills__sub_id__gates_get:
     request:
       method: GET

@@ -8,6 +8,7 @@ import { ragPipeline, setRagActions } from "../rag/ragPipeline";
 import { API_BASE } from "@/providers/data-provider";
 import type {
   BuildsResponse,
+  BuildTimelineResponse,
   ChangeNoteList,
   CommitAccepted,
   CommitStatus,
@@ -125,6 +126,9 @@ export function createSbamApi(projectId: string): BamApi {
       (await getJson<ChangeNoteList>(`projects/${projectId}/workflows/${workflowId}/request-change`)).body,
     requestChange: async (workflowId, body, key) =>
       (await postJson<RequestChangeAccepted>(`projects/${projectId}/workflows/${workflowId}/request-change`, body, { "Idempotency-Key": key })).body,
+    // The build timeline (#926): every Sub-Skill's newest build as ordered steps. Read only.
+    getBuildTimeline: async (workflowId) =>
+      (await getJson<BuildTimelineResponse>(`projects/${projectId}/workflows/${workflowId}/timeline`)).body,
     getWorkflowBuilds: async (workflowId) =>
       (await getJson<BuildsResponse>(`projects/${projectId}/workflows/${workflowId}/builds`)).body,
     // The gates of one Sub-Skill attempt and Retry of a build that waits for the FDE (#715). The server decides the refusals.
