@@ -1,6 +1,6 @@
 import { devAuthEnabled, keycloakEnabled } from "@/lib/session";
 
-import { DevLogin } from "../dev-login";
+import { BullmLogin } from "../_login/bullm-login";
 import { failureReference } from "../failure";
 
 export const metadata = { title: "Admin sign-in" };
@@ -12,7 +12,7 @@ export default async function AdminLoginPage({
 }) {
   const { error, callbackUrl } = await searchParams;
   return (
-    <DevLogin
+    <BullmLogin
       portal="admin"
       enabled={devAuthEnabled()}
       keycloak={keycloakEnabled()}

@@ -213,10 +213,16 @@ export function ProjectsScreen() {
         <Meta>5 columns · newest first · archived projects are read-only</Meta>
         <Meta>Edit opens the project · FDEs assigns members · Archive asks for the name</Meta>
       </Flex>
-      <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 12, paddingTop: 10 }}>
+      <div
+        style={{
+          borderTop: "1px solid var(--sbam-grid-line, #e5e7eb)",
+          marginTop: 12,
+          paddingTop: 10,
+        }}
+      >
         <Meta>
-          <strong style={{ color: "#475569" }}>More fields →</strong> Description · Context notes
-          (Markdown, with the masters template and document guide) — in Edit
+          <strong style={{ color: "var(--sbam-muted, #475569)" }}>More fields →</strong> Description
+          · Context notes (Markdown, with the masters template and document guide) — in Edit
         </Meta>
       </div>
     </>

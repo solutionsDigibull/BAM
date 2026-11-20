@@ -3,21 +3,24 @@
 import { theme, Typography } from "antd";
 import type { ReactNode } from "react";
 
-export const MUTED = "#64748b";
+// Colours are CSS variables whose fallbacks are the light values, so light mode is unchanged and the admin
+// dark theme (components/shell/portal-shell.css) can restyle every table at once (#785).
+export const MUTED = "var(--sbam-muted, #64748b)";
+const LINE = "var(--sbam-grid-line, #e5e7eb)";
 
 export const GRID_THEME = {
   components: {
     Table: {
-      headerBg: "#f8fafc",
+      headerBg: "var(--sbam-grid-head, #f8fafc)",
       headerSplitColor: "transparent",
-      borderColor: "#e5e7eb",
-      rowHoverBg: "#f5f9ff",
+      borderColor: LINE,
+      rowHoverBg: "var(--sbam-grid-hover, #f5f9ff)",
       cellPaddingBlock: 14,
     },
   },
 };
 
-export const GRID_STYLE = { border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" };
+export const GRID_STYLE = { border: `1px solid ${LINE}`, borderRadius: 10, overflow: "hidden" };
 
 export const head = (label: string) => (
   <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.3, color: MUTED }}>
@@ -36,7 +39,7 @@ export function CountBadge({ n, active }: { n: number; active: boolean }) {
         fontSize: 11,
         lineHeight: "18px",
         display: "inline-block",
-        background: active ? token.colorPrimaryBg : "#f1f5f9",
+        background: active ? token.colorPrimaryBg : "var(--sbam-badge-bg, #f1f5f9)",
         color: active ? token.colorPrimary : MUTED,
       }}
     >

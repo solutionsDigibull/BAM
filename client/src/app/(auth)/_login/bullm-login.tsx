@@ -15,10 +15,25 @@ const ERRORS: Record<string, string> = {
   Configuration: "Sign-in is unavailable, try again later.", // Keycloak unreachable
 };
 
-const DEV_CHOICES = [
-  { roles: "sbam-fde", label: "Sign in as FDE" },
-  { roles: "sbam-admin,sbam-fde", label: "Sign in as Admin + FDE" },
-];
+// Development sign-in per portal (SBAM_DEV_AUTH=1, Keycloak off).
+const PORTALS = {
+  admin: {
+    dev: [
+      { roles: "sbam-admin", label: "Sign in as Admin" },
+      { roles: "super-admin", label: "Sign in as Super-admin" },
+    ],
+    other: { href: "/login-fde", label: "FDE? Use the FDE login" },
+    panel: "Admin workspace highlights",
+  },
+  fde: {
+    dev: [
+      { roles: "sbam-fde", label: "Sign in as FDE" },
+      { roles: "sbam-admin,sbam-fde", label: "Sign in as Admin + FDE" },
+    ],
+    other: { href: "/login-admin", label: "Admin? Use the Admin login" },
+    panel: "FDE workspace highlights",
+  },
+} as const;
 
 const Alert = () => (
   <svg
@@ -54,17 +69,19 @@ const Arrow = ({ dir }: { dir: "left" | "right" }) => (
 );
 
 /**
- * The FDE sign-in, in the BuLLM look. The password is never typed here: "Sign in" goes to Keycloak, which asks for
+ * The Admin and FDE sign-in, in the BuLLM look (#719, #785). The password is never typed here: "Sign in" goes to Keycloak, which asks for
  * it on its own page. A username or email typed here only travels to Keycloak as a hint, so its form arrives
  * filled in; Keycloak accepts either, so nothing is validated here.
  */
-export function FdeLogin({
+export function BullmLogin({
+  portal,
   enabled,
   keycloak = false,
   error,
   reference,
   callbackUrl,
 }: {
+  portal: keyof typeof PORTALS;
   /** Development sign-in (SBAM_DEV_AUTH=1): the role buttons stay for local work without Keycloak. */
   enabled: boolean;
   keycloak?: boolean;
@@ -73,11 +90,12 @@ export function FdeLogin({
   callbackUrl?: string;
 }) {
   const [username, setUsername] = useState("");
+  const { dev, other, panel } = PORTALS[portal];
 
   return (
     <main className="login-page">
       <div className="login-card">
-        <Showcase />
+        <Showcase label={panel} />
         <section className="login-left">
           <div className="login-brand">
             <picture>
@@ -105,7 +123,7 @@ export function FdeLogin({
 
           {keycloak && (
             <form className="login-form" action={keycloakSignIn} noValidate>
-              <input type="hidden" name="portal" value="fde" />
+              <input type="hidden" name="portal" value={portal} />
               {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
               <div className="login-field">
                 <label htmlFor="login-username">Username or email</label>
@@ -134,7 +152,7 @@ export function FdeLogin({
           {enabled && !keycloak && (
             <div className="login-dev">
               <p className="login-hint">Development sign-in (SBAM_DEV_AUTH=1)</p>
-              {DEV_CHOICES.map((c) => (
+              {dev.map((c) => (
                 <form key={c.roles} action={devSignIn}>
                   <input type="hidden" name="roles" value={c.roles} />
                   <button type="submit" className="login-submit">
@@ -153,7 +171,7 @@ export function FdeLogin({
             Access is invite-only. Contact your administrator for an account.
           </p>
           <p className="login-hint">
-            <a href="/login-admin">Admin? Use the Admin login</a>
+            <a href={other.href}>{other.label}</a>
           </p>
         </section>
       </div>
@@ -163,7 +181,7 @@ export function FdeLogin({
 
 const ROTATE_MS = 6000;
 
-function Showcase() {
+function Showcase({ label }: { label: string }) {
   const n = LOGIN_MESSAGES.length;
   const [i, setI] = useState(0);
   const [prev, setPrev] = useState<number | null>(null);
@@ -199,7 +217,7 @@ function Showcase() {
   const m = LOGIN_MESSAGES[i]!;
   const old = prev !== null ? LOGIN_MESSAGES[prev] : null;
   return (
-    <aside className="login-panel" aria-label="FDE workspace highlights">
+    <aside className="login-panel" aria-label={label}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={panel.src} alt="" className="login-panel-art" width={580} height={440} />
       <div className="login-panel-body">

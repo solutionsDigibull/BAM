@@ -42,6 +42,7 @@
 
 .login-card {
   /* Whole card fits the window height: sizes below scale with vh, so short or zoomed screens never scroll. */
+  box-sizing: border-box; /* the border stays inside width: 100% on a phone (no 2px page overflow, #785) */
   width: min(1320px, 90vw);
   min-height: min(800px, calc(100vh - 2 * var(--lg-pad)));
   display: grid;

@@ -21,7 +21,14 @@ import {
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 
-import { ApiErrorState, EmptyState, LoadingState } from "@/components/ui-kit";
+import {
+  ApiErrorState,
+  EmptyState,
+  GRID_STYLE,
+  GRID_THEME,
+  LoadingState,
+  MUTED,
+} from "@/components/ui-kit";
 import type { RuntimePackage, RuntimeRegistry } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
@@ -29,7 +36,6 @@ export const NOT_BUILT_MESSAGE = "Registry not built yet";
 export const NOT_ALLOWED = "Not allowed";
 export const SEARCH_MAX = 100;
 
-const MUTED = "#64748b";
 type Filter = "all" | "allowed" | "not-allowed";
 
 /** Case-insensitive substring match on the package name or any of its import names. */
@@ -159,7 +165,12 @@ export function RegistryView({ endpoint }: { endpoint: "admin/registry" | "regis
         </Flex>
         <ConfigProvider
           theme={{
-            components: { Table: { headerBg: "#f8fafc", headerSplitColor: "transparent" } },
+            components: {
+              Table: {
+                headerBg: GRID_THEME.components.Table.headerBg,
+                headerSplitColor: "transparent",
+              },
+            },
           }}
         >
           <Table<RuntimePackage>
@@ -168,7 +179,7 @@ export function RegistryView({ endpoint }: { endpoint: "admin/registry" | "regis
             pagination={false}
             virtual
             scroll={{ x: 760, y: 560 }}
-            style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}
+            style={GRID_STYLE}
             locale={{ emptyText: <EmptyState message="No packages match your search." /> }}
             columns={[
               {

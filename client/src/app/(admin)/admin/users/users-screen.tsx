@@ -16,14 +16,23 @@ import {
   Table,
   Tabs,
   Tag,
-  theme,
   Tooltip,
   Typography,
 } from "antd";
 import dayjs from "dayjs";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 
-import { ApiErrorState, EmptyState, LoadingState } from "@/components/ui-kit";
+import {
+  ApiErrorState,
+  CountBadge,
+  EmptyState,
+  GRID_STYLE,
+  GRID_THEME,
+  head,
+  LoadingState,
+  Meta,
+  MUTED,
+} from "@/components/ui-kit";
 import type { TenantUser, UserStatus } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
@@ -52,37 +61,6 @@ const STATUS_COLOR: Record<UserStatus, string> = {
   INVITED: "gold",
   DEACTIVATED: "default",
 };
-
-const MUTED = "#64748b";
-const head = (label: string) => (
-  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.3, color: MUTED }}>
-    {label.toUpperCase()}
-  </span>
-);
-
-function CountBadge({ n, active }: { n: number; active: boolean }) {
-  const { token } = theme.useToken();
-  return (
-    <span
-      style={{
-        marginLeft: 6,
-        padding: "0 7px",
-        borderRadius: 10,
-        fontSize: 11,
-        lineHeight: "18px",
-        display: "inline-block",
-        background: active ? token.colorPrimaryBg : "#f1f5f9",
-        color: active ? token.colorPrimary : MUTED,
-      }}
-    >
-      {n}
-    </span>
-  );
-}
-
-function Meta({ children }: { children: ReactNode }) {
-  return <Typography.Text style={{ fontSize: 12, color: MUTED }}>{children}</Typography.Text>;
-}
 
 type Action = { kind: "roles" | "active"; user: TenantUser };
 
@@ -191,26 +169,14 @@ export function UsersScreen() {
           {rows.length} of {counts[tab]} rows
         </Meta>
       </Flex>
-      <ConfigProvider
-        theme={{
-          components: {
-            Table: {
-              headerBg: "#f8fafc",
-              headerSplitColor: "transparent",
-              borderColor: "#e5e7eb",
-              rowHoverBg: "#f5f9ff",
-              cellPaddingBlock: 14,
-            },
-          },
-        }}
-      >
+      <ConfigProvider theme={GRID_THEME}>
         <Table<TenantUser>
           rowKey="id"
           bordered={false}
           dataSource={rows}
           pagination={rows.length > 25 ? { pageSize: 25, showSizeChanger: false } : false}
           scroll={{ x: 900 }}
-          style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}
+          style={GRID_STYLE}
           locale={{
             emptyText: (
               <EmptyState message={search ? "No users match your search." : "No users here."} />

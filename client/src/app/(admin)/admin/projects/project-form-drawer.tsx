@@ -280,11 +280,11 @@ export function ProjectFormDrawer({
           {notesTab === "Preview" && (
             <div
               style={{
-                border: "1px solid #e5e7eb",
+                border: "1px solid var(--sbam-grid-line, #e5e7eb)",
                 borderRadius: 8,
                 padding: "8px 16px",
                 minHeight: 140,
-                background: "#fafafa",
+                background: "var(--sbam-grid-head, #fafafa)",
               }}
             >
               <MarkdownPreview source={notes} />
