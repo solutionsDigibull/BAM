@@ -368,6 +368,9 @@ SUB_SKILL: Final = Machine(
             K.BUILDING,
             A,
         ),  # platform defect: fixed and retried by the platform team
+        # #925: once the cause is fixed the FDE rebuilds it (POST W/rebuild), reusing what the
+        # failed build stored. A separate event: the platform team's `retry` above is unchanged.
+        (K.BUILD_ERROR, "recover", K.BUILDING, F),
         (K.CERTIFIED, "freeze", K.FROZEN, S),
         *_from_each((K.VALID, K.INVALID, K.CERTIFIED, K.FROZEN), "scope_changed", K.INVALIDATED, S),
         (K.INVALIDATED, "re_extracted", K.DRAFT, S),

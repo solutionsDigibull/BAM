@@ -42,6 +42,7 @@ from sbam_api.identity.keycloak_admin import KeycloakOrgs, KeycloakUsers
 from sbam_api.identity.revocation import SqlSessionRevocations
 from sbam_api.identity.service import SqlUserDirectory
 from sbam_api.projects.repository import SqlMemberships
+from sbam_api.registry.preflight import prerequisite_checks
 
 _NOT_FEATURE_MODULES = {"core", "main"}
 
@@ -139,7 +140,12 @@ def create_app(
     )
     install_error_handlers(app)
     app.state.health_checks = dict(checks if checks is not None else default_checks(settings))
-    app.include_router(health_router(app.state.health_checks))
+    app.include_router(
+        health_router(
+            app.state.health_checks,
+            prerequisite_checks(lambda: app_sessions(app.state)) if checks is None else None,
+        )
+    )
     routers = discover_routers()
     if missing := unguarded_routes(routers):  # every route must say who may call it (E2.2)
         raise RuntimeError(f"routes without an authorization policy: {', '.join(missing)}")

@@ -25,6 +25,17 @@ class GenerateHarness(Harness):
         super().__init__(tmp_path)
         TemporalRun.__table__.create(self.sessions.kw["bind"], checkfirst=True)  # type: ignore[attr-defined]
         self.pipeline.stage = PipelineStage.WAIT_GENERATE
+        # #925: a build needs the skill-runtime registry (the preflight refuses without it).
+        # Imported here: `registry_db` first in the module would enter the router import cycle.
+        from registry_db import sample_registry
+        from sbam_api.registry.models import RuntimeRegistryPackageRow, RuntimeRegistryRow
+        from sbam_api.registry.sync import sync
+
+        RuntimeRegistryRow.metadata.create_all(
+            self.sessions.kw["bind"],
+            tables=[RuntimeRegistryRow.__table__, RuntimeRegistryPackageRow.__table__],  # type: ignore[list-item]
+        )
+        sync(self.sessions, sample_registry(), activate=True)
         with self.sessions() as s:
             s.execute(update(SowVersion).where(SowVersion.id == self.v1).values(state="APPROVED"))
             self.run_id = uuid7()
