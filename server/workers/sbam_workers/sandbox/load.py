@@ -67,9 +67,9 @@ CODE_GATES: Final = (
     GateName.CLAMAV,
     GateName.BANDIT,
 )
-OPTIONAL_GATES: Final = (
-    GateName.IMPORT_RESOLUTION,
-)  # not in every build yet: if it ran, it passed
+# Evidence that is not in every build: if it ran, it passed. None today: IMPORT_RESOLUTION was
+# retired in #922 (ADR 0040) and an old row of it is ignored.
+OPTIONAL_GATES: Final[tuple[GateName, ...]] = ()
 
 IsatvonOf = Callable[[BuildStageInput], Awaitable[Mapping[str, Any]]]
 

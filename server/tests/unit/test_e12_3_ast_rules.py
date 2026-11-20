@@ -269,15 +269,15 @@ def test_e12_3_handoff_writer_private_state_is_off_limits(
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
-        ("    import os\n", "IMPORT_NOT_ALLOWED"),
-        ("    import requests\n", "IMPORT_NOT_ALLOWED"),
+        ("    import os\n", "FORBIDDEN_IMPORT"),
+        ("    import socket\n", "FORBIDDEN_IMPORT"),
         ("    import pickle\n", "FORBIDDEN_IMPORT"),
         ("    import ctypes\n", "FORBIDDEN_IMPORT"),
         ("    import marshal\n", "FORBIDDEN_IMPORT"),
         ("    import subprocess\n", "FORBIDDEN_IMPORT"),
         ("    import importlib\n", "FORBIDDEN_IMPORT"),
         ("    from os import system\n", "FORBIDDEN_IMPORT"),
-        ("    import os.path\n", "IMPORT_NOT_ALLOWED"),
+        ("    import os.path\n", "FORBIDDEN_IMPORT"),
         ("    eval('1')\n", "FORBIDDEN_CALL"),
         ("    exec('x = 1')\n", "FORBIDDEN_CALL"),
         ("    compile('1', 'f', 'eval')\n", "FORBIDDEN_CALL"),
@@ -300,7 +300,9 @@ def test_e12_3_imports_declared_library_is_allowed(
     template: LoadedTemplate, good: dict[str, bytes]
 ) -> None:
     files = in_helpers(good, "import httpx\n")
-    assert "IMPORT_NOT_ALLOWED" in codes(rules(template, files), GateName.AST_IMPORTS)
+    # #922: an import that is only not suggested is not a finding, declared or not
+    assert "IMPORT_NOT_ALLOWED" not in codes(rules(template, files), GateName.AST_IMPORTS)
+    assert GateName.AST_IMPORTS not in only_failed(rules(template, files))
     assert GateName.AST_IMPORTS not in only_failed(rules(template, files, modules=("httpx",)))
 
 

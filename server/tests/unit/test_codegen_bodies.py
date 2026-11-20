@@ -417,8 +417,10 @@ def edge_check(template: LoadedTemplate, **over: Any) -> set[BodyFindingCode]:
     ("field", "source", "code"),
     [
         ("action_body", "import pickle", BodyFindingCode.FORBIDDEN_IMPORT),
-        ("action_body", "from os import system", BodyFindingCode.IMPORT_NOT_ALLOWED),
-        ("action_body", "import requests", BodyFindingCode.IMPORT_NOT_ALLOWED),
+        ("action_body", "from os import system", BodyFindingCode.FORBIDDEN_IMPORT),
+        ("action_body", "import subprocess", BodyFindingCode.FORBIDDEN_IMPORT),  # IMP-T02
+        ("action_body", "import socket", BodyFindingCode.FORBIDDEN_IMPORT),
+        ("action_body", "import urllib.request", BodyFindingCode.FORBIDDEN_IMPORT),
         ("helpers", "import tenacity", BodyFindingCode.MANUAL_LOOP),
         ("helpers", "@retry(3)\ndef f() -> None:\n    pass", BodyFindingCode.MANUAL_LOOP),
         ("action_body", "x = exec", BodyFindingCode.FORBIDDEN_CALL),

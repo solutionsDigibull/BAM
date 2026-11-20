@@ -180,45 +180,45 @@
     },
     {
       "id": "correction-17",
-      "description": "requests imported in the helpers",
+      "description": "os imported in the helpers",
       "synthetic": true,
-      "expect_code": "IMPORT_NOT_ALLOWED",
+      "expect_code": "FORBIDDEN_IMPORT",
       "defect": {
         "slot": "helpers",
-        "text": "import requests\n\n_SESSION = requests.Session\n\n\n",
+        "text": "import os\n\n_HOME = os.getcwd\n\n\n",
         "find": null
       }
     },
     {
       "id": "correction-18",
-      "description": "numpy imported in the helpers",
+      "description": "socket imported in the helpers",
       "synthetic": true,
-      "expect_code": "IMPORT_NOT_ALLOWED",
+      "expect_code": "FORBIDDEN_IMPORT",
       "defect": {
         "slot": "helpers",
-        "text": "import numpy\n\n_ZEROS = numpy.zeros\n\n\n",
+        "text": "import socket\n\n_SOCK = socket.socket\n\n\n",
         "find": null
       }
     },
     {
       "id": "correction-19",
-      "description": "pandas imported in the helpers",
+      "description": "shutil imported in the helpers",
       "synthetic": true,
-      "expect_code": "IMPORT_NOT_ALLOWED",
+      "expect_code": "FORBIDDEN_IMPORT",
       "defect": {
         "slot": "helpers",
-        "text": "import pandas\n\n_FRAME = pandas.DataFrame\n\n\n",
+        "text": "import shutil\n\n_COPY = shutil.copy\n\n\n",
         "find": null
       }
     },
     {
       "id": "correction-20",
-      "description": "yaml imported in the helpers",
+      "description": "multiprocessing imported in the helpers",
       "synthetic": true,
-      "expect_code": "IMPORT_NOT_ALLOWED",
+      "expect_code": "FORBIDDEN_IMPORT",
       "defect": {
         "slot": "helpers",
-        "text": "from yaml import safe_load\n\n_PARSE = safe_load\n\n\n",
+        "text": "import multiprocessing\n\n_POOL = multiprocessing.Pool\n\n\n",
         "find": null
       }
     }

@@ -167,6 +167,8 @@ PLATFORM_PATCH = "e12-2-gate-platform-defect"
 RETRY_TESTS_PATCH = "704-retry-regenerates-tests"
 REVIEWER_PATCH = "wg11-reviewer-pass"  # #759: the review pass after the gates
 IMPORT_GATES_PATCH = "wg13-import-and-compliance-gates"  # #761: import gate, then licence/vuln/MCP
+# #922 (ADR 0040): new runs skip the import gate; a history that recorded it still replays it.
+NO_IMPORT_GATE_PATCH = "wg35-no-import-gate"
 REPO_CHOICE_PATCH = "wg8-choose-repo"  # #756: pick the repository, or ask the FDE, before building
 REPO_ATTACH_PATCH = (
     "wg28-attach-repo-report"  # #862: fetch the chosen repository, attach its report
@@ -449,8 +451,9 @@ class SubSkillBuild:
         await self._call(BuildStage.ASSEMBLE, assemble, ref)
         await self._call(BuildStage.AST_GATE, ast_gate, ref)
         await self._call(BuildStage.STATIC_GATE, static_gate, ref)
-        if workflow.patched(IMPORT_GATES_PATCH):  # #761: import in the sandbox, then the evidence
-            await self._call(BuildStage.IMPORT_GATE, import_gate, ref)
+        if workflow.patched(IMPORT_GATES_PATCH):  # #761: licence, vulnerability and MCP evidence
+            if not workflow.patched(NO_IMPORT_GATE_PATCH):  # replay of a pre-#922 history only
+                await self._call(BuildStage.IMPORT_GATE, import_gate, ref)
             await self._call(BuildStage.COMPLIANCE_GATES, compliance_gates, ref)
         if workflow.patched(REVIEWER_PATCH):  # #759: one review once every gate has passed
             await self._call(BuildStage.REVIEW, review_code, ref)

@@ -17,9 +17,11 @@ dashboard shows them, the corrector can read them, and `certify.checklist` requi
 A Sub-Skill that starts from no repository has no third-party code: its licence and vulnerability
 rows are recorded PASSED with a tool version that says so, so a missing row always means "not run".
 
-Nothing runs unless the import gate passed this very `bundle_sha256` (a wiring defect otherwise,
-non-retryable). A failing row is a `GateFailed` with the attempt id, like any gate, so the corrector
-reads the findings from `gate_results`. Findings name repositories, packages and rules, never code.
+There is no import evidence any more (#922, ADR 0040): an import SBAM did not declare is neither
+resolved nor scanned, and the stage no longer waits for an `import_gate` row. A failing row is a
+`GateFailed` with the attempt id, like any gate, so the
+corrector reads the findings from `gate_results`. Findings name repositories, packages and rules,
+never code.
 """
 
 import asyncio
@@ -36,7 +38,7 @@ from jsonschema.exceptions import SchemaError
 from pydantic import ValidationError
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.db.repository import TenantContext
-from sbam_api.manifests.repository import GateResultRepository, SubSkillManifestRepository
+from sbam_api.manifests.repository import SubSkillManifestRepository
 from sbam_api.storage.base import Kind, ListableStorage, StorageBackend, StorageScope
 from sbam_contracts.build import GATE_FAILED, BuildStageInput
 from sbam_contracts.build_dashboard import GateName, GateStatus, Severity
@@ -316,24 +318,6 @@ class ComplianceGates:
                 )
             return dict(row.manifest)
 
-    def _require_import_gate(
-        self, inp: BuildStageInput, attempt_id: uuid.UUID, bundle_sha: str
-    ) -> None:
-        with self.sessions() as session:
-            repo = GateResultRepository(session, TenantContext(inp.tenant_id, inp.project_id))
-            row = repo.for_stage(
-                inp.sub_skill_id,
-                GateName.IMPORT_RESOLUTION.value,
-                inp.build_no,
-                inp.cycle,
-                inp.attempt,
-            )
-        if row is None or row.status != GateStatus.PASSED.value or row.bundle_sha256 != bundle_sha:
-            message = (
-                "import_resolution has not passed this bundle: the compliance gates are not run"
-            )
-            raise fail(message, attempt_id, GATE_INPUT_MISMATCH)
-
     @activity.defn(name=STAGE)
     async def run(self, inp: BuildStageInput) -> IdResult:
         return await asyncio.to_thread(self.execute, inp)
@@ -341,7 +325,6 @@ class ComplianceGates:
     def execute(self, inp: BuildStageInput) -> IdResult:
         assembled = find_assembled(self.sessions, inp)
         bundle = read_verified(self.storage, assembled)
-        self._require_import_gate(inp, assembled.attempt_id, bundle.bundle_sha)
         manifest = self.manifest_of(inp, assembled.attempt_id)
         repos = source_repos(manifest)
         verdicts = verdicts_of(manifest, self.reports(inp, repos) if repos else {})

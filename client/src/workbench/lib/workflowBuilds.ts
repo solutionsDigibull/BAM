@@ -33,7 +33,6 @@ export const GATES: readonly { name: GateName; label: string; family: GateFamily
   { name: 'MYPY', label: 'MyPy', family: 'Static' },
   { name: 'CLAMAV', label: 'ClamAV', family: 'Static' },
   { name: 'BANDIT', label: 'Bandit', family: 'Static' },
-  { name: 'IMPORT_RESOLUTION', label: 'Imports', family: 'Static' },
   { name: 'REPO_LICENCE', label: 'Licence', family: 'Compliance' },
   { name: 'DEPENDENCY_VULN', label: 'Vulnerabilities', family: 'Compliance' },
   { name: 'MCP_COMPLIANCE', label: 'MCP', family: 'Compliance' },
