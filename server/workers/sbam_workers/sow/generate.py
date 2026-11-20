@@ -346,7 +346,9 @@ async def generate_sow(inp: SowGenerateInput) -> IdResult:
         project_id=inp.project_id,
         correlation_id=inp.correlation_id,
         temporal_workflow_id=info.workflow_id or "",
-        activity_id=info.activity_id,
+        # the run id: a second run of this workflow id restarts activity ids at 1, and the replay
+        # key alone would hand it the first run's answer (#930); a retry in a run still replays
+        activity_id=f"{info.workflow_run_id}:{info.activity_id}",
         attempt=info.attempt,
     )
     ref = StageRef(**inp.model_dump(exclude={"hint", "fresh"}))
