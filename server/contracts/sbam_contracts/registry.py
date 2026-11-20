@@ -38,6 +38,7 @@ from sbam_contracts.connections import (
 )
 from sbam_contracts.documents import (
     CleanupResult,
+    DocumentAccess,
     DocumentOut,
     OcrPage,
     ParsedDocument,
@@ -319,6 +320,7 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters_v03/bulk_request", MasterBulkRequest),
     ("masters_v03/bulk_report", MasterBulkReport),
     ("documents/document", DocumentOut),
+    ("documents/document_access", DocumentAccess),
     ("documents/purge_target", PurgeTarget),
     ("documents/purge_request", PurgeRequest),
     ("documents/purge_result", PurgeResult),

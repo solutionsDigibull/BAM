@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:1c9fd8e9a45fd968608d345e1161291ddf86b83df981f2a863fb2a66577d56ca
+// source-sha256:c5240ad715c46f322c59f6ad77fd11d1a39087d3b2b5932bf67bd20b1af99cc9
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -51,6 +51,7 @@ export type ErrorCode =
   | "HASH_MISMATCH"
   | "NO_DOCUMENTS"
   | "PARSE_ERROR"
+  | "DOCUMENT_NOT_RELEASED"
   | "CORRUPT"
   | "ENCRYPTED"
   | "EMPTY"
@@ -834,6 +835,7 @@ export interface SbamContracts {
   MasterBulkRequest?: MasterBulkRequest;
   MasterBulkReport?: MasterBulkReport;
   DocumentOut?: DocumentOut;
+  DocumentAccess?: DocumentAccess;
   PurgeTarget?: PurgeTarget;
   PurgeRequest?: PurgeRequest;
   PurgeResult?: PurgeResult;
@@ -4965,6 +4967,23 @@ export interface DocumentRelevance {
    */
   goal_sha256: string;
   scored_at: string;
+}
+/**
+ * `GET .../documents/{id}/access` (#895): a short-lived signed link to the stored original.
+ *
+ * `url` is relative to the API origin and is the credential, so it is never logged or stored.
+ * The signature binds the tenant, the project, the document and `expires_at`; the file is always
+ * served as an attachment. Only a released (scanned clean) document gets one. Every other state is
+ * 409 `DOCUMENT_NOT_RELEASED`, a purged one 410 `GONE`.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "DocumentAccess".
+ */
+export interface DocumentAccess {
+  url: string;
+  expires_at: string;
+  filename: string;
+  mime: string;
 }
 /**
  * One deleted document that is due for purging (IDs only, like every workflow input).

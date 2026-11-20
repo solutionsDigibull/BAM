@@ -49,6 +49,10 @@ UNSCOPED: dict[tuple[str, str], str] = {
     # Signed download: the HMAC signature over (key, tenant, exp) is the credential, not the
     # bearer token (test_idor.py E2.7-T08: a tampered link is 403 whatever the token).
     ("GET", f"{API}/files/{{key}}"): "signed URL, authorised by its signature",
+    # Signed document link (#895): the HMAC over (tenant, project, document, exp) is the
+    # credential, and the document is re-checked, tenant and project scoped, on every download
+    # (test_895_document_access_api.py: other tenant / project / tampering are 404 / 403).
+    ("GET", f"{API}/document-access/{{document_id}}"): "signed link, authorised by its signature",
     # A notification belongs to its recipient (filtered by user id), not to a tenant id in the
     # path; the matrix holds it to 404 for everyone else.
     ("POST", f"{API}/notifications/{{notification_id}}/read"): "user-scoped",

@@ -12,6 +12,7 @@ import { goScreen } from '../lib/route'
 import { tips } from '../lib/actionTips'
 import { GateButton, Icon, Kpis, fmtBytes } from '../components/ui'
 import { ScreenTitle, fdeReason, useIngestStart } from './IngestionFlow'
+import { OpenFileButton } from './OpenFile'
 
 export interface StdFile { u: UploadRecord; v: Verdict }
 /** Every accepted upload with the backend's verdict on it (used by Standardize, Review and Upload). */
@@ -55,6 +56,7 @@ export function StandardizeView({ snap }: { snap: Snapshot }) {
                 <span className={`xs ${v.state === 'failed' ? 'tone-err' : 'muted'}`}>{v.reason}</span>
               </div>
               <VerdictPill v={v} />
+              <OpenFileButton upload={u} />
             </li>
           })}
         </ul>

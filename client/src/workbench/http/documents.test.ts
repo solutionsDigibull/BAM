@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { DocumentOut, DocumentVersionState } from "@/contracts";
 
 import { ApiFailure } from "./http";
-import { deletedOf, isActive, restoreReason, scanEventsOf, toUploadRecord } from "./documents";
+import { accessReason, deletedOf, isActive, openBlock, restoreReason, scanEventsOf, toUploadRecord } from "./documents";
 
 const doc = (state: DocumentVersionState, extra: Partial<DocumentOut> = {}): DocumentOut => ({
   id: "d1",
@@ -130,5 +130,24 @@ describe("the recycle bin and the reason a restore is refused (#712)", () => {
     expect(restoreReason(f(403))).toMatch(/not allowed/);
     expect(restoreReason(f(500, undefined, "Server said no"))).toBe("Server said no");
     expect(restoreReason(new Error("offline"))).toBe("offline");
+  });
+});
+
+describe("opening an uploaded file (#895)", () => {
+  test("test_895_only_a_released_clean_file_can_be_opened", () => {
+    expect(openBlock(toUploadRecord(doc("PARSED")))).toBeUndefined();
+    expect(openBlock(toUploadRecord(doc("SCANNING")))).toMatch(/still being checked/i);
+    expect(openBlock(toUploadRecord(doc("REJECTED")))).toMatch(/quarantined/);
+    expect(openBlock(toUploadRecord(doc("SCAN_FAILED")))).toMatch(/did not finish/);
+  });
+
+  test("test_895_a_refused_link_says_why", () => {
+    const f = (statusCode: number, detail?: string) => new ApiFailure("m", statusCode, detail ? { detail } : undefined);
+    expect(accessReason(f(409, "In the recycle bin"))).toBe("In the recycle bin");
+    expect(accessReason(f(409))).toMatch(/cannot be opened/);
+    expect(accessReason(f(410))).toMatch(/permanently deleted/);
+    expect(accessReason(f(404))).toMatch(/no longer exists/);
+    expect(accessReason(f(403))).toMatch(/not allowed/);
+    expect(accessReason(new Error("offline"))).toBe("offline");
   });
 });

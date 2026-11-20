@@ -12,6 +12,12 @@ Relevance (#802): `POST .../documents/relevance/rescore` scores every parsed doc
 project's current goal in the background (`RelevanceRescore`): 202 `{"run": Run}`, 409 without a
 goal, 503 when Temporal is down. A newer call replaces a running re-score.
 
+Access (#895): `GET .../documents/{id}/access` answers a 5-minute signed link to the stored
+original of a released document (409 `DOCUMENT_NOT_RELEASED` while scanning, rejected, scan-failed
+or deleted, 410 purged, 404 unassigned / other tenant). `GET /document-access/{id}?t&p&exp&sig`
+serves it as an attachment; the signature binds tenant, project, document and expiry, and the
+document is re-checked on every download.
+
 Retry (E4.13): `POST .../documents/{id}/retry` puts a document whose scan or parse failed back to
 SCANNING and starts `DocumentIngestion` for it again: 202 `{"run": Run}`. 409 when it has not failed
 (an infected file included), 404 unassigned / other tenant / deleted, 423 when a frozen version uses
@@ -21,27 +27,31 @@ same run and starts nothing.
 
 import asyncio
 import hmac
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sbam_contracts.api import ErrorCode, Page
-from sbam_contracts.documents import DocumentOut, UploadRequest, UploadToken
+from sbam_contracts.documents import DocumentAccess, DocumentOut, UploadRequest, UploadToken
 from sbam_contracts.runs import Run, RunAccepted, SubjectType
 from sqlalchemy.orm import Session, sessionmaker
 
+from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser, fde, internal
-from sbam_api.core.conventions import ApiError
+from sbam_api.core.conventions import ApiError, content_disposition, not_found
 from sbam_api.core.ids import uuid7
 from sbam_api.core.logging import correlation_id_var
 from sbam_api.core.settings import Settings
 from sbam_api.db.repository import TenantContext
-from sbam_api.ingest import relevance, retention, service, tusd
+from sbam_api.ingest import access, relevance, retention, service, tusd
 from sbam_api.ingest.ingestion import start_ingestion_run, start_waiting
 from sbam_api.ingest.rules import STAGING
 from sbam_api.projects.guard import active_project
+from sbam_api.storage.base import CHUNK
 from sbam_api.storage.router import backend
 from sbam_api.temporal.client import OrchestratorUnavailable
 from sbam_api.temporal.deps import session_factory, temporal_client
@@ -113,6 +123,74 @@ def list_documents(
                 session, user, project_id, include_deleted=include_deleted
             )
         )
+
+
+@router.get("/projects/{project_id}/documents/{document_id}/access", response_model=DocumentAccess)
+def document_access(
+    project_id: Project, document_id: UUID, request: Request, user: User, sessions: Sessions
+) -> DocumentAccess:
+    """A short-lived signed link to the stored original of one released document (#895)."""
+    secret = request.app.state.settings.storage_signing_key
+    with sessions() as session:
+        return access.issue_access(
+            session, user, project_id, document_id, secret.get_secret_value() if secret else None
+        )
+
+
+@router.get(
+    "/document-access/{document_id}",
+    response_class=StreamingResponse,
+    dependencies=[Depends(internal)],  # the signed link is the credential, no user token
+)
+def document_content(
+    document_id: UUID, t: str, p: str, exp: int, sig: str, request: Request, sessions: Sessions
+) -> StreamingResponse:
+    """The original, only through a valid link and only while the document is still released.
+    Always an attachment: the browser never renders it in the app's origin."""
+    settings: Settings = request.app.state.settings
+    secret = settings.storage_signing_key
+    try:
+        tenant_id, project_id = UUID(t), UUID(p)
+    except ValueError:
+        raise ApiError(
+            403, ErrorCode.FORBIDDEN, "Download link is invalid or has expired"
+        ) from None
+    access.verify(
+        secret.get_secret_value() if secret else None, tenant_id, project_id, document_id, exp, sig
+    )
+    ctx = TenantContext(tenant_id, project_id)
+    with sessions() as session:
+        document, version = access.released_document(session, ctx, document_id)
+        record(
+            session,
+            tenant_id=tenant_id,
+            actor_id="signed-link",
+            action="DOCUMENT_DOWNLOADED",
+            entity_type="document",
+            entity_id=str(document.id),
+            after={"project_id": str(project_id), "title": document.title},
+            correlation_id=correlation_id_var.get() or "unknown",
+        )
+        session.commit()
+        title, key = document.title, version.storage_key
+    try:
+        stream = backend(request).open(key)
+    except FileNotFoundError:
+        raise not_found() from None
+
+    def body() -> Iterator[bytes]:
+        with stream:
+            yield from iter(lambda: stream.read(CHUNK), b"")
+
+    headers = {
+        "Content-Disposition": content_disposition(title),
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "sandbox; default-src 'none'",
+        "Cross-Origin-Resource-Policy": "same-origin",
+    }
+    # Never the uploaded type: an HTML or SVG original would otherwise run in the app's origin.
+    return StreamingResponse(body(), media_type="application/octet-stream", headers=headers)
 
 
 @router.delete("/projects/{project_id}/documents/{document_id}", status_code=204)
