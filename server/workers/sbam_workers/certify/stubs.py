@@ -19,25 +19,21 @@ async def certify_sub_skill(inp: BuildStageInput) -> IdResult:
     return IdResult(id=stage_stub_id(inp, "certify_sub_skill"))
 
 
-@activity_for(TaskQueue.CERTIFY)
-@activity.defn(name="certify_macros")
-@stub_activity
+@activity.defn(name="certify_macros")  # registered by `certify/workflow.py`; a typed handle
 async def certify_macros(inp: WorkflowRef) -> IdsResult:
+    """Real (E14.2): a MACRO_SKILL certificate per Macro whose Sub-Skills are all certified."""
     return IdsResult(ids=[stub_id(inp, "certify_macros")])
 
 
-@activity_for(TaskQueue.CERTIFY)
-@activity.defn(name="validate_workflow")
-@stub_activity
+@activity.defn(name="validate_workflow")  # registered by `certify/workflow.py`; a typed handle
 async def validate_workflow(inp: WorkflowRef) -> IdResult:
-    """Real: Workflow-level validation; a failure maps to workflow_validation_failed."""
+    """Real (E14.2): Workflow-level validation; a failure maps to workflow_validation_failed."""
     return IdResult(id=stub_id(inp, "validate_workflow"))
 
 
-@activity_for(TaskQueue.CERTIFY)
-@activity.defn(name="certify_workflow")
-@stub_activity
+@activity.defn(name="certify_workflow")  # registered by `certify/workflow.py`; a typed handle
 async def certify_workflow(inp: WorkflowRef) -> IdResult:
+    """Real (E14.2): the WORKFLOW certificate on the newest manifest hash."""
     return IdResult(id=stub_id(inp, "certify_workflow"))
 
 
