@@ -214,7 +214,7 @@ def test_imp_t07_the_prompts_call_the_list_a_suggestion_and_older_versions_are_u
     assert "there is no `datetime`" not in coder.text
     assert "Import only modules listed" not in coder.text
     corrector = registry.get("correct-code")
-    assert corrector.version == "1.3.0" and "is a suggestion, not a limit" in corrector.text
+    assert corrector.version == "1.4.0" and "is a suggestion, not a limit" in corrector.text
     released = registry.get("codegen-bodies", "1.3.0")  # released: as it was
     assert "there is no `datetime`" in released.text
     assert "Import only modules listed" in registry.get("correct-code", "1.2.0").text

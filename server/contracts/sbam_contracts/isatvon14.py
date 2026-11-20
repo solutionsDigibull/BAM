@@ -54,6 +54,15 @@ END_MESSAGE = re.compile(
 SECRET_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,127}$")
 SECRET_VALUE = re.compile(r"sk-|-----BEGIN|AKIA[0-9A-Z]{8}|Bearer\s|^[A-Za-z0-9+/=_-]{40,}$")
 FORBIDDEN_LIBRARIES: Final = frozenset({"duckdb"})  # PostgreSQL only
+# Loop counters. Fresh state is a value read from a database column keyed by the Sub-Skill's input;
+# the platform keeps no counter in a table, so a fresh-state entry with one of these names has no
+# column and codegen cannot write its state query (WG-40). The loop already stops at max_iterations.
+LOOP_COUNTER_NAMES: Final = frozenset(
+    {
+        "attempt", "attempts", "attempt_count", "attempt_number", "iteration", "iterations",
+        "iteration_count", "pass", "pass_number", "retry", "retries", "retry_count", "loop_count",
+    }
+)  # fmt: skip
 # Stand-in for the SBAM runtime registry until the skill-runtime image publishes one; injectable.
 DEFAULT_LIBRARY_REGISTRY: Final = frozenset(
     {
@@ -505,6 +514,17 @@ def _check_sub_skill(
         if not IDENTIFIER.match(name):
             found.append(
                 (6, f"{idef}s_source.required_inputs.{k}", f"{name!r} is not a field name")
+            )
+    for k, name in enumerate(s.fresh_state_parameters):  # WG-40: no column can back a counter
+        if name.strip().lower() in LOOP_COUNTER_NAMES:
+            found.append(
+                (
+                    6,
+                    f"{idef}s_source.fresh_state_parameters.{k}",
+                    f"{name!r} is a loop counter with no database column behind it; the loop "
+                    "already stops at max_iterations. Remove it from fresh_state_parameters "
+                    "(keep the key, [] is valid) and from every gate that uses it",
+                )
             )
     if len(set(s.required_inputs)) != len(s.required_inputs):
         found.append((6, idef + "s_source.required_inputs", "duplicate input names"))
