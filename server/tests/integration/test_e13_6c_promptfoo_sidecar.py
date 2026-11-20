@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import subprocess
+import sys
 import uuid
 from collections.abc import Iterator
 from pathlib import Path
@@ -92,8 +93,9 @@ def crashing_sidecar(container: str, tmp_path: Path) -> Iterator[Path]:
     image = _docker("inspect", "--format", "{{.Config.Image}}", container).stdout.strip()
     jobs = tmp_path / "jobs"
     jobs.mkdir()
-    getuid = getattr(os, "getuid", None)
-    user = f"{getuid()}:{os.getgid()}" if getuid else "10001:10001"  # type: ignore[attr-defined]
+    user = "10001:10001"  # a Windows bind mount has no owner to match
+    if sys.platform != "win32":
+        user = f"{os.getuid()}:{os.getgid()}"
     name = f"sbam-t07-{uuid.uuid4().hex[:8]}"
     started = _docker(
         "run", "-d", "--rm", "--name", name, "--network", "none", "--read-only",
