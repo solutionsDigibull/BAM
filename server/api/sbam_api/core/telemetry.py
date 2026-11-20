@@ -21,7 +21,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
-from sbam_api.core import bulkhead_metrics
+from sbam_api.core import build_metrics, bulkhead_metrics
 from sbam_api.core.logging import project_id_var, tenant_id_var
 from sbam_api.core.settings import Settings
 
@@ -55,6 +55,7 @@ def tracer_provider(settings: Settings) -> TracerProvider:
 def configure_telemetry(app: FastAPI, settings: Settings) -> None:
     provider = tracer_provider(settings)
     bulkhead_metrics.start(settings)
+    build_metrics.start(settings)
     FastAPIInstrumentor.instrument_app(
         app,
         tracer_provider=provider,

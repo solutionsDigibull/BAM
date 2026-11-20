@@ -580,3 +580,117 @@ groups:
       severity: warning
       team: platform
       environment: ${SBAM_ENV}
+  - uid: sbam-build-stage-stuck
+    title: A Sub-Skill build has made no progress for 30 minutes
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: max(sbam_build_idle_seconds)
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 1800
+    noDataState: OK
+    execErrState: Error
+    for: 5m
+    isPaused: false
+    annotations:
+      summary: A running Sub-Skill build has not changed stage for 30 minutes
+      description: The quietest running build has been in one stage for {{ printf "%.0f" $$values.B.Value }} seconds (threshold 1800). A build waiting for the FDE (a repository answer or a Retry) is not counted. Open the build timeline in the workbench (Translate, Timeline) to see the last step and the model calls.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}
+  - uid: sbam-llm-cost-per-hour
+    title: Model spend is above 5 USD in the last hour
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        datasource:
+          type: prometheus
+          uid: prometheus
+        expr: sum(increase(sbam_llm_cost_usd_total[1h]))
+        instant: true
+        range: false
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: dropNN
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        datasource:
+          type: __expr__
+          uid: __expr__
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 5
+    noDataState: OK
+    execErrState: Error
+    for: 5m
+    isPaused: false
+    annotations:
+      summary: The platform recorded more than 5 USD of model spend in the last hour
+      description: Recorded spend over the last hour is {{ printf "%.2f" $$values.B.Value }} USD (threshold 5). Open the LLM dashboard for the aliases, then the build timeline for the build. LLM_BUILD_BUDGET_USD stops one build at its own cap.
+      runbook: docs/runbooks/README.md
+    labels:
+      severity: warning
+      team: platform
+      environment: ${SBAM_ENV}

@@ -449,6 +449,42 @@
           "mode": "multi"
         }
       }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Longest time a running Sub-Skill build has gone without a stage change (minutes)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(sbam_build_idle_seconds) / 60",
+          "legendFormat": "corrections per initial attempt",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "description": "Correction attempts as a share of first-attempt generations."
     }
   ]
 }
