@@ -126,7 +126,9 @@ def test_720_t22_the_goal_block_is_context_never_a_citable_source() -> None:
 def test_720_t23_sow_generate_newest_documents_the_goal_block() -> None:
     registry = PromptRegistry()
     newest = registry.get("sow-generate")
-    assert newest.version == "1.3.0"  # 1.3.0: rule id formats (WG37)
+    assert newest.version == "1.4.0"  # 1.3.0: rule id formats (WG37); 1.4.0: action vs check
+    assert "no name in both" in newest.text and "`check`: other tools" in newest.text
+    assert "Rule ids come in two kinds" in newest.text
     assert "- `goal`" in newest.text and "never cite it" in newest.text
     assert registry.get("sow-generate", "1.1.0").sha256 == (
         "361e9e19bad8b319c1f935f14c0d1bc6353da9c4b37ca37aa507653b08f0a50f"

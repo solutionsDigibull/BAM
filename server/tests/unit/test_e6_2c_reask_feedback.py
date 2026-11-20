@@ -87,7 +87,11 @@ def test_e6_2c_t04_a_duplicate_feature_or_module_id() -> None:
 def test_e6_2c_t05_the_same_tool_for_action_and_check() -> None:
     doc = good()
     doc["features"][0]["tools"] = {"action": ["parse_bom"], "check": ["Parse_BOM"]}
-    assert lines(doc) == ("features[0].tools: ACTION_CHECK_OVERLAP",)
+    # the bare code made gpt-4o repeat the overlap on every re-ask: it carries a fixed explanation
+    assert lines(doc) == (
+        "features[0].tools: ACTION_CHECK_OVERLAP (a tool is in both action and check; "
+        "check must list other tools that verify the result)",
+    )
 
 
 def test_e6_2c_t06_feedback_never_carries_document_text() -> None:
