@@ -53,7 +53,9 @@ def _lcs(a: Sequence[str], b: Sequence[str]) -> int:
     table = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
     for i, x in enumerate(a):
         for j, y in enumerate(b):
-            table[i + 1][j + 1] = table[i][j] + 1 if x == y else max(table[i][j + 1], table[i + 1][j])
+            table[i + 1][j + 1] = (
+                table[i][j] + 1 if x == y else max(table[i][j + 1], table[i + 1][j])
+            )
     return table[len(a)][len(b)]
 
 
