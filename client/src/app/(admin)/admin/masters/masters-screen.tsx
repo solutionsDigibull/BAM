@@ -45,7 +45,13 @@ function Readme({ readme }: { readme: ReadmeTab }) {
   );
 }
 
-export function MastersScreen() {
+export function MastersScreen({
+  projectId,
+  projectName,
+}: {
+  projectId?: string;
+  projectName?: string;
+}) {
   const { message } = App.useApp();
   const [busy, setBusy] = useState<"export" | "template" | null>(null);
   const [downloadError, setDownloadError] = useState<ApiError | null>(null);
@@ -87,7 +93,7 @@ export function MastersScreen() {
           ...types.map((info) => ({
             key: info.master_type,
             label: info.tab,
-            children: <MasterTable info={info} />,
+            children: <MasterTable info={info} projectId={projectId} />,
           })),
           { key: "DOCUMENTS", label: "Documents", children: <DocumentsPanel /> },
           { key: "FILETYPE", label: "Filetype", children: <FiletypeTable /> },
@@ -101,7 +107,7 @@ export function MastersScreen() {
       <Flex justify="space-between" align="flex-start" wrap gap={12} style={{ marginBottom: 20 }}>
         <div>
           <Typography.Title level={1} style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
-            Masters
+            {projectName ? `${projectName}: Masters` : "Masters"}
           </Typography.Title>
           <Typography.Text style={{ color: MUTED }}>
             The tenant&apos;s Masters 0.3: one tab per workbook sheet, columns frozen
@@ -135,6 +141,7 @@ export function MastersScreen() {
       {body}
       {importing && (
         <ImportWizard
+          projectId={projectId}
           onClose={() => setImporting(false)}
           onApplied={(report) => {
             setImporting(false);

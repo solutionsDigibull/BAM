@@ -49,7 +49,9 @@ export function EntryDrawer({
   entryId,
   onClose,
   onSaved,
+  projectId,
 }: {
+  projectId?: string;
   info: MasterTypeInfo;
   entryId?: string;
   onClose: () => void;
@@ -82,7 +84,9 @@ export function EntryDrawer({
     try {
       const payload = toPayload(values);
       const res = await mutateAsync({
-        url: entryId ? versionsUrl(info.master_type, entryId) : resource,
+        url: entryId
+          ? versionsUrl(info.master_type, entryId)
+          : `${resource}${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`,
         method: "post",
         values: { payload },
         config: { headers: entryId ? ifMatch(resource, entryId) : {} },

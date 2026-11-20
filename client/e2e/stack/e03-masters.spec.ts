@@ -30,7 +30,7 @@ test("e15_1_t03 masters round-trip is identical; a changed structure is rejected
   browser,
 }) => {
   const admin = await signedIn(browser, "admin", USERS.adminA);
-  await admin.goto("/admin/masters");
+  await admin.goto("/admin/masters/tenant");
   await expect(admin.getByRole("button", { name: "Import workbook" })).toBeVisible();
 
   const upsert = await postFile(admin, "/admin/masters/import", workbook("masters_0_3.xlsx"), {

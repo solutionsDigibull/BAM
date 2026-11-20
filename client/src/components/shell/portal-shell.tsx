@@ -12,7 +12,8 @@ import { NotificationCenter } from "@/components/ui-kit";
 import { setAdminTheme, useAdminTheme } from "./admin-theme";
 import logoDark from "./assets/bullm-logo-dark.png";
 import logoLight from "./assets/bullm-logo-light.png";
-import { activeHref, type NavItem } from "./nav";
+import { ModeToggle } from "./mode-toggle";
+import { activeHref, adminMode, MASTERS_NAV, type NavItem } from "./nav";
 import "./portal-shell.css";
 
 // The switch signs in again through the other portal's Keycloak client (#927): its token is the only one that portal's API accepts.
@@ -70,7 +71,7 @@ function shellTheme(dark: boolean): ThemeConfig {
 
 export function PortalShell({
   portal,
-  nav,
+  nav: portalNav,
   canSwitch,
   user,
   children,
@@ -83,6 +84,8 @@ export function PortalShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  // Admin Masters mode swaps the sidebar (#869); the FDE pages and the Admin mode keep the nav they were given.
+  const nav = portal === "admin" && adminMode(pathname) === "masters" ? MASTERS_NAV : portalNav;
   const selected = activeHref(nav, pathname);
   const { name, other } = PORTAL[portal];
   const stored = useAdminTheme();
@@ -163,6 +166,7 @@ export function PortalShell({
               />
             )}
             <span className="portal-title">{title}</span>
+            {portal === "admin" && <ModeToggle />}
             <div className="portal-header-right">
               {portal === "admin" && (
                 <Button

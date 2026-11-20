@@ -134,9 +134,11 @@ function Preview({ report }: { report: ImportReport }) {
 export function ImportWizard({
   onClose,
   onApplied,
+  projectId,
 }: {
   onClose: () => void;
   onApplied: (report: ImportReport) => void;
+  projectId?: string;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [pickProblem, setPickProblem] = useState<string | null>(null);
@@ -149,7 +151,7 @@ export function ImportWizard({
     setBusy(true);
     setError(null);
     try {
-      const result = await importWorkbook(file, mode);
+      const result = await importWorkbook(file, mode, projectId);
       if (mode === "upsert" && result.applied) return onApplied(result);
       setReport(result); // a validation, or an upsert that met row errors after all
     } catch (e) {
