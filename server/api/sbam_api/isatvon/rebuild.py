@@ -8,8 +8,9 @@ After a build round with failed Sub-Skills ProjectPipeline waits at WAIT_REBUILD
 * 423 WORKFLOW_FROZEN, otherwise 409 CONFLICT unless the Workflow is NEEDS_FDE_REVIEW (the pipeline
   itself applies the Workflow's `retry` when it gets the signal, so this route does not);
 * 409 VALIDATION_ERROR naming every requested Sub-Skill whose state has no FDE `retry` event into
-  BUILDING (NEEDS_FDE_REVIEW and DEPENDENCY_FAILED have one). With no ids the request means every
-  Sub-Skill of the Workflow in such a state, and there must be one;
+  BUILDING (NEEDS_FDE_REVIEW and DEPENDENCY_FAILED have one; BUILD_ERROR has `recover`, #925);
+  409 CONFLICT when the skill-runtime registry is not loaded (registry/preflight.py). With no ids
+  the request means every Sub-Skill of the Workflow in such a state, and there must be one;
 * the signal goes out with `expect_stage=WAIT_REBUILD`: 409 PIPELINE_NOT_WAITING when the pipeline
   is anywhere else, 503 when Temporal is down. Nothing is recorded on a refusal.
 
@@ -39,6 +40,7 @@ from sbam_api.core.logging import correlation_id_var
 from sbam_api.isatvon.models import SubSkill
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.pipeline.service import TemporalUnavailable, signal_pipeline
+from sbam_api.registry.preflight import require_build_prerequisites
 from sbam_api.state_machine import TransitionCommand, apply_transition
 from sbam_api.temporal.client import OrchestratorUnavailable
 from sbam_api.temporal.repository import TemporalRunRepository, to_run
@@ -48,8 +50,13 @@ REBUILD_REQUESTED = "REBUILD_REQUESTED"
 KEY_PREFIX = "rebuild:"
 
 
+# #925: BUILD_ERROR too, once the cause is fixed (`recover`, not the platform team's `retry`).
 REBUILDABLE = frozenset(
-    {SubSkillState.NEEDS_FDE_REVIEW.value, SubSkillState.DEPENDENCY_FAILED.value}
+    {
+        SubSkillState.NEEDS_FDE_REVIEW.value,
+        SubSkillState.DEPENDENCY_FAILED.value,
+        SubSkillState.BUILD_ERROR.value,
+    }
 )
 
 
@@ -118,6 +125,7 @@ def _check(
     subs = {s.id: s for s in SubSkillRepository(session, ctx).of_workflow(workflow_id)}
     if any(i not in subs for i in requested):
         raise not_found()
+    require_build_prerequisites(session)  # #925: a rebuild that would fail the same way
     if requested:
         chosen = [subs[i] for i in dict.fromkeys(requested)]
         invalid = [s.skill_id for s in chosen if s.state not in REBUILDABLE]
@@ -138,7 +146,8 @@ def _retry(
     chosen: list[SubSkill],
     correlation_id: str,
 ) -> None:
-    """`retry` (to BUILDING) for each Sub-Skill sent to rebuild; flushed, committed by `_commit`."""
+    """`retry` (`recover` from BUILD_ERROR, #925) to BUILDING for each Sub-Skill sent to rebuild;
+    flushed, committed by `_commit`."""
     ctx = user.context(project_id)
     for sub in chosen:
         apply_transition(
@@ -147,7 +156,7 @@ def _retry(
             TransitionCommand(
                 model=SubSkill,
                 entity_id=sub.id,
-                event="retry",
+                event="recover" if sub.state == SubSkillState.BUILD_ERROR.value else "retry",
                 actor=Actor.FDE,
                 actor_id=str(user.user_id),
                 correlation_id=correlation_id,

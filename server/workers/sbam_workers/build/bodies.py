@@ -4,6 +4,10 @@ Idempotency (TD §13.4): the stage key `(sub_skill_id, build_no, cycle, attempt)
 `code_attempts` row and is also the `llm_calls` replay key, so a Temporal retry after the model
 answered reuses that answer (no second charge) and finds or writes the same row.
 
+#925: a build the FDE restarts after BUILD_ERROR (the `recover` event) starts from the bodies the
+failed build stored: `reuse_stored` copies them into the new build's key, so the model is not paid
+twice. Only when the skeleton template is the same one they were written for.
+
 Registered by `wiring.py` (E11.2b) with the loaders and the worker's `LlmClient`.
 """
 
@@ -71,6 +75,46 @@ class SqlAttemptStore:
                 inp.sub_skill_id, inp.build_no, inp.cycle, inp.attempt
             )
             return None if row is None else (row.id, row.status)
+
+    def reuse_stored(self, inp: BuildStageInput, given: BodiesInputs) -> uuid.UUID | None:
+        """The id of a copy of the last stored bodies, when this build began with `recover`.
+
+        The newest earlier attempt of the Sub-Skill that passed the pre-check, and a `recover`
+        audit row written after it (the FDE restarted a BUILD_ERROR): nothing later has changed
+        what the bodies were written for. No model call, no new `llm_calls` rows."""
+        if inp.cycle != 0 or inp.attempt != 0 or inp.build_no < 2:
+            return None
+        with self.sessions() as session:
+            ctx = self._ctx(inp)
+            stored = CodeAttemptRepository(session, ctx).newest_stored(
+                inp.sub_skill_id, inp.build_no
+            )
+            if stored is None or stored.template_sha256 != given.template.sha256:
+                return None
+            recovered = CodeAttemptRepository(session, ctx).recovered_since(stored)
+            if not recovered:
+                return None
+            row: CodeAttempt = CodeAttemptRepository(session, ctx).record(
+                {
+                    "workflow_id": inp.workflow_id,
+                    "sub_skill_id": inp.sub_skill_id,
+                    "manifest_id": given.manifest_id,
+                    "build_no": inp.build_no,
+                    "cycle": inp.cycle,
+                    "attempt": inp.attempt,
+                    "template_name": stored.template_name,
+                    "template_version": stored.template_version,
+                    "template_sha256": stored.template_sha256,
+                    "status": CodeAttemptStatus.BODIES_GENERATED,
+                    "bodies": stored.bodies,
+                    "llm_call_ids": list(stored.llm_call_ids),
+                    "trace_id": stored.trace_id,
+                    "findings": [],
+                    "created_by": "sbam-worker",
+                }
+            )
+            session.commit()
+            return row.id
 
     def record(
         self, inp: BuildStageInput, scope: LlmScope, given: BodiesInputs, out: GeneratedBodies
@@ -140,6 +184,9 @@ class GenerateBodies:
                 raise precheck_failed(attempt_id)
             return IdResult(id=attempt_id)
         given = await self.inputs(inp)
+        reused = self.attempts.reuse_stored(inp, given)
+        if reused is not None:  # #925: restarted after BUILD_ERROR: stored bodies, no new call
+            return IdResult(id=reused)
         workflow_id = activity.info().workflow_id
         if workflow_id is None:  # the replay key needs the parent workflow
             raise RuntimeError(f"{STAGE} runs only inside a workflow")

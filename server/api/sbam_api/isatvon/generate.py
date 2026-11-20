@@ -42,6 +42,7 @@ from sbam_api.isatvon.edits import editable_workflow
 from sbam_api.isatvon.models import SubSkill
 from sbam_api.isatvon.repository import SubSkillRepository
 from sbam_api.pipeline.service import TemporalUnavailable, signal_pipeline
+from sbam_api.registry.preflight import require_build_prerequisites
 from sbam_api.sow.repository import SowVersionRepository
 from sbam_api.state_machine import TransitionCommand, apply_transition
 from sbam_api.temporal.client import OrchestratorUnavailable
@@ -112,6 +113,7 @@ def _check(
     subs = {s.id: s for s in SubSkillRepository(session, ctx).of_workflow(workflow_id)}
     if any(i not in subs for i in requested):
         raise not_found()
+    require_build_prerequisites(session)  # #925: not a build bound to end in BUILD_ERROR
     chosen = [subs[i] for i in dict.fromkeys(requested)] if requested else list(subs.values())
     if not chosen:
         raise _not_valid([])

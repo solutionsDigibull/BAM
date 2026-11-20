@@ -70,7 +70,24 @@ async def _run(name: str, check: Check) -> bool:
         return False
 
 
-def health_router(checks: Mapping[str, Check]) -> APIRouter:
+async def _prerequisites(info: Mapping[str, Check]) -> dict[str, str]:
+    names = list(info)
+    outcomes = await asyncio.gather(
+        *(asyncio.wait_for(info[n](), CHECK_TIMEOUT_SECONDS) for n in names),
+        return_exceptions=True,
+    )
+    return {
+        n: ("unknown" if isinstance(o, BaseException) else "ok" if o else "missing")
+        for n, o in zip(names, outcomes, strict=True)
+    }
+
+
+def health_router(
+    checks: Mapping[str, Check], info: Mapping[str, Check] | None = None
+) -> APIRouter:
+    """`info` lines are shown under `prerequisites` as ok / missing / unknown and never change the
+    status: a stack that waits for a one-off setup step is healthy (#925)."""
+
     router = APIRouter(tags=["health"])
 
     @router.get("/health/live")
@@ -88,9 +105,13 @@ def health_router(checks: Mapping[str, Check]) -> APIRouter:
         # Informational: a saturated dependency fails fast on its own; it does not make the API
         # unready (that would pull a healthy replica out for a slow scanner).
         bulkheads = {b.name: "saturated" if b.saturated else "ok" for b in REGISTRY}
-        return JSONResponse(
-            {"status": "ok" if healthy else "fail", "checks": report, "bulkheads": bulkheads},
-            status_code=200 if healthy else 503,
-        )
+        body: dict[str, Any] = {
+            "status": "ok" if healthy else "fail",
+            "checks": report,
+            "bulkheads": bulkheads,
+        }
+        if info:
+            body["prerequisites"] = await _prerequisites(info)
+        return JSONResponse(body, status_code=200 if healthy else 503)
 
     return router

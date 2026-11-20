@@ -247,11 +247,16 @@ make down                                 # stop (data kept);  make reset CONFIR
 |---|---|
 | http://localhost:3000 | SBAM web (Admin login and FDE login) |
 | http://localhost:8000/api/v1/docs | API (OpenAPI) |
-| http://localhost:8000/health/ready | API readiness (db, storage, temporal, keycloak) |
+| http://localhost:8000/health/ready | API readiness (db, storage, temporal, keycloak) and `prerequisites.runtime_registry` (`ok` / `missing`) |
 | http://localhost:8080 | Keycloak admin (realm `bullm`) |
 | http://localhost:8233 | Temporal UI |
 | http://localhost:8025 | Mailpit: catches Keycloak invite and password emails (dev only) |
 | http://localhost:3001 / :3002 | Langfuse / Grafana (profile `obs`) |
+
+**A fresh stack must load the skill-runtime registry before any build (#925).** Every Sub-Skill build pins the active
+registry's image digest. Until `make runtime-registry` (or `make runtime-registry-load` for an image that is already built)
+has run, `/health/ready` shows `"runtime_registry": "missing"`, and Generate and Rebuild answer 409 with the fix instead of
+starting builds that would all end in BUILD_ERROR. See [builds-recovery](runbooks/builds-recovery.md).
 
 **When to rebuild images (#804).** `make up` runs the `dev` image targets with `server/` and `client/` bind-mounted,
 so a code change needs **no rebuild and no `make up`**: the API reloads itself, the workers restart on a changed

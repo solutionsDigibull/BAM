@@ -11,3 +11,4 @@ Operational procedures, written by issue E16.6. Planned runbooks: stuck Temporal
 - [Project connections: the keyring, rotation and loss](connections-secrets.md) (WG-16): the `sbam_secrets_keys` secret, the `*` active key, rotating with `rekey`, a compromised or lost key.
 
 Runbook structure: **Symptoms** · **Impact** · **Diagnosis** (commands, dashboards) · **Fix** · **Verification** · **Escalation**.
+- [A Sub-Skill ended in BUILD_ERROR](builds-recovery.md) (WG-38): the registry preflight, the readiness line, recovering without a new project or a second paid run.

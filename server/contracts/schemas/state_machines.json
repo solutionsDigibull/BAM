@@ -721,6 +721,12 @@
         "actor": "ADMIN"
       },
       {
+        "from": "BUILD_ERROR",
+        "event": "recover",
+        "to": "BUILDING",
+        "actor": "FDE"
+      },
+      {
         "from": "CERTIFIED",
         "event": "freeze",
         "to": "FROZEN",
