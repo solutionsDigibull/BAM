@@ -13,10 +13,12 @@ rules, not against the skeleton (AST_SKELETON already pinned everything outside 
 * AST_HANDOFF: the action function itself calls `state_handoff.append(...)` with every
   manifest `required_fields` key as a keyword, and nothing writes the handoff table any other way
   (no UPDATE/DELETE/DDL against it, no reaching into the writer's private connection).
-* AST_IMPORTS: imports are within the template's base imports plus the registry-resolved
-  libraries, siblings relative; never eval/exec/compile/__import__, `os.system`, pickle, marshal,
-  ctypes, importlib, and subprocess only when declared. Dynamic attribute access that could
-  smuggle one of those past the name checks is refused too, and so is reaching a module through
+* AST_IMPORTS: relative imports name only the siblings; no module on the deny list (os, sys,
+  socket, pickle, marshal, ctypes, importlib, ..., see `FORBIDDEN_MODULES`), and subprocess
+  only when declared; never eval/exec/compile/__import__ or `os.system`. Any other module is
+  free: the template's imports and the libraries are a hint to the model, not a rule (#922, ADR
+  0040). Dynamic attribute access that could smuggle one of those past the name checks is refused
+  too, and so is reaching a module through
   another module's attribute (`json.codecs.sys.modules`) or through a format string
   (`"{0.__class__}".format(x)`). The gate is a fast fail: the sandbox is the boundary.
 * AST_SQL_SAFETY: SQL is a literal, parameterised with `%s`. An f-string, `+`, `%`, `.format` or
@@ -36,13 +38,11 @@ from sbam_contracts.build_dashboard import GateName
 
 from sbam_workers.build.codegen.bodies import (
     _SQL,
-    DECLARABLE_MODULES,
     FORBIDDEN_ATTRS,
-    FORBIDDEN_MODULES,
     FORBIDDEN_NAMES,
     RETRY_MODULES,
     SIBLING_MODULES,
-    import_allowlist,
+    denied_import,
 )
 from sbam_workers.build.codegen.render import identifier
 from sbam_workers.build.codegen.store import LoadedTemplate
@@ -510,7 +510,7 @@ def check_handoff(trees: Mapping[str, ast.Module], params: Mapping[str, Any]) ->
 
 
 def _import_findings(
-    file: str, node: ast.Import | ast.ImportFrom, allowed: set[str], declared: set[str]
+    file: str, node: ast.Import | ast.ImportFrom, declared: set[str]
 ) -> list[Finding]:
     gate = GateName.AST_IMPORTS
     out: list[Finding] = []
@@ -527,13 +527,9 @@ def _import_findings(
         return out
     modules = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or ""]
     for module in modules:
-        top = _top(module)
-        if top in FORBIDDEN_MODULES or (top in DECLARABLE_MODULES and top not in declared):
+        if denied_import(module, declared):  # the deny list is the only import rule (#922)
             message = f"import of {module!r} is forbidden"
             out.append(_at(gate, "FORBIDDEN_IMPORT", message, file, node))
-        elif top not in allowed:
-            message = f"import of {module!r} is not in the template's imports or the libraries"
-            out.append(_at(gate, "IMPORT_NOT_ALLOWED", message, file, node))
     if isinstance(node, ast.ImportFrom):
         for alias in node.names:
             if alias.name in GATE_FORBIDDEN_NAMES | FORBIDDEN_ATTRS:
@@ -605,12 +601,11 @@ def check_imports(
 ) -> list[Finding]:
     gate = GateName.AST_IMPORTS
     declared = set(modules)
-    allowed = set(import_allowlist(template.base_imports, declared))
     findings: list[Finding] = []
     for file, tree in sorted(trees.items()):
         for node in ast.walk(tree):
             if isinstance(node, ast.Import | ast.ImportFrom):
-                findings += _import_findings(file, node, allowed, declared)
+                findings += _import_findings(file, node, declared)
             elif isinstance(node, ast.Name) and _forbidden_name(node.id):
                 message = f"{node.id} is forbidden in generated code"
                 findings.append(_at(gate, "FORBIDDEN_CALL", message, file, node))

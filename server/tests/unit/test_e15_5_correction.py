@@ -87,16 +87,15 @@ def test_e15_5_the_correction_set_is_sound_and_every_flaw_raises_its_code() -> N
     assert len({i.id for i in SET.items}) == len(SET.items) == len(DEFECTS) == 20
 
 
-def test_e15_5_five_kinds_of_flaw_four_variants_each() -> None:
+def test_e15_5_four_kinds_of_flaw_eight_import_and_four_other_variants() -> None:
     kinds: dict[str, int] = {}
     for item in SET.items:
         kinds[item.expect_code] = kinds.get(item.expect_code, 0) + 1
     assert kinds == {
         "MANUAL_LOOP": 4,
-        "FORBIDDEN_IMPORT": 4,
+        "FORBIDDEN_IMPORT": 8,  # the four of before #922 plus the four that were IMPORT_NOT_ALLOWED
         "FORBIDDEN_CALL": 4,
         "SQL_UNSAFE": 4,
-        "IMPORT_NOT_ALLOWED": 4,
     }
     assert all(i.synthetic is True for i in SET.items)
 

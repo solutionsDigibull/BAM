@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-// #842: the certification evidence (import gate, repository licence, dependency vulnerabilities, MCP compliance) in the
+// #842: the certification evidence (repository licence, dependency vulnerabilities, MCP compliance) in the
 // workbench's Check and Certify screens. The default project runs `next dev` with the dev role cookie and no sbam-api,
 // so the API is faked at the proxy. Each state is saved as a screenshot for comparison with BAM_UI (CERT_SHOTS or the
 // owner's Downloads folder on this machine).
@@ -23,7 +23,6 @@ const problem = (route: Route, status: number, detail: string) =>
 
 const subId = (n: number) => `0190f3a2-7b1c-7d4e-8f00-${String(n).padStart(12, "0")}`;
 const PASS = {
-  IMPORT_RESOLUTION: "PASSED",
   REPO_LICENCE: "PASSED",
   DEPENDENCY_VULN: "PASSED",
   MCP_COMPLIANCE: "PASSED",
@@ -119,7 +118,7 @@ test("e842_t01 loaded: pass, fail with the reason, and a missing result that blo
       sub_skills: [
         row(1, PASS),
         row(2, { ...PASS, REPO_LICENCE: "FAILED" }),
-        row(3, { IMPORT_RESOLUTION: "PASSED", REPO_LICENCE: "PASSED", DEPENDENCY_VULN: "PASSED" }),
+        row(3, { REPO_LICENCE: "PASSED", DEPENDENCY_VULN: "PASSED" }),
       ],
     }),
   );
@@ -154,7 +153,7 @@ test("e842_t02 ready: every result passes for every Sub-Skill", async ({ page, b
     "results",
   );
   await expect(panel(page).getByText("Ready")).toBeVisible();
-  await expect(panel(page).getByText("Pass", { exact: true })).toHaveCount(5);
+  await expect(panel(page).getByText("Pass", { exact: true })).toHaveCount(4);
   await shot(page, "ready");
 });
 
@@ -185,6 +184,30 @@ test("e842_t05 forbidden: another tenant or an unassigned FDE gets the not-avail
 }) => {
   await open(page, baseURL!, (route) => problem(route, 404, "Not found"));
   await expect(panel(page).getByText("Not available")).toBeVisible();
-  await expect(panel(page).getByText("Import gate")).toHaveCount(0);
+  await expect(panel(page).getByText("Repository licence")).toHaveCount(0);
   await shot(page, "forbidden");
+});
+
+test("e922_t08 an old import result is information only and never blocks certification", async ({
+  page,
+  baseURL,
+}) => {
+  await open(
+    page,
+    baseURL!,
+    (route) =>
+      json(route, {
+        workflow_id: WORKFLOW,
+        workflow_state: "CERTIFYING",
+        active: false,
+        sub_skills: [row(1, { ...PASS, IMPORT_RESOLUTION: "PASSED" }), row(2, PASS)],
+        workflow_gates: { UI_BUNDLE: "PASSED" },
+      }),
+    "results",
+  );
+  const old = panel(page).locator('[data-gate="IMPORT_RESOLUTION"]');
+  await expect(old.getByText(/Information only/)).toBeVisible();
+  await expect(panel(page).getByText("Ready")).toBeVisible();
+  await expect(panel(page).getByText(/Certification can be recorded/)).toBeVisible();
+  await shot(page, "old-import-row");
 });

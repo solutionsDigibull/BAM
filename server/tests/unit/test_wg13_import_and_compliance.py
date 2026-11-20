@@ -552,16 +552,19 @@ def test_wg13_a_failing_row_is_gate_failed_and_the_others_are_still_recorded(
     assert rows[GateName.REPO_LICENCE.value].findings[0]["code"] == "REPO_SCAN_MISSING"
 
 
-def test_wg13_the_compliance_stage_does_not_run_before_the_import_gate_passed(
+def test_wg13_the_compliance_stage_no_longer_waits_for_an_import_gate_row(
     template: LoadedTemplate,  # noqa: F811
     tmp_path: Any,
 ) -> None:
+    """#922 (ADR 0040, replaces `..._does_not_run_before_the_import_gate_passed`): SBAM no longer
+    produces import evidence, so the stage runs on a bundle with only its AST and static rows."""
     sessions, storage, inp = db(), LocalDiskBackend(tmp_path), stage_input()
     passed_ast_and_static(template, sessions, storage, inp)  # no import gate row
-    with pytest.raises(ApplicationError) as err:
-        run_stage(compliance(sessions, storage, manifest()), inp)
-    assert err.value.type == GATE_INPUT_MISMATCH
-    assert GateName.REPO_LICENCE.value not in gate_rows(sessions, inp)
+    run_stage(compliance(sessions, storage, manifest()), inp)
+    rows = gate_rows(sessions, inp)
+    assert GateName.IMPORT_RESOLUTION.value not in rows
+    for gate_name in (GateName.REPO_LICENCE, GateName.DEPENDENCY_VULN, GateName.MCP_COMPLIANCE):
+        assert rows[gate_name.value].status == GateStatus.PASSED.value
 
 
 def test_wg13_a_retried_compliance_stage_writes_no_second_row(
@@ -584,7 +587,7 @@ EVIDENCE_GATES = (GateName.REPO_LICENCE, GateName.DEPENDENCY_VULN, GateName.MCP_
 
 def test_wg13_the_three_rows_are_required_for_certification() -> None:
     assert set(EVIDENCE_GATES) <= set(REQUIRED_GATES)
-    assert GateName.IMPORT_RESOLUTION in REQUIRED_GATES
+    assert GateName.IMPORT_RESOLUTION not in REQUIRED_GATES  # #922: no import evidence any more
     assert evaluate(evidence()).certified  # every required row, all PASSED
 
 

@@ -1,13 +1,12 @@
-"""#761 (WG-13) SubSkillBuild with the import gate and the compliance gates: after the AST and
-static gates, the code is imported in the sandbox, then the licence, dependency vulnerability and
-MCP compliance rows are recorded, all before the review and the tests. Real child workflow on
-Temporal's time-skipping server, stub stages overridden per test (see test_sub_skill_build.py).
+"""#761 (WG-13) SubSkillBuild with the compliance gates (and, before #922, the import gate): after
+the AST and static gates the licence, dependency vulnerability and MCP compliance rows are recorded,
+all before the review and the tests. Real child workflow on Temporal's time-skipping server, stub
+stages overridden per test (see test_sub_skill_build.py).
 
-- A failed import or compliance row goes to the corrector like any gate.
-- A sandbox that cannot be reached (IMPORT_GATE_INFRA) is retried, never corrected, and parks the
-  build as a platform defect.
+- A failed compliance row goes to the corrector like any gate.
+- #922 (ADR 0040): a new build does not run the import gate at all (`wg35-no-import-gate`).
 - Replay: histories recorded before these stages keep replaying (they are behind
-  `workflow.patched`); a build that ran them replays from its own history.
+  `workflow.patched`); a build that ran the import gate replays it from its own history.
 """
 
 import asyncio
@@ -28,15 +27,14 @@ from sbam_workers.pipeline.sub_skill_build import (
 )
 from temporalio.client import WorkflowHistory
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import ApplicationError
 from temporalio.worker import Replayer
 from test_sub_skill_build import HISTORY, Build, gate_failed, run, save_history, traced
 from test_sub_skill_build_review import patch_ids, scheduled
 
 IMPORT_HISTORY = HISTORY.with_name("sub_skill_build_import_gates.json")
 PATCH = "wg13-import-and-compliance-gates"
+NO_IMPORT_PATCH = "wg35-no-import-gate"
 AFTER_STATIC = [
-    "import_gate",
     "compliance_gates",
     "review_code",
     "generate_tests",
@@ -65,8 +63,10 @@ def test_wg13_the_specs_put_both_stages_on_the_build_queue_with_gate_failed_non_
     assert IMPORT_GATE_INFRA in PLATFORM_DEFECTS  # and then a platform defect
 
 
-def test_wg13_both_stages_run_once_after_the_static_gate_and_before_the_review() -> None:
+def test_wg13_the_compliance_stage_runs_once_after_the_static_gate_and_before_the_review() -> None:
+    """#922: the import gate is no longer one of the stages (replaces `both_stages_run_once...`)."""
     order: list[str] = []
+    gate_calls: list[BuildStageInput] = []
 
     def recorder(name: str) -> Callable[[Any], None]:
         return lambda inp: order.append(name)
@@ -77,14 +77,28 @@ def test_wg13_both_stages_run_once_after_the_static_gate_and_before_the_review()
     async def scenario(build: Build) -> Any:
         return await build.finish(), build.actions(), build.state()
 
-    result, actions, state = run(scenario, **overrides)
+    result, actions, state = run(
+        scenario, import_gate=traced("import_gate", gate_calls), **overrides
+    )
     assert order == names
+    assert gate_calls == []  # IMP-T08: nothing produces an IMPORT_RESOLUTION row any more
     assert result.certified and state == "CERTIFIED"
     assert actions == ["tests_started", "tests_passed", "sub_skill.certified"]
 
 
-@pytest.mark.parametrize("stage", ["import_gate", "compliance_gates"])
-def test_wg13_a_failed_row_goes_to_the_corrector_and_the_next_pass_certifies(stage: str) -> None:
+def test_imp_t08_a_new_build_records_the_patch_that_skips_the_import_gate() -> None:
+    async def scenario(build: Build) -> dict[str, Any]:
+        await build.finish()
+        data: dict[str, Any] = json.loads((await build.handle.fetch_history()).to_json())
+        return data
+
+    raw = run(scenario)
+    assert PATCH in patch_ids(raw) and NO_IMPORT_PATCH in patch_ids(raw)
+    assert scheduled(raw, "import_gate") == 0 and scheduled(raw, "compliance_gates") == 1
+
+
+def test_wg13_a_failed_row_goes_to_the_corrector_and_the_next_pass_certifies() -> None:
+    stage = "compliance_gates"
     corrections: list[Any] = []
     calls: list[BuildStageInput] = []
     reviews: list[BuildStageInput] = []
@@ -111,20 +125,6 @@ def test_wg13_a_failed_row_goes_to_the_corrector_and_the_next_pass_certifies(sta
     ]
 
 
-def test_wg13_the_compliance_gates_do_not_run_when_the_import_gate_failed() -> None:
-    compliance: list[BuildStageInput] = []
-
-    async def scenario(build: Build) -> Any:
-        return await build.finish()
-
-    run(
-        scenario,
-        import_gate=traced("import_gate", [], fails_on({0})),
-        compliance_gates=traced("compliance_gates", compliance),
-    )
-    assert [c.attempt for c in compliance] == [1]
-
-
 def test_wg13_no_tests_run_for_code_that_keeps_failing_a_compliance_gate() -> None:
     tests: list[BuildStageInput] = []
 
@@ -141,26 +141,6 @@ def test_wg13_no_tests_run_for_code_that_keeps_failing_a_compliance_gate() -> No
     )
     assert waiting.state.value == "NEEDS_FDE_REVIEW" and state == "NEEDS_FDE_REVIEW"
     assert tests == []  # nothing past the compliance gates ever ran
-
-
-def test_wg13_a_sandbox_that_cannot_be_reached_is_retried_then_a_build_error() -> None:
-    calls: list[int] = []
-    corrections: list[Any] = []
-
-    def down(inp: Any) -> None:
-        calls.append(inp.attempt)
-        raise ApplicationError("sandbox host unreachable (10.0.0.9)", type=IMPORT_GATE_INFRA)
-
-    async def scenario(build: Build) -> Any:
-        return await build.finish(), build.state()
-
-    result, state = run(
-        scenario,
-        import_gate=traced("import_gate", [], down),
-        correct=traced("correct", corrections),
-    )
-    assert not result.certified and state == "BUILD_ERROR"
-    assert len(calls) == SPECS[BuildStage.IMPORT_GATE].attempts and corrections == []
 
 
 # --- replay -------------------------------------------------------------------------------------

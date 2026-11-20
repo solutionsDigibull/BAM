@@ -5,9 +5,9 @@ Pipeline: skeleton + render params -> prompt context -> `LlmClient.run` -> pre-c
 * The model writes only the four `CodeBodies` fields. The output type forbids extra keys, so a
   reply that tries to set a platform field (status, template, imports) is re-asked, never kept.
 * The context is the render params (the manifest's code-relevant part, one Sub-Skill of one
-  project), the rendered skeleton and the import allowlist, each in a `<data>` block. ISATVON
-  prose is data: nothing in it can widen the allowlist, which comes from the template's
-  `base_imports` and the registry-resolved libraries only.
+  project), the rendered skeleton and the suggested imports, each in a `<data>` block. The
+  suggested imports (the template's `base_imports` and the registry-resolved libraries) are a hint
+  only (#922): the model may import any other module that is not on the deny list.
 * The pre-check is a fast fail before assembly, not the authority: the AST gate (TD §12.5) runs
   on the assembled files afterwards. Rejected bodies go to the correction loop (GateFailed).
 * `state_queries` is data: the assembler writes `QUERIES = {name: "SELECT ... %s"}` itself, so no
@@ -39,8 +39,40 @@ PROMPT_ID: Final = "codegen-bodies"
 MAX_BODY_CHARS: Final = 20000
 STATE_QUERIES_FIELD: Final = "state_queries"
 SIBLING_MODULES: Final = frozenset({"models", "state", "state_handoff"})  # `from . import ...`
-# Never importable, whatever the manifest declares (TD §12.5 AST_IMPORTS).
-FORBIDDEN_MODULES: Final = frozenset({"pickle", "marshal", "ctypes", "importlib", "builtins"})
+# The deny list (#922, ADR 0040): modules that can leave the sandbox or reach the host, the network
+# or another process. Never importable, whatever the manifest declares (TD §12.5 AST_IMPORTS). It is
+# the only import rule left: any other module, standard library or third party, is free to import
+# and `allowed_imports` is only a hint to the model.
+FORBIDDEN_MODULES: Final = frozenset(
+    {
+        # code loading and object (de)serialisation that runs code
+        "pickle",
+        "marshal",
+        "shelve",
+        "ctypes",
+        "importlib",
+        "builtins",
+        "runpy",
+        "pkgutil",
+        # the host: process, file system tree, interpreter, signals
+        "os",
+        "sys",
+        "shutil",
+        "multiprocessing",
+        "signal",
+        "pty",
+        # the network
+        "socket",
+        "socketserver",
+        "ssl",
+        "ftplib",
+        "smtplib",
+        "telnetlib",
+        "xmlrpc",
+    }
+)
+# Dotted names denied although their package is free (`urllib.parse` is plain string work).
+FORBIDDEN_SUBMODULES: Final = frozenset({"urllib.request", "http.client", "http.server"})
 DECLARABLE_MODULES: Final = frozenset({"subprocess"})  # forbidden unless a resolved library
 RETRY_MODULES: Final = frozenset({"tenacity", "backoff", "retrying"})
 FORBIDDEN_NAMES: Final = frozenset({"eval", "exec", "compile", "__import__"})
@@ -83,7 +115,9 @@ class BodyFindingCode(StrEnum):
     MANUAL_LOOP = "MANUAL_LOOP"  # `while` or a retry decorator/library: iteration is declarative
     FORBIDDEN_CALL = "FORBIDDEN_CALL"  # eval/exec/compile/__import__, os.system, dunder escapes
     FORBIDDEN_IMPORT = "FORBIDDEN_IMPORT"  # pickle, marshal, ctypes, undeclared subprocess, ...
-    IMPORT_NOT_ALLOWED = "IMPORT_NOT_ALLOWED"  # not in base imports + resolved libraries
+    # #922: no longer raised for a module that is merely not suggested; only for a relative import
+    # outside models/state/state_handoff. The value stays: stored attempts and findings carry it.
+    IMPORT_NOT_ALLOWED = "IMPORT_NOT_ALLOWED"
     SQL_UNSAFE = "SQL_UNSAFE"  # f-string / concatenated / formatted SQL, or a handoff write
     STATE_QUERY_INVALID = "STATE_QUERY_INVALID"  # not one SELECT with one %s per fresh-state name
     SHADOWS_SKELETON = "SHADOWS_SKELETON"  # a helper rebinds a name the skeleton defines
@@ -124,8 +158,21 @@ class GeneratedBodies:
 # --- allowlist and context -----------------------------------------------------------------------
 
 
+def denied_import(module: str, declared: Iterable[str]) -> bool:
+    """True for a module on the deny list: `FORBIDDEN_MODULES`, a denied submodule, or an
+    undeclared `DECLARABLE_MODULES` member. Nothing else is ever refused by name (#922)."""
+    top = module.split(".")[0]
+    dotted = module.split(".")
+    if top in FORBIDDEN_MODULES:
+        return True
+    if any(".".join(dotted[:n]) in FORBIDDEN_SUBMODULES for n in range(2, len(dotted) + 1)):
+        return True
+    return top in DECLARABLE_MODULES and top not in set(declared)
+
+
 def import_allowlist(base_imports: Iterable[str], modules: Iterable[str]) -> tuple[str, ...]:
-    """Template base imports + resolved libraries' top-level modules (E9.3), sorted and unique."""
+    """The suggested imports: template base imports + resolved libraries' top-level modules (E9.3),
+    sorted and unique. A hint for the prompt (#922); `denied_import` is the only rule."""
     names = {*base_imports, *modules}
     bad = sorted(n for n in names if not _MODULE.match(n))
     if bad:
@@ -225,10 +272,8 @@ class _Checker(ast.NodeVisitor):
         top = name.split(".")[0]
         if top in RETRY_MODULES:
             self.add(BodyFindingCode.MANUAL_LOOP, node, f"retry library {top!r}")
-        elif top in FORBIDDEN_MODULES or (top in DECLARABLE_MODULES and top not in self.allowlist):
-            self.add(BodyFindingCode.FORBIDDEN_IMPORT, node, f"import of {top!r}")
-        elif top not in self.allowlist:
-            self.add(BodyFindingCode.IMPORT_NOT_ALLOWED, node, f"{top!r} is not an allowed import")
+        elif denied_import(name, self.allowlist):
+            self.add(BodyFindingCode.FORBIDDEN_IMPORT, node, f"import of {name!r}")
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:

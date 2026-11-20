@@ -8,7 +8,7 @@ const W = 'w-1'
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': status >= 400 ? 'application/problem+json' : 'application/json' } })
 const sub = (id: string, gates: Record<string, string>) => ({ sub_skill_id: id, skill_id: `skill-${id}`, skill_name: `Skill ${id}`, state: 'BUILDING', stage: 'GATES', gates })
 const UI_PASS = { UI_BUNDLE: 'PASSED' }
-const PASS = { IMPORT_RESOLUTION: 'PASSED', REPO_LICENCE: 'PASSED', DEPENDENCY_VULN: 'PASSED', MCP_COMPLIANCE: 'PASSED' }
+const PASS = { REPO_LICENCE: 'PASSED', DEPENDENCY_VULN: 'PASSED', MCP_COMPLIANCE: 'PASSED' }
 
 // The component reads through the proxy with fetch; each test gives one answer per URL.
 function serve(routes: Record<string, () => Response>) {
@@ -29,18 +29,19 @@ describe('Certification evidence panel (#842)', () => {
     expect(screen.getByText(/Loading the certification evidence/i)).toBeTruthy()
   })
 
-  test('test_842_all_five_results_pass_and_certification_can_be_recorded', async () => {
+  test('test_842_all_four_results_pass_and_certification_can_be_recorded', async () => {
     serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'CERTIFYING', active: false, sub_skills: [sub('a', PASS), sub('b', PASS)], workflow_gates: UI_PASS }) })
     view()
-    expect(await screen.findByText('Import gate')).toBeTruthy()
-    for (const label of ['Import gate', 'Repository licence', 'Dependency vulnerabilities', 'MCP compliance', 'UI bundle']) expect(screen.getByText(label)).toBeTruthy()
-    expect(screen.getAllByText('Pass')).toHaveLength(5)
+    expect(await screen.findByText('Repository licence')).toBeTruthy()
+    expect(screen.queryByText(/Import gate/)).toBeNull()
+    for (const label of ['Repository licence', 'Dependency vulnerabilities', 'MCP compliance', 'UI bundle']) expect(screen.getByText(label)).toBeTruthy()
+    expect(screen.getAllByText('Pass')).toHaveLength(4)
     expect(screen.getByText('Ready')).toBeTruthy()
     expect(screen.getByText(/Certification can be recorded/)).toBeTruthy()
   })
 
   test('test_842_a_missing_result_is_shown_as_blocking_certification', async () => {
-    serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'BUILDING', active: true, sub_skills: [sub('a', { IMPORT_RESOLUTION: 'PASSED' })] }) })
+    serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'BUILDING', active: true, sub_skills: [sub('a', { MCP_COMPLIANCE: 'PASSED' })] }) })
     view()
     const licence = (await screen.findByText('Repository licence')).closest('li')!
     expect(within(licence).getByText('Missing')).toBeTruthy()
@@ -79,14 +80,14 @@ describe('Certification evidence panel (#842)', () => {
     serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'BUILDING', active: false, sub_skills: [] }) })
     view()
     expect(await screen.findByText('No evidence yet')).toBeTruthy()
-    expect(screen.queryByText('Import gate')).toBeNull()
+    expect(screen.queryByText('Repository licence')).toBeNull()
   })
 
   test('test_842_another_tenant_or_an_unassigned_fde_sees_the_forbidden_state', async () => {
     serve({ '/builds': () => json({ title: 'Not found', status: 404, detail: 'Not found' }, 404) })
     view()
     expect(await screen.findByText('Not available')).toBeTruthy()
-    expect(screen.queryByText('Import gate')).toBeNull()
+    expect(screen.queryByText('Repository licence')).toBeNull()
   })
 
   test('test_842_a_server_error_shows_the_servers_detail_and_a_retry', async () => {
@@ -97,10 +98,21 @@ describe('Certification evidence panel (#842)', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 
+  test('test_imp_t08_an_old_import_result_is_information_only_and_does_not_block', async () => {
+    const OLD = { ...PASS, IMPORT_RESOLUTION: 'FAILED' }
+    serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'CERTIFYING', active: false, sub_skills: [sub('a', OLD)], workflow_gates: UI_PASS }) })
+    view()
+    const old = (await screen.findByText('Import gate (retired)')).closest('li')!
+    expect(within(old).getByText(/Information only/)).toBeTruthy()
+    expect(within(old).queryByText(/blocked/i)).toBeNull()
+    expect(screen.getByText('Ready')).toBeTruthy()
+    expect(screen.getByText(/Certification can be recorded/)).toBeTruthy()
+  })
+
   test('test_842_the_panel_never_offers_a_write', async () => {
     serve({ '/builds': () => json({ workflow_id: W, workflow_state: 'BUILDING', active: false, sub_skills: [sub('a', PASS)] }) })
     view()
-    await screen.findByText('Import gate')
+    await screen.findByText('Repository licence')
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
     expect(calls.every(c => !(c[1] as RequestInit | undefined)?.method || (c[1] as RequestInit).method === 'GET')).toBe(true)

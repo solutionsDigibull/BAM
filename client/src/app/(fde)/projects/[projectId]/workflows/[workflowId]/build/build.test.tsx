@@ -44,8 +44,8 @@ const builds = (rows: unknown[], active = true): BuildsResponse =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("build dashboard rules (E12.6)", () => {
-  test("23 gate columns in contract order, AST ×8, compliance ×3", () => {
-    expect(GATES).toHaveLength(23);
+  test("22 gate columns in contract order, AST ×8, compliance ×3 (no import gate since #922)", () => {
+    expect(GATES).toHaveLength(22);
     expect(GATES.filter((g) => g.family === "AST")).toHaveLength(8);
     expect(GATES.filter((g) => g.family === "Compliance").map((g) => g.name)).toEqual([
       "REPO_LICENCE",

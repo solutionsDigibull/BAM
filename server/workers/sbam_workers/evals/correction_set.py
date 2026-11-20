@@ -151,24 +151,24 @@ DEFECTS: Final[tuple[tuple[str, str, Defect], ...]] = (
         Defect(slot="check_body", text=f"query = \"{_SQL}'{{}}'\".format(mobile_number)\n"),
     ),
     (
-        "requests imported in the helpers",
-        "IMPORT_NOT_ALLOWED",
-        Defect(slot="helpers", text="import requests\n\n_SESSION = requests.Session\n\n\n"),
+        "os imported in the helpers",
+        "FORBIDDEN_IMPORT",
+        Defect(slot="helpers", text="import os\n\n_HOME = os.getcwd\n\n\n"),
     ),
     (
-        "numpy imported in the helpers",
-        "IMPORT_NOT_ALLOWED",
-        Defect(slot="helpers", text="import numpy\n\n_ZEROS = numpy.zeros\n\n\n"),
+        "socket imported in the helpers",
+        "FORBIDDEN_IMPORT",
+        Defect(slot="helpers", text="import socket\n\n_SOCK = socket.socket\n\n\n"),
     ),
     (
-        "pandas imported in the helpers",
-        "IMPORT_NOT_ALLOWED",
-        Defect(slot="helpers", text="import pandas\n\n_FRAME = pandas.DataFrame\n\n\n"),
+        "shutil imported in the helpers",
+        "FORBIDDEN_IMPORT",
+        Defect(slot="helpers", text="import shutil\n\n_COPY = shutil.copy\n\n\n"),
     ),
     (
-        "yaml imported in the helpers",
-        "IMPORT_NOT_ALLOWED",
-        Defect(slot="helpers", text="from yaml import safe_load\n\n_PARSE = safe_load\n\n\n"),
+        "multiprocessing imported in the helpers",
+        "FORBIDDEN_IMPORT",
+        Defect(slot="helpers", text="import multiprocessing\n\n_POOL = multiprocessing.Pool\n\n\n"),
     ),
 )
 

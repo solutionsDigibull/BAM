@@ -26,7 +26,9 @@ from sbam_contracts.testgen import MIN_CASES, REQUIRED_KINDS, CaseKind
 # UI_BUNDLE (#857) is evidence of the Workflow, not of a Sub-Skill: `certification_reasons` of
 # `sbam_api.manifests.ui_bundle` requires it at Workflow level. REVIEW (#759) is optional evidence:
 # a build that predates the review pass has no row and still certifies, but a row that is on record
-# must have PASSED (see `_gate_reasons`).
+# must have PASSED (see `_gate_reasons`). IMPORT_RESOLUTION (#922, ADR 0040) is no longer evidence:
+# SBAM does not resolve or block imports. Its enum value stays so rows frozen before the change
+# still read and validate; a row on record is ignored here, a missing one is not a reason.
 REQUIRED_GATES: Final = tuple(
     g
     for g in GateName
@@ -37,6 +39,7 @@ REQUIRED_GATES: Final = tuple(
         GateName.LOOP_TESTS,
         GateName.REVIEW,
         GateName.UI_BUNDLE,
+        GateName.IMPORT_RESOLUTION,
     }
 )
 
