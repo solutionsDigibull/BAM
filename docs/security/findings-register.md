@@ -30,7 +30,6 @@ Last reviewed: 2026-11-20.
 | SF-08 | ZAP baseline warnings: Cross-Origin-Resource-Policy header missing (90004) x3, non-storable content (10049) x8, X-Content-Type-Options missing (10021) x3. No High. | ZAP baseline (run 44630792047) | Low | D1 | open | API security headers |
 | SF-09 | A sandbox run with a blocked egress attempt still passes if its cases pass (the attempt is recorded) | `test_e13_2_blocked_egress_in_a_passing_run_does_not_fail_it_but_is_kept` | Medium | D3 | open, decision | #917 |
 | SF-10 | A PostgreSQL reserved word (`user`, `select`) has the shape of a table name and passes the ISATVON 1.4 rules; the schema step refuses it, so no SQL is built from it | `test_e15_3_sql_identifier_injection.py` | Low | D3 | open | Check reserved words in `isatvon14._is_table_name` too |
-| SF-11 | The export package is not yet in the secrets-never-leak check (skipped until #905 merges) | `test_e15_3_secrets_never_leak.py` | Medium | D3 | open | Un-skip after #905 |
 
 ## Fixed
 
@@ -38,3 +37,4 @@ Last reviewed: 2026-11-20.
 |---|---|---|---|---|---|
 | SF-F1 | A token from the admin portal client (`azp=sbam-admin`) was accepted on the FDE API: `aud` was checked, `azp` was not | E15.3 token suite (strict xfail in #889) | High | D1 | #917 (`core/auth.py`) |
 | SF-F2 | High-entropy test literals tripped gitleaks | gitleaks | Low | D3 | #905 (literals removed from history) |
+| SF-11 | The export package was not in the secrets-never-leak check (skipped until #905 merged) | `test_e15_3_secrets_never_leak.py` | Medium | D3 | #917 (zip bytes and every entry checked) |

@@ -14,13 +14,17 @@ value is looked for in:
 Control: the one sanctioned reader (`connections.inject.resolve_env`, used at container start)
 still returns the value, so its absence everywhere else is not because nothing was stored.
 
-The Workflow export package (#133, PR #905) is not on `dev` yet: its check is skipped, not faked.
+The Workflow export package (#133) is checked the same way: the secret is stored for the exported
+Workflow, a frozen version is exported, and neither the zip bytes nor any decompressed entry holds
+it; the package's `.env.example` names the variable with no value.
 """
 
+import io
 import json
 import logging
 import sys
 import uuid
+import zipfile
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -32,6 +36,7 @@ from sqlalchemy import select
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api"))
 
+import test_e14_5_export_api as e145
 import test_wg16_connections_api as wg16
 import test_wg18_commit_api as wg18
 from sbam_api.audit.models import AuditLog
@@ -40,10 +45,12 @@ from sbam_api.connections.inject import resolve_env
 from sbam_api.core.telemetry import tracer_provider
 from sbam_api.manifests.models import WorkflowManifestRow
 from sbam_api.workflow_registry.models import RegisteredWorkflowRow
+from sbam_workers.exports import activities as export_activities
 from test_project_workspace import Harness
 from test_wg12_workflow_registry import TOOLS, FakeBifrost
 
 h = wg18.h  # the Commit harness (connections included)
+client = wg18.client  # the fake Temporal client the export route starts its run on
 SECRET = wg16.SECRET  # a fixed test value; it is never a real key
 LEDGER = wg16.LEDGER
 
@@ -130,8 +137,32 @@ def test_e15_3_a_secret_is_never_in_logs_traces_manifests_or_the_registry(
     assert leaked == []
 
 
-def test_e15_3_a_secret_is_never_in_the_export_package() -> None:
-    pytest.skip(
-        "the Workflow export package (#133, PR #905, branch 133-export-package) is not on dev; "
-        "add the zip-bytes check when it merges"
-    )
+def test_e15_3_a_secret_is_never_in_the_export_package(
+    h: Harness, client: wg18.FakeClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(export_activities, "notify_project", lambda *_, **__: 1)
+    e145.frozen(h)
+    wg16.put_value(h, LEDGER, SECRET)
+    keyring = KeyRing.parse(wg16.KEYS, allow_placeholder=True)
+    with h.sessions() as s:  # control: the value is stored and readable where it is meant to be
+        env = resolve_env(
+            s,
+            wg18.ctx(h),
+            wg16.WORKFLOW,
+            keyring=keyring,
+            actor_id="t",
+            purpose="t",
+            run_id=uuid.uuid4(),
+        )
+        s.rollback()
+    assert env[LEDGER].get_secret_value() == SECRET
+    accepted = e145.post(h)
+    assert accepted.status_code == 202, accepted.text
+    result = e145.run(h, client)
+    raw = wg18.storage(h).get(result.storage_key)
+    archive = zipfile.ZipFile(io.BytesIO(raw))
+    assert SECRET.encode() not in raw
+    leaked = [name for name in archive.namelist() if SECRET.encode() in archive.read(name)]
+    assert leaked == []
+    env_example = archive.read(".env.example").decode()
+    assert f"{LEDGER}=" in env_example.splitlines()  # the name, never the value
