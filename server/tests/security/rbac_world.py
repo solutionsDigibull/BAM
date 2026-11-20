@@ -343,6 +343,7 @@ class World:
         self.master_a = self._create_master("admin_a")
         self.master_b = self._create_master("admin_b")
         self.master_doc_a = self._create_master_document(self.tenant_a)
+        self.scan_a = self._create_scan(self.tenant_a)
         with self.sessions() as s:  # a pinned snapshot of project A's masters (E3.2)
             snapshot = MasterSnapshot(
                 tenant_id=self.tenant_a,
@@ -385,6 +386,24 @@ class World:
         res = self.call("POST", "/admin/masters/RULES", role, json=body)
         assert res.status_code == 201, res.text
         return uuid.UUID(res.json()["id"])
+
+    def _create_scan(self, tenant: uuid.UUID) -> uuid.UUID:
+        """An accepted masters scan (#609): the audit row `POST /admin/masters/import` writes."""
+        scan_id = uuid.uuid4()
+        with self.sessions() as s:
+            s.add(
+                AuditLog(
+                    tenant_id=tenant,
+                    actor_id=str(uuid.uuid4()),
+                    action="MASTERS_SCAN_ACCEPTED",
+                    entity_type="masters_scan",
+                    entity_id=str(scan_id),
+                    after={"kind": "IMPORT"},
+                    correlation_id="cid-rbac-scan",
+                )
+            )
+            s.commit()
+        return scan_id
 
     def _create_master_document(self, tenant: uuid.UUID) -> uuid.UUID:
         """A clean master document (E3.8), written like the upload would leave it."""
@@ -578,6 +597,7 @@ class World:
             "master_a": self.master_a,
             "master_b": self.master_b,
             "master_doc_a": self.master_doc_a,
+            "scan_a": self.scan_a,
             "snapshot_a": self.snapshot_a,
             "kv_a": self.kv_a,
             "sow_a": self.sow_a,

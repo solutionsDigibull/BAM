@@ -59,14 +59,13 @@ from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.bulkhead import CLAMD, BulkheadFullError
 from sbam_api.core.conventions import ApiError
-from sbam_api.core.settings import Settings
 from sbam_api.db.repository import StaleRowVersion
 from sbam_api.filetypes.repository import current_payloads
 from sbam_api.masters.documents import TENANT_SCOPE_PROJECT, scan_unavailable
 from sbam_api.masters.models import MasterEntry, MasterEntryVersion
 from sbam_api.masters.repository import MasterEntryRepository
 from sbam_api.masters.service import _active_project, _audit, _correlation, _repo, version_conflict
-from sbam_api.scan.clamd import ClamdClient, ClamdError
+from sbam_api.scan.clamd import ClamdClient, ClamdError, ClamdSettings
 from sbam_api.storage import Kind, StorageBackend, StorageScope
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -87,7 +86,7 @@ _TAB_TYPES = {tab: master_type for master_type, tab in TABS.items()}
 def import_workbook(
     session: Session,
     user: CurrentUser,
-    settings: Settings,
+    settings: ClamdSettings,
     storage: StorageBackend,
     filename: str,
     data: bytes,
@@ -133,7 +132,7 @@ def import_workbook(
 def read_workbook(
     session: Session,
     user: CurrentUser,
-    settings: Settings,
+    settings: ClamdSettings,
     storage: StorageBackend,
     scope: StorageScope,
     filename: str,
@@ -167,7 +166,7 @@ def _structure_mismatch(errors: list[FieldError]) -> ApiError:
 def _scan(
     session: Session,
     user: CurrentUser,
-    settings: Settings,
+    settings: ClamdSettings,
     storage: StorageBackend,
     scope: StorageScope,
     sha256: str,

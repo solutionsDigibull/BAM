@@ -46,7 +46,6 @@ from sbam_api.audit.repository import record
 from sbam_api.core.auth import CurrentUser
 from sbam_api.core.bulkhead import CLAMD, BulkheadFullError
 from sbam_api.core.conventions import ApiError, check_if_match, not_found
-from sbam_api.core.settings import Settings
 from sbam_api.db.base import utcnow
 from sbam_api.db.repository import TenantScopedRepository
 from sbam_api.filetypes.config import Filetype, enabled_rows, load
@@ -54,7 +53,7 @@ from sbam_api.ingest.rules import extension
 from sbam_api.masters.models import MasterDocument
 from sbam_api.masters.repository import MasterEntryRepository
 from sbam_api.masters.service import _active_project, _correlation
-from sbam_api.scan.clamd import ClamdClient, ClamdError, ScanVerdict
+from sbam_api.scan.clamd import ClamdClient, ClamdError, ClamdSettings, ScanVerdict
 from sbam_api.storage import Kind, StorageBackend, StorageScope
 
 TENANT_SCOPE_PROJECT: Final = uuid.UUID(int=0)
@@ -165,20 +164,9 @@ def _title(filename: str) -> str:
     return "".join(c for c in name if c.isprintable())[:255]
 
 
-def attach(
-    session: Session,
-    user: CurrentUser,
-    settings: Settings,
-    storage: StorageBackend,
-    filename: str,
-    data: bytes,
-    project_id: uuid.UUID | None,
-    master_type: MasterType | None,
-    *,
-    sleep: Callable[[float], None] = time.sleep,
-) -> Attached:
-    if project_id is not None:
-        _active_project(session, user, project_id)
+def precheck(filename: str, data: bytes) -> tuple[str, Filetype]:
+    """The cheap checks, before any scan: (the title, the Filetype row). 413 / 422 / 415. The
+    request runs them for an asynchronous upload too, so a bad file is refused at once (#609)."""
     if len(data) > MAX_FILE_BYTES:
         raise ApiError(413, ErrorCode.FILE_TOO_LARGE, "The file is larger than 15 MB")
     title = _title(filename)
@@ -197,6 +185,24 @@ def attach(
             "This file type is not supported yet",
             errors=[FieldError(path="file", message=f"no loader for .{extension(title) or '?'}")],
         )
+    return title, filetype
+
+
+def attach(
+    session: Session,
+    user: CurrentUser,
+    settings: ClamdSettings,
+    storage: StorageBackend,
+    filename: str,
+    data: bytes,
+    project_id: uuid.UUID | None,
+    master_type: MasterType | None,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Attached:
+    if project_id is not None:
+        _active_project(session, user, project_id)
+    title, filetype = precheck(filename, data)
 
     sha256 = hashlib.sha256(data).hexdigest()
     repo = _repo(session, user)
@@ -282,7 +288,9 @@ def attach(
     return Attached(document, created=existing is None)
 
 
-def _scan(settings: Settings, data: bytes, sleep: Callable[[float], None]) -> ScanVerdict | None:
+def _scan(
+    settings: ClamdSettings, data: bytes, sleep: Callable[[float], None]
+) -> ScanVerdict | None:
     """The verdict, or None when clamd gave none in `SCAN_ATTEMPTS` tries (never a pass)."""
     clamd = ClamdClient(settings.clamav_host, settings.clamav_port, settings.clamav_timeout)
     delay = SCAN_BACKOFF
