@@ -96,6 +96,12 @@ Client-document samples, one per MVP file type (TD §5.2). They tell one story: 
 | `malware/eicar.part2.b64` | The last 34 bytes, base64-encoded | Joined with part 1 by `eicar_bytes()` it is the 68-byte string (SHA-256 `275a021b…fd0f`); a scanner reports that INFECTED |
 | `malware/size_limits.json` | Upload limits used by size-boundary tests: 15 MB, 15 MB + 1 byte, 20 files | Values equal the limits in the upload design |
 
+## security/
+
+| File | What it is | Expected outcome |
+|---|---|---|
+| `security/template_injection.txt` | Versioned E15.3-T04 corpus: one Jinja2 / template-injection payload per line (`{{ }}`, `{% %}`, the `cycler.__init__.__globals__` payload, other engines' syntax) plus the LLM data-block variants (`</DATA>`, `</Data >`, `</ data>`, forged `<data name=...>`, `<image name=...>`). Written by hand | Each payload, put in every free-text ISATVON field the codegen templates print, renders as data: never compiled as Jinja2 source, nothing evaluated or run (`tests/security/test_e15_3_t04_template_injection.py`) |
+
 ## MVP loader coverage (E0.8-T07)
 
 Compared with TD §5.2. Every loader marked as MVP has at least one fixture, except one gap.

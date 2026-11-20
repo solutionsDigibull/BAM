@@ -59,12 +59,12 @@ def test_e0_8_t02_checksums_cover_every_fixture_file_and_nothing_else() -> None:
 
 def test_e0_8_t03_every_file_is_documented() -> None:
     assert undocumented() == []
-    assert len(fixture_files()) == 39  # + masters_0_3.xlsx (#781)
+    assert len(fixture_files()) == 40  # + masters_0_3.xlsx (#781), the E15.3 corpus (#137)
 
 
 def test_e0_8_t03_readme_lists_no_file_that_does_not_exist() -> None:
     readme = (FIXTURES_DIR / "README.md").read_text(encoding="utf-8")
-    listed = re.findall(r"`((?:documents|isa14|masters|sow|malware)/[^`]+)`", readme)
+    listed = re.findall(r"`((?:documents|isa14|masters|sow|malware|security)/[^`]+)`", readme)
     assert listed
     assert [name for name in listed if not (FIXTURES_DIR / name).is_file()] == []
 
