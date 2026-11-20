@@ -181,17 +181,11 @@ async function fakeMasters(page: Page, opts: { error?: boolean } = {}) {
   return { rows, log };
 }
 
-// A narrow screen folds the tabs that don't fit into antd's "more" menu.
+// A narrow screen clips or folds the tabs that don't fit: focus + Enter works for any of them.
 const pickTab = async (page: Page, name: string) => {
   const tab = page.getByRole("tab", { name, exact: true });
-  const more = page.locator(".ant-tabs-nav-more");
-  const box = await tab.boundingBox();
-  const bar = await page.locator(".ant-tabs-nav-wrap").boundingBox();
-  const fits = box && bar && box.x >= bar.x && box.x + box.width <= bar.x + bar.width - 48;
-  if (!fits && (await more.isVisible())) {
-    await more.click();
-    await page.locator(".ant-tabs-dropdown-menu-item", { hasText: name }).click();
-  } else await tab.click();
+  await tab.focus();
+  await page.keyboard.press("Enter");
 };
 // The grid is a lazy chunk: the first `next dev` compile can take a while.
 const openTab = async (page: Page, name: string) => {
@@ -327,6 +321,7 @@ test("mui4_t21 search with facets, Add N blank rows and the footer hint", async 
   await page.getByRole("combobox", { name: "Search Organizations" }).fill("");
   await page.getByRole("combobox", { name: "Filter by Location" }).click();
   await page.locator(".ant-select-item-option", { hasText: "Pune" }).click();
+  await page.keyboard.press("Escape"); // close the open list so it doesn't cover the toolbar
   await expect(page.getByText("1 of 2 rows")).toBeVisible();
   await expect(page.getByText(/Ctrl\+Enter saves/)).toBeVisible();
   await page.getByRole("button", { name: /Add 5 blank rows/ }).click();
