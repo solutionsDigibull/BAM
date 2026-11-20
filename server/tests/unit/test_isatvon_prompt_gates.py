@@ -39,7 +39,7 @@ DECLARED = frozenset(
 
 
 def test_689_the_prompt_declares_the_names_its_examples_use() -> None:
-    assert {"status", "attempt", "max_iterations"} <= DECLARED
+    assert {"status", "missing_count", "max_iterations"} <= DECLARED
 
 
 @pytest.mark.parametrize("text", RIGHT)

@@ -23,8 +23,8 @@ def codes(**over: str) -> set[str]:
     return {f.code.value for f in precheck(bodies, ENV.allowlist, ENV.params, ENV.skeleton)}
 
 
-def test_e11_4_the_newest_corrector_prompt_is_1_3_0_and_1_0_0_is_untouched() -> None:
-    assert PROMPT.version == "1.3.0"  # 1.2.0 added loop_gates, 1.3.0 (#922) the imports hint
+def test_e11_4_the_newest_corrector_prompt_is_1_4_0_and_1_0_0_is_untouched() -> None:
+    assert PROMPT.version == "1.4.0"  # 1.2.0 loop_gates, 1.3.0 (#922) imports, 1.4.0 (#928) state
     assert REGISTRY.get("correct-code", "1.0.0").sha256 == (
         "5013b740498265f3bb9b79b65aa8c22725cdc1eb3296ea18a3d1e5778cb641c7"
     )  # a released version is never edited
@@ -32,7 +32,7 @@ def test_e11_4_the_newest_corrector_prompt_is_1_3_0_and_1_0_0_is_untouched() -> 
 
 def test_e11_4_every_finding_code_the_prompt_names_is_a_real_pre_check_code() -> None:
     named = set(re.findall(r"`([A-Z][A-Z_]+)` finding", PROMPT.text))
-    assert named == {"MANUAL_LOOP"}
+    assert named == {"MANUAL_LOOP", "STATE_QUERY_INVALID"}  # the latter: #928
     assert named <= {c.value for c in BodyFindingCode}
 
 

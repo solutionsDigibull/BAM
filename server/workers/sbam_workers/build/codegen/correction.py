@@ -50,6 +50,7 @@ MAX_FINDINGS: Final = 50
 MAX_TRACE_BYTES: Final = 200 * 1024
 MAX_FINDING_TEXT: Final = 2000
 MAX_PATCH_OPS: Final = 50
+MAX_HINT_MEMBERS: Final = 20
 PATCH_ROOT: Final = "isatvon_definition"
 MAX_CHANGED_PATH_CHARS: Final = (
     200  # CorrectionResult.changed_paths: one pointer, at most this long
@@ -261,10 +262,16 @@ def _index(container: list[Any], token: str, *, append: bool) -> int:
     return index
 
 
+def _members(node: dict[str, Any]) -> str:
+    """The member names of the object a pointer missed, so the next patch can aim (WG-40)."""
+    names = [str(k)[:40] for k in list(node)[:MAX_HINT_MEMBERS]]
+    return f" (members here: {', '.join(names)})" if names else ""
+
+
 def _child(node: Any, token: str) -> Any:
     if isinstance(node, dict):
         if token not in node:
-            raise _PatchError(f"no member {token!r}")
+            raise _PatchError(f"no member {token!r}{_members(node)}")
         return node[token]
     if isinstance(node, list):
         return node[_index(node, token, append=False)]
@@ -282,7 +289,7 @@ def _apply(doc: dict[str, Any], op: PatchOp) -> None:
             raise _PatchError("test failed")
     elif isinstance(target, dict):
         if op.op != "add" and last not in target:
-            raise _PatchError(f"no member {last!r}")
+            raise _PatchError(f"no member {last!r}{_members(target)}")
         if op.op == "remove":
             del target[last]
         else:
@@ -297,6 +304,16 @@ def _apply(doc: dict[str, Any], op: PatchOp) -> None:
             target[index] = value
     else:
         raise _PatchError(f"cannot change a {type(target).__name__}")
+
+
+def _contract_hint(path: str, message: str) -> str:
+    """What to do instead, for the one required key a corrector kept deleting (WG-40)."""
+    if path.endswith("s_source.fresh_state_parameters") and "required" in message.lower():
+        return (
+            ". The key stays: when no fresh state is needed, `replace` it with [] "
+            "(an empty list is valid), never `remove` it"
+        )
+    return ""
 
 
 def apply_isatvon_patch(
@@ -321,7 +338,11 @@ def apply_isatvon_patch(
     violations = validate_sub_skill(patched, library_registry=frozenset(library_registry))
     if violations:
         return None, [
-            PatchFinding(PatchFindingCode.ISATVON_CONTRACT, v.path, f"rule {v.rule}: {v.message}")
+            PatchFinding(
+                PatchFindingCode.ISATVON_CONTRACT,
+                v.path,
+                f"rule {v.rule}: {v.message}{_contract_hint(v.path, v.message)}",
+            )
             for v in violations
         ]
     return patched, []
