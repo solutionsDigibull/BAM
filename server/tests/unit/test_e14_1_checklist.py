@@ -108,6 +108,23 @@ def test_e14_1_t06_evidence_on_different_bundles_is_rejected() -> None:
     assert evaluate(evidence(gates=gates)).reasons == ("EVIDENCE_HASH_MISMATCH",)
 
 
+def test_e14_1_t06_a_code_gate_without_a_bundle_hash_is_a_mismatch() -> None:
+    """MYPY is written through `record_verdicts`, which always records the bundle hash: a row of it
+    without one is not evidence about this bundle."""
+    gates = [gate(g, bundle_sha256=None) if g is GateName.MYPY else gate(g) for g in REQUIRED_GATES]
+    gates.append(gate(GateName.BANDIT))
+    assert evaluate(evidence(gates=gates)).reasons == ("EVIDENCE_HASH_MISMATCH",)
+
+
+def test_e14_1_a_pre_bundle_gate_without_a_hash_still_certifies() -> None:
+    """LIBRARIES runs before there is a bundle: its row has no hash and that is fine."""
+    gates = [
+        gate(g, bundle_sha256=None) if g is GateName.LIBRARIES else gate(g) for g in REQUIRED_GATES
+    ]
+    gates.append(gate(GateName.BANDIT))
+    assert evaluate(evidence(gates=gates)).certified
+
+
 def test_e14_1_gates_on_attempt_one_do_not_cover_tests_on_attempt_two() -> None:
     test = replace(evidence().test, code_attempt_id="attempt-2")  # type: ignore[type-var]
     assert evaluate(evidence(test=test)).reasons == ("EVIDENCE_HASH_MISMATCH",)
@@ -135,6 +152,16 @@ def test_e14_1_bandit_high_blocks_but_medium_only_certifies() -> None:
 def test_e14_1_a_failing_test_run_blocks() -> None:
     test = replace(evidence().test, state=TestRunState.FAIL, passed=2, failed=1)  # type: ignore[type-var]
     assert "TESTS_FAILED" in evaluate(evidence(test=test)).reasons
+
+
+def test_e14_1_every_case_must_be_accounted_for() -> None:
+    """A run where some cases neither passed nor failed is incomplete evidence."""
+    test = replace(  # type: ignore[type-var]
+        evidence().test, total=3, passed=1, failed=0, state=TestRunState.PASS
+    )
+    verdict = evaluate(evidence(test=test))
+    assert not verdict.certified
+    assert "TESTS_FAILED" in verdict.reasons
 
 
 # --- #759: the review pass is optional evidence --------------------------------------------------

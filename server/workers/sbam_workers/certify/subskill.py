@@ -14,8 +14,9 @@ What it does, in one transaction:
      document; the evidence and certification blocks are outside it) and freezes its row;
   4. inserts the certificate.
 
-A retry finds the certificate of the same (Sub-Skill, bundle hash) and returns it: no second row,
-no second manifest write. Messages and logs carry ids, gate names and reasons, never code.
+A retry of the same code attempt finds its certificate and returns it: no second row, no second
+manifest write. Another build or attempt whose bundle is byte-identical is checked in full: it
+certifies only on its own evidence. Messages and logs carry ids, gate names and reasons, never code.
 """
 
 import asyncio
@@ -26,6 +27,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
+from sbam_api.builds.models import CodeAttempt
 from sbam_api.builds.repository import CodeAttemptRepository
 from sbam_api.certifications.models import CertificationLevel
 from sbam_api.certifications.repository import CertificationRepository
@@ -77,9 +79,18 @@ def _digest(value: str) -> str:
 def _passed_kinds(
     results: list[dict[str, Any]], kinds: Mapping[str, CaseKind]
 ) -> frozenset[CaseKind]:
-    """The kinds of the cases whose every assertion held."""
+    """The kinds of the cases that ran and whose every assertion held: a case with no result row
+    did not pass, it was not tested."""
+    ran = {r["case"] for r in results}
     failed = {r["case"] for r in results if not r["passed"]}
-    return frozenset(kind for name, kind in kinds.items() if name not in failed)
+    return frozenset(kind for name, kind in kinds.items() if name in ran and name not in failed)
+
+
+def _sealed_for(manifest: Mapping[str, Any] | None, attempt_id: str) -> bool:
+    """Whether certification already sealed this manifest on the evidence of `attempt_id`."""
+    record = (manifest or {}).get("sbam_build_record") or {}
+    evidence = record.get("evidence") if isinstance(record, Mapping) else None
+    return isinstance(evidence, Mapping) and evidence.get("code_attempt_id") == attempt_id
 
 
 def _built_router(manifest: Mapping[str, Any]) -> str | None:
@@ -212,6 +223,20 @@ class CertifySubSkill:
             _sow_problem(session, ctx, manifest_row.manifest),
         )
 
+    @staticmethod
+    def _is_retry(
+        session: Session, ctx: TenantContext, evidence: Mapping[str, Any], attempt: CodeAttempt
+    ) -> bool:
+        """The certificate is this attempt's own, or an earlier try of this activity already sealed
+        this attempt's manifest (it passed and `record` returned the certificate on file)."""
+        attempt_id = str(attempt.id)
+        if evidence.get("code_attempt_id") == attempt_id:
+            return True
+        if attempt.manifest_id is None:
+            return False
+        row = SubSkillManifestRepository(session, ctx).get(attempt.manifest_id)
+        return row is not None and row.is_frozen and _sealed_for(row.manifest, attempt_id)
+
     def _certify(self, inp: BuildStageInput, isatvon: Mapping[str, Any]) -> uuid.UUID:
         ctx = TenantContext(inp.tenant_id, inp.project_id)
         try:
@@ -229,8 +254,13 @@ class CertifySubSkill:
                     inp.sub_skill_id,
                     "sha256:" + attempt.bundle_sha256,
                 )
-                if done is not None:  # a retried activity: the certificate stands
-                    return done.id
+                if done is not None and self._is_retry(session, ctx, done.evidence, attempt):
+                    return done.id  # a retried activity: the certificate stands
+                # Another build (or attempt) with a byte-identical bundle is checked in full below.
+                # If it passes, its own manifest is sealed and frozen, and `record` returns the
+                # existing certificate: the unique key (tenant, level, subject, content_sha256)
+                # allows one per bundle, so that certificate's evidence still names the first
+                # attempt that passed. Keying it per attempt needs a D3 decision and a migration.
             loaded = self._load(session, ctx, inp, current_suite)
             if isinstance(loaded, ApplicationError):
                 raise loaded
