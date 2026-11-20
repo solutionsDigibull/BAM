@@ -31,6 +31,7 @@ class Task(StrEnum):
     TESTGEN = "testgen"
     CORRECTION = "correction"
     REVIEW = "review"
+    UI_COPY = "ui-copy"
 
 
 class _Strict(BaseModel):
