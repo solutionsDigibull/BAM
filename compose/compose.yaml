@@ -464,6 +464,8 @@ services:
       # The masters workbook import (#56) scans uploads with clamd; down = the import answers 503.
       CLAMAV_HOST: clamav
       CLAMAV_PORT: "3310"
+      # The promptfoo rubric grader is part of this stack (E13.6c), so a case may carry an llm_rubric (#127).
+      RUBRIC_GRADING: "true"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes: [storage:/data/storage]
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]

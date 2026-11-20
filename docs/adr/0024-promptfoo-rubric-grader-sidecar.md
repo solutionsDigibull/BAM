@@ -30,6 +30,15 @@ and nothing ran it. The rule "LLM calls go only through Bifrost with an alias" h
    blocked (TESTING_BLOCKED), with no correction spent (E13.6-T07).
 5. **No grader configured blocks testing.** `PROMPTFOO_JOBS_DIR` empty means no grader: a suite with a rubric case
    blocks testing instead of being scored, so nothing is ever read as the code's fault because the platform could not grade it.
+6. **A stored `llm_rubric` reaches the grader, or is refused where it is stored (#127, 2026-11-21).** Until now the
+   suite builder skipped every stored `llm_rubric`, so the sidecar was never asked about one. Decision (the
+   recommended option of the 2026-11-21 audit): the suite keeps a stored rubric as the case's last assertion on a
+   SUCCESS case, and `judge_with_grader` hands it to `SidecarGrader` after the deterministic checks passed (a
+   deterministic failure is never graded). Where a case is stored (an FDE edit or add, and the model's test data), a
+   rubric is accepted only when a grader is configured (`RUBRIC_GRADING` on the API, `PROMPTFOO_JOBS_DIR` on the
+   worker): otherwise the write is a 422 at `/assertions/N/type` with the reason, and the model's answer is re-asked.
+   A rubric needs text (at most 4 000 characters) and a case that ends in SUCCESS. The related #127 question, the
+   BLOCKED badge that is never produced while an existing test asserts the opposite, is left as it is.
 
 ## Consequences
 

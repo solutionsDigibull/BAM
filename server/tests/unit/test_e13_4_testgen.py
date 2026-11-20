@@ -528,3 +528,22 @@ def test_a_case_whose_input_contradicts_no_op_condition_is_sent_back() -> None:
         case("fine", "ESCALATION", "ESCALATED"), case("noop", "NO_OP", "NO_OP", input=blocked)
     )
     assert not [x for x in check_output(base, ok) if "no_op_condition" in x]
+
+
+def test_e13_6_t_rubric_9_a_rubric_the_model_writes_is_kept_only_with_a_grader() -> None:
+    rubric = case(
+        "polite", "EDGE", "SUCCESS", assertions=[{"type": "llm_rubric", "value": "reads well"}]
+    )
+    w = World([{"cases": [*GOOD["cases"], rubric]}, GOOD])
+    w.run()  # no grader configured: the answer is re-asked and the rubric case is never stored
+    assert len(w.bifrost.requests) == 2 and "/assertions/0/type" in json.dumps(
+        w.bifrost.requests[1]
+    )
+    assert "polite" not in {c.name for c in w.cases()}
+
+    graded = World([{"cases": [*GOOD["cases"], rubric]}])
+    graded.stage.rubric_grading = True
+    graded.run()
+    assert len(graded.bifrost.requests) == 1
+    stored = {c.name: c.assertions for c in graded.cases()}
+    assert stored["polite"] == [{"type": "llm_rubric", "value": "reads well"}]

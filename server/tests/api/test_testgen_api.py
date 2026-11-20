@@ -333,3 +333,62 @@ def test_e13_7_the_tests_answer_carries_the_closed_input_schema(h: Harness) -> N
     schema = h.tests().json()["input_schema"]
     assert schema["additionalProperties"] is False
     assert set(INPUT) <= set(schema["properties"])
+
+
+RUBRIC = {"type": "llm_rubric", "value": "the summary is polite"}
+
+
+def with_grader(h: Harness) -> None:
+    state = h.client.app.state  # type: ignore[attr-defined]
+    state.settings = state.settings.model_copy(update={"rubric_grading": True})
+
+
+def test_e13_6_t_rubric_6_a_rubric_is_refused_with_its_reason_when_no_grader_is_configured(
+    h: Harness,
+) -> None:
+    sha = h.seed()
+    cid = h.case_id("case-PASS_FIRST")
+    res = h.write("PUT", f"/cases/{cid}", sha, {"assertions": [RUBRIC]})
+    problem(res, 422, "VALIDATION_ERROR")
+    [error] = res.json()["errors"]
+    assert error["path"] == "/assertions/0/type" and "rubric grader" in error["message"]
+    assert len(h.dataset_rows()) == 1  # nothing stored
+
+
+def test_e13_6_t_rubric_7_a_rubric_is_stored_when_the_grader_is_configured(h: Harness) -> None:
+    with_grader(h)
+    sha = h.seed()
+    cid = h.case_id("case-PASS_FIRST")
+    res = h.write("PUT", f"/cases/{cid}", sha, {"assertions": [RUBRIC]})
+    assert res.status_code == 200, res.text
+    assert res.json()["assertions"] == [RUBRIC]
+    posted = h.write(
+        "POST",
+        "/cases",
+        res.headers["ETag"].strip('"'),
+        {
+            "name": "polite",
+            "input": INPUT,
+            "expected_terminal": "SUCCESS",
+            "assertions": [RUBRIC],
+        },
+    )
+    assert posted.status_code == 201, posted.text
+
+
+@pytest.mark.parametrize(
+    ("assertion", "case_name", "path"),
+    [
+        ({"type": "llm_rubric", "value": "  "}, "case-PASS_FIRST", "/assertions/0/value"),
+        ({"type": "llm_rubric"}, "case-PASS_FIRST", "/assertions/0/value"),
+        (RUBRIC, "case-ESCALATION", "/assertions/0/type"),
+    ],
+)
+def test_e13_6_t_rubric_8_a_rubric_needs_text_and_a_case_that_succeeds(
+    h: Harness, assertion: dict[str, Any], case_name: str, path: str
+) -> None:
+    with_grader(h)
+    sha = h.seed()
+    res = h.write("PUT", f"/cases/{h.case_id(case_name)}", sha, {"assertions": [assertion]})
+    problem(res, 422, "VALIDATION_ERROR")
+    assert res.json()["errors"][0]["path"] == path

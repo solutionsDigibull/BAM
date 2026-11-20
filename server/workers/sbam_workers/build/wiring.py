@@ -496,6 +496,7 @@ def _generate_tests() -> GenerateTests:
         _llm(settings, sessions),
         SqlDatasetStore(sessions, make_backend(settings)),
         SqlBuildInputs(sessions, make_backend(settings)).schema_text,
+        rubric_grading=bool(settings.promptfoo_jobs_dir),
     )
 
 

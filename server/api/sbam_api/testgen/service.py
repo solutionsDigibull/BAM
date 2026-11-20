@@ -246,6 +246,7 @@ def edit_case(
     case_id: uuid.UUID,
     put: CasePut,
     if_match: str | None,
+    rubric_grading: bool = False,
 ) -> tuple[TestCaseOut, str]:
     """(the case after the edit, the dataset sha256 now: the new `ETag`)."""
     opened = Open(session, user, project_id, workflow_id, sub_id, if_match)
@@ -256,7 +257,9 @@ def edit_case(
     row, kind, body = pairs[index]
     changes = {name: getattr(put, name) for name in put.model_fields_set}
     edited = body.model_copy(update=changes)
-    errors = case_errors(opened.isatvon(), kind, CaseBody.model_validate(edited.model_dump()))
+    errors = case_errors(
+        opened.isatvon(), kind, CaseBody.model_validate(edited.model_dump()), rubric_grading
+    )
     if errors:
         raise _unprocessable(errors)
     if edited == body:  # nothing changed: no new version
@@ -274,11 +277,12 @@ def add_case(
     sub_id: uuid.UUID,
     post: CasePost,
     if_match: str | None,
+    rubric_grading: bool = False,
 ) -> tuple[TestCaseOut, str]:
     opened = Open(session, user, project_id, workflow_id, sub_id, if_match)
     pairs = opened.pairs()
     body = CaseBody.model_validate(post.model_dump())
-    errors = case_errors(opened.isatvon(), CaseKind.FDE, body)
+    errors = case_errors(opened.isatvon(), CaseKind.FDE, body, rubric_grading)
     if body.name in {b.name for _, _, b in pairs}:
         errors.append(FieldError(path="/name", message="a case with this name already exists"))
     if errors:
