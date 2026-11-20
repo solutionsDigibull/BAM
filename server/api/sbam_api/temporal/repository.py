@@ -8,8 +8,8 @@ import uuid
 from datetime import UTC, datetime
 
 from sbam_contracts.runs import TERMINAL_STATES, Run, RunState, SubjectType
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, aliased
 
 from sbam_api.db.repository import TenantScopedRepository
 from sbam_api.temporal.models import TemporalRun
@@ -34,6 +34,28 @@ class TemporalRunRepository(TenantScopedRepository[TemporalRun]):
             .limit(1)
         )
         return self.session.scalars(query).one_or_none()
+
+    def latest_for_subjects(
+        self, subject_type: str, subject_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, TemporalRun]:
+        """`latest_for_subject` for many subjects in one query (the Build & Test grid); a subject
+        without a run is absent. Newest is the highest id, as there."""
+        if not subject_ids:
+            return {}
+        newest_first = func.row_number().over(
+            partition_by=TemporalRun.subject_id, order_by=TemporalRun.id.desc()
+        )
+        ranked = (
+            self._scoped()
+            .where(
+                TemporalRun.subject_type == subject_type, TemporalRun.subject_id.in_(subject_ids)
+            )
+            .add_columns(newest_first.label("newest"))
+            .subquery()
+        )
+        run = aliased(TemporalRun, ranked)
+        rows = self.session.scalars(select(run).where(ranked.c.newest == 1))
+        return {row.subject_id: row for row in rows}
 
     def latest_for_workflow_id(self, temporal_workflow_id: str) -> TemporalRun | None:
         """The newest run of a Temporal workflow id (e.g. `pipeline-<project_id>`)."""
