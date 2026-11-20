@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:224f5eb2327485e3d755c6980fd0ed68ec47a750994b08d5f2b2d3a812e7a7e9
+// source-sha256:1c9fd8e9a45fd968608d345e1161291ddf86b83df981f2a863fb2a66577d56ca
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -894,6 +894,9 @@ export interface SbamContracts {
   ExportAccepted?: ExportAccepted;
   BudgetCaps?: BudgetCaps;
   BudgetState?: BudgetState;
+  ProjectTokenCaps?: ProjectTokenCaps;
+  TokenMeter?: TokenMeter;
+  RaiseCap?: RaiseCap;
   Connection?: Connection;
   ConnectionList?: ConnectionList;
   ConnectionValueIn?: ConnectionValueIn;
@@ -7720,6 +7723,45 @@ export interface BudgetState {
   cap: number;
   level: BudgetLevel;
   raised_once?: boolean;
+  build_id?: string | null;
+}
+/**
+ * `GET`/`PUT /admin/projects/{id}/token-caps` (#776): the caps of one project.
+ *
+ * `row_version` is the ETag (`If-Match` on PUT); it is 0 while nothing is stored, and then
+ * `is_default` is true and `caps` are the platform defaults.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "ProjectTokenCaps".
+ */
+export interface ProjectTokenCaps {
+  caps: BudgetCaps;
+  row_version: number;
+  is_default: boolean;
+}
+/**
+ * `GET /projects/{id}/token-budget` (#776): used against the cap per scope, for the meter.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TokenMeter".
+ */
+export interface TokenMeter {
+  scopes: BudgetState[];
+  first_alert_pct: number;
+  second_alert_pct: number;
+}
+/**
+ * `POST .../token-budget/raise` (#776): a new cap for one scope, once per build.
+ *
+ * `build_id` is the build the meter names for that scope (the Temporal workflow id of its calls).
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "RaiseCap".
+ */
+export interface RaiseCap {
+  scope: BudgetScope;
+  build_id: string;
+  tokens: number;
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema

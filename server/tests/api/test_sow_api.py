@@ -17,6 +17,7 @@ from sbam_api.projects.models import Project
 from sbam_api.sow.models import Sow, SowImpactRecord, SowVersion
 from sbam_api.sow.service import Generation, canonical_sha256, record_generation
 from sbam_api.sow.tiptap import to_tiptap
+from sbam_api.token_budget.models import ProjectTokenCapsRow
 from sbam_contracts.sow import SowDocument
 from sbam_contracts.sow_api import MAX_TIPTAP_BYTES
 from sqlalchemy import select, update
@@ -30,7 +31,14 @@ class Harness(GraphHarness):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__(tmp_path)
         bind = self.sessions.kw["bind"]
-        for table in (LlmCall, LlmDerivative, Sow, SowVersion, SowImpactRecord):  # impacts: E7.2
+        for table in (
+            LlmCall,
+            LlmDerivative,
+            ProjectTokenCapsRow,
+            Sow,
+            SowVersion,
+            SowImpactRecord,
+        ):  # impacts: E7.2
             table.__table__.create(bind, checkfirst=True)  # type: ignore[attr-defined]
         self.dvid, doc = self.document("Acme quotes cables. Scope: quoting only.")
         self.kv = self.ready([doc], [], [])

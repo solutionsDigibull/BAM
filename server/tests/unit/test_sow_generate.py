@@ -20,6 +20,7 @@ from sbam_api.llm.models import LlmCall, LlmDerivative
 from sbam_api.llm.repository import LlmCallRepository
 from sbam_api.sow.models import Sow, SowVersion
 from sbam_api.sow.service import canonical_sha256
+from sbam_api.token_budget.models import ProjectTokenCapsRow
 from sbam_contracts.pipeline import StageRef
 from sbam_contracts.sow import SECTIONS, Citation, SowDocument
 from sbam_workers.llm.store import LlmScope
@@ -63,7 +64,7 @@ class Gen:
     def __init__(self, w: World, *docs: str) -> None:
         self.w = w
         engine = w.sessions.kw["bind"]
-        for table in (LlmCall, LlmDerivative, Sow, SowVersion):
+        for table in (LlmCall, LlmDerivative, ProjectTokenCapsRow, Sow, SowVersion):
             table.__table__.create(engine, checkfirst=True)  # type: ignore[attr-defined]
         w.docs(*(docs or DOCS))
         self.inp = w.run_input()

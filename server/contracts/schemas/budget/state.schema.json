@@ -46,6 +46,20 @@
       "default": false,
       "title": "Raised Once",
       "type": "boolean"
+    },
+    "build_id": {
+      "anyOf": [
+        {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Build Id"
     }
   },
   "required": [

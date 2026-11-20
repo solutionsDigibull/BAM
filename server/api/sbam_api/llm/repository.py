@@ -135,6 +135,65 @@ class LlmCallRepository(TenantScopedRepository[LlmCall]):
         )
         return int(self.session.scalar(query) or 0)
 
+    def tokens_for_workflow(self, temporal_workflow_id: str) -> int:
+        """Tokens (in + out) of every attempt recorded under one Temporal workflow id of the
+        project: one Sub-Skill build's own count (#776)."""
+        query = select(func.coalesce(func.sum(LlmCall.tokens_in + LlmCall.tokens_out), 0)).where(
+            LlmCall.tenant_id == self.ctx.tenant_id,
+            LlmCall.project_id == self.ctx.project_id,
+            LlmCall.temporal_workflow_id == temporal_workflow_id,
+            LlmCall.deleted_at.is_(None),
+        )
+        return int(self.session.scalar(query) or 0)
+
+    def has_workflow(self, temporal_workflow_id: str) -> bool:
+        """Whether the project has any call under this Temporal workflow id (a raise names one)."""
+        query = (
+            select(LlmCall.id)
+            .where(
+                LlmCall.tenant_id == self.ctx.tenant_id,
+                LlmCall.project_id == self.ctx.project_id,
+                LlmCall.temporal_workflow_id == temporal_workflow_id,
+                LlmCall.deleted_at.is_(None),
+            )
+            .limit(1)
+        )
+        return self.session.scalar(query) is not None
+
+    def last_workflow(self, aliases: frozenset[str], *, inside: bool) -> str | None:
+        """The Temporal workflow id of the project's latest call for these aliases (or all
+        others): the build the meter names for a scope."""
+        query = (
+            select(LlmCall.temporal_workflow_id)
+            .where(
+                LlmCall.tenant_id == self.ctx.tenant_id,
+                LlmCall.project_id == self.ctx.project_id,
+                LlmCall.deleted_at.is_(None),
+                LlmCall.alias.in_(aliases) if inside else LlmCall.alias.not_in(aliases),
+            )
+            .order_by(LlmCall.id.desc())
+            .limit(1)
+        )
+        return self.session.scalar(query)
+
+    def heaviest_build(self, build_prefix: str) -> tuple[str, int] | None:
+        """(workflow id, tokens) of the Sub-Skill build with the most tokens in the project."""
+        total = func.sum(LlmCall.tokens_in + LlmCall.tokens_out)
+        query = (
+            select(LlmCall.temporal_workflow_id, total)
+            .where(
+                LlmCall.tenant_id == self.ctx.tenant_id,
+                LlmCall.project_id == self.ctx.project_id,
+                LlmCall.deleted_at.is_(None),
+                LlmCall.temporal_workflow_id.like(f"{build_prefix}%"),
+            )
+            .group_by(LlmCall.temporal_workflow_id)
+            .order_by(total.desc())
+            .limit(1)
+        )
+        row = self.session.execute(query).first()
+        return None if row is None else (str(row[0]), int(row[1] or 0))
+
 
 class LlmDerivativeRepository(TenantScopedRepository[LlmDerivative]):
     model = LlmDerivative
