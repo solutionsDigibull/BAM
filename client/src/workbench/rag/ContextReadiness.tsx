@@ -2,6 +2,7 @@ import { useCustom } from '@refinedev/core'
 import type { KnowledgeVersionList, KnowledgeVersionSummary } from '@/contracts'
 import { okfBundleUrl } from '../http/sbamApi'
 import { projectIdOfPath } from '../lib/evidence'
+import { knowledgeFailure } from './stop-cause'
 import { Banner, Copy, Empty, ErrorState, Icon, Kpis, Pane, Section, Skeleton, StatusPill, Time, shortHash } from '../components/ui'
 
 // Context readiness (2.4, Part of #825): is the newest knowledge version ready to write a SOW from. Everything comes from
@@ -76,7 +77,12 @@ export function ContextReadiness() {
       : <ErrorState title="Could not load the knowledge" action={<button className="btn btn-primary" onClick={() => query.refetch()}>Retry</button>}>{f.problem?.detail ?? f.message ?? 'The request failed.'}</ErrorState>
   } else if (query.isLoading || !data) body = <Skeleton rows={6} label="Loading the knowledge" />
   else if (!v) body = <Empty icon="info" title="No knowledge yet">The knowledge graph is built once the uploaded files are read.</Empty>
-  else if (v.status === 'FAILED') body = <Banner tone="err" icon="x"><strong>Version {v.version} failed.</strong> {v.error_reason ?? 'No reason reported.'} Rebuild it from Index.</Banner>
+  else if (v.status === 'FAILED') {
+    const cause = knowledgeFailure(v.error_reason)
+    body = cause
+      ? <Banner tone="err" icon="x"><strong>{cause.title}</strong> Version {v.version} was stopped. {cause.hint}</Banner>
+      : <Banner tone="err" icon="x"><strong>Version {v.version} failed.</strong> {v.error_reason ?? 'No reason reported.'} Rebuild it from Index.</Banner>
+  }
   else if (v.status !== 'READY') body = <Banner tone="info" icon="refresh"><strong>Version {v.version} is building.</strong> Readiness shows once it is ready.</Banner>
   else body = <Ready v={v} projectId={projectId} />
   return (

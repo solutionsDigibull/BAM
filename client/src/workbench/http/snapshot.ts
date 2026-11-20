@@ -17,6 +17,7 @@ import type { IngestionRun, RunStatus, Snapshot, Sow, Stage, StepId, StepInfo } 
 import { setRagState, type KnowledgeGraph, type KnowledgeStatus } from "../rag/ragPipeline";
 import { deletedOf, isActive, scanEventsOf, toUploadRecord } from "./documents";
 import { getJson, listAll } from "./http";
+import { knowledgeFailureText } from "../rag/stop-cause";
 
 const TITLES = ["SOW generation and approval", "SOW to ISATVON skills", "Contract and checks", "Test, persist, deploy"];
 const LOCKED = [
@@ -183,7 +184,7 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
     runId: kv?.id,
     version: kv?.version,
     status: kv?.status as KnowledgeStatus | undefined,
-    error: kv?.error_reason ?? undefined,
+    error: knowledgeFailureText(kv?.error_reason),
     lastSyncAt: kv?.finished_at ?? undefined,
     counts: {
       documents: c?.documents ?? cov?.documents?.length ?? 0,
@@ -213,7 +214,7 @@ export async function buildSnapshot(projectId: string): Promise<Snapshot> {
       ? undefined
       : { runId: "pipeline", at: started ?? new Date().toISOString(), fileIds: uploads.filter((u) => u.released).map((u) => u.id) };
 
-  const one = stepOne(state, uploads.length, kv?.error_reason ?? undefined);
+  const one = stepOne(state, uploads.length, knowledgeFailureText(kv?.error_reason));
   const steps: StepInfo[] = ([1, 2, 3, 4] as StepId[]).map((n) => {
     const info =
       n === 1

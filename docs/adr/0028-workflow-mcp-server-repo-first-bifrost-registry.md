@@ -58,7 +58,10 @@ a confirmed decision. Where this ADR changes a *default* of an earlier ADR it sa
    at 100% the build stops cleanly in `NEEDS_FDE_REVIEW` with the reason "token budget reached", and the FDE or
    an Admin may raise the cap once per build. A provider refusal for credit reasons is a clear, non-retryable
    error, not a silent retry. Admin can change the caps per project. Cognee's calls get a price entry so their
-   cost is recorded.
+   cost is recorded. Cognee's calls bypass the wrapper, so its meter callbacks end a running `cognify`
+   at once (#777): on Bifrost's `502 upstream_credentials_exhausted`, or when the knowledge cap is reached,
+   the callback sets a stop flag, the adapter cancels the call and the build fails with the non-retryable code
+   `ModelCreditExhausted` or `KnowledgeTokenCap`, which the Context step shows in plain words.
 7. **A demo before Commit.** After certification and the automated checks, the FDE sees the whole product, UI
    included, in a time-limited **preview** microVM that only the assigned FDE can reach, with real data and the
    real services the code declares. Commit is the FDE's final approval: it freezes the workflow, registers it

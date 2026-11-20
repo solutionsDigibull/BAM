@@ -61,6 +61,18 @@ describe("Context readiness (2.4, #825): the newest knowledge version", () => {
     expect(screen.getByText(/COGNEE_TIMEOUT/)).toBeTruthy();
   });
 
+  test("test_777_a_credit_refusal_names_the_cause_and_what_to_do", async () => {
+    install({ getKnowledgeVersions: async () => list(version({ status: "FAILED", error_reason: "ModelCreditExhausted" })) });
+    wrap();
+    expect(await screen.findByText(/The model account is out of credit/)).toBeTruthy();
+    expect(screen.getByText(/add credit to the model provider account/)).toBeTruthy();
+    cleanup();
+    install({ getKnowledgeVersions: async () => list(version({ status: "FAILED", error_reason: "KnowledgeTokenCap" })) });
+    wrap();
+    expect(await screen.findByText(/reached its token limit/)).toBeTruthy();
+    expect(screen.getByText(/raise the limit/)).toBeTruthy();
+  });
+
   test("test_825_no_knowledge_yet_is_an_empty_state", async () => {
     install({ getKnowledgeVersions: async () => list() });
     wrap();

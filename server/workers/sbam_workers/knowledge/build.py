@@ -20,6 +20,8 @@ a fake Cognee and a temp-dir storage; the activity only builds the real ones. Fo
   6. cognify (heartbeating from a separate task: it runs for minutes), then count the entities;
   7. save the coverage; the version stays BUILDING. `build_okf_bundle` (E5.3) makes it READY once
      its bundle validates. A retry after this point returns at once (no second cognify).
+A provider with no credit left, or the knowledge token cap reached, ends the cognify at once
+(#777): FAILED with `ModelCreditExhausted` / `KnowledgeTokenCap`, non-retryable.
 No document added, or no entity after cognify: FAILED, non-retryable `EmptyCorpus`. Cognee still
 down on the last attempt: FAILED. A FAILED build leaves the previous READY version usable.
 Payloads carry ids only; content is read from storage here. Logs carry ids and counts only.
@@ -77,6 +79,7 @@ from sbam_workers import mirror
 from sbam_workers.knowledge.cognee_adapter import CogneeAdapter, CogneeUnavailable, item_key
 from sbam_workers.knowledge.derivatives import DOC_MD, Derivative, derivatives_of
 from sbam_workers.knowledge.embedding_probe import EmbeddingProviderRejected, probe_embeddings
+from sbam_workers.llm.meter import CogneeStopped
 from sbam_workers.registry import activity_for
 from sbam_workers.settings import WorkerSettings
 
@@ -404,6 +407,9 @@ async def build_version(deps: BuildDeps, inp: RunInput, *, attempt: int = 1) -> 
         raise ApplicationError(
             str(exc), type=EMBEDDING_PROVIDER_REJECTED, non_retryable=True
         ) from None
+    except CogneeStopped as exc:  # no model credit or the token cap: stays so, do not retry (#777)
+        await asyncio.to_thread(_finish, deps, inp, version.id, coverage, exc.cause.value)
+        raise ApplicationError(str(exc), type=exc.cause.value, non_retryable=True) from None
     except CogneeUnavailable as exc:
         if attempt >= BUILD_KNOWLEDGE_ATTEMPTS:  # Temporal will not retry: record the failure
             await asyncio.to_thread(_finish, deps, inp, version.id, coverage, COGNEE_UNAVAILABLE)
