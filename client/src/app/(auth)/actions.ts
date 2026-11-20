@@ -41,6 +41,22 @@ export async function keycloakSignIn(formData: FormData) {
   );
 }
 
+/** The other portal's landing page (the portal switch in the header, #927). */
+const switchTarget = (portal: Portal): string =>
+  portal === "admin" ? "/admin/projects" : landing("fde", []);
+
+/**
+ * Switch portals (#927). The API only accepts a portal's own client token (`core/auth.py` checks `azp`, #917), and
+ * the session holds the token of the portal the user signed in through. So with Keycloak the switch signs in again
+ * through the other portal's provider: the Keycloak SSO session makes it silent, and the session then carries that
+ * portal's token. Dev sign-in has no tokens, so it just navigates.
+ */
+export async function switchPortal(formData: FormData) {
+  const portal: Portal = formData.get("portal") === "admin" ? "admin" : "fde";
+  if (!keycloakEnabled()) redirect(switchTarget(portal));
+  await signIn(providerId(portal), { redirectTo: switchTarget(portal) });
+}
+
 export async function signOut() {
   (await cookies()).delete(DEV_ROLES_COOKIE);
   if (keycloakEnabled()) {

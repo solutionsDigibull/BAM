@@ -6,14 +6,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
-import { signOut } from "@/app/(auth)/actions";
+import { signOut, switchPortal } from "@/app/(auth)/actions";
 import { NotificationCenter } from "@/components/ui-kit";
 
 import { activeHref, type NavItem } from "./nav";
 
+// The switch signs in again through the other portal's Keycloak client (#927): its token is the only one that portal's API accepts.
 const PORTAL = {
-  admin: { name: "Admin", other: { href: "/projects", label: "FDE portal" } },
-  fde: { name: "FDE", other: { href: "/admin/projects", label: "Admin portal" } },
+  admin: { name: "Admin", other: { portal: "fde", label: "FDE portal" } },
+  fde: { name: "FDE", other: { portal: "admin", label: "Admin portal" } },
 } as const;
 
 export function PortalShell({
@@ -94,9 +95,12 @@ export function PortalShell({
             />
           )}
           {canSwitch && (
-            <Link href={other.href}>
-              <Button icon={<SwapOutlined />}>{other.label}</Button>
-            </Link>
+            <form action={switchPortal}>
+              <input type="hidden" name="portal" value={other.portal} />
+              <Button htmlType="submit" icon={<SwapOutlined />}>
+                {other.label}
+              </Button>
+            </form>
           )}
           <NotificationCenter />
           <form action={signOut}>
