@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:5df9a8f4d91fe54557c8378b3146446c1c9f8e547442608fc2a32d4471261979
+// source-sha256:224f5eb2327485e3d755c6980fd0ed68ec47a750994b08d5f2b2d3a812e7a7e9
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -242,6 +242,16 @@ export type GateName =
  * via the `definition` "sbam_contracts__build_dashboard__Severity".
  */
 export type SbamContracts_BuildDashboard__Severity = "LOW" | "MEDIUM" | "HIGH";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StepKind".
+ */
+export type StepKind = "TRANSITION" | "MODEL" | "CODE_ATTEMPT" | "GATE";
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "StepStatus".
+ */
+export type StepStatus = "OK" | "FAILED" | "RUNNING";
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
  * via the `definition` "ReviewVerdict".
@@ -730,6 +740,7 @@ export interface SbamContracts {
   SubSkillExtraction?: SubSkillExtraction;
   BuildsResponse?: BuildsResponse;
   GatesResponse?: GatesResponse;
+  BuildTimelineResponse?: BuildTimelineResponse;
   ReviewAnswer?: ReviewAnswer;
   HeldPatchResponse?: HeldPatchResponse;
   PatchDecision?: PatchDecision;
@@ -1586,6 +1597,97 @@ export interface Finding {
   actual?: string | null;
   package?: string | null;
   severity?: SbamContracts_BuildDashboard__Severity | null;
+}
+/**
+ * `GET W/timeline`: every Sub-Skill's latest build, oldest step first.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "BuildTimelineResponse".
+ */
+export interface BuildTimelineResponse {
+  workflow_id: string;
+  workflow_state: WorkflowState;
+  /**
+   * Pattern: `^\d+\.\d{4}$`
+   */
+  cost_usd: string;
+  sub_skills: SubSkillTimeline[];
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "SubSkillTimeline".
+ */
+export interface SubSkillTimeline {
+  sub_skill_id: string;
+  skill_id: string;
+  skill_name: string;
+  state: SubSkillState;
+  build_id?: string | null;
+  build_no?: number | null;
+  started_at?: string | null;
+  last_activity_at?: string | null;
+  current_stage?: string | null;
+  code_attempts?: number;
+  llm_calls?: number;
+  tokens_in?: number;
+  tokens_out?: number;
+  /**
+   * Pattern: `^\d+\.\d{4}$`
+   */
+  cost_usd?: string;
+  failure?: TimelineFailure | null;
+  steps?: TimelineStep[];
+}
+/**
+ * Why the build is parked or failed: the last transition's event and the failing gates.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TimelineFailure".
+ */
+export interface TimelineFailure {
+  event: string;
+  state: SubSkillState;
+  at: string;
+  failing_gates?: GateName[];
+  findings?: TimelineFinding[];
+}
+/**
+ * A gate finding by name only: which gate, which rule code, where. No message text.
+ *
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TimelineFinding".
+ */
+export interface TimelineFinding {
+  gate: GateName;
+  code: string;
+  file?: string | null;
+  line?: number | null;
+  package?: string | null;
+}
+/**
+ * This interface was referenced by `SbamContracts`'s JSON-Schema
+ * via the `definition` "TimelineStep".
+ */
+export interface TimelineStep {
+  seq: number;
+  kind: StepKind;
+  name: string;
+  status: StepStatus;
+  started_at: string;
+  duration_ms?: number | null;
+  cycle?: number | null;
+  attempt?: number | null;
+  from_state?: SubSkillState | null;
+  to_state?: SubSkillState | null;
+  alias?: string | null;
+  calls?: number;
+  tokens_in?: number;
+  tokens_out?: number;
+  /**
+   * Pattern: `^\d+\.\d{4}$`
+   */
+  cost_usd?: string;
+  findings?: TimelineFinding[];
 }
 /**
  * This interface was referenced by `SbamContracts`'s JSON-Schema
