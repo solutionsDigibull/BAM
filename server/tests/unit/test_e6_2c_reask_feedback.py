@@ -39,7 +39,9 @@ def lines(doc: dict[str, Any]) -> tuple[str, ...]:
 def test_e6_2c_t01_none_identified_in_rule_refs_is_named_by_position_and_code() -> None:
     doc = good()
     doc["rules_constraints"]["rule_refs"] = ["None identified"]
-    assert lines(doc) == ("rules_constraints.rule_refs[0]: NOT_A_RULE_ID",)
+    [line] = lines(doc)  # WG37: followed by a fixed explanation, never by the model's own text
+    assert line.startswith("rules_constraints.rule_refs[0]: NOT_A_RULE_ID (rule_refs takes only")
+    assert "None identified" not in line
 
 
 def test_e6_2c_t01_the_second_answer_fixes_it_after_the_coded_feedback() -> None:
@@ -105,4 +107,5 @@ def test_e6_2c_a_sow_that_stays_wrong_still_ends_as_schema_invalid() -> None:
 
     with pytest.raises(SchemaInvalidAfterRetries) as caught:
         asyncio.run(run_structured(call, SMOKE, SowDocument))
-    assert caught.value.attempts[-1].errors == ("rules_constraints.rule_refs[0]: NOT_A_RULE_ID",)
+    [last] = caught.value.attempts[-1].errors
+    assert last.startswith("rules_constraints.rule_refs[0]: NOT_A_RULE_ID (")

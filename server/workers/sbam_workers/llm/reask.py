@@ -122,6 +122,26 @@ def _path(loc: tuple[int | str, ...], names: frozenset[str]) -> str:
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
 
 
+# Fixed text for a document-level rule's code: a bare code told the model nothing, so it repeated
+# the mistake on every re-ask (#924). Static strings only, never data (E1.21).
+CODE_HINTS: dict[str, str] = {
+    "UNKNOWN_RULE_REF": (
+        "rule_refs takes only ids of the Rules master entries given in masters; a document's own "
+        "rule label such as R-01 goes in constraints as text, and is never rewritten into RULE-*"
+    ),
+    "NOT_A_RULE_ID": (
+        "rule_refs takes only Rules master ids RULE-* copied from masters, or [] when masters has "
+        "none; a document's own rule label such as R-01 goes in constraints as text, never in "
+        "rule_refs and never rewritten into RULE-*"
+    ),
+}
+
+
+def _explained(line: str, code: str) -> str:
+    hint = CODE_HINTS.get(code)
+    return f"{line} ({hint})" if hint else line
+
+
 def _coded_line(err: Any) -> str | None:
     """A document-level rule that names its own position (`where`) and, when it has one, an id the
     schema already validated: `modules[2]: MODULE_WITHOUT_FEATURE M-X`. Anything else in its
@@ -132,7 +152,7 @@ def _coded_line(err: Any) -> str | None:
         return None
     ident = ctx.get("id")
     suffix = f" {ident}" if isinstance(ident, str) and _SAFE_ID.match(ident) else ""
-    return f"{where}: {err['type']}{suffix}"
+    return _explained(f"{where}: {err['type']}{suffix}", err["type"])
 
 
 def error_lines(exc: ValidationError, names: frozenset[str]) -> tuple[str, ...]:

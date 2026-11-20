@@ -63,7 +63,7 @@ from sbam_workers.llm.client import (
     LlmTransportError,
 )
 from sbam_workers.llm.embed import embed
-from sbam_workers.llm.reask import SchemaInvalidAfterRetries
+from sbam_workers.llm.reask import CODE_HINTS, SchemaInvalidAfterRetries
 from sbam_workers.llm.registry import PromptRegistry
 from sbam_workers.llm.store import LlmScope, SqlCallStore
 from sbam_workers.llm.trace import LangfuseTracer
@@ -87,6 +87,7 @@ REASONS: Final = {
     LLM_UNAVAILABLE: LLM_UNAVAILABLE,
 }
 _SAFE_ID = re.compile(r"^[A-Za-z0-9#:._-]{1,80}$")
+NO_MASTER_RULES: Final = "this project's Rules master has no rule, so rule_refs must be []"
 
 
 @dataclass(frozen=True)
@@ -134,6 +135,31 @@ def check_citations(context: SowContext) -> Callable[[SowDocument], tuple[str, .
         return tuple(dict.fromkeys(errors))  # once each, in order
 
     return check
+
+
+def check_rule_refs(context: SowContext) -> Callable[[SowDocument], tuple[str, ...]]:
+    """Every `rule_refs` id is a Rules master id the model was shown. A rule the documents name
+    themselves (R-01) is not one, and a guessed `RULE-*` is an invented rule (WG37)."""
+
+    def check(doc: SowDocument) -> tuple[str, ...]:
+        refs = doc.rules_constraints.rule_refs
+        bad = [i for i, ref in enumerate(refs) if ref not in context.rule_ids]
+        if not bad:
+            return ()
+        # the ids that exist are the tenant's master data (safe ids only), never document text
+        exist = sorted(i for i in context.rule_ids if _SAFE_ID.match(i))
+        known = f"Rules master ids that exist: {', '.join(exist)}" if exist else NO_MASTER_RULES
+        why = CODE_HINTS["UNKNOWN_RULE_REF"]
+        return tuple(
+            f"rules_constraints.rule_refs[{i}]: UNKNOWN_RULE_REF ({why}; {known})" for i in bad
+        )
+
+    return check
+
+
+def check_document(context: SowContext) -> Callable[[SowDocument], tuple[str, ...]]:
+    citations, rules = check_citations(context), check_rule_refs(context)
+    return lambda doc: (*citations(doc), *rules(doc))
 
 
 def finalize(doc: SowDocument, context: SowContext) -> dict[str, Any]:
@@ -255,7 +281,7 @@ async def generate_version(
             SowDocument,
             context.blocks,
             scope,
-            validate=check_citations(context),
+            validate=check_document(context),
             manifest_extra=context.manifest,
             fresh=fresh,
         )

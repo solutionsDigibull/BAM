@@ -15,7 +15,7 @@
       "sow-generate"
     ],
     "status": "todo",
-    "note": "Needs 20 small OKF bundles with cited expectations; one real call is about $0.22 on a full bundle, so items are small."
+    "note": "Needs 20 small OKF bundles with cited expectations; one real call is about $0.22 on a full bundle, so items are small. One deterministic case already exists, sow-rule-labels.json (#924: documents name rules R-xx), replayed by tests/unit/test_wg37_sow_rule_refs.py without a model."
   },
   {
     "task": "isatvon",
