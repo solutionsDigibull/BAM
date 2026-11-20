@@ -1,0 +1,33 @@
+# Trivy exceptions (E15.3, #137): a CRITICAL finding that has no fixed package yet.
+#
+# ci.yml's image gate fails on every CRITICAL finding, fixed or not, except the ones listed here.
+# Each entry names the finding, why it is accepted and who owns it (`statement`), and when the
+# exception ends (`expired_at`, at most 90 days out). After that date Trivy reports the finding
+# again and the gate fails, so the owner re-checks for a fix: upgrade the base image, or renew the
+# entry with a new reason. Never add an entry for a finding that has a fix. The findings register
+# (docs/security/findings-register.md) lists every open entry.
+vulnerabilities:
+  - id: CVE-2023-45853
+    statement: >-
+      zlib1g in the python:3.12 (Debian bookworm) base image; Debian has no fixed package. The bug
+      is in minizip's zipOpenNewFileInZip4_64, which no SBAM image calls. Owner D1.
+      Images: sbam-api, sbam-worker, sbam-toolchain, sbam-llm-mock, sbam-mock-api, sbam-promptfoo,
+      skill-runtime.
+    expired_at: 2027-02-18
+  - id: CVE-2025-7458
+    statement: >-
+      libsqlite3-0 in the Debian bookworm base image; no fixed package. SBAM uses PostgreSQL;
+      SQLite is only used by unit tests, never with untrusted SQL. Owner D1.
+      Images: sbam-api, sbam-worker, sbam-toolchain, sbam-llm-mock, sbam-mock-api, skill-runtime.
+    expired_at: 2027-02-18
+  - id: CVE-2026-58016
+    statement: >-
+      libglib2.0-0 in the Debian bookworm base image of sbam-worker; no fixed package. The bug is in
+      GDBus introspection parsing; the worker runs no D-Bus. Owner D1.
+    expired_at: 2027-02-18
+  - id: CVE-2026-6653
+    statement: >-
+      libxml2 in the skill-runtime base image; no fixed package. Denial of service on crafted XML; a
+      generated skill parses XML only from its own inputs inside CubeSandbox, with the sandbox's
+      CPU, memory and time limits. Owner D3.
+    expired_at: 2027-02-18

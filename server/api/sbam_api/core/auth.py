@@ -39,6 +39,9 @@ ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_FDE = "super-admin", "sbam-admin", "sbam-fde"
 # The roles SBAM's own database also records (`users.portal_roles`). Any other realm role in a token
 # (offline_access, uma_authorization, ...) is passed through untouched.
 PORTAL_ROLE_SET = frozenset({ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_FDE})
+# The admin portal's Keycloak client (compose/keycloak/realm-bullm.json). Both portal clients put
+# `sbam-api` in `aud`; `azp` names the client, and its tokens are refused on the FDE API (E15.3).
+ADMIN_PORTAL_CLIENT = "sbam-admin"
 log = logging.getLogger("sbam_api.security")
 
 
@@ -117,6 +120,7 @@ class CurrentUser:
     email: str | None = None
     display_name: str | None = None
     session_id: str | None = None  # Keycloak `sid`: a new value means a new login
+    client_id: str | None = None  # `azp`: the Keycloak client the token was issued to
 
     def context(self, project_id: uuid.UUID | None = None) -> TenantContext:
         """For the tenant-scoped repository (#36). Only call on tenant routes."""
@@ -181,6 +185,7 @@ class TokenVerifier:
             email=_text(claims.get("email")),
             display_name=_text(claims.get("name")) or _text(claims.get("preferred_username")),
             session_id=_text(claims.get("sid"), 64),
+            client_id=_text(claims.get("azp"), 255),
         )
 
 
@@ -409,8 +414,9 @@ def admin(user: CurrentUserDep) -> CurrentUser:
 
 
 def fde(user: CurrentUserDep) -> CurrentUser:
-    """FDE portal APIs (`/projects/{project_id}/...`): sbam-fde in a tenant."""
-    if ROLE_FDE not in user.roles:
+    """FDE portal APIs (`/projects/{project_id}/...`): sbam-fde in a tenant, with a token that was
+    not issued to the admin portal's client."""
+    if ROLE_FDE not in user.roles or user.client_id == ADMIN_PORTAL_CLIENT:
         raise wrong_portal()
     if user.tenant_id is None:
         raise not_found()

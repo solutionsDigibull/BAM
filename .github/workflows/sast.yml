@@ -1,0 +1,44 @@
+# Static security analysis of the shipped Python code (E15.3-T08, #137). Bandit 1.9.4 (Apache-2.0),
+# pinned here and configured in server/bandit.yaml; `bandit` fails on any HIGH-severity, HIGH-confidence
+# finding. The full report (every level) is uploaded. gitleaks and Trivy stay in ci.yml (secret-scan,
+# image-scan); the ZAP baseline runs in ci.yml's compose-smoke, against the running stack.
+name: sast
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  schedule:
+    - cron: "27 2 * * *" # nightly, after ci.yml's rescan
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sast-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BANDIT: bandit==1.9.4
+
+jobs:
+  bandit: # required-check name
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - name: Bandit report (every level)
+        run: |
+          mkdir -p reports
+          cd server && uvx "$BANDIT" -c bandit.yaml -r api workers -f json -o ../reports/bandit.json --exit-zero
+      - name: Bandit (fails on HIGH severity and HIGH confidence)
+        run: cd server && uvx "$BANDIT" -c bandit.yaml -r api workers --severity-level high --confidence-level high
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: bandit-report, path: reports/, if-no-files-found: ignore }

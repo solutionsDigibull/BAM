@@ -1,0 +1,8 @@
+# Bandit (SAST) for the shipped Python code, E15.3-T08 (#137). Run by .github/workflows/sast.yml:
+#   uvx bandit==1.9.4 -c bandit.yaml -r api workers --severity-level high --confidence-level high
+# CI fails on any HIGH-severity, HIGH-confidence finding. Lower levels are reported, not gating.
+# Tests are not shipped code (fixtures hold deliberate payloads), so they are not scanned.
+# A finding that is a false positive gets an inline `# nosec <TEST_ID>` with the reason, never a skip here.
+exclude_dirs:
+  - tests
+  - .venv

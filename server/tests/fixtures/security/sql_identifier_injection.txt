@@ -1,0 +1,74 @@
+# E15.3 (#137) SQL in identifiers: table names an LLM-written or FDE-edited ISATVON could carry.
+# One payload per line; lines starting with "# " are comments. Versioned: add, never rewrite.
+# Each must be refused by the ISATVON rules (v_variables.tables, state_handoff_file.table) and by
+# the schema step's name check before any SQL is built from it (guard_sql interpolates names).
+users; DROP TABLE users
+users;DROP TABLE users--
+x; DELETE FROM investors
+x); DROP TABLE investors; --
+x' OR '1'='1
+x" ; DROP TABLE investors; --
+"investors"
+"Investors"; DROP SCHEMA public CASCADE
+x -- comment
+x/* comment */
+x/**/union/**/select
+x UNION SELECT password FROM users
+x; COPY investors TO PROGRAM 'id'
+x; COPY (SELECT 1) TO '/tmp/x'
+x; CREATE ROLE evil SUPERUSER LOGIN
+x; ALTER ROLE sbam SUPERUSER
+x; GRANT ALL ON ALL TABLES IN SCHEMA public TO PUBLIC
+x; SELECT pg_sleep(10)
+x; SELECT pg_read_file('/etc/passwd')
+x; CREATE EXTENSION dblink
+x; LOAD '/tmp/evil.so'
+x; DO $$ BEGIN PERFORM pg_sleep(5); END $$
+x$$; DROP TABLE investors; $$
+x; SET session_replication_role = replica
+x; DROP TRIGGER sbam_handoff_insert_only_row ON handoff
+x; ALTER TABLE handoff DISABLE TRIGGER ALL
+x; TRUNCATE handoff
+x; UPDATE handoff SET payload = '{}'
+x; DELETE FROM handoff
+pg_catalog.pg_authid
+information_schema.tables
+public.investors
+sbam.workflows
+other_schema.x
+x.y.z
+x ON investors FOR EACH ROW EXECUTE FUNCTION evil()
+investors FOR EACH STATEMENT EXECUTE FUNCTION pg_terminate_backend()
+x(id int); DROP TABLE y
+x (id int)
+x	tab
+x\nDROP TABLE y
+x\x00
+x%00
+x%3B DROP TABLE y
+x`whoami`
+$(whoami)
+{{ cycler.__init__.__globals__.os.popen('id').read() }}
+{% raw %}x{% endraw %}
+U&"\0064rop"
+E'\x41'
+x::regclass
+x[1]
+x->>'a'
+x || 'y'
+x AND 1=1
+1st_table
+Investors
+TABLE
+user
+select
+DROP
+a_table_name_that_is_far_too_long_for_postgresql_identifiers_sixty_four
+ìnvestors
+investörs
+інвестори
+x y
+x-y
+x.y
+x;
+;

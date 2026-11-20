@@ -29,6 +29,7 @@ env:
   SYFT_IMAGE: anchore/syft:v1.52.0@sha256:500e2d872ac019436926e8322b4fc1f39441d94d21f6f4046c6ff29b30e8cb02
   GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
   HADOLINT_IMAGE: hadolint/hadolint:v2.14.0@sha256:27086352fd5e1907ea2b934eb1023f217c5ae087992eb59fde121dce9c9ff21e
+  ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:2.17.0@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
 
 jobs:
   lint:
@@ -213,13 +214,13 @@ jobs:
             type=gha,scope=${{ matrix.name }}-${{ github.head_ref || github.ref_name }}
             type=gha,scope=${{ matrix.name }}-${{ github.base_ref || 'dev' }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}-${{ github.head_ref || github.ref_name }}
-      - name: Trivy (fails on fixable CRITICAL)
+      - name: Trivy (fails on CRITICAL unless .trivyignore.yaml has an unexpired exception)
         run: |
           mkdir -p reports
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/reports:/reports" "$TRIVY_IMAGE" \
             image --scanners vuln --format json --output "/reports/trivy-${{ matrix.name }}.json" "$IMAGE:${{ github.sha }}"
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
-            image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE:${{ github.sha }}"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/.trivyignore.yaml:/trivyignore.yaml:ro" "$TRIVY_IMAGE" \
+            image --scanners vuln --severity CRITICAL --ignorefile /trivyignore.yaml --exit-code 1 "$IMAGE:${{ github.sha }}"
       - name: SBOM (SPDX)
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$SYFT_IMAGE" \
@@ -352,6 +353,7 @@ jobs:
         run: scripts/ci-llm-egress-guard.sh start
       # Flaky first boot (image pulls, Keycloak import): retry once, then fail.
       - name: make up
+        id: up
         run: make up ENV_FILE="$ENV_FILE" || { echo "::warning::make up failed, retrying once"; make down ENV_FILE="$ENV_FILE"; make up ENV_FILE="$ENV_FILE"; }
       # skill-runtime + runtime registry (#67): build, generate inside the image, sync into the stack DB.
       # SKILL_RUNTIME_IMAGE also enables the in-image PostgreSQL test (E12.1-T05) in make test-int.
@@ -372,6 +374,26 @@ jobs:
       - name: No egress to openrouter.ai (E1.15-T07)
         run: scripts/ci-llm-egress-guard.sh verify
         env: { ENV_FILE: compose/.env.ci }
+      # E15.3-T08 (#137): ZAP baseline (passive, Apache-2.0) over every API operation, imported from the
+      # dev stack's OpenAPI document. Warnings are reported; any High-risk alert fails the job.
+      # Runs even when an earlier test step failed: the scan only needs the running stack.
+      - name: ZAP baseline (API)
+        if: ${{ !cancelled() && steps.up.outcome == 'success' }}
+        run: |
+          mkdir -p reports/zap && chmod 777 reports/zap
+          port="$(sed -n 's/^API_PORT=//p' "$ENV_FILE")"
+          api="http://localhost:${port:-8000}/api/v1"
+          docker run --rm --network host -v "$PWD/reports/zap:/zap/wrk:rw" "$ZAP_IMAGE" \
+            zap-baseline.py -t "$api/openapi.json" -z "-openapiurl $api/openapi.json" -I \
+            -J zap-baseline.json -r zap-baseline.html
+          python3 -c 'import json, sys
+          r = json.load(open("reports/zap/zap-baseline.json"))
+          high = [a["name"] for s in r.get("site", []) for a in s.get("alerts", []) if int(a.get("riskcode", 0)) >= 3]
+          print("\n".join("HIGH: " + n for n in high) or "ZAP: no High alerts")
+          sys.exit(1 if high else 0)'
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: zap-baseline, path: reports/zap/, if-no-files-found: ignore }
       # Real browser logins through Keycloak against the running stack (#51, E2.5-T01..T08).
       - *setup-pnpm
       - *setup-node

@@ -128,19 +128,25 @@ def test_e15_3_t03_token_for_another_audience_401(world: World, aud: str) -> Non
     unauthenticated(call(world, "GET", "/projects/{project_a}/pipeline", other))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Spec E15.3 edge case: a token from the sbam-admin client on the FDE API is 403. The API "
-        "never reads `azp`: TokenVerifier.verify (server/api/sbam_api/core/auth.py:150-183) "
-        "checks only aud=sbam-api, and fde() (auth.py:411) decides the portal by realm role, so "
-        "an FDE user's token minted by the sbam-admin client is accepted (200)."
-    ),
-)
 def test_e15_3_t03_fde_user_token_from_the_admin_client_403(world: World) -> None:
+    """Spec edge case: the portal is the token's client (`azp`), not only the user's role."""
     from_admin_client = token(world, "fde_a_assigned", azp="sbam-admin")
+    before = world.side_effects()
 
-    res = call(world, "GET", "/projects/{project_a}/pipeline", from_admin_client)
+    for method, path, _ in FDE_ROUTES:
+        res = call(world, method, path, from_admin_client)
 
-    assert res.status_code == 403, res.text
-    assert res.json()["code"] == "WRONG_PORTAL"
+        assert res.status_code == 403, res.text
+        assert res.headers["content-type"].startswith(PROBLEM_JSON)
+        assert res.json()["code"] == "WRONG_PORTAL"
+    assert world.side_effects() == before
+
+
+def test_e15_3_t03_control_each_portal_client_works_on_its_own_api(world: World) -> None:
+    """The azp check refuses only the admin client on the FDE API: the FDE client's token on the
+    FDE API and the admin client's token on the admin API are still accepted."""
+    fde = token(world, "fde_a_assigned", azp="sbam-fde")
+    admin = token(world, "admin_a", azp="sbam-admin")
+
+    assert call(world, "GET", "/projects/{project_a}/pipeline", fde).status_code == 200
+    assert call(world, "GET", "/admin/projects", admin).status_code == 200
