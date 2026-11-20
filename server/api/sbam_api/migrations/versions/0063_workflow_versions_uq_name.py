@@ -1,6 +1,6 @@
 """workflow_versions: the unique (workflow_id, version) takes its naming-convention name
 
-Revision ID: 0063_workflow_versions_unique_name
+Revision ID: 0063_workflow_versions_uq_name
 Revises: 0062_workflow_versions
 Create Date: 2026-11-20
 
@@ -16,7 +16,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0063_workflow_versions_unique_name"
+revision: str = "0063_workflow_versions_uq_name"
 down_revision: str | Sequence[str] | None = "0062_workflow_versions"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
