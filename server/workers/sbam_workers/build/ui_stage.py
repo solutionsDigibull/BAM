@@ -120,6 +120,10 @@ class Copier(Protocol):
 # --- the model's part ----------------------------------------------------------------------------
 
 
+def _digest(context: Mapping[str, str]) -> str:
+    return hashlib.sha256(json.dumps(dict(context), sort_keys=True).encode()).hexdigest()[:16]
+
+
 def copy_context(name: str, spec: dict[str, Any]) -> dict[str, str]:
     """The `<data>` block of the request: names, ids and the Sub-Skills' own text, no secrets."""
     skills = []
@@ -202,7 +206,9 @@ class LlmCopier:
             project_id=inp.project_id,
             correlation_id=inp.correlation_id,
             temporal_workflow_id=temporal_workflow_id,
-            activity_id=f"{STAGE}:{inp.workflow_id}",
+            # the content digest: a Workflow whose spec changed must not get the old copy back from
+            # the replay key; a retry of the same spec still replays (#926 review of #930)
+            activity_id=f"{STAGE}:{inp.workflow_id}:{_digest(context)}",
         )
         try:
             result = await self.llm.run(
