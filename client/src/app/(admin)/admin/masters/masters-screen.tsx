@@ -6,15 +6,17 @@
 import { DownloadOutlined, FileExcelOutlined, UploadOutlined } from "@ant-design/icons";
 import { useCustom, useInvalidate } from "@refinedev/core";
 import { Alert, App, Button, Flex, Table, Tabs, Typography } from "antd";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { ApiErrorState, LoadingState, MUTED } from "@/components/ui-kit";
-import type { MasterTypes, ReadmeTab } from "@/contracts";
+import type { MasterType, MasterTypes, ReadmeTab } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
 import { DocumentsPanel } from "./documents-panel";
 import { FiletypeTable } from "./filetype-table";
+import { MasterGridPanel } from "./master-grid-panel";
 import { MasterTable } from "./master-table";
+import { ToolFactory } from "./tool-factory";
 import { ImportWizard } from "./import-wizard";
 import { download, entriesResource, LAYOUT_URL, SCREEN_TYPES } from "./masters-api";
 
@@ -81,22 +83,48 @@ export function MastersScreen({
       <ApiErrorState error={query.error ?? { statusCode: 500 }} onRetry={() => query.refetch()} />
     );
   else {
-    const types = SCREEN_TYPES.flatMap((t) => {
-      const info = layout.types.find((i) => i.master_type === t);
-      return info ? [info] : [];
-    });
+    const infoOf = (t: MasterType) => layout.types.find((i) => i.master_type === t);
+    const [org, rules, skills, tools, agents] = (
+      ["ORGANIZATION", "RULES", "SKILLS", "TOOLING", "AGENTS"] as const
+    ).map(infoOf);
+    const tab = (key: string, label: string, children: ReactNode) => ({ key, label, children });
     body = (
       <Tabs
         destroyOnHidden
         items={[
-          { key: "README", label: "README", children: <Readme readme={layout.readme} /> },
-          ...types.map((info) => ({
-            key: info.master_type,
-            label: info.tab,
-            children: <MasterTable info={info} projectId={projectId} />,
-          })),
-          { key: "DOCUMENTS", label: "Documents", children: <DocumentsPanel /> },
-          { key: "FILETYPE", label: "Filetype", children: <FiletypeTable /> },
+          tab("README", "README", <Readme readme={layout.readme} />),
+          ...(org
+            ? [tab(org.master_type, org.tab, <MasterGridPanel info={org} projectId={projectId} />)]
+            : []),
+          ...(rules
+            ? [
+                tab(
+                  rules.master_type,
+                  rules.tab,
+                  <MasterTable info={rules} projectId={projectId} />,
+                ),
+              ]
+            : []),
+          ...(skills
+            ? [
+                tab(
+                  skills.master_type,
+                  skills.tab,
+                  <MasterGridPanel info={skills} projectId={projectId} singleClick duplicate />,
+                ),
+              ]
+            : []),
+          ...(tools || agents
+            ? [
+                tab(
+                  "TOOLS",
+                  "Tool Factory",
+                  <ToolFactory tools={tools} agents={agents} projectId={projectId} />,
+                ),
+              ]
+            : []),
+          tab("DOCUMENTS", "Documents", <DocumentsPanel />),
+          tab("FILETYPE", "Filetype", <FiletypeTable />),
         ]}
       />
     );

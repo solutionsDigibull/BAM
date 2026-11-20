@@ -202,8 +202,8 @@ test("e3_10 the tabs; Filetype has no edit controls", async ({ page, baseURL }) 
     "README",
     "Organization",
     "Rules",
-    "Agents",
     "Skills",
+    "Tool Factory",
     "Documents",
     "Filetype",
   ]);
