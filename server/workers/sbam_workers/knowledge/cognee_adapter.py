@@ -41,7 +41,14 @@ from sbam_contracts.knowledge import (
     cognee_dataset,
 )
 
-from sbam_workers.llm.meter import metered
+from sbam_workers.llm.meter import (
+    CREDIT_MARKER,
+    CogneeStopped,
+    StopCause,
+    credit_refused,
+    metered,
+    refuse_if_capped,
+)
 
 log = logging.getLogger("sbam_workers.knowledge.cognee")
 
@@ -152,8 +159,18 @@ def classify(exc: BaseException) -> BaseException:
     cur: BaseException | None = exc
     while cur is not None and id(cur) not in seen:
         seen.add(id(cur))
-        if isinstance(cur, ScopeError | ItemRejected | DatasetNotFound | CogneeUnavailable):
+        if isinstance(
+            cur, ScopeError | ItemRejected | DatasetNotFound | CogneeUnavailable | CogneeStopped
+        ):
             return cur
+        # The provider has no credit: permanent until someone tops it up, never `CogneeUnavailable`
+        # (the 502 below), which Temporal would retry for an hour (#777).
+        if credit_refused(f"{cur} {getattr(cur, 'body', '') or ''}"):
+            return CogneeStopped(
+                StopCause.CREDIT_EXHAUSTED,
+                f"the model account is out of credit (the provider answered {CREDIT_MARKER}); "
+                "top it up and rebuild",
+            )
         name = type(cur).__name__
         if name in _NOT_FOUND:
             return DatasetNotFound("dataset not found")
@@ -258,9 +275,11 @@ class CogneeAdapter:
     async def cognify(self, scope: ProjectScope) -> None:
         """Build the graph. Can take minutes: the calling activity heartbeats from its own task."""
         dataset, who = await self._authorize(scope)
-        with metered(scope.tenant_id, scope.project_id, "cognify"):  # its model calls are counted
+        await refuse_if_capped(scope.tenant_id, scope.project_id)  # a reached cap refuses the next
+        with metered(scope.tenant_id, scope.project_id, "cognify") as stop:  # calls are counted
             async with _classified():
-                await self._backend.cognify(who, dataset)
+                # A credit refusal or the token cap, seen by the meter's callbacks, ends it at once
+                await stop.run(self._backend.cognify(who, dataset))
         self._log("cognify done", scope)
 
     async def search(self, scope: ProjectScope, query: str, top_k: int = 10) -> list[SearchHit]:
