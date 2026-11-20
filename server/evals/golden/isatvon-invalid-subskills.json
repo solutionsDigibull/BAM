@@ -1,0 +1,108 @@
+{
+  "case": "wg41-invalid-subskills",
+  "note": "#929: the real model's Sub-Skills came out INVALID in the live run of 2026-11-20. SYNTHETIC: each case is the ISA14 MS01.1 sample with one change that has the shape of a live failure class (a no_op_condition on an output, on an undeclared name or on a loop counter, a statement without Action/Check/Bound, a type that is not a JSON-schema type, a loop counter in fresh state). Replayed without a model by tests/unit/test_wg41_valid_subskills.py: the validator must refuse each one with the given code and path, and the re-ask feedback must carry the code, the position, the offending names and the fixed fix, and no other text. Not a scored eval set and no baseline: a real-model baseline is todo (it needs an owner-approved spend cap).",
+  "cases": [
+    {
+      "id": "no-op-on-output",
+      "changes": {
+        "isatvon_definition.v_variables.no_op_condition": "auth_status == 'LOCKED'"
+      },
+      "code": "UNRESOLVED_IDENTIFIER",
+      "path": "isatvon_definition.v_variables.no_op_condition",
+      "feedback": ["auth_status (an output)", "max_iterations < 1"]
+    },
+    {
+      "id": "no-op-on-loop-counter",
+      "changes": {
+        "isatvon_definition.v_variables.no_op_condition": "attempt >= max_iterations"
+      },
+      "code": "UNRESOLVED_IDENTIFIER",
+      "path": "isatvon_definition.v_variables.no_op_condition",
+      "feedback": ["attempt (a loop counter)", "never an output field"]
+    },
+    {
+      "id": "no-op-on-undeclared-name",
+      "changes": {
+        "isatvon_definition.v_variables.no_op_condition": "manual_override == True"
+      },
+      "code": "UNRESOLVED_IDENTIFIER",
+      "path": "isatvon_definition.v_variables.no_op_condition",
+      "feedback": ["manual_override (undeclared)", "required_inputs"]
+    },
+    {
+      "id": "success-gate-on-undeclared-name",
+      "changes": {
+        "isatvon_definition.v_variables.success_gate": "quote_ready == True"
+      },
+      "code": "UNRESOLVED_IDENTIFIER",
+      "path": "isatvon_definition.v_variables.success_gate",
+      "feedback": ["quote_ready (undeclared)", "every name must be declared"]
+    },
+    {
+      "id": "statement-without-action-check-bound",
+      "changes": {
+        "isatvon_definition.i_instructions.statement": "Triggered by a login request."
+      },
+      "code": "ISATVON_CONTRACT",
+      "path": "isatvon_definition.i_instructions.statement",
+      "feedback": [
+        "missing Action:",
+        "missing Check:",
+        "missing Bound:",
+        "`Action: <the one job the action tool does>.`",
+        "`Bound: Up to <max_iterations> passes, then escalate to <role>.`"
+      ]
+    },
+    {
+      "id": "float-as-type",
+      "changes": {
+        "isatvon_definition.o_outcome.json_schema.user_role": "float"
+      },
+      "code": "ISATVON_CONTRACT",
+      "path": "isatvon_definition.o_outcome.json_schema",
+      "feedback": ["properties user_role", "string, integer, number, boolean, object, array"]
+    },
+    {
+      "id": "capitalised-type",
+      "changes": {
+        "isatvon_definition.o_outcome.json_schema.jwt_token": "String"
+      },
+      "code": "ISATVON_CONTRACT",
+      "path": "isatvon_definition.o_outcome.json_schema",
+      "feedback": ["properties jwt_token", "never float"]
+    },
+    {
+      "id": "status-word-as-type",
+      "changes": {
+        "isatvon_definition.o_outcome.json_schema.user_role": "Priced"
+      },
+      "code": "ISATVON_CONTRACT",
+      "path": "isatvon_definition.o_outcome.json_schema",
+      "feedback": ["properties user_role", "a status word such as Priced"]
+    },
+    {
+      "id": "loop-counter-in-fresh-state",
+      "changes": {
+        "isatvon_definition.s_source.fresh_state_parameters": [
+          "failed_login_attempts",
+          "active_devices",
+          "user_status",
+          "attempt"
+        ]
+      },
+      "code": "ISATVON_CONTRACT",
+      "path": "isatvon_definition.s_source.fresh_state_parameters.3",
+      "feedback": ["attempt", "there is no attempt counter", "`[]` is valid"]
+    },
+    {
+      "id": "gate-that-does-not-parse",
+      "changes": {
+        "isatvon_definition.v_variables.no_op_condition": "user_status in ('LOCKED', 'ZZ-DOCUMENT-TEXT')"
+      },
+      "code": "GATE_PARSE_ERROR",
+      "path": "isatvon_definition.v_variables.no_op_condition",
+      "feedback": ["GATE_PARSE_ERROR", "bare names"],
+      "never": ["ZZ-DOCUMENT-TEXT"]
+    }
+  ]
+}

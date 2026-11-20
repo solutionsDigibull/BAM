@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from sbam_workers.isatvon.feedback import explain
 from sbam_workers.isatvon.sub_skills import (
     ExtractionError,
     Source,
@@ -96,7 +97,8 @@ def _guard(deps: SowDeps, inp: RegenerateInput) -> tuple[list[dict[str, str]], d
         current = [{"id": str(r.id), "skill_id": r.skill_id, "name": r.skill_name} for r in rows]
         feedback = {
             r.skill_id: [
-                {"code": e.get("code"), "path": e.get("path")} for e in (r.validation_errors or [])
+                {"code": e.get("code"), "path": e.get("path"), "detail": explain(r.isatvon, e)}
+                for e in (r.validation_errors or [])
             ]
             for r in rows
             if r.validation_errors and (inp.sub_skill_id is None or r.id == inp.sub_skill_id)
