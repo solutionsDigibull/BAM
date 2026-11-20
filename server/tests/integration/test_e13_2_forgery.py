@@ -13,6 +13,7 @@ Needs Docker and `skill-runtime:local` (`make runtime-registry`); not part of th
 import textwrap
 from typing import Any
 
+import pytest
 from sbam_contracts.sandbox import FailureCategory, InfraReason, RunnerOutputs
 
 from .test_e13_2_runner_container import (  # noqa: F401 - agent_url is a fixture
@@ -22,6 +23,8 @@ from .test_e13_2_runner_container import (  # noqa: F401 - agent_url is a fixtur
     run,
     run_input,
 )
+
+pytestmark = pytest.mark.integration
 
 FORGED = b'{"forged": true}'
 
@@ -95,6 +98,9 @@ KILL_RUNNER = """\
 os.kill(os.getppid(), signal.SIGKILL)
 results.append("killed-runner")
 """
+EXIT_PROCESS = """\
+os._exit(0)
+"""
 REPLACE_OUT = """\
 import shutil
 shutil.rmtree(out, ignore_errors=True)
@@ -120,6 +126,12 @@ def reported(result: Any) -> str:
     return ",".join(p["action_output"].get("jwt_token", "") for p in passes)
 
 
+def otp_match(outputs: RunnerOutputs) -> Any:
+    """The check tool's own answer for the first pass, from the runner's trace."""
+    passes: Any = outputs.cases[0].trace["passes"]
+    return passes[0]["check_output"]["otp_match"]
+
+
 def test_e13_2_625_a_bundle_cannot_reach_the_runner_nor_leave_a_writer_behind(
     agent_url: str,  # noqa: F811
 ) -> None:
@@ -137,7 +149,11 @@ def test_e13_2_625_a_bundle_cannot_reach_the_runner_nor_leave_a_writer_behind(
     assert "harness-on-disk-denied" in said and "harness-on-disk-writable" not in said
     assert FORGED not in (result.outputs_json or b""), "a forged outputs.json survived"
     assert result.exit_code == 0 and result.destroy_error is None
-    assert not result.classified.passed, result.classified  # SUCCESS was never reached honestly
+    # The verdict is the harness's own, computed from the real state and the check tool, so a bundle
+    # that writes an honest handoff row can pass; what it cannot do is change how it is judged.
+    outputs = RunnerOutputs.model_validate_json(result.outputs_json or b"")
+    assert outputs.cases[0].passed == result.classified.passed
+    assert otp_match(outputs) is True
 
 
 def test_e13_2_625_ending_the_runner_after_writing_a_forged_file_is_not_a_pass(
@@ -159,4 +175,24 @@ def test_e13_2_625_a_bundle_that_replaces_the_out_directory_cannot_pass_either(
     """A symlink where the directory belongs: the runner clears it before writing, and when it still
     cannot write its file the run is a failed runner, never a verdict."""
     result = run(agent_url, run_input(files=attack(REPLACE_OUT), cases=one_case()))
+    # Either the runner could not write (a failed runner) or it recreated `out/` and wrote its own
+    # file; a verdict, if there is one, is the harness's, computed from real state (not forged).
+    if result.outputs_json:
+        outputs = RunnerOutputs.model_validate_json(result.outputs_json)
+        assert outputs.cases[0].passed == result.classified.passed
+        assert otp_match(outputs) is True
+    else:
+        assert not result.classified.passed, result.classified
+
+
+def test_e13_2_625_a_tool_that_hard_exits_after_forging_cannot_yield_a_pass(
+    agent_url: str,  # noqa: F811
+) -> None:
+    """`os._exit` before the runner has written anything (ADR 0027 limit): it only ends the child
+    process, the runner survives and writes its own verdict from the trace, so the forged file is
+    gone and the case, which never reached its handoff, is a failure and never a pass."""
+    result = run(agent_url, run_input(files=attack(FORGE_FILE, EXIT_PROCESS), cases=one_case()))
+    assert FORGED not in (result.outputs_json or b""), "a forged outputs.json survived"
     assert not result.classified.passed, result.classified
+    assert result.classified.category is FailureCategory.RUNTIME_ERROR, result.classified
+    assert result.classified.infra_reason is None and result.exit_code == 0
