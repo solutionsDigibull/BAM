@@ -119,6 +119,7 @@ from sbam_contracts.masters_api import (
     MasterTypes,
     MasterVersionCreate,
 )
+from sbam_contracts.masters_scan import MastersImportAccepted, MastersScanStatus
 from sbam_contracts.masters_v03 import (
     AgentsPayloadV03,
     MasterBulkReport,
@@ -311,6 +312,8 @@ ROOTS: Final[tuple[tuple[str, type[BaseModel]], ...]] = (
     ("masters/master_document_patch", MasterDocumentPatch),
     ("masters/master_document", MasterDocumentOut),
     ("masters/master_document_list", MasterDocumentList),
+    ("masters_scan/accepted", MastersImportAccepted),
+    ("masters_scan/status", MastersScanStatus),
     ("masters_v03/organization", OrganizationPayloadV03),
     ("masters_v03/rules", RulesPayloadV03),
     ("masters_v03/agents", AgentsPayloadV03),
