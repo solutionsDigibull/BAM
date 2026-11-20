@@ -86,3 +86,21 @@ describe("System settings (#826): engines and model usage, read only", () => {
     expect(within(dialog).getByText(/Read only/)).toBeTruthy();
   });
 });
+
+describe("System settings in the profile menu (#826)", () => {
+  test("test_826_no_settings_dialog_is_in_the_page_until_it_is_opened", async () => {
+    const { TopBar } = await import("./shell");
+    install({ getPreflight: async () => preflight([]), getLlmUsage: async () => usage() });
+    render(
+      <div className="bam-wb">
+        <Refine dataProvider={dataProvider} options={{ disableTelemetry: true }}>
+          <TopBar syncedAt={0} offline={false} />
+        </Refine>
+      </div>,
+    );
+    expect(document.querySelector("dialog")).toBeNull(); // another dialog's aria-labelledby must not resolve to it
+    screen.getByRole("button", { name: "Profile" }).click();
+    (await screen.findByText("System settings")).click();
+    expect(await screen.findByRole("dialog", { name: "System settings" })).toBeTruthy();
+  });
+});

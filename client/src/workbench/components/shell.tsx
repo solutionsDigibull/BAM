@@ -99,7 +99,9 @@ function ProfileMenu() {
         <button className="profile-item" onClick={() => { setOpen(false); setSettings(true) }}><Icon name="tb-robot" size={14} />System settings</button>
         <button className="profile-item" onClick={() => { setOpen(false); signOut() }}><Icon name="logout" size={14} />Sign out</button>
       </div>
-      <SystemSettings open={settings} onClose={() => setSettings(false)} />
+      {/* Mounted only while open: every Dialog labels itself with id `dlg-title`, so a closed one left in the page would
+          give the other dialogs its name. */}
+      {settings && <SystemSettings open onClose={() => setSettings(false)} />}
     </div>
   )
 }
