@@ -126,6 +126,12 @@ def reported(result: Any) -> str:
     return ",".join(p["action_output"].get("jwt_token", "") for p in passes)
 
 
+def otp_match(outputs: RunnerOutputs) -> Any:
+    """The check tool's own answer for the first pass, from the runner's trace."""
+    passes: Any = outputs.cases[0].trace["passes"]
+    return passes[0]["check_output"]["otp_match"]
+
+
 def test_e13_2_625_a_bundle_cannot_reach_the_runner_nor_leave_a_writer_behind(
     agent_url: str,  # noqa: F811
 ) -> None:
@@ -147,7 +153,7 @@ def test_e13_2_625_a_bundle_cannot_reach_the_runner_nor_leave_a_writer_behind(
     # that writes an honest handoff row can pass; what it cannot do is change how it is judged.
     outputs = RunnerOutputs.model_validate_json(result.outputs_json or b"")
     assert outputs.cases[0].passed == result.classified.passed
-    assert outputs.cases[0].trace["passes"][0]["check_output"]["otp_match"] is True
+    assert otp_match(outputs) is True
 
 
 def test_e13_2_625_ending_the_runner_after_writing_a_forged_file_is_not_a_pass(
@@ -174,7 +180,7 @@ def test_e13_2_625_a_bundle_that_replaces_the_out_directory_cannot_pass_either(
     if result.outputs_json:
         outputs = RunnerOutputs.model_validate_json(result.outputs_json)
         assert outputs.cases[0].passed == result.classified.passed
-        assert outputs.cases[0].trace["passes"][0]["check_output"]["otp_match"] is True
+        assert otp_match(outputs) is True
     else:
         assert not result.classified.passed, result.classified
 
