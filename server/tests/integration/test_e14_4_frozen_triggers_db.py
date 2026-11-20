@@ -106,7 +106,7 @@ def test_e14_4_the_workflow_versions_table_has_the_trigger_and_the_unique_versio
         unique = conn.execute(
             text(
                 "SELECT count(*) FROM pg_constraint"
-                " WHERE conname = 'uq_workflow_versions_workflow_id'"
+                " WHERE conname = 'uq_workflow_versions_workflow_id_version'"
             )
         )
         assert unique.scalar() == 1
