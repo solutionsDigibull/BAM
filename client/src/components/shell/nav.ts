@@ -5,6 +5,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/users", label: "Users & Roles" },
   { href: "/admin/registry", label: "Registry" },
   { href: "/admin/srim-defaults", label: "SRIM defaults" },
+  { href: "/admin/token-caps", label: "Token caps" },
   { href: "/admin/tenants", label: "Tenants" },
 ];
 
