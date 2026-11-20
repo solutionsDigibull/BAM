@@ -38,6 +38,14 @@ metrics:
     labels: [bulkhead]
     evidence: {file: server/api/sbam_api/core/bulkhead_metrics.py, contains: sbam_bulkhead_saturated}
 
+  # --- Build progress (#926): the stuck-stage alert. ---
+  - name: sbam_build_idle_seconds
+    type: gauge
+    source: sbam-otel-meter
+    status: emitted
+    labels: []
+    evidence: {file: server/api/sbam_api/core/build_metrics.py, contains: sbam_build_idle_seconds}
+
   # --- Temporal SDK metrics: need a Temporal Runtime with an OTLP metrics exporter in the workers. ---
   - name: temporal_activity_schedule_to_start_latency_seconds_bucket
     type: histogram
@@ -135,10 +143,9 @@ metrics:
   - name: sbam_llm_cost_usd_total
     type: counter
     source: sbam-otel-meter
-    status: planned
-    labels: [alias, tenant_id]
-    owner: "Bifrost client (E1.15 follow-up)"
-    emitter: counter of llm_calls.cost in USD
+    status: emitted
+    labels: [alias]
+    evidence: {file: server/workers/sbam_workers/llm/spend_metrics.py, contains: sbam_llm_cost_usd}
   - name: sbam_clamav_signature_age_seconds
     type: gauge
     source: sbam-otel-meter

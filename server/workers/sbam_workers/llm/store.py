@@ -13,6 +13,8 @@ from sbam_api.notifications.service import Source, notify_project
 from sbam_contracts.notifications import NotificationType
 from sqlalchemy.orm import Session, sessionmaker
 
+from sbam_workers.llm.spend_metrics import record as record_cost
+
 
 @dataclass(frozen=True)
 class LlmScope:
@@ -94,6 +96,7 @@ class SqlCallStore:
                 }
             )
             session.commit()
+            record_cost(row.alias, row.cost_usd)
             return row.id
 
     def derivative(self, scope: LlmScope, cache_key: str) -> dict[str, Any] | None:

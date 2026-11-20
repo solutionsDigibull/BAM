@@ -8,11 +8,14 @@ import uuid
 from datetime import UTC, datetime
 
 from sbam_contracts.runs import TERMINAL_STATES, Run, RunState, SubjectType
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from sbam_api.db.repository import TenantScopedRepository
 from sbam_api.temporal.models import TemporalRun
+
+# BuildStage.WAIT_RETRY / WAIT_REPO: a build parked for the FDE (a person, not a fault)
+WAITING_STAGES = ("wait_retry", "wait_repo_choice")
 
 
 class TemporalRunRepository(TenantScopedRepository[TemporalRun]):
@@ -127,3 +130,23 @@ def to_run(row: TemporalRun) -> Run:
         started_at=_utc(row.created_at),
         updated_at=_utc(row.updated_at),
     )
+
+
+def longest_idle_build_seconds(session: Session, now: datetime | None = None) -> float:
+    """How long the build that has gone longest without a stage change has been quiet, in seconds
+    (0 when no Sub-Skill build is running). Cross-tenant on purpose and a single number: the
+    `sbam_build_idle_seconds` gauge behind the stuck-stage alert (#926) carries no id and no tenant.
+    """
+    query = select(func.min(TemporalRun.updated_at)).where(
+        TemporalRun.state == RunState.RUNNING.value,
+        TemporalRun.subject_type == SubjectType.SUB_SKILL.value,
+        TemporalRun.deleted_at.is_(None),
+        # waiting for a person is not stuck: the FDE's repository answer or a Retry
+        or_(TemporalRun.current_stage.is_(None), TemporalRun.current_stage.not_in(WAITING_STAGES)),
+    )
+    oldest = session.scalar(query)
+    if oldest is None:
+        return 0.0
+    if oldest.tzinfo is None:
+        oldest = oldest.replace(tzinfo=UTC)
+    return max(0.0, ((now or datetime.now(UTC)) - oldest).total_seconds())
