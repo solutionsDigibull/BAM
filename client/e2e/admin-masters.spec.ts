@@ -273,7 +273,9 @@ test("e3_10_t02 reordered Skills columns: diff table, Apply disabled", async ({
   }));
   await page.goto("/admin/masters");
   const dialog = await chooseAndValidate(page);
-  await expect(dialog.getByText("The workbook does not have the Masters 0.3 structure")).toBeVisible();
+  await expect(
+    dialog.getByText("The workbook does not have the Masters 0.3 structure"),
+  ).toBeVisible();
   await expect(dialog.getByText("reordered")).toHaveCount(2);
   await expect(dialog.getByRole("button", { name: "Apply" })).toBeDisabled();
   expect(modes).toEqual(["validate-only"]);
