@@ -33,6 +33,8 @@ import type {
   RepoQuestions,
   RequestChangeAccepted,
   KnowledgeVersionList,
+  LlmUsage,
+  Preflight,
   StagingStatus,
   WorkflowCodeTree,
   WorkflowFileView,
@@ -122,6 +124,8 @@ export function createSbamApi(projectId: string): BamApi {
     getWorkflowVersions: async (workflowId) =>
       (await getJson<WorkflowVersionList>(`projects/${projectId}/workflows/${workflowId}/versions`)).body,
     getKnowledgeVersions: async () => (await getJson<KnowledgeVersionList>(`projects/${projectId}/knowledge`)).body,
+    getPreflight: async () => (await getJson<Preflight>("preflight")).body,
+    getLlmUsage: async () => (await getJson<LlmUsage>(`projects/${projectId}/llm-usage`)).body,
     getStagingStatus: async (workflowId) =>
       (await getJson<StagingStatus>(`projects/${projectId}/workflows/${workflowId}/staging`)).body,
     getChangeNotes: async (workflowId) =>

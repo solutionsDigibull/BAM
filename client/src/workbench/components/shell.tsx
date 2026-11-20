@@ -10,6 +10,7 @@ import { signOut, useSession } from '../features/login/session'
 import { AutoChip, HitlChip, Icon, Tip, fmtFull, fmtTime } from './ui'
 import { BrandLockup } from './BrandLockup'
 import { UploadFilesBlock } from '../steps/UploadPanes'
+import { SystemSettings } from './SystemSettings'
 
 export const useUploadsInFlight = () =>
   useUppyState(uppy, s => Object.values(s.files).filter(f => f.progress.uploadStarted && !f.progress.uploadComplete && !f.error).length)
@@ -74,10 +75,11 @@ export function TopBar({ syncedAt, offline }: { snap?: Snapshot; syncedAt: numbe
   )
 }
 
-// Profile: who is signed in, Switch to Masters, and Sign out. Click or keyboard opens it; Escape or an outside click closes it.
+// Profile: who is signed in, System settings (read only, #826) and Sign out. Click or keyboard opens it; Escape or an outside click closes it.
 function ProfileMenu() {
   const email = useSession()
   const [open, setOpen] = useState(false)
+  const [settings, setSettings] = useState(false)
   const wrap = useRef<HTMLDivElement>(null)
   const btn = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -94,8 +96,10 @@ function ProfileMenu() {
       </button>
       <div id="profile-menu" className="profile-menu" hidden={!open}>
         <p className="profile-who"><span className="muted xs">Signed in as</span><strong>{email ?? '—'}</strong></p>
+        <button className="profile-item" onClick={() => { setOpen(false); setSettings(true) }}><Icon name="tb-robot" size={14} />System settings</button>
         <button className="profile-item" onClick={() => { setOpen(false); signOut() }}><Icon name="logout" size={14} />Sign out</button>
       </div>
+      <SystemSettings open={settings} onClose={() => setSettings(false)} />
     </div>
   )
 }
