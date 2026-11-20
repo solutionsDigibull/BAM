@@ -427,3 +427,16 @@ def test_e13_2_the_fresh_state_key_survives_a_postgres_round_trip() -> None:
         for doc in (raw, jsonb(raw))
     }
     assert keys == {"mobile_number"}
+
+
+def test_a02_t19_fresh_state_queries_run_on_the_reader_connection_not_the_runners(
+    runner: ModuleType,
+) -> None:
+    """The runner keeps its own (privileged) connection for seeding and the handoff check; the
+    bundle's SELECTs go to the restricted reader when there is one (ADR 0026, decision 5)."""
+    reader, admin = FakeConn([]), FakeConn([])
+    s = runner.PgStore(admin, "handoff", "q", {"q": "k1"}, QUERIES, ["iteration_pass", "x"], reader)
+    assert s.read_state(["balance"]) == {"balance": 5}
+    assert reader.executed == [QUERIES["balance"]] and admin.executed == []
+    s.apply_script({"sql": ["UPDATE t SET a = 1"]})  # the case's own script is not the bundle's
+    assert admin.executed == ["UPDATE t SET a = 1"]

@@ -42,11 +42,16 @@ the interpreter is known to be bypassable. A bundle that passes its own tests ca
   allocation and a `sleep` past the deadline are contained by the sandbox. They need a live sandbox to be
   shown, which needs the CubeSandbox host (#122); until then the evidence is the local container's hardening only.
 - **The runtime audit hook (#120)** for imports and file or network access is not built here.
-- **A bundle can still forge its own verdict today.** The in-VM runner imports the bundle into the same process as
-  the harness (#625). That is a separate fix (child process under another uid, outputs written by the parent) and
-  an open design question for the owner of E13.
-- **The fresh-state role** (decision 5) is the stated requirement; whether the sandbox runner already connects as
-  such a role has not been verified in this change.
+- **Forging the verdict** (#625) is addressed by [0027](0027-code-under-test-runs-in-its-own-process.md) and
+  ADR 0043: the bundle runs in a child process; the second uid is #967.
+- **The fresh-state role** (decision 5) now exists where the runner reads state (#428): the in-VM runner creates
+  `sbam_state_reader` in its throwaway PostgreSQL (SELECT on the case's tables, a read-only session, a statement
+  timeout, no `pg_read_server_files`) and runs the bundle's `QUERIES` as that role (tests `test_a02_t10`..`t13`, unit
+  `t19`; the sandbox escape tests are `t14`..`t18`). The bundle's own tools still connect as the database owner; separating them is #967 (needs the #122
+  template).
+- **`params["tables"]`** is not needed: the table-membership check already takes its relations from the workflow's
+  `schema.sql` (`schema_tables`), so a query on a table the schema does not create is refused whenever the schema is
+  known.
 
 ## Consequences
 
