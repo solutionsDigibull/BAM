@@ -503,6 +503,45 @@ def test_e14_2_certify_workflow_refuses_a_manifest_on_old_bundles() -> None:
     assert "MANIFEST_STALE:MS01.1_Login" in str(error)
 
 
+def test_e14_2_a_macro_with_no_sub_skill_fails_validation_not_certification() -> None:
+    """certify_macros skips a Macro with no child and the DAG checks only count skill nodes, so the
+    refusal must come from validate_workflow (which has a retry path), not certify_workflow (which
+    would leave the Workflow in CERTIFYING)."""
+    w = World()
+    with w.sessions() as s:
+        empty = MacroSkill(
+            id=uuid7(),
+            tenant_id=w.tenant,
+            project_id=w.project,
+            workflow_id=w.workflow,
+            sow_version_id=uuid7(),
+            macro_category="MS03_Empty",
+            name="MS03_Empty",
+            description="-",
+            order=3,
+            sow_refs=[],
+            agent_ref=None,
+            validation_errors=[],
+        )
+        empty.state = "PENDING"
+        s.add(empty)
+        s.commit()
+    w.certify_macros()
+    error = failure(w.validate)
+    assert error.type == VALIDATION_FAILED
+    assert error.message == "workflow validation failed: MACRO_NOT_CERTIFIED:MS03_Empty"
+    assert len(w.audit(VALIDATION_ACTION)) == 1
+
+
+def test_e14_2_a_stale_manifest_fails_validation_not_certification() -> None:
+    w = World()
+    w.write_manifest(w.manifest(bundle=2), build_no=2)  # names bundles nobody built
+    w.certify_macros()
+    error = failure(w.validate)
+    assert error.type == VALIDATION_FAILED
+    assert "MANIFEST_STALE:MS01.1_Login" in error.message
+
+
 def test_e14_2_a_workflow_outside_the_run_is_refused() -> None:
     w = World()
     w.inp = w.inp.model_copy(update={"project_id": uuid7()})

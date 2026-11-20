@@ -295,6 +295,36 @@ def _stale_skills(manifest: WorkflowManifest, tree: Tree) -> list[Finding]:
     ]
 
 
+def _certificate_findings(
+    session: Session, ctx: TenantContext, tree: Tree, manifest: WorkflowManifest
+) -> tuple[list[dict[str, Any]], list[Finding]]:
+    """Each Macro's certificate on its current children (MACRO_NOT_CERTIFIED when it has none, a
+    Macro with no Sub-Skill included) and the manifest's bundles (MANIFEST_STALE). Returns the
+    certificates found, for the Workflow evidence, and the findings."""
+    certs = CertificationRepository(session, ctx)
+    macros: list[dict[str, Any]] = []
+    findings: list[Finding] = []
+    for macro in tree.macros:
+        children = tree.of(macro)
+        found = None
+        if children:
+            found = certs.find(
+                CertificationLevel.MACRO_SKILL.value, macro.id, macro_content_sha256(children)
+            )
+        if found is None:
+            findings.append(Finding(MACRO_NOT_CERTIFIED, macro.macro_category, "no certificate"))
+            continue
+        macros.append(
+            {
+                "macro_category": macro.macro_category,
+                "macro_skill_id": str(macro.id),
+                "certification_id": str(found.id),
+                "content_sha256": found.content_sha256,
+            }
+        )
+    return macros, findings + _stale_skills(manifest, tree)
+
+
 # --- the stages -----------------------------------------------------------------------------------
 
 
@@ -408,6 +438,13 @@ class WorkflowCertification:
             self._workflow(session, ctx, inp)
             facts = self.facts(session, ctx, inp.workflow_id)
             findings = findings_of(facts)
+            if not findings and facts.manifest is not None:
+                # What certify_workflow would still refuse (a Macro without a certificate, e.g.
+                # one with no Sub-Skill; a manifest on an old bundle) is found here, so it fails
+                # through `workflow_validation_failed` and its retry instead of stranding the
+                # Workflow in CERTIFYING.
+                _, more = _certificate_findings(session, ctx, facts.tree, facts.manifest)
+                findings = tuple(sorted(set(more)))
             if findings:
                 self._record_findings(session, inp, facts, findings)
                 session.commit()
@@ -453,34 +490,11 @@ class WorkflowCertification:
             manifest, sha = facts.manifest, facts.manifest_sha256
             if findings or manifest is None or sha is None or facts.manifest_id is None:
                 raise refused(findings or [Finding(MANIFEST_MISSING, WORKFLOW_SUBJECT, "")])
-            certs = CertificationRepository(session, ctx)
-            macros: list[dict[str, Any]] = []
-            for macro in facts.tree.macros:
-                children = facts.tree.of(macro)
-                found = None
-                if children:
-                    found = certs.find(
-                        CertificationLevel.MACRO_SKILL.value,
-                        macro.id,
-                        macro_content_sha256(children),
-                    )
-                if found is None:
-                    findings.append(
-                        Finding(MACRO_NOT_CERTIFIED, macro.macro_category, "no certificate")
-                    )
-                    continue
-                macros.append(
-                    {
-                        "macro_category": macro.macro_category,
-                        "macro_skill_id": str(macro.id),
-                        "certification_id": str(found.id),
-                        "content_sha256": found.content_sha256,
-                    }
-                )
-            findings += _stale_skills(manifest, facts.tree)
+            macros, more = _certificate_findings(session, ctx, facts.tree, manifest)
+            findings += more
             if findings:
                 raise refused(sorted(set(findings)))
-            row = certs.record(
+            row = CertificationRepository(session, ctx).record(
                 {
                     "level": CertificationLevel.WORKFLOW.value,
                     "subject_id": inp.workflow_id,
