@@ -33,7 +33,7 @@ import openpyxl
 from sbam_contracts.api import ErrorCode, FieldError
 from sbam_contracts.masters import FiletypePayload, MasterType
 from sbam_contracts.masters_api import ImportMode, ImportReport, ImportRowError, ImportTabReport
-from sbam_contracts.masters_v03 import ID_KEY, status_of
+from sbam_contracts.masters_v03 import ID_KEY, STRUCTURE_VERSION, status_of
 from sbam_contracts.masters_workbook import (
     COLUMN_NUMBER_START,
     COLUMNS,
@@ -156,8 +156,10 @@ def _structure_mismatch(errors: list[FieldError]) -> ApiError:
     return ApiError(
         422,
         ErrorCode.STRUCTURE_MISMATCH,
-        "The workbook does not have the BAM 0.2 structure",
-        "Use the published template; columns and tabs are never mapped automatically.",
+        f"The workbook does not have the {STRUCTURE_VERSION} structure",
+        "Download the template (Masters > Download template) and fill it in; columns and tabs are"
+        " never mapped automatically. A BAM 0.2 workbook (the MSC consolidated file) cannot be"
+        " imported since Masters 0.3.",
         errors=errors,
     )
 

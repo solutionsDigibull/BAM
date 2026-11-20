@@ -243,7 +243,7 @@ test("e3_10_t02 reordered Skills columns: diff table, Apply disabled", async ({
     status: 422,
     body: {
       type: "about:blank",
-      title: "The workbook does not have the BAM 0.2 structure",
+      title: "The workbook does not have the Masters 0.3 structure",
       status: 422,
       detail: "Use the published template; columns and tabs are never mapped automatically.",
       code: "STRUCTURE_MISMATCH",
@@ -273,7 +273,7 @@ test("e3_10_t02 reordered Skills columns: diff table, Apply disabled", async ({
   }));
   await page.goto("/admin/masters");
   const dialog = await chooseAndValidate(page);
-  await expect(dialog.getByText("The workbook does not have the BAM 0.2 structure")).toBeVisible();
+  await expect(dialog.getByText("The workbook does not have the Masters 0.3 structure")).toBeVisible();
   await expect(dialog.getByText("reordered")).toHaveCount(2);
   await expect(dialog.getByRole("button", { name: "Apply" })).toBeDisabled();
   expect(modes).toEqual(["validate-only"]);
