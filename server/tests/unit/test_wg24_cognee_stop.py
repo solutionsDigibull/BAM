@@ -190,7 +190,7 @@ def test_wg24_t01_a_reached_cap_stops_the_running_build(
 
     asyncio.run(go())
     assert not backend.finished and backend.made < 50
-    assert w.budget.caps.knowledge_tokens == 60
+    assert w.budget.caps is not None and w.budget.caps.knowledge_tokens == 60
 
 
 def test_wg24_t03_the_next_call_after_the_cap_is_refused(
