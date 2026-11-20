@@ -27,6 +27,7 @@ MILLION = Decimal(1_000_000)
 # other alias counts against the Workflow build's. A Sub-Skill's own cap needs the Sub-Skill id in
 # the call scope and comes with the per-project settings (#776).
 KNOWLEDGE_ALIASES = frozenset({"sbam-knowledge", "sbam-embed"})
+BUILD_PREFIX = "build-"  # `runs.build_workflow_id`: the Temporal workflow id of one Sub-Skill build
 PERCENT = {BudgetLevel.FIRST_ALERT: "first", BudgetLevel.SECOND_ALERT: "second"}
 
 
@@ -55,6 +56,7 @@ class Budget:
         return (
             self.settings.llm_project_budget_usd is not None
             or self.settings.llm_tenant_budget_usd is not None
+            or self.settings.llm_build_budget_usd is not None
         )
 
     def cost_of(self, alias: str, tokens_in: int, tokens_out: int, reported: Decimal) -> Decimal:
@@ -84,6 +86,13 @@ class Budget:
                 f"{alias} calls report no cost and LLM_PRICE_USD_PER_MTOK has no price for it, "
                 "so the LLM budget cannot count them"
             )
+        build_cap = self.settings.llm_build_budget_usd
+        if build_cap is not None and scope.temporal_workflow_id.startswith(BUILD_PREFIX):
+            built = await asyncio.to_thread(self.store.spent_build, scope)
+            if built >= build_cap:
+                raise BudgetExceeded(
+                    f"this build has spent ${built:.4f} of its ${build_cap:.4f} per-build budget"
+                )
         for limit, tenant, what in (
             (self.settings.llm_project_budget_usd, False, "project"),
             (self.settings.llm_tenant_budget_usd, True, "tenant"),

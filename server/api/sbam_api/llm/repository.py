@@ -113,6 +113,17 @@ class LlmCallRepository(TenantScopedRepository[LlmCall]):
             query = query.where(LlmCall.project_id == self.ctx.project_id)
         return Decimal(str(self.session.scalar(query) or 0))
 
+    def spent_for_workflow(self, temporal_workflow_id: str) -> Decimal:
+        """Total `cost_usd` of every attempt recorded under one Temporal workflow id in the
+        project (#926: a build's own spend). Failed attempts count: they were billed."""
+        query = select(func.coalesce(func.sum(LlmCall.cost_usd), 0)).where(
+            LlmCall.tenant_id == self.ctx.tenant_id,
+            LlmCall.project_id == self.ctx.project_id,
+            LlmCall.temporal_workflow_id == temporal_workflow_id,
+            LlmCall.deleted_at.is_(None),
+        )
+        return Decimal(str(self.session.scalar(query) or 0))
+
     def tokens(self, aliases: frozenset[str], *, inside: bool) -> int:
         """Tokens (in + out) of every attempt of the project whose alias is in `aliases` (`inside`)
         or not. Failed attempts count: the provider billed them. The project is the context's."""
