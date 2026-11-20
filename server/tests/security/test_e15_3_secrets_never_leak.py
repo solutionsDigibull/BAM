@@ -42,6 +42,7 @@ import test_wg18_commit_api as wg18
 from sbam_api.audit.models import AuditLog
 from sbam_api.connections.crypto import KeyRing
 from sbam_api.connections.inject import resolve_env
+from sbam_api.connections.repository import ConnectionRepository
 from sbam_api.core.telemetry import tracer_provider
 from sbam_api.manifests.models import WorkflowManifestRow
 from sbam_api.workflow_registry.models import RegisteredWorkflowRow
@@ -142,20 +143,16 @@ def test_e15_3_a_secret_is_never_in_the_export_package(
 ) -> None:
     monkeypatch.setattr(export_activities, "notify_project", lambda *_, **__: 1)
     e145.frozen(h)
-    wg16.put_value(h, LEDGER, SECRET)
+    stored = wg16.put_value(h, LEDGER, SECRET)
+    assert stored.status_code < 300, stored.text
     keyring = KeyRing.parse(wg16.KEYS, allow_placeholder=True)
-    with h.sessions() as s:  # control: the value is stored and readable where it is meant to be
-        env = resolve_env(
-            s,
-            wg18.ctx(h),
-            wg16.WORKFLOW,
-            keyring=keyring,
-            actor_id="t",
-            purpose="t",
-            run_id=uuid.uuid4(),
-        )
-        s.rollback()
-    assert env[LEDGER].get_secret_value() == SECRET
+    ctx = wg18.ctx(h)
+    with h.sessions() as s:  # control: the value is stored, sealed, and opens to the secret
+        row = next(r for r in ConnectionRepository(s, ctx).all_rows() if r.name == LEDGER)
+        sealed = row.sealed()
+    assert sealed is not None
+    opened = keyring.open(ctx.tenant_id, uuid.UUID(h.project), LEDGER, sealed)
+    assert opened.get_secret_value() == SECRET
     accepted = e145.post(h)
     assert accepted.status_code == 202, accepted.text
     result = e145.run(h, client)
