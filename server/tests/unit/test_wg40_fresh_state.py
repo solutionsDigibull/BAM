@@ -157,7 +157,7 @@ def test_wg40_t08_old_valid_isatvons_are_unchanged() -> None:
 def test_wg40_t09_the_prompts_say_it() -> None:
     registry = PromptRegistry()
     isatvon = registry.get("isatvon-sub-skills")
-    assert isatvon.version == "1.5.0"
+    assert isatvon.version == "1.6.0"
     assert "Never a loop counter" in isatvon.text and "`[]`, which is valid" in isatvon.text
     assert not re.search(r"list `attempt` in `fresh_state_parameters`", isatvon.text)
     assert "attempt" not in re.search(r"Declared here[^\n]*\n[^\n]*", isatvon.text).group(0)  # type: ignore[union-attr]

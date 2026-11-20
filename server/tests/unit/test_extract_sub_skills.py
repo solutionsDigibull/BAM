@@ -22,6 +22,7 @@ from sbam_workers.isatvon.sub_skills import (
     FEATURE_NOT_COVERED,
     LLM_UNAVAILABLE,
     REDACTED,
+    RULE_REASKS,
     SCHEMA_INVALID,
     SOW_NOT_APPROVED,
     skill_ids,
@@ -147,7 +148,7 @@ def test_e8_3_t08_rule_violations_are_flagged_and_every_field_kept(p: Pass2) -> 
     )
     bifrost = FakeBifrost([completion(answer(broken, KYC))])
     p.run_macro(bifrost)
-    assert len(bifrost.requests) == 1  # rule findings are never asked again
+    assert len(bifrost.requests) == 1 + RULE_REASKS  # asked again (#929), then stored as it is
     row = p.sub_skills()[0]
     assert row.state == "INVALID"
     assert codes(row) == [

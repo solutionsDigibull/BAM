@@ -17,7 +17,9 @@ is used), so tests run it with a fake Bifrost. For Macro Skill `inp.macro_skill_
   4. `sbam-isatvon` answers a `SubSkillExtraction`. Beyond the schema, every feature must be in some
      Sub-Skill's `sow_refs` (`FEATURE_NOT_COVERED`) and every ref must be one of those features
      (`UNKNOWN_SOW_REF`); both are asked again like a schema error (codes and ids only). TD §10.4
-     rule findings are never asked again: they are stored.
+     rule findings are asked again too, at most `RULE_REASKS` times, with the position, the code,
+     the offending names and one fixed sentence each (`feedback`, #929); what is still wrong
+     after that is stored, not refused.
   5. SBAM, not the model, sets the ids: `skill_id` `MSnn.m_<Name>` (m by order from 1, a repeated
      name gets `_2`, `_3`, ...), `macro_category` = the Macro Skill's, and `next` = the following
      Sub-Skill, the last one pointing at the next Macro Skill (null after the last).
@@ -74,6 +76,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from sbam_workers import mirror
+from sbam_workers.isatvon import feedback
 from sbam_workers.llm.client import (
     ContextTooLarge,
     LlmClient,
@@ -96,6 +99,7 @@ log = logging.getLogger("sbam_workers.isatvon.sub_skills")
 ALIAS: Final = "sbam-isatvon"
 PROMPT_ID: Final = "isatvon-sub-skills"
 EXTRACT_ATTEMPTS: Final = 3  # ProjectPipeline's PLAN uses the same (a test checks)
+RULE_REASKS: Final = 2  # of the re-asks, at most this many are spent on TD §10.4 findings (#929)
 NAME_CHARS: Final = 100  # of the name part of `MSnn.m_<Name>`
 REDACTED: Final = "[REDACTED]"
 REUSED: Final = frozenset({SubSkillState.CERTIFIED.value, SubSkillState.FROZEN.value})
@@ -165,6 +169,38 @@ def check_coverage(
                     errors.append(f"sub_skills.{i}.sow_refs.{j}: UNKNOWN_SOW_REF {shown}")
         errors += [f"features.{f}: FEATURE_NOT_COVERED" for f in ids if f not in covered]
         return tuple(dict.fromkeys(errors))
+
+    return check
+
+
+def check_rules(
+    src: "Source", budget: int = RULE_REASKS
+) -> Callable[[SubSkillExtraction], tuple[str, ...]]:
+    """#929: the answer's Sub-Skills, finished the way they are stored, go through the build's
+    validator; its findings go back to the model as lines of code, position and names (`feedback`),
+    at most `budget` times. After that the answer is taken as it is and stored INVALID with its
+    findings, as before, so an FDE can still edit it. Secret findings are never asked again."""
+    left = [budget]
+
+    def check(answer: SubSkillExtraction) -> tuple[str, ...]:
+        if left[0] <= 0:
+            return ()
+        raws = finish(src, answer)
+        found = [
+            [
+                f.model_dump(mode="json")
+                for f in validate_sub_skill(
+                    raw,
+                    macro_category=src.macro_category,
+                    library_registry=DEFAULT_LIBRARY_REGISTRY,
+                )
+            ]
+            for raw in raws
+        ]
+        out = feedback.lines(raws, found)
+        if out:
+            left[0] -= 1
+        return tuple(out)
 
     return check
 
@@ -418,6 +454,11 @@ async def ask_sub_skills(
     context, or an E7.2 rework, which answers `one` Sub-Skill). A failure is left on the Workflow
     (as `what`, default the Macro Skill) and raised non-retryable (see the docstring)."""
     what = what or src.macro_category
+    coverage, rules = check_coverage(src.features, one=one), check_rules(src)
+
+    def validate(answer: SubSkillExtraction) -> tuple[str, ...]:
+        return coverage(answer) or rules(answer)
+
     try:
         return await deps.llm.run(
             ALIAS,
@@ -425,7 +466,7 @@ async def ask_sub_skills(
             SubSkillExtraction,
             {**_blocks(src), **(extra_blocks or {})},
             scope,
-            validate=check_coverage(src.features, one=one),
+            validate=validate,
             subject={"macro_skill_id": str(src.macro_id), "macro_category": src.macro_category},
         )
     except SchemaInvalidAfterRetries as exc:

@@ -23,6 +23,8 @@ model's answer. Nothing in this folder calls a model.
 
 `sow` has one hand-written case so far, `golden/sow-rule-labels.json` (documents that name rules R-xx while the Rules master is empty). It is replayed on a fake gateway by `tests/unit/test_wg37_sow_rule_refs.py`, so it runs in CI with no model; it is not a scored set and has no baseline.
 
+`isatvon` has one hand-written case set so far, `golden/isatvon-invalid-subskills.json` (#929): ten synthetic Sub-Skills, each the MS01.1 sample with one change of a class the real model produced (a `no_op_condition` on an output, on an undeclared name or on a loop counter; a statement without `Action:`/`Check:`/`Bound:`; `float`, `String` or `Priced` as a JSON-schema type; a loop counter in fresh state). `tests/unit/test_wg41_valid_subskills.py` replays it without a model: the validator must refuse each with its code and path, and the re-ask feedback must quote the code, the position, the offending names and a fixed fix sentence. It is additive, not scored and has no baseline: the real-model baseline is `todo` (it needs an owner-approved spend cap).
+
 `codegen` and `correction` also have one hand-written case, `golden/codegen-invented-column.json` (#923): the model is tempted to invent a column or a table in a state query. It is synthetic, replayed without a model by `tests/unit/test_wg36_schema_in_prompt.py`, and scored there by the build's own pre-check; it is additive and not part of the 20-item sets or the gate. Its real-model baseline is `todo`: it needs an owner-approved spend cap.
 
 ## Running the gate
