@@ -240,6 +240,7 @@ CHILD_ENV_KEYS: Final = (
     "SBAM_DATA_DIR",
     "SBAM_MOCK_BASE_URL",
 )
+CASE_NAME: Final = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.:-]{0,99}")
 PR_SET_DUMPABLE: Final = 4
 PR_SET_CHILD_SUBREAPER: Final = 36
 STOP_ROUNDS: Final = 50
@@ -337,12 +338,14 @@ class ChildProcess:
     `stop()`, which ends the process group and with it the blocked read."""
 
     def __init__(
-        self, bundle_dir: Path, tool_module: str, database: str, limits: Any
+        self, bundle_dir: Path, tool_module: str, database: str, limits: Any, case: str = ""
     ) -> None:
         request_read, request_write = os.pipe()
         reply_read, reply_write = os.pipe()
         self.max_reply = limits.max_output_bytes
         env = {k: os.environ[k] for k in CHILD_ENV_KEYS if k in os.environ}
+        if CASE_NAME.fullmatch(case):  # the case's name, for the mock API's X-Sbam-Case (E13.5b)
+            env["SBAM_CASE"] = case
         argv = [
             sys.executable, "-I", CHILD_SCRIPT, str(bundle_dir), tool_module, database,
             str(request_read), str(reply_write), str(limits.memory_mb),
@@ -613,7 +616,7 @@ async def run_case_in_db(
         except BundleError as exc:
             return error_trace(case_id, "IMPORT_ERROR", f"BundleError: {exc}"), []
         child = ChildProcess(
-            bundle_dir, request.tool_module, db.case_name(number), request.limits
+            bundle_dir, request.tool_module, db.case_name(number), request.limits, case_id
         )
         hello = await asyncio.wait_for(child.ask(None), request.limits.case_timeout_s)
         if (
