@@ -1,0 +1,509 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sbam:contracts:build/timeline_response:0.1.0",
+  "$defs": {
+    "GateName": {
+      "description": "The dashboard's gate columns, in display order (TD §7 `gate_results.gate` plus the two the\ndashboard adds: CODEGEN for generation itself and LOOP_TESTS for the sandbox loop tests).",
+      "enum": [
+        "ISATVON_CONTRACT",
+        "LIBRARIES",
+        "SCHEMA_SQL",
+        "CODEGEN",
+        "AST_SYNTAX",
+        "AST_SKELETON",
+        "AST_CONFORMANCE",
+        "AST_DECOUPLING",
+        "AST_NO_MANUAL_LOOP",
+        "AST_HANDOFF",
+        "AST_IMPORTS",
+        "AST_SQL_SAFETY",
+        "RUFF",
+        "BLACK",
+        "MYPY",
+        "CLAMAV",
+        "BANDIT",
+        "IMPORT_RESOLUTION",
+        "REPO_LICENCE",
+        "DEPENDENCY_VULN",
+        "MCP_COMPLIANCE",
+        "UI_BUNDLE",
+        "REVIEW",
+        "LOOP_TESTS"
+      ],
+      "title": "GateName",
+      "type": "string"
+    },
+    "StepKind": {
+      "enum": [
+        "TRANSITION",
+        "MODEL",
+        "CODE_ATTEMPT",
+        "GATE"
+      ],
+      "title": "StepKind",
+      "type": "string"
+    },
+    "StepStatus": {
+      "enum": [
+        "OK",
+        "FAILED",
+        "RUNNING"
+      ],
+      "title": "StepStatus",
+      "type": "string"
+    },
+    "SubSkillState": {
+      "enum": [
+        "DRAFT",
+        "VALID",
+        "INVALID",
+        "BUILDING",
+        "CORRECTING",
+        "TESTING",
+        "TESTING_BLOCKED",
+        "NEEDS_FDE_REVIEW",
+        "DEPENDENCY_FAILED",
+        "BUILD_ERROR",
+        "CERTIFIED",
+        "FROZEN",
+        "INVALIDATED",
+        "SUPERSEDED"
+      ],
+      "title": "SubSkillState",
+      "type": "string"
+    },
+    "SubSkillTimeline": {
+      "additionalProperties": false,
+      "properties": {
+        "sub_skill_id": {
+          "format": "uuid",
+          "title": "Sub Skill Id",
+          "type": "string"
+        },
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "skill_name": {
+          "title": "Skill Name",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SubSkillState"
+        },
+        "build_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
+        "build_no": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build No"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "last_activity_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Activity At"
+        },
+        "current_stage": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Stage"
+        },
+        "code_attempts": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Code Attempts",
+          "type": "integer"
+        },
+        "llm_calls": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Llm Calls",
+          "type": "integer"
+        },
+        "tokens_in": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tokens In",
+          "type": "integer"
+        },
+        "tokens_out": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tokens Out",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "default": "0.0000",
+          "pattern": "^\\d+\\.\\d{4}$",
+          "title": "Cost Usd",
+          "type": "string"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimelineFailure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/TimelineStep"
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sub_skill_id",
+        "skill_id",
+        "skill_name",
+        "state"
+      ],
+      "title": "SubSkillTimeline",
+      "type": "object"
+    },
+    "TimelineFailure": {
+      "additionalProperties": false,
+      "description": "Why the build is parked or failed: the last transition's event and the failing gates.",
+      "properties": {
+        "event": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Event",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/SubSkillState"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "failing_gates": {
+          "items": {
+            "$ref": "#/$defs/GateName"
+          },
+          "title": "Failing Gates",
+          "type": "array"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/TimelineFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "event",
+        "state",
+        "at"
+      ],
+      "title": "TimelineFailure",
+      "type": "object"
+    },
+    "TimelineFinding": {
+      "additionalProperties": false,
+      "description": "A gate finding by name only: which gate, which rule code, where. No message text.",
+      "properties": {
+        "gate": {
+          "$ref": "#/$defs/GateName"
+        },
+        "code": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        }
+      },
+      "required": [
+        "gate",
+        "code"
+      ],
+      "title": "TimelineFinding",
+      "type": "object"
+    },
+    "TimelineStep": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/StepKind"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/StepStatus"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "cycle": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cycle"
+        },
+        "attempt": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attempt"
+        },
+        "from_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubSkillState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "to_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubSkillState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "alias": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alias"
+        },
+        "calls": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "tokens_in": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tokens In",
+          "type": "integer"
+        },
+        "tokens_out": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tokens Out",
+          "type": "integer"
+        },
+        "cost_usd": {
+          "default": "0.0000",
+          "pattern": "^\\d+\\.\\d{4}$",
+          "title": "Cost Usd",
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/TimelineFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "seq",
+        "kind",
+        "name",
+        "status",
+        "started_at"
+      ],
+      "title": "TimelineStep",
+      "type": "object"
+    },
+    "WorkflowState": {
+      "enum": [
+        "CREATED",
+        "ISATVON_EXTRACTING",
+        "ISATVON_REVIEW",
+        "BUILDING",
+        "CERTIFYING",
+        "CERTIFIED",
+        "FROZEN",
+        "EXTRACTION_FAILED",
+        "NEEDS_FDE_REVIEW",
+        "WORKFLOW_VALIDATION_FAILED",
+        "CANCELLED"
+      ],
+      "title": "WorkflowState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`GET W/timeline`: every Sub-Skill's latest build, oldest step first.",
+  "properties": {
+    "workflow_id": {
+      "format": "uuid",
+      "title": "Workflow Id",
+      "type": "string"
+    },
+    "workflow_state": {
+      "$ref": "#/$defs/WorkflowState"
+    },
+    "cost_usd": {
+      "pattern": "^\\d+\\.\\d{4}$",
+      "title": "Cost Usd",
+      "type": "string"
+    },
+    "sub_skills": {
+      "items": {
+        "$ref": "#/$defs/SubSkillTimeline"
+      },
+      "title": "Sub Skills",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workflow_id",
+    "workflow_state",
+    "cost_usd",
+    "sub_skills"
+  ],
+  "title": "BuildTimelineResponse",
+  "type": "object"
+}

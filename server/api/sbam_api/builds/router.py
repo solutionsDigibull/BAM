@@ -12,6 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Path, Query, Request
 from sbam_contracts.build import RetryAccepted, RetryRequest, SubSkillRetry
 from sbam_contracts.build_dashboard import BuildsResponse, GatesResponse
+from sbam_contracts.build_timeline import BuildTimelineResponse
 from sbam_contracts.code_view import (
     CodeAttemptList,
     CodeDiff,
@@ -23,7 +24,14 @@ from sbam_contracts.held_patch import HeldPatchResponse, PatchDecided, PatchDeci
 from sbam_contracts.workflow_repos import WorkflowRepositories
 from sqlalchemy.orm import Session, sessionmaker
 
-from sbam_api.builds import code_view, dashboard, patch_decision, workflow_code, workflow_repos
+from sbam_api.builds import (
+    code_view,
+    dashboard,
+    patch_decision,
+    timeline,
+    workflow_code,
+    workflow_repos,
+)
 from sbam_api.builds.service import ensure_waiting, retry_build
 from sbam_api.core.auth import CurrentUser, fde
 from sbam_api.core.conventions import validate_idempotency_key
@@ -50,6 +58,16 @@ def builds(
 ) -> BuildsResponse:
     with sessions() as session:
         return dashboard.builds(session, user, project_id, workflow_id)
+
+
+@router.get("/projects/{project_id}/workflows/{workflow_id}/timeline")
+def build_timeline(
+    project_id: Project, workflow_id: UUID, user: User, sessions: Sessions
+) -> BuildTimelineResponse:
+    """#926: every Sub-Skill's newest build as ordered steps: transitions, model calls (tokens and
+    cost), code attempts and failing gates, with the failure reason of a parked build."""
+    with sessions() as session:
+        return timeline.timeline(session, user, project_id, workflow_id)
 
 
 @router.get("/projects/{project_id}/workflows/{workflow_id}/sub-skills/{sub_id}/gates")

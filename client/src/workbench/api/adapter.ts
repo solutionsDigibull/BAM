@@ -1,6 +1,6 @@
 import type { DataProvider } from '@refinedev/core'
 import type {
-  BuildsResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
+  BuildsResponse, BuildTimelineResponse, ChangeNoteList, CommitAccepted, CommitStatus, Connection, KnowledgeNodeDetail, ConnectionList, ConnectionTestResult, ConnectionUpdate, ConnectionValueResult,
   CodeAttemptList, CodeDiff, CodeFileView, GatesResponse, HeldPatchResponse, TestRunTraces, TestRunsResponse, TestsResponse, ManifestVersionList, ManifestView, PatchDecided, RegisteredWorkflow, RepoAnswered, RepoAnswerRequest, RepoQuestions, RequestChangeAccepted, RequestChangeCreate, StagingStatus, WorkflowCodeTree, WorkflowVersionList, WorkflowFileView, WorkflowRepositories,
 } from '@/contracts'
 import type { RetryAccepted } from '../lib/workflowBuilds'
@@ -37,6 +37,8 @@ export interface BamApi {
   getChangeNotes(workflowId: string): Promise<ChangeNoteList>
   /** Request change from Staging (ADR 0032 decision 5): a plain-words note on one Sub-Skill, with an Idempotency-Key. 409 once the version has its 3 notes. */
   requestChange(workflowId: string, body: RequestChangeCreate, key: string): Promise<RequestChangeAccepted>
+  /** The build timeline of the workflow: steps, tokens, cost and the failure reason of each Sub-Skill's newest build (#926, read only). */
+  getBuildTimeline(workflowId: string): Promise<BuildTimelineResponse>
   /** The Sub-Skill rows of the workflow's build (the choices of a change note). */
   getWorkflowBuilds(workflowId: string): Promise<BuildsResponse>
   /** One attempt's gate results with their findings (`attempt` omitted = the latest). Read only (#715). */
@@ -153,6 +155,7 @@ const reads: Record<string, (q: Query) => Promise<unknown>> = {
   'workflow-versions': q => api.getWorkflowVersions(q.workflowId ?? ''),
   'change-notes': q => api.getChangeNotes(q.workflowId ?? ''),
   'workflow-builds': q => api.getWorkflowBuilds(q.workflowId ?? ''),
+  'build-timeline': q => api.getBuildTimeline(q.workflowId ?? ''),
   'code-attempts': q => api.getCodeAttempts(q.workflowId ?? '', q.subId ?? ''),
   'code-attempt-file': q => api.getCodeAttemptFile(q.workflowId ?? '', q.subId ?? '', Number(q.attempt), q.path ?? ''),
   'code-attempt-diff': q => api.getCodeAttemptDiff(q.workflowId ?? '', q.subId ?? '', Number(q.from), Number(q.to), q.path ?? ''),

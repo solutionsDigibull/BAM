@@ -56,6 +56,29 @@ class LlmCallRepository(TenantScopedRepository[LlmCall]):
         )
         return list(self.session.scalars(query))
 
+    def of_build(self, build_id: str) -> list[Any]:
+        """(activity_id, alias, status, tokens_in, tokens_out, cost_usd, created_at) of every call
+        attempt of one build workflow (#926), oldest first. No prompt, output or error text."""
+        query = (
+            select(
+                LlmCall.activity_id,
+                LlmCall.alias,
+                LlmCall.status,
+                LlmCall.tokens_in,
+                LlmCall.tokens_out,
+                LlmCall.cost_usd,
+                LlmCall.created_at,
+            )
+            .where(
+                LlmCall.tenant_id == self.ctx.tenant_id,
+                LlmCall.project_id == self.ctx.project_id,
+                LlmCall.temporal_workflow_id == build_id,
+                LlmCall.deleted_at.is_(None),
+            )
+            .order_by(LlmCall.id)
+        )
+        return list(self.session.execute(query))
+
     def usage_by_alias(self) -> list[tuple[str, int, int, int, int, Decimal]]:
         """(alias, calls, failed, tokens_in, tokens_out, cost) per model alias in scope, dearest
         first. Same scope and the same billed-attempts rule as `spent`."""
