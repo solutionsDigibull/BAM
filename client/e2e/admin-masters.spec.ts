@@ -197,7 +197,7 @@ test("e3_10 FDE on /admin/masters gets Forbidden and no data request", async ({
 test("e3_10 the tabs; Filetype has no edit controls", async ({ page, baseURL }) => {
   await signInAs(page, "sbam-admin", baseURL!);
   await fakeMasters(page, () => ({ body: {} }));
-  await page.goto("/admin/masters");
+  await page.goto("/admin/masters/tenant");
   await expect(page.getByRole("tab")).toHaveText([
     "README",
     "Organization",
@@ -220,7 +220,7 @@ test("e3_10_t01 import: validate -> preview -> apply, then the entries are visib
 }) => {
   await signInAs(page, "sbam-admin", baseURL!);
   const { modes } = await fakeMasters(page, (mode) => ({ body: report(mode, mode === "upsert") }));
-  await page.goto("/admin/masters");
+  await page.goto("/admin/masters/tenant");
   await page.getByRole("tab", { name: "Rules" }).click();
   await expect(page.getByText(/No Rules entries yet/)).toBeVisible();
 
@@ -271,7 +271,7 @@ test("e3_10_t02 reordered Skills columns: diff table, Apply disabled", async ({
       ],
     },
   }));
-  await page.goto("/admin/masters");
+  await page.goto("/admin/masters/tenant");
   const dialog = await chooseAndValidate(page);
   await expect(
     dialog.getByText("The workbook does not have the Masters 0.3 structure"),
@@ -287,7 +287,7 @@ test("e3_11_t01 upload and route: Organization (Evidence / media), chips progres
 }) => {
   await signInAs(page, "sbam-admin", baseURL!);
   await fakeMasters(page, () => ({ body: {} }));
-  await page.goto("/admin/masters");
+  await page.goto("/admin/masters/tenant");
   await page.getByRole("tab", { name: "Documents" }).click();
   const panel = page.getByRole("tabpanel");
   await expect(panel.getByText(/No master documents yet/)).toBeVisible();
@@ -309,7 +309,7 @@ test("e3_11_t02 override to Skills is persisted: reload shows Skills with ADMIN_
 }) => {
   await signInAs(page, "sbam-admin", baseURL!);
   await fakeMasters(page, () => ({ body: {} }));
-  await page.goto("/admin/masters");
+  await page.goto("/admin/masters/tenant");
   await page.getByRole("tab", { name: "Documents" }).click();
   const panel = page.getByRole("tabpanel");
   await panel.locator('input[type="file"]').setInputFiles({

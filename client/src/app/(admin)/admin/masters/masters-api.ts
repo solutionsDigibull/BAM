@@ -9,6 +9,9 @@ import { API_BASE, toApiError, type ApiError } from "@/providers/data-provider";
 
 export const LAYOUT_URL = "admin/master-types";
 export const FILETYPES_URL = "admin/filetypes";
+/** The query a project-scoped masters page adds to its list, create and import calls. */
+export const scopeQuery = (projectId?: string) =>
+  projectId ? { project_id: projectId } : undefined;
 export const entriesResource = (type: MasterType) => `admin/masters/${type}`;
 
 // The screen's tabs; Tooling has no screen yet (docs/reference/ui/README.md, open point on #65).
@@ -114,10 +117,15 @@ export function workbookProblem(file: { name: string; size: number }): string | 
 }
 
 /** POST /admin/masters/import as multipart (Refine's custom() only sends JSON). */
-export async function importWorkbook(file: File, mode: ImportMode): Promise<ImportReport> {
+export async function importWorkbook(
+  file: File,
+  mode: ImportMode,
+  projectId?: string,
+): Promise<ImportReport> {
   const form = new FormData();
   form.append("file", file);
   form.append("mode", mode);
+  if (projectId) form.append("project_id", projectId);
   const res = await fetch(`${API_BASE}/admin/masters/import`, {
     method: "POST",
     body: form,

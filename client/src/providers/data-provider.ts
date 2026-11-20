@@ -76,6 +76,7 @@ export const dataProvider: DataProvider = {
       if (all) qs.set("limit", String(ALL_PAGE_SIZE));
       else if (pagination?.pageSize) qs.set("limit", String(pagination.pageSize));
       if (cursor) qs.set("cursor", String(cursor));
+      for (const [k, v] of Object.entries(meta?.query ?? {})) qs.set(k, String(v)); // e.g. project_id
       if (sorters?.[0])
         qs.set("sort", `${sorters[0].order === "desc" ? "-" : ""}${sorters[0].field}`);
       const query = qs.size ? `?${qs}` : "";

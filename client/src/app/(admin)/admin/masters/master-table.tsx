@@ -18,7 +18,7 @@ import type { MasterEntry, MasterTypeInfo } from "@/contracts";
 import type { ApiError } from "@/providers/data-provider";
 
 import { EntryDrawer } from "./entry-drawer";
-import { cellText, emptyMessage, entriesResource, STATUS_COLOR } from "./masters-api";
+import { cellText, emptyMessage, entriesResource, scopeQuery, STATUS_COLOR } from "./masters-api";
 
 const COLUMN_WIDTH = 220;
 // ponytail: antd's virtual list only past this many rows; BAM workbooks hold tens of rows per tab.
@@ -45,7 +45,7 @@ function Cell({ value }: { value: unknown }) {
   );
 }
 
-export function MasterTable({ info }: { info: MasterTypeInfo }) {
+export function MasterTable({ info, projectId }: { info: MasterTypeInfo; projectId?: string }) {
   const { message } = App.useApp();
   const invalidate = useInvalidate();
   const [search, setSearch] = useState("");
@@ -53,6 +53,7 @@ export function MasterTable({ info }: { info: MasterTypeInfo }) {
   const { result, query } = useList<MasterEntry, ApiError>({
     resource: entriesResource(info.master_type),
     pagination: { mode: "off" },
+    meta: { query: scopeQuery(projectId) },
   });
   const entries = useMemo(() => result.data ?? [], [result.data]);
   const rows = useMemo(() => {
@@ -73,6 +74,7 @@ export function MasterTable({ info }: { info: MasterTypeInfo }) {
   const drawer = editing && (
     <EntryDrawer
       info={info}
+      projectId={projectId}
       entryId={editing.id}
       onClose={() => setEditing(null)}
       onSaved={(e) => {
