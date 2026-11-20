@@ -381,7 +381,7 @@ class DocumentAccess(BaseModel):
 
     `url` is relative to the API origin and is the credential, so it is never logged or stored.
     The signature binds the tenant, the project, the document and `expires_at`; the file is always
-    served as an attachment. Only a released (scanned clean) document gets one: any other state is
+    served as an attachment. Only a released (scanned clean) document gets one. Every other state is
     409 `DOCUMENT_NOT_RELEASED`, a purged one 410 `GONE`."""
 
     url: str
