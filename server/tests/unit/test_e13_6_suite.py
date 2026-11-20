@@ -132,3 +132,76 @@ def test_e13_6_an_enum_or_format_field_is_not_free_text() -> None:
     }
     assert not free_text_only(output_schema_of(sub))
     assert AssertionType.LLM_RUBRIC not in types(build_suite(sub, CASES, rubric="r"), "happy")
+
+
+def stored_rubric(text: Any = "the summary is polite") -> list[dict[str, Any]]:
+    return [{"type": "llm_rubric", "value": text}]
+
+
+def test_e13_6_t_rubric_1_a_stored_rubric_reaches_the_suite_as_the_last_assertion() -> None:
+    cases = [
+        case("happy", "PASS_FIRST", "SUCCESS", assertions=stored_rubric()),
+        case("never passes", "ESCALATION", "ESCALATED"),
+        case("nothing to do", "NO_OP", "NO_OP"),
+    ]
+    suite = build_suite(isatvon(), cases)
+    happy = types(suite, "happy")
+    assert happy[-1] is AssertionType.LLM_RUBRIC and happy.count(AssertionType.LLM_RUBRIC) == 1
+    assert happy[0] is AssertionType.TERMINAL_STATE  # a rubric is never the only check
+    (found,) = [c for c in suite.cases if c.name == "happy"]
+    assert found.assertions[-1].value == "the summary is polite"
+    assert AssertionType.LLM_RUBRIC not in types(suite, "never passes")
+
+
+def test_e13_6_t_rubric_2_a_stored_rubric_goes_last_even_when_listed_first() -> None:
+    mixed = [
+        *stored_rubric(),
+        {"type": "ui_updates"},
+        {"type": "expected_output", "value": {"state_handoff_id": "x"}},
+    ]
+    suite = build_suite(
+        isatvon(), [case("happy", "PASS_FIRST", "SUCCESS", assertions=mixed), *CASES[1:]]
+    )
+    got = types(suite, "happy")
+    assert got.count(AssertionType.LLM_RUBRIC) == 1 and got[-1] is AssertionType.LLM_RUBRIC
+
+
+@pytest.mark.parametrize("value", [None, "", "   ", 7, {"a": 1}])
+def test_e13_6_t_rubric_3_a_stored_rubric_without_text_is_a_suite_build_error(value: Any) -> None:
+    bad = [case("happy", "PASS_FIRST", "SUCCESS", assertions=stored_rubric(value)), *CASES[1:]]
+    with pytest.raises(SuiteBuildError, match="needs its text"):
+        build_suite(isatvon(), bad)
+
+
+def test_e13_6_t_rubric_4_a_stored_rubric_wins_over_the_given_one_and_changes_the_hash() -> None:
+    plain = build_suite(isatvon(), CASES)
+    cases = [
+        case("happy", "PASS_FIRST", "SUCCESS", assertions=stored_rubric("mine")),
+        *CASES[1:],
+    ]
+    with_rubric = build_suite(isatvon(), cases, rubric="theirs")
+    (found,) = [c for c in with_rubric.cases if c.name == "happy"]
+    assert [a.value for a in found.assertions if a.type is AssertionType.LLM_RUBRIC] == ["mine"]
+    assert suite_sha256(with_rubric) != suite_sha256(plain)
+
+
+def test_e13_6_t_rubric_5_the_rubric_reaches_the_grader_request() -> None:
+    import asyncio
+
+    from sbam_workers.test.grader import request_for
+    from sbam_workers.test.judge import grade_with_retries, needs_rubric
+    from test_e13_6_judge import Grader, outputs
+
+    cases = [
+        case("pass_first", "PASS_FIRST", "SUCCESS", assertions=stored_rubric("reads well")),
+        case("escalation", "ESCALATION", "ESCALATED"),
+        case("no_op", "NO_OP", "NO_OP"),
+    ]
+    suite = build_suite(isatvon(), cases)
+    asked = needs_rubric(suite)
+    assert [c.name for c in asked] == ["pass_first"]
+    [sent] = request_for(asked, outputs())["cases"]
+    assert sent["name"] == "pass_first" and sent["rubric"] == "reads well"
+    grader = Grader()
+    assert asyncio.run(grade_with_retries(grader, asked, outputs())) == {"pass_first": True}
+    assert grader.calls == 1

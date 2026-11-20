@@ -10,9 +10,12 @@ field, and the `Looping [Pass x/y]` updates in order. A case that ends in SUCCES
 output schema, `state_handoff_id`, and the expected outputs when the case declares them.
 
 Assertions a case carries (FDE or model) are kept when their type is one the suite knows; any other
-type is refused, so a typo cannot turn into a test that checks nothing. An `llm_rubric` is added
-only when every output field is free text (no enum or format), as the last assertion, and only to a
-SUCCESS case: a rubric is never the only check.
+type is refused, so a typo cannot turn into a test that checks nothing. A stored `llm_rubric` (a
+non-empty string) is kept as the case's last assertion on a SUCCESS case, so it reaches the rubric
+grader (#127, ADR 0024); on any other case it is dropped, as the entry check refuses it there. A
+rubric given to `build_suite` is added only when every output field is free text (no enum or
+format), as the last assertion, and only to a SUCCESS case, when the case has none of its own. A
+rubric is never the only check: the deterministic assertions always come first.
 """
 
 from collections.abc import Mapping, Sequence
@@ -88,6 +91,7 @@ def _assertions(
     if declared:
         out.append(SuiteAssertion(type=AssertionType.EXPECTED_OUTPUT, value=declared))
     have = {a.type for a in out}
+    stored: str | None = None
     for extra in case.get("assertions") or []:
         try:
             kind = AssertionType(str(extra["type"]))
@@ -95,12 +99,20 @@ def _assertions(
             raise SuiteBuildError(
                 f"case {case['name']!r}: unknown assertion type {extra['type']!r}"
             ) from None
-        if kind is AssertionType.LLM_RUBRIC or kind in have:
-            continue  # the rubric is decided below; a repeat adds nothing
+        if kind is AssertionType.LLM_RUBRIC:
+            value = extra.get("value")
+            if not isinstance(value, str) or not value.strip():
+                raise SuiteBuildError(f"case {case['name']!r}: an llm_rubric needs its text")
+            stored = stored or value  # the rubric goes last, below
+            continue
+        if kind in have:
+            continue  # a repeat adds nothing
         out.append(SuiteAssertion(type=kind, value=extra.get("value")))
         have.add(kind)
-    if free_text and terminal == "SUCCESS" and rubric:
-        out.append(SuiteAssertion(type=AssertionType.LLM_RUBRIC, value=rubric))
+    if terminal == "SUCCESS":
+        chosen = stored or (rubric if free_text else None)
+        if chosen:
+            out.append(SuiteAssertion(type=AssertionType.LLM_RUBRIC, value=chosen))
     return out
 
 

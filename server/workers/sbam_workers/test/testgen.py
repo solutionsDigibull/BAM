@@ -178,7 +178,10 @@ def _no_op_fires(condition: str, inputs: Mapping[str, Any]) -> bool | None:
 
 
 def check_output(
-    isatvon: Mapping[str, Any], out: TestgenOutput, schema_sql: str = ""
+    isatvon: Mapping[str, Any],
+    out: TestgenOutput,
+    schema_sql: str = "",
+    rubric_grading: bool = False,
 ) -> tuple[str, ...]:
     """Error lines for a re-ask: the case index, the field path and, for an input, the rule from
     our input schema, for seed SQL the column rule of `schema.sql` (`tables`, #704), or a stable
@@ -191,7 +194,7 @@ def check_output(
         if case.kind not in kinds:
             lines.append(f"case {index}: kind {case.kind.value} is not allowed for this Sub-Skill")
         body = CaseBody.model_validate(case.model_dump(exclude={"kind"}))
-        for e in case_errors(isatvon, case.kind, body):
+        for e in case_errors(isatvon, case.kind, body, rubric_grading):
             if e.path.startswith("/input/"):
                 bad_input = True
                 lines.append(f"case {index}: {e.path}: {_input_rule(schema, e.path)}")
@@ -253,7 +256,11 @@ def check_output(
 
 
 async def generate(
-    client: LlmClient, scope: LlmScope, isatvon: Mapping[str, Any], schema_sql: str = ""
+    client: LlmClient,
+    scope: LlmScope,
+    isatvon: Mapping[str, Any],
+    schema_sql: str = "",
+    rubric_grading: bool = False,
 ) -> LlmResult[TestgenOutput]:
     return await client.run(
         ALIAS,
@@ -261,7 +268,7 @@ async def generate(
         TestgenOutput,
         request_context(isatvon, schema_sql),
         scope,
-        validate=lambda out: check_output(isatvon, out, schema_sql),
+        validate=lambda out: check_output(isatvon, out, schema_sql, rubric_grading),
     )
 
 
@@ -517,7 +524,9 @@ class GenerateTests:
         client: LlmClient,
         store: SqlDatasetStore,
         schema_of: Callable[[BuildStageInput], Awaitable[str]] | None = None,
+        rubric_grading: bool = False,
     ) -> None:
+        self.rubric_grading = rubric_grading  # the grader sidecar is configured: llm_rubric is kept
         self.isatvon_of = isatvon_of
         self.client = client
         self.store = store
@@ -552,7 +561,11 @@ class GenerateTests:
             raise RuntimeError(f"{STAGE} runs only inside a workflow")
         schema_sql = schema or ""
         result = await generate(
-            self.client, stage_scope(inp, workflow_id, replaces), isatvon, schema_sql
+            self.client,
+            stage_scope(inp, workflow_id, replaces),
+            isatvon,
+            schema_sql,
+            self.rubric_grading,
         )
         cases = [
             (c.kind, CaseBody.model_validate(c.model_dump(exclude={"kind"})))

@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     # Per socket operation, on the request path only (the worker has its own, 60 s): under 10 s, so
     # a hung clamd cannot hold an API thread for long (audit N-02).
     clamav_timeout: float = Field(default=10.0, gt=0)
+    # True when the `sbam-promptfoo` rubric grader sidecar is part of the stack (E13.6c, ADR 0024).
+    # A test case may then carry an `llm_rubric` assertion; without it the assertion is refused when
+    # the case is stored, so a rubric is never kept that nothing would grade (#127).
+    rubric_grading: bool = False
     log_level: str = "INFO"
     # OpenTelemetry (#35): spans are exported only when the endpoint is set (Compose `obs` profile).
     otel_exporter_otlp_endpoint: AnyHttpUrl | None = None

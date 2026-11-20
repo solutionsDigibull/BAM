@@ -8,6 +8,8 @@ can mark the field (`/input/amount`, `/initial_state/0`).
   writes at most `MAX_SEED_ROWS` rows.
 * `expected_terminal` is one the case's kind can reach.
 * every assertion has a type the Promptfoo suite knows (`sbam_contracts.promptfoo.AssertionType`).
+* an `llm_rubric` assertion carries its text, belongs to a case that ends in SUCCESS, and is stored
+  only when the rubric grader is configured (`rubric_grading`): it would otherwise never be graded.
 """
 
 import re
@@ -60,7 +62,39 @@ def _seed_errors(field: str, statements: Sequence[str], tables: Sequence[str]) -
     ]
 
 
-def case_errors(isatvon: Mapping[str, Any], kind: CaseKind, case: CaseBody) -> list[FieldError]:
+MAX_RUBRIC_CHARS = 4_000  # well under the sidecar's own 40 000-character limit
+
+
+def _rubric_errors(
+    index: int, assertion: Any, case: CaseBody, rubric_grading: bool
+) -> list[FieldError]:
+    path = f"/assertions/{index}"
+    if not rubric_grading:
+        message = (
+            "llm_rubric needs the rubric grader (sbam-promptfoo), which is not configured here"
+        )
+        return [FieldError(path=f"{path}/type", message=message)]
+    errors: list[FieldError] = []
+    value = getattr(assertion, "value", None)
+    if not isinstance(value, str) or not value.strip() or len(value) > MAX_RUBRIC_CHARS:
+        errors.append(
+            FieldError(
+                path=f"{path}/value",
+                message=f"an llm_rubric needs its text, at most {MAX_RUBRIC_CHARS} characters",
+            )
+        )
+    if case.expected_terminal.value != "SUCCESS":
+        errors.append(
+            FieldError(
+                path=f"{path}/type", message="llm_rubric applies to a case that ends in SUCCESS"
+            )
+        )
+    return errors
+
+
+def case_errors(
+    isatvon: Mapping[str, Any], kind: CaseKind, case: CaseBody, rubric_grading: bool = False
+) -> list[FieldError]:
     """Every problem with a case, empty when it may be stored."""
     tables = declared_tables(isatvon)
     errors = _input_errors(input_schema(isatvon), case.input)
@@ -91,6 +125,8 @@ def case_errors(isatvon: Mapping[str, Any], kind: CaseKind, case: CaseBody) -> l
                     message=f"unknown assertion type; use one of {', '.join(known)}",
                 )
             )
+        elif assertion.type == AssertionType.LLM_RUBRIC:
+            errors += _rubric_errors(index, assertion, case, rubric_grading)
     if case.expected_terminal not in KIND_TERMINAL[kind]:
         allowed = ", ".join(sorted(t.value for t in KIND_TERMINAL[kind]))
         errors.append(

@@ -15,7 +15,7 @@ tenant's, an unassigned project's or another Workflow's Sub-Skill.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sbam_contracts.testgen import CasePost, CasePut, TestCaseOut, TestsResponse
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -31,6 +31,13 @@ S = W + "/sub-skills/{sub_id}/tests"
 Project = Annotated[UUID, Depends(active_project)]  # assigned FDE; archived: writes 409
 User = Annotated[CurrentUser, Depends(fde)]
 Sessions = Annotated[sessionmaker[Session], Depends(session_factory)]
+
+
+def _rubric_grading(request: Request) -> bool:
+    return bool(request.app.state.settings.rubric_grading)
+
+
+RubricGrading = Annotated[bool, Depends(_rubric_grading)]
 IfMatch = Annotated[str | None, Header()]
 
 
@@ -64,11 +71,12 @@ def put_case(
     user: User,
     sessions: Sessions,
     response: Response,
+    rubric_grading: RubricGrading,
     if_match: IfMatch = None,
 ) -> TestCaseOut:
     with sessions() as session:
         case, sha = service.edit_case(
-            session, user, project_id, workflow_id, sub_id, case_id, body, if_match
+            session, user, project_id, workflow_id, sub_id, case_id, body, if_match, rubric_grading
         )
         session.commit()
     response.headers["ETag"] = _etag(sha)
@@ -84,10 +92,13 @@ def post_case(
     user: User,
     sessions: Sessions,
     response: Response,
+    rubric_grading: RubricGrading,
     if_match: IfMatch = None,
 ) -> TestCaseOut:
     with sessions() as session:
-        case, sha = service.add_case(session, user, project_id, workflow_id, sub_id, body, if_match)
+        case, sha = service.add_case(
+            session, user, project_id, workflow_id, sub_id, body, if_match, rubric_grading
+        )
         session.commit()
     response.headers["ETag"] = _etag(sha)
     return case
