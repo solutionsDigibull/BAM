@@ -5,6 +5,7 @@ Operational procedures, written by issue E16.6. Planned runbooks: stuck Temporal
 - [Prerequisites: access and hosts](prerequisites.md) (E0.14): GHCR, OpenRouter key, KVM host, dev VM, Netbird, plus the team access checklist.
 - [Deploy and roll back a release](deploy.md) (E16.4): `scripts/deploy.sh`, the release folders and log, the rollback drill.
 - [Sandbox: the CubeSandbox host and the local runner](sandbox-host.md) (E13.2): configuring the test worker's sandbox, what the host must provide, why testing is blocked, the orphan reaper.
+- [The certifying CubeSandbox run](cubesandbox-certifying-tests.md) (E13.6-T02, E14.1-T01): the one command a KVM host owner runs, what a pass looks like, how to record it in #127 and #129.
 - [Backups and restore](backup-restore.md) (E16.5): nightly encrypted, append-only backups, the backup host, failed backups, the restore drill.
 - [An API dependency bulkhead is saturated](bulkhead-saturated.md) (N-02b): the alert, what fails fast, how to tell which dependency, why readiness does not change.
 - [The Workflow registry in Bifrost](workflow-registry.md) (WG-12): what is registered and when, supersede, lookup, reconcile, and what production needs (TLS, token, health check).
