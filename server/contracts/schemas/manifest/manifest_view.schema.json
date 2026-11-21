@@ -62,6 +62,19 @@
       "title": "Reused",
       "type": "boolean"
     },
+    "reused_from": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "E14.3: the certificate this Sub-Skill's certificate was carried over from (the manifest's certification.reused_from); null when it earned its own",
+      "title": "Reused From"
+    },
     "manifest": {
       "additionalProperties": {
         "$ref": "#/$defs/JsonValue"

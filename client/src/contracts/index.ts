@@ -1,6 +1,6 @@
 // GENERATED — DO NOT EDIT. Source: server/contracts (Pydantic).
 // Regenerate with `make contracts`; CI fails if this file differs from a fresh generation.
-// source-sha256:38fb5dd692beb4dbb9f86aad88e52925ec77bf50037c2befd2a0cb58bee853d0
+// source-sha256:70fa446fc70837e3664ab127407aa3a5ae4a4775906bdd6848438a6eea1d88d9
 
 /**
  * Stable machine-readable error codes. Add new codes here; never rename or reuse one.
@@ -3011,6 +3011,10 @@ export interface ManifestView {
    * the Sub-Skill was reused, or its hash equals the build before
    */
   reused?: boolean;
+  /**
+   * E14.3: the certificate this Sub-Skill's certificate was carried over from (the manifest's certification.reused_from); null when it earned its own
+   */
+  reused_from?: string | null;
   manifest: {
     [k: string]: JsonValue | undefined;
   };
