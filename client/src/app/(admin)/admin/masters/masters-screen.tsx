@@ -15,7 +15,7 @@ import type { ApiError } from "@/providers/data-provider";
 import { DocumentsPanel } from "./documents-panel";
 import { FiletypeTable } from "./filetype-table";
 import { MasterGridPanel } from "./master-grid-panel";
-import { MasterTable } from "./master-table";
+import { RulesEngine } from "./rules-engine";
 import { ToolFactory } from "./tool-factory";
 import { ImportWizard } from "./import-wizard";
 import { download, entriesResource, LAYOUT_URL, SCREEN_TYPES } from "./masters-api";
@@ -101,7 +101,7 @@ export function MastersScreen({
                 tab(
                   rules.master_type,
                   rules.tab,
-                  <MasterTable info={rules} projectId={projectId} />,
+                  <RulesEngine info={rules} projectId={projectId} />,
                 ),
               ]
             : []),

@@ -230,7 +230,7 @@ test("e3_10_t01 import: validate -> preview -> apply, then the entries are visib
   await dialog.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByText("Imported: 1 created, 0 updated")).toBeVisible();
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("RULE-BOM", { exact: true })).toBeVisible(); // stable-ID chip
+  await expect(page.getByText(/RULE-BOM/).first()).toBeVisible(); // the rule, in the grid
   expect(modes).toEqual(["validate-only", "upsert"]);
 });
 
